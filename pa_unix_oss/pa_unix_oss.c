@@ -98,17 +98,14 @@ PaDriverInfo;
 #include <malloc.h>
 #include <memory.h>
 #include <math.h>
-#include "portaudio.h"
-#include "pa_host.h"
-#include "pa_trace.h"
-
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <sched.h>
+#include <pthread.h>
+#include <errno.h>
 
 #ifdef __linux__
 #include <linux/soundcard.h>
@@ -116,9 +113,9 @@ PaDriverInfo;
 #include <machine/soundcard.h> /* JH20010905 */
 #endif
 
-#include <sched.h>
-#include <pthread.h>
-
+#include "portaudio.h"
+#include "pa_host.h"
+#include "pa_trace.h"
 
 #define PRINT(x)   { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
@@ -159,9 +156,12 @@ typedef struct PaHostSoundControl
     int              pahsc_InputHandle;
     int              pahsc_AudioPriority;          /* priority of background audio thread */
     pthread_t        pahsc_AudioThread;            /* background audio thread */
+    pid_t            pahsc_AudioThreadPID;         /* background audio thread */
     pthread_t        pahsc_WatchDogThread;         /* highest priority thread that protects system */
+    int              pahsc_WatchDogRun;           /* Ask WatchDog to stop. */
     pthread_t        pahsc_CanaryThread;           /* low priority thread that detects abuse by audio */
     struct timeval   pahsc_CanaryTime;
+    int              pahsc_CanaryRun;             /* Ask Canary to stop. */
     short           *pahsc_NativeInputBuffer;
     short           *pahsc_NativeOutputBuffer;
     unsigned int     pahsc_BytesPerInputBuffer;    /* native buffer size in bytes */
@@ -542,13 +542,13 @@ PaError PaHost_Init( void )
 
 static int PaHost_CanaryProc( PaHostSoundControl   *pahsc )
 {
-    int   result;
+    int   result = 0;
 
 #ifdef GNUSTEP
     GSRegisterCurrentThread(); /* SB20010904 */
 #endif
 
-    while( (result = usleep( WATCHDOG_INTERVAL_USEC )) == 0 )
+    while( pahsc->pahsc_CanaryRun && ((result = usleep( WATCHDOG_INTERVAL_USEC )) == 0) )
     { 
         gettimeofday( &pahsc->pahsc_CanaryTime, NULL );
     }
@@ -563,7 +563,7 @@ static int PaHost_CanaryProc( PaHostSoundControl   *pahsc )
 }
 
 /*******************************************************************************************
- * Monitor audio thread and kill it if it hogs the CPU.
+ * Monitor audio thread and lower its it if it hogs the CPU.
  * To prevent getting killed, the audio thread must update a
  * variable with a timer value.
  * If the value is not recent enough, then the
@@ -594,19 +594,18 @@ static PaError PaHost_WatchDogProc( PaHostSoundControl   *pahsc )
     
     /* Compare watchdog time with audio and canary thread times. */
     /* Sleep for a while or until thread cancelled. */
-    while( (result = usleep( WATCHDOG_INTERVAL_USEC )) == 0 )
+    while( pahsc->pahsc_WatchDogRun && ((result = usleep( WATCHDOG_INTERVAL_USEC )) == 0) )
     {
         int              delta;
         struct timeval   currentTime;
         
         gettimeofday( &currentTime, NULL );
 
-        /* If audio thread is not advancing, then kill it. */
+        /* If audio thread is not advancing, then lower its priority. */
         delta = currentTime.tv_sec - pahsc->pahsc_EntryTime.tv_sec;
         DBUG(("PaHost_WatchDogProc: audio delta = %d\n", delta ));
         if( delta > WATCHDOG_MAX_SECONDS )
         {
-            ERR_RPT(("PaHost_WatchDogProc: killing hung audio thread!\n"));
             goto killAudio;
         }
         
@@ -614,8 +613,8 @@ static PaError PaHost_WatchDogProc( PaHostSoundControl   *pahsc )
         delta = currentTime.tv_sec - pahsc->pahsc_CanaryTime.tv_sec;
         if( delta > WATCHDOG_MAX_SECONDS )
         {
-            ERR_RPT(("PaHost_WatchDogProc: canary died! Killing runaway audio thread!\n"));
-            goto killAudio;
+            ERR_RPT(("PaHost_WatchDogProc: canary died!\n"));
+            goto lowerAudio;
         }
     }
 
@@ -625,12 +624,33 @@ static PaError PaHost_WatchDogProc( PaHostSoundControl   *pahsc )
 #endif
     return 0;
     
+lowerAudio:
+    {
+        struct sched_param    schat = { 0 };
+        if( sched_setscheduler(pahsc->pahsc_AudioThreadPID, SCHED_OTHER, &schat) != 0)
+        {
+            ERR_RPT(("PaHost_WatchDogProc: failed to lower audio priority. errno = %d\n", errno ));
+            /* Fall through into killing audio thread. */
+        }
+        else
+        {
+            ERR_RPT(("PaHost_WatchDogProc: lowered audio priority to prevent hogging of CPU.\n"));
+            goto cleanup;
+        }
+    }
+    
 killAudio:
+    ERR_RPT(("PaHost_WatchDogProc: killing hung audio thread!\n"));
     pthread_kill( pahsc->pahsc_AudioThread, SIGKILL );
+
+cleanup:
+    pahsc->pahsc_CanaryRun = 0;
+    DBUG(("PaHost_WatchDogProc: cancel Canary\n"));
     pthread_cancel( pahsc->pahsc_CanaryThread );
+    DBUG(("PaHost_WatchDogProc: join Canary\n"));
     pthread_join( pahsc->pahsc_CanaryThread, NULL );
+    DBUG(("PaHost_WatchDogProc: forget Canary\n"));
     pahsc->pahsc_CanaryThread = INVALID_THREAD;
-    pahsc->pahsc_WatchDogThread = INVALID_THREAD;
     
 #ifdef GNUSTEP
     GSUnregisterCurrentThread();  /* SB20010904 */
@@ -644,6 +664,8 @@ static void PaHost_StopWatchDog( PaHostSoundControl   *pahsc )
 /* Cancel WatchDog thread if there is one. */
     if( pahsc->pahsc_WatchDogThread != INVALID_THREAD )
     {
+        pahsc->pahsc_WatchDogRun = 0;
+        DBUG(("PaHost_StopWatchDog: cancel WatchDog\n"));
         pthread_cancel( pahsc->pahsc_WatchDogThread );
         pthread_join( pahsc->pahsc_WatchDogThread, NULL );
         pahsc->pahsc_WatchDogThread = INVALID_THREAD;
@@ -651,7 +673,10 @@ static void PaHost_StopWatchDog( PaHostSoundControl   *pahsc )
 /* Cancel Canary thread if there is one. */
     if( pahsc->pahsc_CanaryThread != INVALID_THREAD )
     {
+        pahsc->pahsc_CanaryRun = 0;
+        DBUG(("PaHost_StopWatchDog: cancel Canary\n"));
         pthread_cancel( pahsc->pahsc_CanaryThread );
+        DBUG(("PaHost_StopWatchDog: join Canary\n"));
         pthread_join( pahsc->pahsc_CanaryThread, NULL );
         pahsc->pahsc_CanaryThread = INVALID_THREAD;
     }
@@ -668,6 +693,7 @@ static PaError PaHost_StartWatchDog( PaHostSoundControl   *pahsc )
     gettimeofday( &pahsc->pahsc_CanaryTime, NULL );
 
     /* Launch a canary thread to detect priority abuse. */
+    pahsc->pahsc_CanaryRun = 1;
     hres = pthread_create(&(pahsc->pahsc_CanaryThread),
                       NULL /*pthread_attr_t * attr*/,
                       (void*)PaHost_CanaryProc, pahsc);
@@ -680,6 +706,7 @@ static PaError PaHost_StartWatchDog( PaHostSoundControl   *pahsc )
     }
 
     /* Launch a watchdog thread to prevent runaway audio thread. */
+    pahsc->pahsc_WatchDogRun = 1;
     hres = pthread_create(&(pahsc->pahsc_WatchDogThread),
                       NULL /*pthread_attr_t * attr*/,
                       (void*)PaHost_WatchDogProc, pahsc);
@@ -710,6 +737,9 @@ static PaError PaHost_BoostPriority( internalPortAudioStream *past )
     pahsc = (PaHostSoundControl *) past->past_DeviceData;
     if( pahsc == NULL ) return paInternalError;
         
+    pahsc->pahsc_AudioThreadPID = getpid();
+    DBUG(("PaHost_BoostPriority: audio PID = %d\n", pahsc->pahsc_AudioThreadPID ));
+    
     /* Choose a priority in the middle of the range. */
     pahsc->pahsc_AudioPriority = (sched_get_priority_max(SCHEDULER_POLICY) -
                                   sched_get_priority_min(SCHEDULER_POLICY)) / 2;
@@ -806,13 +836,13 @@ static PaError Pa_AudioThreadProc( internalPortAudioStream   *past )
         pahsc->pahsc_LastStreamBytes += delta;
         pahsc->pahsc_LastPosPtr = info.bytes;
     }
-
+    DBUG(("Pa_AudioThreadProc: left audio loop.\n"));
+    
     past->past_IsActive = 0;
-
     PaHost_StopWatchDog( pahsc );
     
-    DBUG(("leaving audio thread.\n"));
 error:
+    DBUG(("leaving audio thread.\n"));
 #ifdef GNUSTEP
     GSUnregisterCurrentThread();  /* SB20010904 */
 #endif
