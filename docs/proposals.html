@@ -21,8 +21,7 @@ name=KeyWords>
 </TD></TR></TBODY></TABLE></CENTER>
 <P><A href="http://www.portaudio.com/">PortAudio Home Page</A></P>
 
-
-<P>Updated: January 11, 2002 </P>
+<P>Updated: May 14, 2002 </P>
 <H2>Introduction</H2>
 <P>This document describes modifications to the PortAudio API currently being considered by the developer community. It is intended to capture the current state of discussions. The authors are the various members of the PortAudio community and are too numerous to mention. Please refer to the mailing list archives to see who said what. </P>
 <P>We are still at the design stage with all of these proposals - if you think something is missing, could be improved, or would just like to comment please do so on the PortAudio mailing list.</P>
@@ -33,15 +32,15 @@ name=KeyWords>
 <LI><A HREF="#Underflow">PortAudioCallback Underflow/Overflow Handling</A> </LI>
 <LI><A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A> * </LI>
 <LI><A HREF="#Latency">Improve Latency Mechanisms</A> * </LI>
-<LI><A HREF="#AllowCallbackVariableFramesPerBuffer">Allow Callbacks to Accept Variable framesPerBuffer</A> *</LI>
-<LI><A HREF="#Blocking">Blocking Read/Write API</A> |C| </LI>
+<LI><A HREF="#AllowCallbackVariableFramesPerBuffer">Allow Callbacks to Accept Variable framesPerBuffer</A> * </LI>
+<LI><A HREF="#Blocking">Blocking Read/Write API</A></LI>
 <LI><A HREF="#Interleaved">Non-Interleaved Buffers</A> </LI>
-<LI><A HREF="#MultipleDriverModels">Support for Multiple Driver Models in a Single PortAudio Build</A> |C| </LI>
-<LI><A HREF="#DriverModelSpecificPa_OpenStream">Driver Model Specific Pa_OpenStream() Parameters</A> |C| </LI>
-<LI><A HREF="#Error">Handling of Host-Specific Error Codes</A> * </LI>
+<LI><A HREF="#MultipleDriverModels">Support for Multiple Host APIs in a Single PortAudio Build</A> |C| </LI>
+<LI><A HREF="#DriverModelSpecificPa_OpenStream">Host API Specific Pa_OpenStream() Parameters</A> |C| </LI>
+<LI><A HREF="#Error">Handling of Host API Specific Error Codes</A> * </LI>
 <LI><A HREF="#RenamePa_GetCPULoad">Rename Pa_GetCPULoad() and paInvalidDeviceId for Consistency</A> </LI>
-<LI><A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> * </LI>
 <LI><A HREF="#AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A> </LI>
+<LI><A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> *</LI>
 <LI><A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> *</LI></UL>
 
 <I><P>The proposals above which are marked with a * are under construction, those marked with |</I>C<I>| are essentially complete but require community approval or comment before they are considered complete. The remaining proposals are essentially complete and will be implemented as-is unless significant objections are raised.</P>
@@ -74,29 +73,29 @@ These bits may be set in the statusFlags parameter.
 <TT>#define paInputUnderflow&nbsp;&nbsp; (1&lt;&lt;0) /* Input data is all zeros because no real data is available. */</TT> 
 #define paInputOverflow    (1&lt;&lt;1) /* Input data was discarded by PortAudio */
 <TT>#define </TT>paOutputUnderflow  <TT>(1&lt;&lt;2) </TT>/* Output data was inserted by PortAudio because the callback is using too much CPU */
-#define paOutputOverflow   (1&lt;&lt;3) <TT>/* Output data will be ignored because no room is available. */</PRE>
-</TT><P>&nbsp;</P>
+#define paOutputOverflow   (1&lt;&lt;3) <TT>/* Output data will be ignored because no room is available. */
+</TT></PRE>
 <P>New rules will govern when the <TT>PortAudioCallback</TT> is called:</P>
 
 <UL>
-<LI>For input-only streams, the callback will be called for every available input buffer. If the callback takes too long to complete and input samples have to be discarded the paInputOverflow flag will be set the next time the callback is called. In input-only stream will never be called with the paInputUnderflow flag set. </LI>
+<LI>For input-only streams, the callback will be called for every available input buffer. If the callback takes too long to complete and input samples have to be discarded the paInputOverflow flag will be set the next time the callback is called. An input-only stream will never be called with the paInputUnderflow flag set. </LI>
 <LI>For output-only streams, the callback will be called whenever an output buffer needs to be filled, except when doing so would cause the stream to fall further behind real-time due to CPULoad being too high. In such cases PortAudio will insert silence or repeat the previous buffer to the output and the paOutputUnderflow bit will be set next time the callback is called. An output-only stream will never be called with the paOutputOverflow flag set. </LI>
-<LI>By default, a full duplex stream will behave according to the same rules as an output-only stream. If input is not available, the paInputUnderflow bit will be set and the input buffers will contain zeros. In the case of an input buffer overflow, PortAudio will discard input - in such cases the input samples will <B>not</B> be passed to a callback, and paInputOverflow will be set next time the callback is called to generate more output. A default full-duplex stream will never be called with the paOutputOverflow flag set. </LI>
-<LI>A new mode flag <I>paNeverDropInput</I> to Pa_OpenStream() specifies that a full duplex stream will not discard overflowed input samples without calling the callback. When an input buffer overflow occurs, the callback will be called with the paOutputOverflow flag set, when the callback completes the output buffers will be discarded.</LI></UL>
+<LI>By default, a full duplex stream will behave according to the same rules as an output-only stream. If input is not available, the paInputUnderflow bit will be set and the input buffers will contain zeros. In the case of an input buffer overflow, PortAudio will discard input - in such cases the input samples will <B>not</B> be passed to a callback, and paInputOverflow will be set next time the callback is called to generate more output. A full-duplex stream in default mode will never be called with the paOutputOverflow flag set. </LI>
+<LI>A new mode flag to Pa_OpenStream(), <I>paNeverDropInput</I> specifies that a full duplex stream will not discard overflowed input samples without calling the callback. When an input buffer overflow occurs, the callback will be passed an input buffer containing valid data and a valid output buffer pointer, the paOutputOverflow flag will be set, when the callback completes the output buffer will be discarded.</LI></UL>
 
-<P>Note that the default full-duplex mode is intended to cover most common uses of PortAudio, where the client wants a simple audio streaming interface, and is happy to let PortAudio handle buffer underflow/overflow conditions when they occurs.</P>
+<P>Note that the default full-duplex mode is intended to cover most common uses of PortAudio, where the client wants a simple audio streaming interface, and is happy to let PortAudio handle buffer underflow/overflow conditions when they occur.</P>
 <H4>Impact Analysis</H4>
-<P>This proposal involves adding a new statusFlags parameter to PortAudioCallback. This will require all clients to update their callback implementations accordingly. Clients who previously checked for NULL buffers will be able to remove such checks.</P>
+<P>This proposal involves adding a new statusFlags parameter to PortAudioCallback. This will require all clients to update their callback declarations accordingly. Clients who previously checked for NULL buffers will be able to remove such checks. Only clients who whish to take advantage of the callback flags, or the new <I>paNeverDropInput</I> mode will require significant changes.</P>
 <P>____________</P>
 <H2><A NAME="ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A></H2>
 <H4>Status</H4>
 <P>This proposal is open for discussion.</P>
 <H4>Background</H4>
-<P>It has been noted that the current method (Pa_GetDeviceInfo()) of querying devices for supported sample formats, channels and sample rates is weak. It does not cleanly differentiate between 'PortAudio supported' formats and 'native' formats, and it is incapable of representing formats where the parameters are interdependent (eg where full duplex is only supported for certain sample rates.) We have also found that a static structure is not a good match for many driver models where format discovery is performed by polling the driver. Even if a sound card supports arbitrary sample rates, the driver model may only allow a client to poll to see whether a rate is available rather than providing the available rate ranges.</P>
+<P>It has been noted that the current method (Pa_GetDeviceInfo()) of querying devices for supported sample formats, channels and sample rates is weak. It does not cleanly differentiate between 'PortAudio supported' formats and 'native' formats, and it is incapable of representing formats where the parameters are interdependent (eg where full duplex is only supported for certain sample rates.) We have also found that a static structure is not a good match for many host APIs where format discovery is performed by polling the driver. Even if a sound card supports arbitrary sample rates, the host API may only allow a client to poll to see whether a rate is available rather than providing the available rate ranges.</P>
 <P>It has been noted that most (platform specific) audio APIs do a pretty bad job of allowing for device capability querying. Even the better APIs (ALSA is perhaps one) don't necessarily provide accurate information. This proposal should seek to maximise the amount of information that can be extracted from existing APIs while remaining expressive enough to take full advantage of APIs with more advanced capability querying systems should they become available in the future.</P>
 <H4>Proposal</H4>
 <P>A number of options are being considered with regard to supplying clients with format information:</P>
-<P>Use PaDeviceInfo only for representing information that can be expressed without polling the driver multiple times, or only check for "standard" formats, or leave it unchanged.</P>
+<P>Use PaDeviceInfo only for representing information that can be expressed without querying the host API multiple times, or only check for "standard" formats, or leave it unchanged.</P>
 <P>And/Or</P>
 <P>Add a Pa_IsFormatSupported() function:</P>
 <PRE>Pa_IsFormatSupported( PaDeviceID inputDevice, 
@@ -107,13 +106,23 @@ These bits may be set in the statusFlags parameter.
                         int numOutputChannels, 
                         PaSampleFormat outputSampleFormat, 
                         void *outputDriverInfo, 
-                        double sampleRate );</PRE>
+                        double sampleRate );
+</PRE>
+<P>At a minimum this call would need to return values indicating whether the requested format(s) are supported natively, or will undergo conversion by PortAudio. The result could be a set of flags indicating:</P>
+
+<UL>
+<LI>Input byte order (native/converted)</LI>
+<LI>Input sample format (native/converted)</LI>
+<LI>Output byte order (native/converted)</LI>
+<LI>Output sample format (native/converted)</LI></UL>
+
+<P>There also needs to be a method for accommodating host-API-specific return flags.</P>
 <H4>Discussion</H4>
-<P>At present it seems desirable to retain Pa_GetDeviceInfo() and the PaDeviceInfo structure. At a minimum PaDeviceInfo needs to contain name and driver model type code fields:</P>
+<P>At present it seems desirable to retain Pa_GetDeviceInfo() and the PaDeviceInfo structure. At a minimum PaDeviceInfo needs to contain name and host API type code fields:</P>
 <PRE>typedef struct{
     int structVersion; 
     const char *name;
-    PaDriverModelTypeCode driverModel;
+    PaHostAPITypeCode hostAPI;
 } PaDeviceInfo;</PRE>
 <P>It was suggested that we could do things the way MME does: if Pa_OpenStream() is called with a NULL stream parameter then the stream isn't opened, but it is checked to see if the device supports the specified format - if the format is supported then paNoError would be returned, otherwise an error code would be returned. However, this has been ruled to be unsatisfactory, since querying for supported formats is really a different function from opening a stream.</P>
 <H4>Impact Analysis</H4>
@@ -123,33 +132,36 @@ These bits may be set in the statusFlags parameter.
 <H4>Status</H4>
 <P>This proposal is open for discussion.</P>
 <H4>Background</H4>
-<P>The current mechanism for setting latency is not considered optimal by all clients of the API. There seems to be some tension between using the framesPerBuffer parameter of Pa_OpenStream as a latency control parameter and as a specifier for the number of frames supplied to the callback. Specifying latency as a single millisecond value would be more user friendly for some users, however some driver models need latency to be tuned by specifying buffer sizes and number of buffers. Additionally, it not clear whether separate input and output buffer counts would allow tuning of lower latencies in some circumstances.</P>
+<P>The current mechanism for setting latency is not considered optimal by all clients of the API. There seems to be some tension between using the framesPerBuffer parameter of Pa_OpenStream as a latency control parameter and as a specifier for the number of frames supplied to the callback. Specifying latency as a single millisecond value would be more user friendly for some users, however some host APIs need latency to be tuned by specifying buffer sizes and number of buffers. Additionally, it not clear whether separate input and output buffer counts would allow tuning of lower latencies in some circumstances.</P>
 <P>A related issue is the need to improve the interface available to determine default latency parameters. The most recent proposal is documented below, however there is still some debate as to whether this is satisfactory. </P>
 <P>See this thread: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-October/000196.html">http://techweb.rfa.org/pipermail/portaudio/2001-October/000196.html</A> </P>
 <H4>Proposal</H4>
-<P>The numBuffers parameter for Pa_OpenStream() could accept the following values in addition to the normal N&gt;0 values.&nbsp; Use PA_LATENCY_LOW for interactive performance, when response time is critical.&nbsp; Use PA_LATENCY_HIGH when playing sound files or other non-interactive uses, when glitch free operation is more critical. </P>
-<PRE>
-#define PA_LATENCY_WHATEVER&nbsp;&nbsp; (0) /* or _NO_OPINION or? */
-#define PA_LATENCY_LOW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (-1)&nbsp; /* For interactive performance. */
-#define PA_LATENCY_HIGH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (-2)&nbsp; /* For playing sound files. */</PRE>
-<P>Currently, when numBuffers&gt;0, Pa_OpenStream will constrain the actual numBuffers so that the latency is within a valid range determined by the driver, or an environment variables such as PA_MIN_LATENCY_MSEC. Propose changing the behaviour so that the requested value is honoured as much as possible. This will allow the user to override the minimum if they know their system can handle it. This might be used, for example on patched Linux kernels. By doing this we simplify the implementations and eliminate the need for adding a Pa_SetMinimumLatency() function. </P>
-<PRE>
-/* Negative return values are (double) paError */
-double Pa_GetMinimumLatency( int deviceId, double frameRate );
-double Pa_GetPreferredLatency( int deviceId, double frameRate );
-double Pa_GetMaximumLatency( int deviceId, double frameRate );
-/* the following would operate directly on streams */
+<P>The numBuffers parameter to Pa_OpenStream() could be removed, and replaced by two new parameters inputLatencySamples and outputLatencySamples. These parameters allow clients to fine-tune latency in a portable manner. PortAudio implementations should make every reasonable to select buffer sizes based on these parameters, but for various reasons they may choose the closest viable buffer size and latency instead. In such cases PortAudio implementations should round-up (ie always provide equal or higher latency than requested.) </P>
+<P>The special latency value of 0 indicates that the implementation should use the default latency values, this will produce the same behavior as passing 0 for numBuffers in existing PortAudio implementations. Clients may retrieve recommended safe latency settings using the following two functions:</P>
+<PRE> int Pa_GetRecommendedLowLatencySamples( PaDeviceID deviceID ); /* For interactive performance. */
+ int Pa_GetRecommendedHighLatencySamples( PaDeviceID deviceID ); /* For playing sound files. */</PRE>
+<P>&nbsp;</P>
+<P>Currently, when numBuffers&gt;0, Pa_OpenStream will constrain the actual numBuffers so that the latency is within a valid range determined by the host API, or an environment variables such as PA_MIN_LATENCY_MSEC. Propose changing the behavior so that the requested value is honored as much as possible. This will allow the user to override the minimum if they know their system can handle it. This might be used, for example on patched Linux kernels</P>
+<P>In addition to the portable latency setting mechanism just described, implementations may use the inputDriverInfo and outputDriverInfo Pa_OpenStream() parameters to provide host API specific latency setting mechanisms which directly reflect the underlying buffer passing scheme. For example, the MME driverInfo structure would provide a way to directly set the bufferSize and numberOfBuffers parameters for input and output. When driverInfo structures are passed to Pa_OpenStream(), using 0 values for their API specific latency settings should cause PortAudio to use Pa_OpenStream()'s latencySamples parameters.</P>
+<P>In cases where Host API specific latency parameters may be limited to certain allowable ranges (buffer sizes in ASIO for example) a method for querying these limits should be provided. This will consist of host-API specific query functions declared in a host-api specific header file. These header files will also contain the declaration of the host API specific driverInfo structure.</P>
+<P>The following two functions have been proposed to retrieve the estimated input and output latency of a stream. Both return the estimated latency in ms.</P>
+<PRE>/* the following would operate directly on streams */
 double Pa_StreamInputLatency( PortAudioStream *stream );
 double Pa_StreamOutputLatency(PortAudioStream *stream );</PRE>
 <H4>Discussion</H4>
-<P>This proposal does not yet address the question of whether there needs to be separate numInputBuffers and numOutputBuffers parameters for optimal latency specification.</P>
+<P>This proposal provides both a high level mechanism for portable latency tuning, and suggests method for providing a host-API specific latency tuning interface. The provision of both default latency settings (via 0 valued latencySamples parameters) and query functions for recommended latency settings provide the needed flexibility for simple, and portable applications.</P>
+<P>It is not clear whether a 0 latencySamples parameter produces the same latency as returned by Pa_GetRecommendedHighLatencySamples() or whether there is a separate default latency value, in which case there should also be a Pa_GetDefaultLatencySamples() function.</P>
+<P>It is unclear whether the Pa_StreamInputLatency() and Pa_StreamOutputLatency() functions are needed, whether they relate directly to this proposal, and how they will be effected by the yet to be documented <U>Improve Callback Timestamp Information</U> proposal. </P>
+<P>Should we provide a way of notifying the client if the latencySamples parameters have not been accurately honored?</P>
+<H4>Impact Analysis</H4>
+<P>This proposal will require all clients to alter their calls to Pa_OpenStream(). Clients who passed a 0 value for numBuffers will not need to significantly alter their code. Clients who manipulated numBuffers will need to either use the latencySamples parameters, or the host API specific interfaces, as they become available.</P>
 <P>____________</P>
-<H2><A NAME="Blocking"><A NAME="AllowCallbackVariableFramesPerBuffer"></A>Allow Callbacks to Accept Variable framesPerBuffer</A></H2>
+<H2><A NAME="AllowCallbackVariableFramesPerBuffer"></A>Allow Callbacks to Accept Variable framesPerBuffer</H2>
 <H4>Status</H4>
 <P>This proposal is under construction.</P>
 <B><P>Background</B><BR>
 <BR>
-Some devices prefer, or even require, a particular value for framesPerBuffer. Some applications also prefer a particular buffer size because they may, for example, be doing FFTs. If possible, an integral number of application buffers can be fit into a device buffer. If an integral number of application buffers cannot be fit into an application buffer then some system for adapting between them is required. Stephane Letz implemented a block adapter for the ASIO driver that could perhaps be made part of a utility library for PortAudio.<BR>
+Some devices prefer, or even require, a particular value for framesPerBuffer. Some applications also prefer a particular buffer size because they may, for example, be doing FFTs. If possible, an integral number of application buffers can be fit into a device buffer. If an integral number of application buffers cannot be fit into an application buffer then some system for adapting between them is required. Stephane Letz implemented a block adapter for the ASIO implementation that could perhaps be made part of a utility library for PortAudio.<BR>
 <BR>
 Adapting between different block size, unfortunately, involves extra memory movement and should be avoided. One way to avoid this is to allow an application to say "I can handle any value for framesPerBuffer". An example would be a simple algorithm like the one in "pa_tests/pa_fuzz.c". Its callback function could easily work with any value for FramesPerBuffer.<BR>
 <BR>
@@ -165,12 +177,13 @@ In order to find out what value the implementation chose, and also to help the a
 <BR>
 <FONT FACE="Courier New" SIZE=2>int Pa_GetFramesPerBuffer( PortAudioStream* stream );<BR>
 int Pa_GetNumOutputBuffers( PortAudioStream* stream );<BR>
-int Pa_GetNumInputBuffers( PortAudioStream* stream );</FONT><BR>
-</P>
+int Pa_GetNumInputBuffers( PortAudioStream* stream );</P>
+</FONT><H4>Impact Analysis</H4>
+<P>This proposal will not effect existing client code, since all clients will currently specify a non-zero framesPerBuffer parameter. Clients whose code can operate with a flexible number of framesPerBuffer may benefit from improved efficiency in some cases simply by specifying paFramesPerBufferUnspecified.</P>
 <P>____________</P>
-<H2>Blocking Read/Write API</H2>
+<H2><A NAME="Blocking"></A>Blocking Read/Write API</H2>
 <H4>Status</H4>
-<P>This proposal is open for comment.</P>
+<P>This proposal is sufficiently well defined to be implemented.</P>
 <H4>Background</H4>
 <P>Many PortAudio users have requested a blocking read()/write() API that will be supported in addition to the current callback based API. A blocking Read/Write API would allow a more natural style of multi-threaded programming, and facilitate single-threaded reactive applications, while insulating clients from platform-specific thread synchronisation facilities. </P>
 <P>A blocking read/write API would also be useful when binding PortAudio to languages that don't easily support callbacks such as Python, Java, Lisp and Smalltalk. However in this case it has been noted that a blocking API is not sufficient - the host language also needs to support native threads to interact efficiently with blocking. Dannenberg observes that native thread support cannot be added without major redesign (based on a study of Python and Squeak), but given blocking calls, there are several ways to structure programs using non-native threads.</P>
@@ -182,11 +195,11 @@ int Pa_GetNumInputBuffers( PortAudioStream* stream );</FONT><BR>
 <P>If a NULL callback parameter is passed to Pa_OpenStream() then the stream will be opened in blocking mode. This enables users to call Pa_WriteStream() and Pa_ReadStream() to read and write sample data. (The PaErrorNum item "paNullCallback" becomes obsolete.)</P>
 <P>Pa_WriteStream() writes a buffer of frames to a stream. The length of the buffer is arbitrary and specified by the frames parameter. Pa_WriteStream() returns when all samples have been copied from buffer. If necessary, Pa_WriteStream() will wait until buffer space becomes available. (Waiting on Unix will be the by-product of an I/O system call, waiting in Win32 will be implemented by waiting on an Event object, and waiting on MacOS 9 will probably require a busy wait.) High performance applications will want to match the length of the buffer to framesPerBuffer, but this is not a requirement.</P>
 <P>The buffer parameter has the same semantics and format as the inputbuffer and outputbuffer parameters of a PortAudioCallback function. In particular, non-interleaved data is handled in the same way.</P>
-<P>Pa_ReadStream() is similar, but it reads rather than writes. </P>
 <PRE>PaError Pa_WriteStream( PortAudioStream *stream,
                         void *buffer,
-                        unsigned long frames );
-
+                        unsigned long frames );</PRE>
+<P>Pa_ReadStream() is similar, but it reads rather than writes.</P>
+<PRE>
 PaError Pa_ReadStream( PortAudioStream *stream,
                        void *buffer,
                        unsigned long frames );</PRE>
@@ -200,10 +213,10 @@ long Pa_StreamReadAvailable( PortAudioStream *stream );</PRE>
 <P>A rejected alternative is to allow Pa_WriteStream() and Pa_ReadStream() to return the number of frames actually written or read so that a Mac implementation could return immediately and avoid blocking. This would require applications to be prepared to handle partial read/writes. It seems simpler and more consistent to use "Available" to determine in advance whether blocking or busy waiting will occur if that is a concern. Also, note that data is almost certainly copied; however, it seems likely that the copy will be folded into any format conversion.</P>
 <P>Implementations may want to provide a way for applications to be notified when data can be written or read. For example, one might want to know the file ID of an ALSA or OSS stream for use in a select() system call. Since this sort of information will be platform-specific and non-portable, no interface is defined here, but implementations can include a device-model-specific access function. If applications commonly need this information, we can think about how to make this more standardized.</P>
 <H4>Implementation Notes</H4>
-<P>Implementing blocking i/o will be quite simple for driver models where the underlying API is blocking-based. Under Windows (MME), the arrival of a buffer will signal an Event passed to waveOutOpen(). Pa_WriteStream() and Pa_ReadStream() will do all the work (no server threads necessary). Writes will make waveOutWrite calls. When no buffer is available, the writer will wait on the event and try again. Reading is similar. On the Mac, a double-buffer scheme can be set up where the Mac callbacks pick up data placed in buffers by Pa_WriteStream(). The double-buffer adds to the latency. Alternatively (and preferably) callbacks can be used only for notification, and Pa_WriteStream() can issue all the calls to write samples.</P>
+<P>Implementing blocking i/o will be quite simple for host APIs which are natively blocking-based. Under Windows (MME), the arrival of a buffer will signal an Event passed to waveOutOpen(). Pa_WriteStream() and Pa_ReadStream() will do all the work (no server threads necessary). Writes will make waveOutWrite calls. When no buffer is available, the writer will wait on the event and try again. Reading is similar. On the Mac, a double-buffer scheme can be set up where the Mac callbacks pick up data placed in buffers by Pa_WriteStream(). The double-buffer adds to the latency. Alternatively (and preferably) callbacks can be used only for notification, and Pa_WriteStream() can issue all the calls to write samples.</P>
 <P>PABLIO currently contains a busy-wait ring buffer in "ringbuffer.c" which is generic, used in many projects and is pretty solid. This code could be a useful starting point for implementing the new blocking API on some platforms.</P>
 <P>Pa_WriteStream() and Pa_ReadStream() are not thread safe. Applications wanting to call these from multiple threads should manage their own mutual exclusion. <I>[Roger: Is any of PortAudio thread safe? I don't think so. This is good because it avoids many system calls for mutual exclusion.]</P>
-</I><P>At one time it was suggested that implementations only implement blocking calls and that callbacks would be required to implement callbacks in terms of the blocking API. The current direction is that this decision should be made independently for each driver-model.</P>
+</I><P>At one time it was suggested that implementations only implement blocking calls and that callbacks would be required to implement callbacks in terms of the blocking API. The current direction is that this decision should be made independently for each host API.</P>
 <H4>Impact Analysis</H4>
 <P>This proposal would extend the functionality of PortAudio without requiring any changes to client code with the exception that the PaErrorNum paNullCallback will no longer be defined. As noted above, implementation complexity is dependent on the target platform.</P>
 <P>____________</P>
@@ -256,59 +269,59 @@ Pa_OpenStream(&amp;stream,
 <PRE>
     float *left = ((float **) inputBuffer)[0];
     float *right = ((float **) inputBuffer)[1];</PRE>
-<P>This new sample format could also be used to interrogate the native driver to see if it supports interleaved or non-interleaved buffers. This would be achieved by reading the nativeSampleFormats field of the PaDeviceInfo structure. </P>
+<P>This new sample format could also be used to interrogate the host API to see if it supports interleaved or non-interleaved buffers. This would be achieved by reading the nativeSampleFormats field of the PaDeviceInfo structure. </P>
 <H4>Impact Analysis</H4>
 <P>This proposal extends the functionality of PortAudio without any impact on existing client code. It will require new conversion functions and all existing PortAudio implementations will have to be modified to reference these new conversion functions.</P>
 <P>____________</P>
-<H2><A NAME="MultipleDriverModels">Support For Multiple Driver Models</A> in a Single Build</H2>
+<H2><A NAME="MultipleDriverModels">Support For Multiple Host APIs</A> in a Single Build</H2>
 <H4>Status</H4>
 <P>This proposal is currently being discussed. Its final form depends on a number of other unfinished proposals.</P>
 <H4>Dependencies </H4>
-<P>The API changes described in this proposal are independent of all other proposals. However, changes to the host error mechanism defined in <A HREF="#Error">Handling of Host-Specific Error Codes</A>, and the addition of new API functions due to the <A HREF="#Blocking">Blocking Read/Write API</A> proposal may effect the implementation of this proposal. Changes to the API defined by the <A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A> and the <A HREF="#Latency">Improve the Latency Setting Mechanism</A> proposals will need to be multi-driver-model capable. </P>
+<P>The API changes described in this proposal are independent of all other proposals. However, changes to the host error mechanism defined in <A HREF="#Error">Handling of Host-Specific Error Codes</A>, and the addition of new API functions due to the <A HREF="#Blocking">Blocking Read/Write API</A> proposal may effect the implementation of this proposal. Changes to the API defined by the <A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A> and the <A HREF="#Latency">Improve the Latency Setting Mechanism</A> proposals will need to be multi-host-API capable. </P>
 <H4>Background</H4>
-<P>As the number of supported driver models available on each platform grows (WMME, ASIO, and DirectSound under Windows for example) client applications need to be able to select between different driver models at run-time. At least four platforms supported by PortAudio have multiple native driver models. At present PortAudio allows clients to link in support for at most one driver model.</P>
+<P>As the number of supported host APIs on each platform grows (WMME, ASIO, and DirectSound under Windows for example) client applications need to be able to select between different host APIs at run-time. At least four platforms supported by PortAudio have multiple host audio APIs. At present PortAudio allows clients to link in support for at most one host API.</P>
 <P>This proposal is based this email: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-December/000308.html">http://techweb.rfa.org/pipermail/portaudio/2001-December/000308.html</A></P>
 <H4>Requirements</H4>
-<P>It will be necessary to supply clients with a method of displaying a textual description of the driver model for each PortAudio device.</P>
-<P>Some PortAudio functions do not operate on PortAudioStreams, but rather they operate on or return the global state of the PortAudio library as a whole. If multiple driver-models were present, some of these functions would have different implementations, or would return different values depending on which the driver model they applied to. These functions include:</P>
+<P>It will be necessary to supply clients with a method of displaying a textual description of the host API for each PortAudio device.</P>
+<P>Some PortAudio functions do not operate on PortAudioStreams, but rather they operate on or return the global state of the PortAudio library as a whole. If multiple host APIs were present, some of these functions would have different implementations, or would return different values depending on which host API they applied to. These functions include:</P>
 <PRE>    int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate );
     PaDeviceID Pa_GetDefaultInputDeviceID( void );
     PaDeviceID Pa_GetDefaultOutputDeviceID( void );
     </PRE>
-<P>Note that Pa_CountDevices() could also be interpreted as applying to a specific driver model.</P>
-<P>PortAudio currently implements a per-driver-model extension mechanism via the inputDriverInfo and outputDriverInfo parameters to Pa_OpenStream(). For code to take advantage of driver-model-specific extensions when multiple driver models are present there needs to be a way to establish which (statically named) driver model is associated with each device. This is because driver-model-specific extensions should only be used in combination with devices supplied by that driver model.</P>
-<P>PortAudio should present clients with all of the devices made available by each driver model. This means that some physical devices may be accessible though multiple driver models. Since it will not be possible to open a full duplex stream with input and output devices from different driver models, some clients may want to enumerate the available driver models and only display devices from one driver model at a time.</P>
-<P>Introducing a new PortAudioDriverModel abstraction could fulfil the above requirements. At a minimum, this abstraction would need to have the following attributes:</P>
+<P>Note that Pa_CountDevices() could also be interpreted as applying to a specific host API.</P>
+<P>PortAudio currently defines a per-host-API extension mechanism via the inputDriverInfo and outputDriverInfo parameters to Pa_OpenStream(). For code to take advantage of host-API-specific extensions when multiple host APIs are present there needs to be a way to establish which (statically identified) host API is associated with each device. This is because host-API -specific extensions must only be used in combination with devices supplied by that host API.</P>
+<P>PortAudio should present clients with all of the devices made available by each host API. This means that some physical devices may be accessible though multiple host APIs. Since it will not be possible to open a full duplex stream with input and output devices from different host APIs, some clients may want to enumerate the available host APIs and only display devices from one host API at a time.</P>
+<P>Introducing a new PortAudioHostAPI abstraction could fulfil the above requirements. At a minimum, this abstraction would need to have the following attributes:</P>
 
 <UL>
 <LI>A textual description for display on user interfaces </LI>
-<LI>Functions for querying default device ids and latency parameters for each driver model </LI>
-<LI>A unique identifier published in portaudio.h for use in code which takes advantage of driver model specific extensions</LI></UL>
+<LI>Functions for querying default device ids and latency parameters for each host API </LI>
+<LI>A unique identifier for each host API published in portaudio.h for use in code which takes advantage of host API specific extensions</LI></UL>
 
 <P>Additionally, the following features could be present:</P>
 
 <UL>
-<LI>A method for querying the default PortAudioDriverModel (perhaps the "best" driver model which has more than 0 devices available) </LI>
-<LI>A method for enumerating 'currently available' PortAudioDriverModels. 'Currently available' could be interpreted as meaning the driver models linked into the current PortAudio implementation, or it could mean the driver models which currently have more than zero devices available. </LI>
-<LI>A method of enumerating PortAudioDevices independently for each available PortAudioDriverModel</LI></UL>
+<LI>A method for querying the default PortAudioHostAPI (perhaps the "best" host API which has more than 0 devices available) </LI>
+<LI>A method for enumerating 'currently available' PortAudioHostAPIs. 'Currently available' could be interpreted as meaning the host APIs linked into the current PortAudio implementation, or it could mean the host APIs which currently have more than zero devices available. </LI>
+<LI>A method of enumerating PortAudioDevices independently for each available PortAudioHostAPI</LI></UL>
 
 <H4>Proposal</H4>
 <P>This proposal consists of the 7 modifications to the PortAudio API listed below.</P>
-<P>1. Define a new PaDriverModelTypeID enumeration, with fixed values for each driver model:</P>
+<P>1. Define a new PaHostAPITypeID enumeration, with fixed values for each host API:</P>
 <PRE>
 /*
-    The PaDriverModelTypeID enumeration contains constants for uniquely 
-    Identifying each driver model supported by PortAudio. This type
-    is used in the PaDriverModelInfo structure below. Driver model type ids
+    The PaHostAPITypeID enumeration contains constants for uniquely 
+    Identifying each host API supported by PortAudio. This type
+    is used in the PaHostAPIInfo structure below. Host API type ids
     are guaranteed to never change, thus allowing code to be written that 
-    conditionally uses driver model specific extensions.
-    New type ids will only be allocated when support for a new driver 
+    conditionally uses host API specific extensions.
+    New type ids will only be allocated when support for a host API 
     model reaches "public alpha" status, prior to that developers should
     use the paInDevelopment type id.
 */
 
 typedef enum {
-    paInDevelopment=0, /* use while developing support for a new driver model */
+    paInDevelopment=0, /* use while developing support for a new host API */
     paWin32DirectSound=1,
     paWin32MME=2,
     paWin32ASIO=3,
@@ -319,91 +332,91 @@ typedef enum {
     paALSA=8,
     paIRIXAL=9,
     paBeOS=10    
-}PaDriverModelTypeID;</PRE>
-<P>2. Define a method for enumerating driver models:</P>
+}PaHostAPITypeID;</PRE>
+<P>2. Define a method for enumerating host APIs:</P>
 <PRE>
 /*
-    Driver model enumeration mechanism.
+    Host API enumeration mechanism.
 
-    Driver model ids range from 0 to Pa_CountDriverModels()-1.
+    Host API ids range from 0 to Pa_CountHostAPIs()-1.
 
-    The default driver model is the lowest common denominator
-    driver model on the current platform and is unlikely to provide
+    The default host API is the lowest common denominator
+    Host API on the current platform and is unlikely to provide
     the best performance.
 */
 
-typedef int PaDriverModelID;
-#define paDefaultDriverModel 0;
+typedef int PaHostAPIID;
+#define paDefaultHostAPI 0;
 
 struct{
     int structVersion; 
-    PaDriverModelTypeID typeID; /* the well known unique identifier of this driver model */
-    const char *name; /* a textual description of the driver model for display on user interfaces */
-}PaDriverModelInfo;
+    PaHostAPITypeID typeID; /* the well known unique identifier of this host API */
+    const char *name; /* a textual description of the host API for display on user interfaces */
+}PaHostAPIInfo;
 
 
-PaDriverModelID Pa_CountDriverModels();</PRE>
-<P>3. Provide a method for retrieving information about a given driver model:</P>
+PaHostAPIID Pa_ CountHostAPIs ();</PRE>
+<P>3. Provide a method for retrieving information about a given host API:</P>
 <PRE>
 /*
-    Pa_ GetDriverModelInfo () returns a pointer to an immutable 
-    PaDriverModelInfo structure referring to the device specified by driverModelID. 
-    If driverModelID is out of range the function returns NULL. The returned structure 
+    Pa_GetHostAPIInfo () returns a pointer to an immutable 
+    PaHostAPIInfo structure referring to the host API specified by hostAPIID. 
+    If hostAPIID is out of range the function returns NULL. The returned structure 
     is owned by the PortAudio implementation and must not be manipulated or 
     freed. The pointer is only guaranteed to be valid between calls 
     to Pa_Initialize() and Pa_Terminate(). 
 */ 
 
-const PaDriverModelInfo* Pa_GetDriverModelInfo( PaDriverModelID driverModelID );</PRE>
-<P>4. Add a new field to PaDeviceInfo to identify the driver model type:</P>
+const PaHostAPIInfo * Pa_GetHostAPIInfo(PaHostAPIID hostAPIID);</PRE>
+<P>4. Add a new field to PaDeviceInfo to identify the host API type:</P>
 <PRE>
 struct{
     ...
-    PaDriverModelID driverModel; /* note this is the run-time id */
+    PaHostAPIID hostAPI; /* note this is the run-time id */
     ...
 }PaDeviceInfo;</PRE>
 <P>This would enable the following two code fragments to be written.</P>
 <PRE>
-/* obtain the user-readable name of a device's driver model */
-Pa_GetDriverModelInfo( deviceInfo-&gt;driverModel )-&gt;name;
+/* obtain the user-readable name of a device's host API */
+Pa_GetHostAPIInfo( deviceInfo-&gt;hostAPI )-&gt;name;
 
-/* implement special behavior for a specific driver model */
-if( Pa_GetDriverModelInfo( deviceInfo-&gt;driverModel )-&gt;typeID == paWin32MME ){
+/* implement special behavior for a specific host API */
+if( Pa_GetHostAPIInfo( deviceInfo-&gt;hostAPI )-&gt;typeID == paWin32MME ){
     InitialiseMMESpecificDeviceInfo();
 }</PRE>
-<P>5. Provide methods for finding per-driver model default devices and latency settings:</P>
+<P>5. Provide methods for finding per-host API default devices and latency settings:</P>
 <PRE>
-PaDeviceID Pa_DriverModelDefaultInputDeviceID( PaDriverModelID driverModelID );
-PaDeviceID Pa_DriverModelDefaultOutputDeviceID( PaDriverModelID driverModelID );
-int Pa_DriverModelMinNumBuffers( PaDriverModelID driverModelID, int framesPerBuffer, double sampleRate );</PRE>
-<P>6. Provide functions for enumerating devices on a per-driver-model basis. Note that this functionality is provided in addition to the current Pa_CountDevices() and Pa_GetDeviceInfo() functions:</P>
+PaDeviceID Pa_HostAPIDefaultInputDeviceID( PaHostAPIID hostAPIID );
+PaDeviceID Pa_HostAPIDefaultOutputDeviceID( PaHostAPIID hostAPIID);
+int Pa_HostAPIMinNumBuffers(PaHostAPIID hostAPIID, int framesPerBuffer, double sampleRate );</PRE>
+<P>6. Provide functions for enumerating devices on a per-host-API basis. Note that this functionality is provided in addition to the current Pa_CountDevices() and Pa_GetDeviceInfo() functions:</P>
 <PRE>
-int Pa_DriverModelCountDevices( PaDriverModelID driverModelID );
-PaDeviceID Pa_DriverModelGetDeviceID( PaDriverModelID driverModelID, int perDriverModelIndex );</PRE>
-<P>7. Re-implement the following existing functions to use the default driver model. This would be a backwards compatible change except for Pa_GetMinNumBuffers() which gains an extra parameter.</P>
+int Pa_HostAPICountDevices( PaHostAPIID hostAPIID );
+PaDeviceID Pa_HostAPIGetDeviceID( PaHostAPIID hostAPIID, int perHostAPIIndex );</PRE>
+<P>7. Re-implement the following existing functions to use the default host API. This would be a backwards compatible change except for Pa_GetMinNumBuffers() which gains an extra parameter.</P>
 <PRE>
-PaDeviceID Pa_GetDefaultInputDeviceID( void ); /* returns the default device id for the default driver model */
+PaDeviceID Pa_GetDefaultInputDeviceID( void ); /* returns the default device id for the default host API */
 PaDeviceID Pa_GetDefaultOutputDeviceID( void );
 
 int Pa_GetMinNumBuffers( PaDeviceID id, int framesPerBuffer, double sampleRate );</PRE>
-<P>Note that Pa_GetMinNumBuffers() takes a device id, not a driver model id. This minimises the need for clients to be aware of the multiple driver model extensions. </P>
+<P>Note that Pa_GetMinNumBuffers() takes a device id, not a host API id. This minimises the need for clients to be aware of the multiple host API extensions. </P>
 <H4>Discussion</H4>
 <P>The main disadvantage of this proposal it that it may make the API seem more complex for new users.</P>
-<P>There is concern that this proposal is too complex, and that the simpler solution of simply adding a driverModel string to the device info structure of each device would be sufficient. It is true that the simple solution would allow clients to duplicate the functionality of this proposal, provided driverModel strings were published and guaranteed not to change in the future. However, the bulk of the functionality included in this proposal will need to be implemented internally to facilitate multiple driver model support anyway. This proposal is based on the assumption that it is better to expose such functionality in the PortAudio API rather than require clients to reimplement what is already present internally. </P>
-<P>There has been discussion about supporting "pluggable" driver models - the general idea is that a client application could link against PortAudio and PortAudio would load the available Driver Models at run-time using "PortAudio Driver Model Plugins." Some people consider this to be an overly complex solution, and no significant advantages over a monolithic PortAudio dll have been submitted yet. Some people would like PortAudio to always be able to be statically linked with multiple driver model support.</P>
-<P>The overhead (both processor and memory) of the Multiple Driver Model support should be minimised on platforms which don't have multiple driver models (such as BeOS and some handheld devices.) Essentially this means that the functionality provided in the multiple driver model fa&ccedil;ade should be easy to duplicate.</P>
+<P>There is concern that this proposal is too complex, and that the simpler solution of simply adding a hostAPI string to the device info structure of each device would be sufficient. It is true that the simple solution would allow clients to duplicate the functionality of this proposal, provided hostAPI strings were published and guaranteed not to change in the future. However, the bulk of the functionality included in this proposal will need to be implemented internally to facilitate multiple host API support anyway. This proposal is based on the assumption that it is better to expose such functionality in the PortAudio API rather than require clients to reimplement what is already present internally. </P>
+<P>There has been discussion about supporting "pluggable" host APIs - the general idea is that a client application could link against PortAudio and PortAudio would load the available Host APIs at run-time using "PortAudio Host API Plugins." Some people consider this to be an overly complex solution, and no significant advantages over a monolithic PortAudio dll have been submitted yet. Some people would like PortAudio to always be able to be statically linked with multiple host API support. The ability to load additional host APIs at runtime is considered desirable so long as the basic multiple host API mechanism does not require dynamic linking.</P>
+<P>The overhead (both processor and memory) of the Multiple Host API support should be minimised on platforms which don't have multiple host APIs (such as BeOS and some handheld devices.) However, the multiple host API support will still be used on all platoforms, so as to reduce the burden on implementers if a second API becomes available, and also to allow reuse of common code in the multiple host API layer across all implementations.</P>
 <H4>Implementation Notes</H4>
 <P>The implementation will follow the methodology currently employed in PortMIDI described here: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-December/000295.html">http://techweb.rfa.org/pipermail/portaudio/2001-December/000295.html</A></P>
-<P>An implementation of the driver model neutral "Fa&ccedil;ade" of this proposal exists here: </P>
+<P>An implementation of the host API neutral "Fa&ccedil;ade" of this proposal exists here: </P>
 <P><A HREF="http://www.portaudio.com/docs/pa_drivermodel.c.txt">http://www.portaudio.com/docs/pa_drivermodel.c.txt</A></P>
 <P><A HREF="http://www.portaudio.com/docs/pa_drivermodel.h.txt">http://www.portaudio.com/docs/pa_drivermodel.h.txt</A></P>
-<P>This proposal will involve the changes described below. Note that the string &lt;DM&gt; will be replaced with a driver model tag for each implementation.</P>
-<P>Each driver model will have it's own Initialize function which PortAudio will call in response to client calls to Pa_Initialize and Pa_Terminate respectively. This will be the only identifier each driver model implementation will be required to expose.</P>
-<PRE>PaError Pa&lt;DM&gt;_MultiDriverInitialize( PaDriverModelImplementation **impl );</PRE>
-<P>PaDriverModelImplementation is an internal data structure containing a set of function pointers for globally relevant functions: (function pointer type declarations omitted for simplicity:)</P>
+<P>This proposal will involve the changes described below. Note that the string &lt;HA&gt; will be replaced with a host API tag for each implementation.</P>
+<P>Each host API will have it's own Initialize function which PortAudio will call in response to client calls to Pa_Initialize and Pa_Terminate respectively. This will be the only identifier each host API implementation will be required to expose.</P>
+<PRE>PaError Pa&lt;HA&gt;_Initialize( PaImplementation **impl );</PRE>
+<P>PaImplementation is an internal data structure containing a set of function pointers for globally relevant functions: (function pointer type declarations omitted for simplicity:)</P>
 <PRE>struct{
-    fptr terminate; /* takes the PaDriverModelImplementation* returned by initialize */
-    fptr getDriverModelInfo;
+    fptr terminate; /* takes the PaImplementation* returned by initialize */
+    fptr getHostAPIInfo;
     fptr getHostError;
     fptr getHostErrorText;
     fptr countDevices;
@@ -412,9 +425,9 @@ int Pa_GetMinNumBuffers( PaDeviceID id, int framesPerBuffer, double sampleRate )
     fptr getDeviceInfo;
     fptr openStream;
     fptr getMinNumBuffers;
-} PaDriverModelImplementation;</PRE>
-<P>The function pointers in PaDriverModelImplementation will point to the corresponding functions in current PortAudio implementations. The new multiple driver model support code will take care of mapping per-driver model device ids onto a single homogenous driver id range. A significant advantage of this scheme is that it will require very little change to existing PortAudio implementations.</P>
-<P>A new PaStreamImplementation internal data structure will be defined to contain function pointers to implementations of the stream functions for each driver model. This structure will be placed at the head of implementation-specific data structures returned as PortAudioStream* in current implementations.</P>
+} PaImplementation;</PRE>
+<P>The function pointers in PaImplementation will point to the corresponding functions in current PortAudio implementations. The new multiple host API support code will take care of mapping per-host API device ids onto a single homogenous device id range. A significant advantage of this scheme is that it will require very little change to existing PortAudio implementations.</P>
+<P>A new PaStreamImplementation internal data structure will be defined to contain function pointers to implementations of the stream functions for each host API. This structure will be placed at the head of implementation-specific data structures returned as PortAudioStream* in current implementations.</P>
 <PRE>struct{
     unsigned long magic;
     fptr close;
@@ -431,29 +444,29 @@ int Pa_GetMinNumBuffers( PaDeviceID id, int framesPerBuffer, double sampleRate )
 } PaStreamImplementation;</PRE>
 <P>Magic contains a unique bit pattern which should be set by implementations when a stream is opened, and cleared when it is closed. This technique will allow implementations to perform some degree of validation on PortAudioStream* passed to PortAudio.</P>
 <H4>Impact Analysis</H4>
-<P>This proposal will significantly improve the utility of PortAudio by allowing clients to support multiple driver models in a single executable. </P>
-<P>The only required change for existing clients will to insert an extra deviceID parameter into calls to Pa_GetMinNumBuffers().</P>
-<P>Since multiple driver models may return devices with the same names, a minimum requirement for clients who want to be "multiple driver model aware" will be to ensure that the appropriate driver model name is displayed alongside device names in the user interface.</P>
+<P>This proposal will significantly improve the utility of PortAudio by allowing clients to support multiple host APIs in a single executable. </P>
+<P>The only required change for existing clients will be to insert an extra deviceID parameter into calls to Pa_GetMinNumBuffers().</P>
+<P>Since multiple host APIs may return devices with the same names, a minimum requirement for clients who want to be "multiple host API aware" will be to ensure that the appropriate host API name is displayed alongside device names in the user interface.</P>
 <P>____________</P>
-<H2><A NAME="DriverModelSpecificPa_OpenStream">Driver Model Specific Pa_OpenStream() Parameters</A></H2>
+<H2><A NAME="DriverModelSpecificPa_OpenStream">Host API Specific Pa_OpenStream() Parameters</A></H2>
 <H4>Status</H4>
-<P>This proposal is essentially complete, but is pending the final definition of PaDriverModelTypeID (see below.) </P>
+<P>This proposal is essentially complete, but is pending the final definition of PaHostAPITypeID (see below.) </P>
 <H4>Dependencies</H4>
-<P>If the PaDriverModelSpecificStreamInfo structure defined in this proposal includes a PaDriverModelTypeID driver model identifier, then this proposal depends on the <A HREF="#MultipleDriverModels">Support for Multiple Driver Models in a Single PortAudio Build</A> proposal to define the form of the identifier.</P>
+<P>If the PaHostAPISpecificStreamInfo structure defined in this proposal includes a PaHostAPITypeID host API identifier, then this proposal depends on the <A HREF="#MultipleDriverModels">Support for Multiple Host APIs in a Single PortAudio Build</A> proposal to define the form of the identifier.</P>
 <H4>Background</H4>
-<P>Pa_OpenStream has always had the inputDriverInfo and outputDriverInfo parameters, which were defined to support passing driver-model specific information to PortAudio implementations. Currently these parameters are defined as void* and are not used by any implementation. Two uses of inputDriverInfo and outputDriverInfo are planned for the near future: passing device names to OSS drivers, and passing additional device ids for opening multichannel soundcards under MME.</P>
+<P>Pa_OpenStream has always had the inputDriverInfo and outputDriverInfo parameters, which were defined to support passing host API specific information to PortAudio implementations. Currently these parameters are defined as void* and are not used by any implementation. Two uses of inputDriverInfo and outputDriverInfo are planned for the near future: passing device names to OSS drivers, and passing additional device ids for opening multichannel soundcards under MME.</P>
 <H4>Proposal</H4>
 <P>The following structure could be defined and be placed at the head of all data structures passed to the inputDriverInfo and outputDriverInfo parameters of Pa_OpenStream:</P>
 <PRE>struct{
     unsigned long size;    /* size of whole structure including this header */
-    PaDriverModelTypeID driverModel; /* driver model for which this data is intended */
+    PaHostAPITypeID hostAPI; /* host API for which this data is intended */
     unsigned long version; /* structure version */
-}PaDriverModelSpecificStreamInfo;</PRE>
-<P>The following driver model specific extensions should be placed in separate header files rather than being placed in portaudio.h</P>
+}PaHostAPISpecificStreamInfo;</PRE>
+<P>The following host API specific extensions should be placed in separate header files rather than being placed in portaudio.h</P>
 <P>___</P>
 <P>The following structure is proposed for passing device names to the OSS implementation:</P>
 <PRE>struct{
-    PaDriverModelSpecificStreamInfo header;
+    PaHostAPISpecificStreamInfo header;
     char *deviceName;
 }PaOSSSpecificStreamInfo;</PRE>
 <P>A pointer to this structure could be passed to Pa_OpenStream() to request that a device other than the default dsp device be opened. This structure could be used for opening input and/or output devices.</P>
@@ -461,25 +474,25 @@ int Pa_GetMinNumBuffers( PaDeviceID id, int framesPerBuffer, double sampleRate )
 <P>The following structure is proposed for passing multiple interleaved device ids to the MME implementation in order to open a multichannel stream with some soundcards that support multichannel operation via multiple stereo (or other number of channels) interleaved devices. When this structure is passed, the MME implementation would ignore the deviceId parameters passed directly to Pa_OpenStream(), however it would not ignore the channelCount parameters.</P>
 <P>#define paWMMEPassMultipleInterleavedBuffers 0x01 /* a flag */</P>
 <PRE>struct{
-    PaDriverModelSpecificStreamInfo header;
+    PaHostAPISpecificStreamInfo header;
     int *deviceIdsAndChannelCounts; /* interleaved deviceIds and channelCounts */
     int deviceCount;
     int flags;
 }PaMMESpecificStreamInfo;</PRE>
-<P>The deviceIdsAndChannelCounts field points to an array of ints containing multiple {deviceId, channelCount} pairs. The number of integer elements in the array must be two times the value of the deviceCount field. Specified deviceIds must have a driver model type of Windows MME. Currently only one flag is defined: paWMMEPassMultipleInterleavedBuffers, this can be used to request that the raw, multiple interleaved buffers be passed to the callback.</P>
+<P>The deviceIdsAndChannelCounts field points to an array of ints containing multiple {deviceId, channelCount} pairs. The number of integer elements in the array must be two times the value of the deviceCount field. Specified deviceIds must have a host API type of Windows MME. Currently only one flag is defined: paWMMEPassMultipleInterleavedBuffers, this can be used to request that the raw, multiple interleaved buffers be passed to the callback.</P>
 <H4>Discussion</H4>
-<P>The type of the inputDriverInfo and outputDriverInfo parameters could be changed to PaDriverModelSpecificStreamInfo* however this may cause more trouble that it's worth.</P>
+<P>The type of the inputDriverInfo and outputDriverInfo parameters could be changed to PaHostAPISpecificStreamInfo* however this may cause more trouble that it's worth.</P>
 <P>The PaMMESpecificStreamInfo functionality may require the common buffer conversion functions defined in the <A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> proposal to support (multiple interleave &lt;==&gt; unified interleave) and (multiple interleave &lt;==&gt; non-interleaved) conversions.</P>
 <H4>Impact Analysis</H4>
 <P>This proposal provides access to new platform-specific extensions. No existing client code will be modified. Only implementations that implement the extensions will be effected.</P>
 <P>____________</P>
-<H2><A NAME="Error"></A>Handling of Host-Specific Error Codes</H2>
+<H2><A NAME="Error"></A>Handling of Host API Specific Error Codes</H2>
 <H4>Status</H4>
-<P>This proposal is sufficiently well defined to be implemented immediately. However, the possibility of extending the scope of this proposal is being discussed in this thread: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2002-January/000358.html">http://techweb.rfa.org/pipermail/portaudio/2002-January/000358.html</A></P>
+<P>This proposal is sufficiently well defined to be implemented immediately. However, the possibility of extending the scope of this proposal has been discussed in this thread: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2002-January/000358.html">http://techweb.rfa.org/pipermail/portaudio/2002-January/000358.html</A></P>
 <H4>Background</H4>
 <P>Currently the PaHostError error code is used to notify clients that a platform-specific error condition occurred. This is considered ambiguous and difficult to work with. </P>
 <H4>Proposal</H4>
-<P>PortAudio should seek to avoid returning ambiguous paHostError error codes, and instead translate to portable PortAudio error codes instead. In the case of the pa_win_mme implementation this means translating the following MME error codes:</P>
+<P>PortAudio should seek to avoid returning ambiguous paHostError error codes, and instead translate to portable PortAudio error codes. In the case of the pa_win_mme implementation this means translating the following MME error codes:</P>
 <P>MMSYSERR_ALLOCATED to paDeviceBusy (new) <BR>
 MMSYSERR_BADDEVICEID to paInvalidDeviceId (already defined) <BR>
 MMSYSERR_NODRIVER to paDriverMissing (new) <BR>
@@ -489,7 +502,7 @@ WAVERR_BADFORMAT to paSampleFormatNotSupported (already defined) </P>
 <P>It is suggested that all implementations should be audited for their use of PaHostError.</P>
 <P>There was some concern about polluting the PortAudio error code namespace with platform-specific error codes, and of the potential overhead of including platform specific error strings on other platforms. Another suggestion has been to add a Pa_GetHostErrorText() function.</P>
 <P>If all error codes are mapped to PortAudio error codes do we need a PaHostError code and the Pa_GetHostErrorCode() function?</P>
-<P>A suggestion has been made to extend Pa_GetErrorText() so that it retrieved driver model specific error strings when a host error occurs.</P>
+<P>A suggestion has been made to extend Pa_GetErrorText() so that it retrieved host API specific error strings when a host error occurs.</P>
 <H4>Impact Analysis</H4>
 <P>This proposal improves the quality of PortAudio diagnostics. Client code that depends on paHostError code to flag certain conditions may be effected.</P>
 <P>____________</P>
@@ -504,6 +517,33 @@ WAVERR_BADFORMAT to paSampleFormatNotSupported (already defined) </P>
 <P>Rename the paInvalidDeviceId error code to paInvalidDeviceID to conform to the established naming conventions.</P>
 <H4>Impact Analysis</H4>
 <P>This proposal improves the consistency of the naming scheme making the API easier to learn and remember. All clients which call Pa_GetCPULoad() will need to alter their code by renaming the function call. Clients who explicitly check for the paInvalidDeviceId error code will have to edit its capitalisation.</P>
+<P>____________</P>
+<H2><A NAME="AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A></H2>
+<H4>Status</H4>
+<P>This proposal is sufficiently well defined to be implemented. </P>
+<H4>Background</H4>
+<P>Some host APIs (eg ASIO, MME and DirectSound under Windows NT) can require a reboot to free devices when they are not closed properly (due to a program not calling Pa_Close() either in error, or due to a crash.) As a quality of implementation issue PortAudio should seek to avoid such circumstances.</P>
+<H4>Proposal</H4>
+<P>The definition of Pa_Terminate() should be extended as follows:</P>
+<PRE>/*
+    Pa_Terminate() is the library termination function - call this after 
+    using the library. This function deallocates all resources allocated 
+    by PortAudio since it was initializied using Pa_Initialize(). Any open 
+    PortAudioStreams are closed.
+
+    Pa_Terminate() MUST be called before exiting a program which 
+    uses PortAudio. Failure to do so may result in serious resource 
+    leaks, such as audio devices not being available until the next reboot.
+*/
+PaError Pa_Terminate( void );</PRE>
+<H4>Implementation Notes</H4>
+<P>One possible implementation strategy would be to add a "next" member to the internal stream data structure thus making it a linked list node, which could be linked into a list of all open streams.</P>
+<H4>Discussion</H4>
+<P>Some concerns have been raised about the overhead involved in PortAudio having to keep track of which streams are currently open. </P>
+<P>There has been some discussion about the behavior of nesting multiple calls to Pa_Initialize() and Pa_Terminate() - there is no intention of changing the current behaviour, which is that PortAudio has two states: "Initialized" and "Uninitialized" - in the Initialized state, Pa_Initialize() does nothing and returns an error, in the Uninitialized state Pa_Terminate() does nothing and returns an error.</P>
+<H4>Impact Analysis</H4>
+<P>This proposal changes the termination behaviour of PortAudio to reduce the likelihood of resource leaks.</P>
+<P>On Windows, the new Pa_Terminate() behaviour would allow users who want full protection against device leakage to install a global Win32 exception handler that calls Pa_Terminate() before exiting when a crash occurs. Similar techniques (using SIGNAL handlers perhaps?) may be possible on other platforms where necessary.</P>
 <P>____________</P>
 <H2><A NAME="CodingStyleGuidelines">Coding Style Guidelines</A></H2>
 <H4>Status</H4>
@@ -542,38 +582,11 @@ WAVERR_BADFORMAT to paSampleFormatNotSupported (already defined) </P>
 <H4>Impact Analysis</H4>
 <P>This proposal will require all existing code to be reviewed and possibly revised. This is not expected to be a "big-bang" operation. Rather it is envisaged that this will be a long term, ongoing process aimed at improving the quality of the PortAudio codebase. </P>
 <P>____________</P>
-<H2><A NAME="AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A></H2>
-<H4>Status</H4>
-<P>This proposal is sufficiently well defined to be implemented. </P>
-<H4>Background</H4>
-<P>Some driver models (eg ASIO, MME and DirectSound under Windows NT) can require a reboot to free devices when they are not closed properly (due to a program not calling Pa_Close() either in error, or due to a crash.) As a quality of implementation issue PortAudio should seek to avoid such circumstances.</P>
-<H4>Proposal</H4>
-<P>The definition of Pa_Terminate() should be extended as follows:</P>
-<PRE>/*
-    Pa_Terminate() is the library termination function - call this after 
-    using the library. This function deallocates all resources allocated 
-    by PortAudio since it was initializied using Pa_Initialize(). Any open 
-    PortAudioStreams are closed.
-
-    Pa_Terminate() MUST be called before exiting a program which 
-    uses PortAudio. Failure to do so may result in serious resource 
-    leaks, such as audio devices not being available until the next reboot.
-*/
-PaError Pa_Terminate( void );</PRE>
-<H4>Implementation Notes</H4>
-<P>One possible implementation strategy would be to add a "next" member to the internal stream data structure thus making it a linked list node, which could be linked into a list of all open streams.</P>
-<H4>Discussion</H4>
-<P>Some concerns have been raised about the overhead involved in PortAudio having to keep track of which streams are currently open. </P>
-<P>There has been some discussion about the behaviour of nesting multiple calls to Pa_Initialize() and Pa_Terminate() - there is no intention of changing the current behaviour, which is that PortAudio has two states: "Initialized" and "Uninitialized" - in the Initialized state, Pa_Initialize() does nothing and returns an error, in the Uninitialized state Pa_Terminate() does nothing and returns an error.</P>
-<H4>Impact Analysis</H4>
-<P>This proposal changes the termination behaviour of PortAudio to reduce the likelihood of resource leaks.</P>
-<P>On Windows, the new Pa_Terminate() behaviour would allow users who want full protection against device leakage to install a global Win32 exception handler that calls Pa_Terminate() before exiting when a crash occurs. Similar techniques (using SIGNAL handlers perhaps?) may be possible on other platforms where necessary.</P>
-<P>____________</P>
 <H2><A NAME="ReviseInternalHostAPI">Revise Internal Host API</A></H2>
 <H4>Status</H4>
 <P>This proposal is under construction. Ideally, someone should go through all of the existing implementations and identify code that could be factored into a common library (parameter validation code for example.)</P>
 <H4>Dependencies</H4>
-<P>This proposal is dependent on the <A HREF="#MultipleDriverModels">Support for Multiple Driver Models in a Single PortAudio Build</A> proposal, and the <A HREF="#Interleaved">Non-Interleaved Buffers</A> proposal. The proposed conversion functions may be dependent on the MME multichannel via stereo pairs extension which is part of the <A HREF="#DriverModelSpecificPa_OpenStream">Driver Model Specific Pa_OpenStream() Parameters</A> proposal.</P>
+<P>This proposal is dependent on the <A HREF="#MultipleDriverModels">Support for Multiple Host APIs in a Single PortAudio Build</A> proposal, and the <A HREF="#Interleaved">Non-Interleaved Buffers</A> proposal. The proposed conversion functions may be dependent on the MME multichannel via stereo pairs extension which is part of the <A HREF="#DriverModelSpecificPa_OpenStream">Host API Specific Pa_OpenStream() Parameters</A> proposal.</P>
 <H4>Background</H4>
 <P>PortAudio defines a set of helper functions that all implementations share. It is envisaged that these internal functions will need to be revised in response to the changes proposed in this document. It would also be beneficial to take this opportunity to refactor any other common code fragments that could be shared by multiple implementations.</P>
 <P>A refactoring of the buffer data conversion functions was proposed here: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-November/000244.html">http://techweb.rfa.org/pipermail/portaudio/2001-November/000244.html</A> However the proposal below is not quite the same. A significant benefit of formally specifying the interface to the buffer conversion functions is that it would facilitate the creation of optimised assembly language versions for different platforms.</P>
@@ -597,7 +610,7 @@ PaError Pa_Terminate( void );</PRE>
 PaBufferConversionFunction* Pa_GetBufferConversionFunction( 
     PaSampleFormat destFormat, int destChannels, PaEndianness destEndianness,
     PaSampleFormat srcFormat, int srcChannels, PaEndianness srcEndianness );</PRE>
-<P>Note that the interleave/deinterleave status is encoded in the destFormat and srcFormat parameters. paHostEndian is used to represent the endianness of the current platform since some driver models (eg ASIO) allow the driver to use samples in a different endianness from the host endianness. Another alternative is to encode sample endianness in PaSampleFormat - this would allow clients to write sample data of either endianness to PortAudio (e.g. soundfile playback direct from file) and benefit from PortAudio's byte swapping code.</P>
+<P>Note that the interleave/deinterleave status is encoded in the destFormat and srcFormat parameters. paHostEndian is used to represent the endianness of the current platform since some host APIs (eg ASIO) allow the driver to use samples in a different endianness from the host endianness. Another alternative is to encode sample endianness in PaSampleFormat - this would allow clients to write sample data of either endianness to PortAudio (e.g. soundfile playback direct from file) and benefit from PortAudio's byte swapping code.</P>
 <P>The redundant use of channel parameters in both the conversion functions and the factory function is intentional and would allow channel-optimised conversion functions to be supplied for common cases such as 16-bit stereo.</P>
 <H4>Discussion</H4>
 <P>This proposal currently only addresses buffer conversion functions, however it is important to identify other common code fragments that could be placed in the shared PortAudio library.</P>
@@ -606,9 +619,9 @@ PaBufferConversionFunction* Pa_GetBufferConversionFunction(
 <P>It hasn't been established whether PortAudio will be extended to support all PaSampleFormats on all devices.</P>
 <P>It isn't clear whether paCustomFormat is viable under this proposal, or how it would be accommodated.</P>
 <P>When the client requested format and the host format are different a temporary buffer may be required to hold the converted data. However, in general PortAudio should aim to convert data in-place. Functions may be needed to establish when temporary buffers are needed, and to allocate them.</P>
-<P>Due to a mismatch between the API buffer size and the PortAudio callback buffer size some driver models require PortAudio to shuffle data among multiple buffers in order to fulfil client requests - this has not yet been considered within the current proposal.</P>
+<P>Due to a mismatch between the API buffer size and the PortAudio callback buffer size some Host APIs require PortAudio to shuffle data among multiple buffers in order to fulfil client requests - this has not yet been considered within the current proposal.</P>
 <P>Memory allocation should probably be handled with platform specific functions such as Win32 GlobalAlloc() rather than using malloc()</P>
 <H4>Impact Analysis</H4>
-<P>This proposal only effects PortAudio implementors. Increasing the utility of shared code will improve the quality of all PortAudio implementations in terms of speed, size, and robustness. It should also reduce the effort involved in porting PortAudio to a new driver model.</P>
+<P>This proposal only effects PortAudio implementors. Increasing the utility of shared code will improve the quality of all PortAudio implementations in terms of speed, size, and robustness. It should also reduce the effort involved in porting PortAudio to a new host API.</P>
 <P>____________</P></BODY>
 </HTML>
