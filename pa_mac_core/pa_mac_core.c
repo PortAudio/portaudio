@@ -37,6 +37,17 @@
  3.29.2001 - Phil Burk - First pass... converted from Window MME code with help from Darren.
  3.30.2001 - Darren Gibbs - Added more support for dynamically querying device info.
  12.7.2001 - Gord Peters - Tweaks to compile on PA V17 and OS X 10.1
+ 2.7.2002 - Darren and Phil - fixed isInput so GetProperty works better, 
+             fixed device queries for numChannels and sampleRates,
+    one CoreAudio device now maps to separate input and output PaDevices,
+    audio input works if using same CoreAudio device (some HW devices make separate CoreAudio devices).
+    
+TODO:
+O- conversion for other user formats besides paFloat32
+O- FIFO between input and output callbacks if different devices, like in pa_mac.c
+O- debug mono output
+O- error check for unsupported sample rates
+O- BUG: if ask for 22050 when only 44100 supported then get 44100 and no error message
  */
 #include <CoreServices/CoreServices.h>
 #include <CoreAudio/CoreAudio.h>
@@ -47,9 +58,6 @@
 #include "pa_trace.h"
 
 /************************************************* Constants ********/
-#define PA_USE_TIMER_CALLBACK    (0)  /* Select between two options for background task. 0=thread, 1=timer */
-#define PA_USE_HIGH_LATENCY      (0)  /* For debugging glitches. */
-
 /* Switches for debugging. */
 #define PA_SIMULATE_UNDERFLOW    (0)  /* Set to one to force an underflow of the output buffer. */
 
@@ -57,20 +65,17 @@
 #define PA_TRACE_RUN             (0)
 #define PA_TRACE_START_STOP      (1)
 
-#define PA_MIN_MSEC_PER_HOST_BUFFER  (10)
-#define PA_MAX_MSEC_PER_HOST_BUFFER  (100) /* Do not exceed unless user buffer exceeds */
-#define PA_MIN_NUM_HOST_BUFFERS      (3)
-#define PA_MAX_NUM_HOST_BUFFERS      (16)  /* OK to exceed if necessary */
-#define PA_MIN_LATENCY_MSEC          (200)
-
-#define MIN_TIMEOUT_MSEC                 (1000)
+#define PA_MIN_LATENCY_MSEC      (8)
+#define MIN_TIMEOUT_MSEC         (1000)
 
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
 #define DBUG(x)  /* PRINT(x) */
 #define DBUGX(x) /* PRINT(x) */
 
-/************************************************* Definitions ********/
+// define value of isInput passed to CodeAudio routines
+#define IS_INPUT   (true)
+#define IS_OUTPUT   (false)
 
 /**************************************************************
  * Structure for internal host specific stream data.
@@ -78,11 +83,11 @@
  */
 typedef struct PaHostSoundControl
 {
+    AudioDeviceID      pahsc_AudioDeviceID;  // Must be the same for input and output for now.
     /* Input -------------- */
     int                pahsc_BytesPerHostInputBuffer;
     int                pahsc_BytesPerUserInputBuffer;    /* native buffer size in bytes */
     /* Output -------------- */
-    AudioDeviceID      pahsc_OutputAudioDeviceID;
     int                pahsc_BytesPerHostOutputBuffer;
     int                pahsc_BytesPerUserOutputBuffer;    /* native buffer size in bytes */
     /* Run Time -------------- */
@@ -92,7 +97,6 @@ typedef struct PaHostSoundControl
     // LARGE_INTEGER      pahsc_EntryCount;
     // LARGE_INTEGER      pahsc_LastExitCount;
     /* Init Time -------------- */
-    int                pahsc_NumHostBuffers;
     int                pahsc_FramesPerHostBuffer;
     int                pahsc_UserBuffersPerHostBuffer;
 
@@ -102,14 +106,30 @@ typedef struct PaHostSoundControl
 }
 PaHostSoundControl;
 
+/**************************************************************
+ * Structure for internal extended device info.
+ * There will be one or two PortAudio devices for each Core Audio device:
+ *   one input and or one output.
+ */
+typedef struct PaHostDeviceInfo
+{
+    PaDeviceInfo      paInfo;
+    AudioDeviceID     audioDeviceID;
+}
+PaHostDeviceInfo;
+
 /************************************************* Shared Data ********/
 /* FIXME - put Mutex around this shared data. */
-static int sNumDevices = 0;
-static PaDeviceInfo **sDevicePtrs = NULL;
+static int sNumPaDevices = 0;   /* Total number of PaDeviceInfos */
+static int sNumInputDevices = 0; /* Total number of input PaDeviceInfos */
+static int sNumOutputDevices = 0;
+static PaHostDeviceInfo *sDeviceInfos = NULL;
 static int sDefaultInputDeviceID = paNoDevice;
 static int sDefaultOutputDeviceID = paNoDevice;
 static int sPaHostError = 0;
-static AudioDeviceID *sDeviceIDList;   // Array of AudioDeviceIDs
+
+static int sNumCoreDevices = 0;
+static AudioDeviceID *sCoreDeviceIDs;   // Array of Core AudioDeviceIDs
 
 static const char sMapperSuffixInput[] = " - Input";
 static const char sMapperSuffixOutput[] = " - Output";
@@ -123,6 +143,14 @@ static const char sMapperSuffixOutput[] = " - Output";
 
 static PaError Pa_QueryDevices( void );
 PaError PaHost_GetTotalBufferFrames( internalPortAudioStream   *past );
+
+static int PaHost_ScanDevices( Boolean isInput );
+static int PaHost_QueryDeviceInfo( PaHostDeviceInfo *hostDeviceInfo, int coreDeviceIndex, Boolean isInput );
+
+static PaDeviceID Pa_QueryDefaultInputDevice( void );
+static PaDeviceID Pa_QueryDefaultOutputDevice( void );
+static void PaHost_CalcHostBufferSize( internalPortAudioStream *past );
+
 /********************************* BEGIN CPU UTILIZATION MEASUREMENT ****/
 static void Pa_StartUsageCalculation( internalPortAudioStream   *past )
 {
@@ -170,24 +198,55 @@ static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
 #endif
 }
 
-static PaDeviceID Pa_QueryDefaultDevice( int deviceEnum )
+/************************************************************************/
+static PaDeviceID Pa_QueryDefaultInputDevice( void )
 {
     OSStatus err = noErr;
     UInt32  count;
     int          i;
-    AudioDeviceID tempDevice = kAudioDeviceUnknown;
+    AudioDeviceID tempDeviceID = kAudioDeviceUnknown;
     PaDeviceID  defaultDeviceID;
 
     // get the default output device for the HAL
     // it is required to pass the size of the data to be returned
     count = sizeof(AudioDeviceID);
-    err = AudioHardwareGetProperty( deviceEnum,  &count, (void *) &tempDevice);
+    err = AudioHardwareGetProperty( kAudioHardwarePropertyDefaultInputDevice,  &count, (void *) &tempDeviceID);
     if (err != noErr) goto Bail;
-    // find index of default device
+    // scan input devices to see which one matches this device
     defaultDeviceID = paNoDevice;
-    for( i=0; i<sNumDevices; i++ )
+    for( i=0; i<sNumInputDevices; i++ )
     {
-        if( sDeviceIDList[i] == tempDevice )
+        DBUG(("Pa_QueryDefaultInputDevice: i = %d, aDevId = %d\n", i, sDeviceInfos[i].audioDeviceID ));
+        if( sDeviceInfos[i].audioDeviceID == tempDeviceID )
+        {
+            defaultDeviceID = i;
+            break;
+        }
+    }
+Bail:
+    return defaultDeviceID;
+}
+
+/************************************************************************/
+static PaDeviceID Pa_QueryDefaultOutputDevice( void )
+{
+    OSStatus err = noErr;
+    UInt32  count;
+    int          i;
+    AudioDeviceID tempDeviceID = kAudioDeviceUnknown;
+    PaDeviceID  defaultDeviceID;
+
+    // get the default output device for the HAL
+    // it is required to pass the size of the data to be returned
+    count = sizeof(AudioDeviceID);
+    err = AudioHardwareGetProperty( kAudioHardwarePropertyDefaultOutputDevice,  &count, (void *) &tempDeviceID);
+    if (err != noErr) goto Bail;
+    // scan input devices to see which one matches this device
+    defaultDeviceID = paNoDevice;
+    for( i=sNumInputDevices; i<sNumPaDevices; i++ )
+    {
+        DBUG(("Pa_QueryDefaultOutputDevice: i = %d, aDevId = %d\n", i, sDeviceInfos[i].audioDeviceID ));
+        if( sDeviceInfos[i].audioDeviceID == tempDeviceID )
         {
             defaultDeviceID = i;
             break;
@@ -206,33 +265,42 @@ static PaError Pa_QueryDevices( void )
     Boolean  outWritable;
     int         numBytes;
 
-    // find out how many audio devices there are, if any
+    // find out how many Core Audio devices there are, if any
     err = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices, &outSize, &outWritable);
     if (err != noErr)
         ERR_RPT(("Couldn't get info about list of audio devices\n"));
 
     // calculate the number of device available
-    sNumDevices = outSize / sizeof(AudioDeviceID);
+    sNumCoreDevices = outSize / sizeof(AudioDeviceID);
 
     // Bail if there aren't any devices
-    if (sNumDevices < 1)
+    if (sNumCoreDevices < 1)
         ERR_RPT(("No Devices Available\n"));
 
     // make space for the devices we are about to get
-    sDeviceIDList = malloc(outSize);
+    sCoreDeviceIDs = malloc(outSize);
 
     // get an array of AudioDeviceIDs
-    err = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &outSize, (void *)sDeviceIDList);
+    err = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &outSize, (void *)sCoreDeviceIDs);
     if (err != noErr)
         ERR_RPT(("Couldn't get list of audio device IDs\n"));
 
-    /* Allocate structures to hold device info pointers. */
-    numBytes = sNumDevices * sizeof(PaDeviceInfo *);
-    sDevicePtrs = PaHost_AllocateFastMemory( numBytes );
-    if( sDevicePtrs == NULL ) return paInsufficientMemory;
+    // Allocate structures to hold device info pointers.
+    // There will be a maximum of two Pa devices per Core Audio device, input and/or output.
+    numBytes = sNumCoreDevices * 2 * sizeof(PaHostDeviceInfo);
+    sDeviceInfos = (PaHostDeviceInfo *) PaHost_AllocateFastMemory( numBytes );
+    if( sDeviceInfos == NULL ) return paInsufficientMemory;
 
-    sDefaultInputDeviceID = Pa_QueryDefaultDevice( kAudioHardwarePropertyDefaultInputDevice );
-    sDefaultOutputDeviceID = Pa_QueryDefaultDevice( kAudioHardwarePropertyDefaultOutputDevice );
+    // Scan all the Core Audio devices to see which support input and allocate a
+    // PaHostDeviceInfo structure for each one.
+    PaHost_ScanDevices( IS_INPUT );
+    sNumInputDevices = sNumPaDevices;
+    // Now scan all the output devices.
+    PaHost_ScanDevices( IS_OUTPUT );
+    sNumOutputDevices = sNumPaDevices - sNumInputDevices;
+
+    sDefaultInputDeviceID = Pa_QueryDefaultInputDevice();
+    sDefaultOutputDeviceID = Pa_QueryDefaultOutputDevice();
 
     return paNoError;
 }
@@ -246,28 +314,29 @@ long Pa_GetHostError()
 /*************************************************************************/
 int Pa_CountDevices()
 {
-    if( sNumDevices <= 0 ) Pa_Initialize();
-    return sNumDevices;
+    if( sNumPaDevices <= 0 ) Pa_Initialize();
+    return sNumPaDevices;
 }
 
 /*************************************************************************/
 
 /* Allocate a string containing the device name. */
-char *deviceNameFromID(AudioDeviceID deviceID )
+char *deviceNameFromID(AudioDeviceID deviceID, Boolean isInput )
 {
     OSStatus err = noErr;
     UInt32  outSize;
     Boolean  outWritable;
     char     *deviceName = nil;
     // query size of name
-    err =  AudioDeviceGetPropertyInfo(deviceID, 0, false, kAudioDevicePropertyDeviceName, &outSize, &outWritable);
+    err =  AudioDeviceGetPropertyInfo(deviceID, 0, isInput, kAudioDevicePropertyDeviceName, &outSize, &outWritable);
     if (err == noErr)
     {
         deviceName = malloc( outSize + 1);
         if( deviceName )
         {
-            err = AudioDeviceGetProperty(deviceID, 0, false, kAudioDevicePropertyDeviceName, &outSize, deviceName);
-            // FIXME if (err == noErr)
+            err = AudioDeviceGetProperty(deviceID, 0, isInput, kAudioDevicePropertyDeviceName, &outSize, deviceName);
+            if (err != noErr)
+                ERR_RPT(("Couldn't get audio device name.\n"));
         }
     }
 
@@ -276,13 +345,10 @@ char *deviceNameFromID(AudioDeviceID deviceID )
 
 /*************************************************************************/
 
-void deviceDataFormatFromID(AudioDeviceID deviceID , AudioStreamBasicDescription *desc )
+OSStatus deviceDataFormatFromID(AudioDeviceID deviceID , AudioStreamBasicDescription *desc, Boolean isInput )
 {
-    OSStatus err = noErr;
-    UInt32  outSize;
-
-    outSize = sizeof(*desc);
-    err = AudioDeviceGetProperty(deviceID, 0, false, kAudioDevicePropertyStreamFormat, &outSize, desc);
+    UInt32  outSize = sizeof(*desc);
+    return AudioDeviceGetProperty(deviceID, 0, isInput, kAudioDevicePropertyStreamFormat, &outSize, desc);
 }
 
 /*************************************************************************/
@@ -293,13 +359,13 @@ void deviceDataFormatFromID(AudioDeviceID deviceID , AudioStreamBasicDescription
 // fields set to 0 will be ignored in the query, but otherwise values
 // must match exactly.
 
-Boolean deviceDoesSupportFormat(AudioDeviceID deviceID , AudioStreamBasicDescription *desc )
+Boolean deviceDoesSupportFormat(AudioDeviceID deviceID, AudioStreamBasicDescription *desc, Boolean isInput )
 {
     OSStatus err = noErr;
     UInt32  outSize;
 
     outSize = sizeof(*desc);
-    err = AudioDeviceGetProperty(deviceID, 0, false, kAudioDevicePropertyStreamFormatSupported, &outSize, desc);
+    err = AudioDeviceGetProperty(deviceID, 0, isInput, kAudioDevicePropertyStreamFormatSupported, &outSize, desc);
 
     if (err == kAudioHardwareNoError)
         return true;
@@ -334,7 +400,7 @@ char* coreAudioErrorString (int errCode )
         str = "kAudioHardwareIllegalOperationError";
         break;
     default:
-        str = "UNKNWON ERROR!";
+        str = "Unknown CoreAudio Error!";
         break;
     }
 
@@ -342,118 +408,147 @@ char* coreAudioErrorString (int errCode )
 }
 
 /*************************************************************************
-** If a PaDeviceInfo structure has not already been created,
-** then allocate one and fill it in for the selected device.
+** PaDeviceInfo structures have already been created
+** so just return the pointer.
 **
-** We create one extra input and one extra output device for the WAVE_MAPPER.
-** [Does anyone know how to query the default device and get its name?]
 */
 const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
 {
-#define NUM_STANDARDSAMPLINGRATES   3   /* 11.025, 22.05, 44.1 */
-#define NUM_CUSTOMSAMPLINGRATES     4   /* must be the same number of elements as in the array below */
-#define MAX_NUMSAMPLINGRATES        (NUM_STANDARDSAMPLINGRATES+NUM_CUSTOMSAMPLINGRATES)
+    if( id < 0 || id >= sNumPaDevices )
+        return NULL;
 
-    PaDeviceInfo *deviceInfo;
-    AudioDeviceID    devID;
-    double *sampleRates; /* non-const ptr */
-    double possibleSampleRates[] = {8000.0, 11025.0, 22050.0, 44100.0, 48000.0, 88200.0, 96000.0};
+    return &sDeviceInfos[id].paInfo;
+}
+
+/*************************************************************************
+** Scan all of the Core Audio devices to see which support input or output.
+** Changes sNumDevices, and fills in sDeviceInfos.
+*/
+static int PaHost_ScanDevices( Boolean isInput )
+{
+    int coreDeviceIndex;
+    int result;
+    PaHostDeviceInfo  *hostDeviceInfo;
+    int numAdded = 0;
+
+    for(  coreDeviceIndex=0; coreDeviceIndex<sNumCoreDevices; coreDeviceIndex++ )
+    {
+        // try to fill in next PaHostDeviceInfo
+        hostDeviceInfo = &sDeviceInfos[sNumPaDevices];
+        result = PaHost_QueryDeviceInfo( hostDeviceInfo, coreDeviceIndex, isInput );
+        DBUG(("PaHost_ScanDevices: paDevId = %d, coreDevId = %d\n", sNumPaDevices, hostDeviceInfo->audioDeviceID ));
+        if( result > 0 )
+        {
+            sNumPaDevices += 1;  // bump global counter if we got one
+            numAdded += 1;
+        }
+        else if( result < 0 ) return result;
+    }
+    return numAdded;
+}
+
+/*************************************************************************
+** Try to fill in the device info for this device.
+** Return 1 if a good device that PA can use.
+** Return 0 if not appropriate
+** or return negative error.
+**
+*/
+static int PaHost_QueryDeviceInfo( PaHostDeviceInfo *hostDeviceInfo, int coreDeviceIndex, Boolean isInput )
+{
+    OSErr   err;
     int index;
     AudioStreamBasicDescription formatDesc;
     Boolean result;
+    AudioDeviceID    devID;
+    double *sampleRates = NULL; /* non-const ptr */
 
-    if( id < 0 || id >= sNumDevices )
-        return NULL;
-
-    if( sDevicePtrs[ id ] != NULL )
-    {
-        return sDevicePtrs[ id ];
-    }
-
-    deviceInfo = PaHost_AllocateFastMemory( sizeof(PaDeviceInfo) );
-    if( deviceInfo == NULL ) return NULL;
+    PaDeviceInfo *deviceInfo = &hostDeviceInfo->paInfo;
+    double possibleSampleRates[] = {8000.0, 11025.0, 22050.0, 44100.0, 48000.0, 88200.0, 96000.0};
+    int maxNumSampleRates = sizeof( possibleSampleRates ) / sizeof( double );
 
     deviceInfo->structVersion = 1;
     deviceInfo->maxInputChannels = 0;
     deviceInfo->maxOutputChannels = 0;
     deviceInfo->numSampleRates = -1;
 
+    devID = sCoreDeviceIDs[ coreDeviceIndex ];
+    hostDeviceInfo->audioDeviceID = devID;
 
-    // fill in format descriptor
-    if( id < sNumDevices )
+    // Figure out supported sample rates
+    // Make room in case device supports all rates.
+    sampleRates = (double*)PaHost_AllocateFastMemory( maxNumSampleRates * sizeof(double) );
+    if( sampleRates == NULL ) return paInsufficientMemory;
+
+    deviceInfo->sampleRates = sampleRates;
+    deviceInfo->numSampleRates = 0;
+
+    // Loop through the possible sampling rates and check each to see if the device supports it.
+    for (index = 0; index < maxNumSampleRates; index ++)
     {
-        devID = sDeviceIDList[ id ];
+        memset( &formatDesc, 0, sizeof(AudioStreamBasicDescription) );
+        formatDesc.mSampleRate = possibleSampleRates[index];
+        result = deviceDoesSupportFormat( devID, &formatDesc, isInput );
 
-        // Get the device name
-        deviceInfo->name = deviceNameFromID( devID );
-
-        // Figure out supported sample rates
-        // Make room in case device supports all rates.
-        sampleRates = (double*)PaHost_AllocateFastMemory( MAX_NUMSAMPLINGRATES * sizeof(double) );
-        deviceInfo->sampleRates = sampleRates;
-        deviceInfo->numSampleRates = 0;
-
-        // Loop through the possible sampling rates and check each to see if the device supports it.
-        for (index = 0; index < MAX_NUMSAMPLINGRATES; index ++)
+        if (result == true)
         {
-            memset( &formatDesc, 0, sizeof(AudioStreamBasicDescription) );
-            formatDesc.mSampleRate = possibleSampleRates[index];
-            result = deviceDoesSupportFormat( devID, &formatDesc );
-
-            if (result == true)
-            {
-                deviceInfo->numSampleRates += 1;
-                *sampleRates = possibleSampleRates[index];
-                sampleRates++;
-            }
+            deviceInfo->numSampleRates += 1;
+            *sampleRates = possibleSampleRates[index];
+            sampleRates++;
         }
+    }
+    // If no sample rates supported, then not a very good device.
+    if( deviceInfo->numSampleRates == 0 ) goto error;
 
-        // Get data format info from the device.
-        deviceDataFormatFromID(devID, &formatDesc);
+    // Get data format info from the device.
+    err = deviceDataFormatFromID(devID, &formatDesc, isInput );
+    // If no channels supported, then not a very good device.
+    if( (err != noErr) || (formatDesc.mChannelsPerFrame == 0) ) goto error;
 
-        deviceInfo->maxInputChannels = 0; // FIXME - Input and Output are separate devices!
+    if( isInput )
+    {
+        deviceInfo->maxInputChannels = formatDesc.mChannelsPerFrame;
+    }
+    else
+    {
         deviceInfo->maxOutputChannels = formatDesc.mChannelsPerFrame;
-
-        // FIXME - where to put current sample rate?:  formatDesc.mSampleRate
-
-        // Right now the Core Audio headers only define one formatID: LinearPCM
-        // Apparently LinearPCM must be Float32 for now.
-        // FIXME -
-        switch (formatDesc.mFormatID)
-        {
-        case kAudioFormatLinearPCM:
-            deviceInfo->nativeSampleFormats = paFloat32;
-
-            // FIXME - details about the format are in these flags.
-            // formatDesc.mFormatFlags
-
-            // here are the possibilities
-            // kLinearPCMFormatFlagIsFloat   // set for floating point, clear for integer
-            // kLinearPCMFormatFlagIsBigEndian  // set for big endian, clear for little
-            // kLinearPCMFormatFlagIsSignedInteger // set for signed integer, clear for unsigned integer,
-            //    only valid if kLinearPCMFormatFlagIsFloat is clear
-            // kLinearPCMFormatFlagIsPacked   // set if the sample bits are packed as closely together as possible,
-            //    clear if they are high or low aligned within the channel
-            // kLinearPCMFormatFlagIsAlignedHigh  // set if the sample bits are placed
-
-            break;
-        default:
-            deviceInfo->nativeSampleFormats = paFloat32;  // FIXME
-            break;
-        }
-
     }
 
-    sDevicePtrs[ id ] = deviceInfo;
-    return deviceInfo;
+    // FIXME - where to put current sample rate?:  formatDesc.mSampleRate
 
-    /* FIXME
-    error:
-        free( sampleRates );
-        free( deviceInfo );
-    */
+    // Right now the Core Audio headers only define one formatID: LinearPCM
+    // Apparently LinearPCM must be Float32 for now.
+    switch (formatDesc.mFormatID)
+    {
+    case kAudioFormatLinearPCM:
+        deviceInfo->nativeSampleFormats = paFloat32;
 
-    return NULL;
+        // FIXME - details about the format are in these flags.
+        // formatDesc.mFormatFlags
+
+        // here are the possibilities
+        // kLinearPCMFormatFlagIsFloat   // set for floating point, clear for integer
+        // kLinearPCMFormatFlagIsBigEndian  // set for big endian, clear for little
+        // kLinearPCMFormatFlagIsSignedInteger // set for signed integer, clear for unsigned integer,
+        //    only valid if kLinearPCMFormatFlagIsFloat is clear
+        // kLinearPCMFormatFlagIsPacked   // set if the sample bits are packed as closely together as possible,
+        //    clear if they are high or low aligned within the channel
+        // kLinearPCMFormatFlagIsAlignedHigh  // set if the sample bits are placed
+        break;
+
+    default:
+        deviceInfo->nativeSampleFormats = paFloat32;  // FIXME
+        break;
+    }
+
+
+    // Get the device name
+    deviceInfo->name = deviceNameFromID( devID, isInput );
+    return 1;
+
+error:
+    if( sampleRates != NULL ) free( sampleRates );
+    return 0;
 }
 
 /*************************************************************************
@@ -491,7 +586,7 @@ static PaDeviceID PaHost_GetEnvDefaultDeviceID( char *envName )
 
 static PaError Pa_MaybeQueryDevices( void )
 {
-    if( sNumDevices == 0 )
+    if( sNumPaDevices == 0 )
     {
         return Pa_QueryDevices();
     }
@@ -622,7 +717,10 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
     return (result != 0) ? result : done;
 }
 
-OSStatus appIOProc (AudioDeviceID  inDevice, const AudioTimeStamp*  inNow, const AudioBufferList*  inInputData, const AudioTimeStamp*  inInputTime, AudioBufferList*  outOutputData, const AudioTimeStamp* inOutputTime, void* contextPtr)
+OSStatus appIOProc (AudioDeviceID  inDevice, const AudioTimeStamp*  inNow,
+                    const AudioBufferList*  inInputData, const AudioTimeStamp*  inInputTime,
+                    AudioBufferList*  outOutputData, const AudioTimeStamp* inOutputTime,
+                    void* contextPtr)
 {
 
     PaError      result = 0;
@@ -665,6 +763,7 @@ OSStatus appIOProc (AudioDeviceID  inDevice, const AudioTimeStamp*  inNow, const
     return result;
 }
 
+#if 0
 static int PaHost_CalcTimeOut( internalPortAudioStream *past )
 {
     /* Calculate timeOut longer than longest time it could take to play all buffers. */
@@ -672,59 +771,36 @@ static int PaHost_CalcTimeOut( internalPortAudioStream *past )
     if( timeOut < MIN_TIMEOUT_MSEC ) timeOut = MIN_TIMEOUT_MSEC;
     return timeOut;
 }
-
+#endif
 /*******************************************************************/
 PaError PaHost_OpenInputStream( internalPortAudioStream   *past )
 {
-    PaError          result = paNoError;
     PaHostSoundControl *pahsc;
+    const PaHostDeviceInfo *hostDeviceInfo;
+    PaError          result = paNoError;
+    UInt32           bytesPerHostBuffer;
+    UInt32           dataSize;
+    OSStatus         err = noErr;
     int              bytesPerInputFrame;
-    const PaDeviceInfo  *pad;
 
     pahsc = (PaHostSoundControl *) past->past_DeviceData;
 
     DBUG(("PaHost_OpenStream: deviceID = 0x%x\n", past->past_InputDeviceID));
-    pad = Pa_GetDeviceInfo( past->past_InputDeviceID );
-    if( pad == NULL ) return paInternalError;
+    if( (past->past_InputDeviceID < 0) || (past->past_InputDeviceID >= sNumPaDevices) )
+    {
+        return paInvalidDeviceId;
+    }
+    hostDeviceInfo = &sDeviceInfos[past->past_InputDeviceID];
 
-    bytesPerInputFrame = Pa_GetSampleSize(pad->nativeSampleFormats) * past->past_NumInputChannels;
+    // calculate buffer sizes in bytes
+    bytesPerInputFrame = Pa_GetSampleSize(past->past_InputSampleFormat) * past->past_NumInputChannels;
     pahsc->pahsc_BytesPerUserInputBuffer = past->past_FramesPerUserBuffer * bytesPerInputFrame;
-    pahsc->pahsc_BytesPerHostInputBuffer = pahsc->pahsc_UserBuffersPerHostBuffer * pahsc->pahsc_BytesPerUserInputBuffer;
-    // FIXME
-    return result;
-}
+    pahsc->pahsc_BytesPerHostInputBuffer = pahsc->pahsc_FramesPerHostBuffer * bytesPerInputFrame;
 
-/*******************************************************************/
-PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
-{
-    PaError          result = paNoError;
-    PaHostSoundControl *pahsc;
-    const PaDeviceInfo *pad;
-    UInt32           bytesPerHostBuffer;
-    UInt32   dataSize;
-    UInt32   hardwareLatency = -1;
-    Boolean   writeable = false;
-    OSStatus         err = noErr;
-    int              bytesPerOutputFrame;
-
-    pahsc = (PaHostSoundControl *) past->past_DeviceData;
-
-    DBUG(("PaHost_OpenStream: deviceID = 0x%x\n", past->past_OutputDeviceID));
-    pad = Pa_GetDeviceInfo( past->past_OutputDeviceID );
-    if( pad == NULL ) return paInternalError;
-
-    pahsc->pahsc_OutputAudioDeviceID = sDeviceIDList[past->past_OutputDeviceID];
-
-    bytesPerOutputFrame = Pa_GetSampleSize(pad->nativeSampleFormats) * past->past_NumOutputChannels;
-    pahsc->pahsc_BytesPerUserOutputBuffer = past->past_FramesPerUserBuffer * bytesPerOutputFrame;
-    pahsc->pahsc_BytesPerHostOutputBuffer = pahsc->pahsc_UserBuffersPerHostBuffer * pahsc->pahsc_BytesPerUserOutputBuffer;
-
-    // FIXME - force host buffer to user size
-
-    // change the bufferSize of the device
-    bytesPerHostBuffer = past->past_OutputBufferSize; // FIXME
+    // Change the bufferSize of the device! Is this per device or just for our stream?
+    bytesPerHostBuffer = pahsc->pahsc_BytesPerHostInputBuffer;
     dataSize = sizeof(UInt32);
-    err = AudioDeviceSetProperty( pahsc->pahsc_OutputAudioDeviceID, 0, 0, false,
+    err = AudioDeviceSetProperty( hostDeviceInfo->audioDeviceID, 0, 0, IS_INPUT,
                                   kAudioDevicePropertyBufferSize, dataSize, &bytesPerHostBuffer);
     if( err != noErr )
     {
@@ -733,22 +809,47 @@ PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
         goto error;
     }
 
-    // FIXME -- this isn't working for some reason.  I can't figure out what the error code is.
+    return result;
+
+error:
+    return result;
+}
+
+/*******************************************************************/
+PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
+{
+    PaHostSoundControl *pahsc;
+    const PaHostDeviceInfo *hostDeviceInfo;
+    PaError          result = paNoError;
+    UInt32           bytesPerHostBuffer;
+    UInt32           dataSize;
+    OSStatus         err = noErr;
+    int              bytesPerOutputFrame;
+
+    pahsc = (PaHostSoundControl *) past->past_DeviceData;
+
+    DBUG(("PaHost_OpenStream: deviceID = 0x%x\n", past->past_OutputDeviceID));
+    if( (past->past_OutputDeviceID < 0) || (past->past_OutputDeviceID >= sNumPaDevices) )
+    {
+        return paInvalidDeviceId;
+    }
+    hostDeviceInfo = &sDeviceInfos[past->past_OutputDeviceID];
+
+    // calculate buffer sizes in bytes
+    bytesPerOutputFrame = Pa_GetSampleSize(past->past_OutputSampleFormat) * past->past_NumOutputChannels;
+    pahsc->pahsc_BytesPerUserOutputBuffer = past->past_FramesPerUserBuffer * bytesPerOutputFrame;
+    pahsc->pahsc_BytesPerHostOutputBuffer = pahsc->pahsc_FramesPerHostBuffer * bytesPerOutputFrame;
+
+    // Change the bufferSize of the device! Is this per device or just for our stream?
+    bytesPerHostBuffer = pahsc->pahsc_BytesPerHostOutputBuffer;
     dataSize = sizeof(UInt32);
-    err = AudioDeviceGetProperty(pahsc->pahsc_OutputAudioDeviceID, 0, false, kAudioDevicePropertyLatency, &dataSize, &writeable);
+    err = AudioDeviceSetProperty( hostDeviceInfo->audioDeviceID, 0, 0, IS_OUTPUT,
+                                  kAudioDevicePropertyBufferSize, dataSize, &bytesPerHostBuffer);
     if( err != noErr )
     {
-        PRINT(("A CoreAudio error occurred: %s.\n", coreAudioErrorString( err ) ));
-    }
-
-    err = AudioDeviceGetProperty(pahsc->pahsc_OutputAudioDeviceID, 0, false, kAudioDevicePropertyLatency, &dataSize, (void *)&hardwareLatency);
-    if ( err != noErr )
-    {
-        PRINT(("A CoreAudio error occurred: %s.\n", coreAudioErrorString( err ) ));
-    }
-    else
-    {
-        PRINT(("Output Stream Hardware Latency = %d frames.\n", hardwareLatency ));
+        ERR_RPT(("Could not force buffer size!"));
+        result = paHostError;
+        goto error;
     }
 
     return result;
@@ -761,92 +862,38 @@ error:
 PaError PaHost_GetTotalBufferFrames( internalPortAudioStream   *past )
 {
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
-    return pahsc->pahsc_NumHostBuffers * pahsc->pahsc_FramesPerHostBuffer;
+    return pahsc->pahsc_FramesPerHostBuffer;
 }
 
 
 /*******************************************************************
-* Determine number of WAVE Buffers
-* and how many User Buffers we can put into each WAVE buffer.
+* Determine how many User Buffers we can put into our CoreAudio stream buffer.
+* Uses:
+*    past->past_FramesPerUserBuffer, etc.
+* Sets:
+*    past->past_NumUserBuffers
+*    pahsc->pahsc_UserBuffersPerHostBuffer
+*    pahsc->pahsc_FramesPerHostBuffer
 */
-void PaHost_CalcNumHostBuffers( internalPortAudioStream *past )
+static void PaHost_CalcHostBufferSize( internalPortAudioStream *past )
 {
     PaHostSoundControl *pahsc = past->past_DeviceData;
-    unsigned int  minNumBuffers;
-    int           minFramesPerHostBuffer;
-    int           maxFramesPerHostBuffer;
-    int           minTotalFrames;
-    int           userBuffersPerHostBuffer;
-    int           framesPerHostBuffer;
-    int           numHostBuffers;
+    unsigned int  minNumUserBuffers;
 
-    /* Calculate minimum and maximum sizes based on timing and sample rate. */
-    minFramesPerHostBuffer = (int) (PA_MIN_MSEC_PER_HOST_BUFFER * past->past_SampleRate / 1000.0);
-    minFramesPerHostBuffer = (minFramesPerHostBuffer + 7) & ~7;
-    DBUG(("PaHost_CalcNumHostBuffers: minFramesPerHostBuffer = %d\n", minFramesPerHostBuffer ));
-
-    maxFramesPerHostBuffer = (int) (PA_MAX_MSEC_PER_HOST_BUFFER * past->past_SampleRate / 1000.0);
-    maxFramesPerHostBuffer = (maxFramesPerHostBuffer + 7) & ~7;
-    DBUG(("PaHost_CalcNumHostBuffers: maxFramesPerHostBuffer = %d\n", maxFramesPerHostBuffer ));
-
-    /* Determine number of user buffers based on minimum latency. */
-    minNumBuffers = Pa_GetMinNumBuffers( past->past_FramesPerUserBuffer, past->past_SampleRate );
-    past->past_NumUserBuffers = ( minNumBuffers > past->past_NumUserBuffers ) ? minNumBuffers : past->past_NumUserBuffers;
+    // Determine number of user buffers based on minimum latency.
+    minNumUserBuffers = Pa_GetMinNumBuffers( past->past_FramesPerUserBuffer, past->past_SampleRate );
+    // Compare to user requested number in user wants more than the minimum.
+    past->past_NumUserBuffers = ( minNumUserBuffers > past->past_NumUserBuffers ) ?
+                                minNumUserBuffers : past->past_NumUserBuffers;
     DBUG(("PaHost_CalcNumHostBuffers: min past_NumUserBuffers = %d\n", past->past_NumUserBuffers ));
 
-    minTotalFrames = past->past_NumUserBuffers * past->past_FramesPerUserBuffer;
-
-    /* We cannot make the WAVE buffers too small because they may not get serviced quickly enough. */
-    if( (int) past->past_FramesPerUserBuffer < minFramesPerHostBuffer )
-    {
-        userBuffersPerHostBuffer =
-            (minFramesPerHostBuffer + past->past_FramesPerUserBuffer - 1) /
-            past->past_FramesPerUserBuffer;
-    }
-    else
-    {
-        userBuffersPerHostBuffer = 1;
-    }
-
-
-    framesPerHostBuffer = past->past_FramesPerUserBuffer * userBuffersPerHostBuffer;
-    /* Calculate number of WAVE buffers needed. Round up to cover minTotalFrames. */
-    numHostBuffers = (minTotalFrames + framesPerHostBuffer - 1) / framesPerHostBuffer;
-
-    /* Make sure we have anough WAVE buffers. */
-    if( numHostBuffers < PA_MIN_NUM_HOST_BUFFERS)
-    {
-        numHostBuffers = PA_MIN_NUM_HOST_BUFFERS;
-    }
-    else if( (numHostBuffers > PA_MAX_NUM_HOST_BUFFERS) &&
-             ((int) past->past_FramesPerUserBuffer < (maxFramesPerHostBuffer/2) ) )
-    {
-        /* If we have too many WAVE buffers, try to put more user buffers in a wave buffer. */
-        while(numHostBuffers > PA_MAX_NUM_HOST_BUFFERS)
-        {
-            userBuffersPerHostBuffer += 1;
-            framesPerHostBuffer = past->past_FramesPerUserBuffer * userBuffersPerHostBuffer;
-            numHostBuffers = (minTotalFrames + framesPerHostBuffer - 1) / framesPerHostBuffer;
-            /* If we have gone too far, back up one. */
-            if( (framesPerHostBuffer > maxFramesPerHostBuffer) ||
-                    (numHostBuffers < PA_MAX_NUM_HOST_BUFFERS) )
-            {
-                userBuffersPerHostBuffer -= 1;
-                framesPerHostBuffer = past->past_FramesPerUserBuffer * userBuffersPerHostBuffer;
-                numHostBuffers = (minTotalFrames + framesPerHostBuffer - 1) / framesPerHostBuffer;
-                break;
-            }
-        }
-    }
-
-    pahsc->pahsc_UserBuffersPerHostBuffer = userBuffersPerHostBuffer;
-    pahsc->pahsc_FramesPerHostBuffer = framesPerHostBuffer;
-    pahsc->pahsc_NumHostBuffers = numHostBuffers;
+    // For CoreAudio, we only have one Host buffer, so...
+    pahsc->pahsc_UserBuffersPerHostBuffer = past->past_NumUserBuffers;
+    // Calculate size of CoreAudio buffer.
+    pahsc->pahsc_FramesPerHostBuffer = past->past_FramesPerUserBuffer * past->past_NumUserBuffers;
 
     DBUG(("PaHost_CalcNumHostBuffers: pahsc_UserBuffersPerHostBuffer = %d\n", pahsc->pahsc_UserBuffersPerHostBuffer ));
-    DBUG(("PaHost_CalcNumHostBuffers: pahsc_NumHostBuffers = %d\n", pahsc->pahsc_NumHostBuffers ));
     DBUG(("PaHost_CalcNumHostBuffers: pahsc_FramesPerHostBuffer = %d\n", pahsc->pahsc_FramesPerHostBuffer ));
-    DBUG(("PaHost_CalcNumHostBuffers: past_NumUserBuffers = %d\n", past->past_NumUserBuffers ));
 }
 
 /*******************************************************************/
@@ -865,12 +912,20 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
     memset( pahsc, 0, sizeof(PaHostSoundControl) );
     past->past_DeviceData = (void *) pahsc;
 
-    /* Figure out how user buffers fit into WAVE buffers. */
-    // FIXME - just force for now
+    // If we are using both input and out, then they must be on the same CoreAudio device,
+    // until we implement a FIFO between two devices.
+    if( (past->past_OutputDeviceID != paNoDevice) && (past->past_InputDeviceID != paNoDevice) )
+    {
+        AudioDeviceID inputID = sDeviceInfos[past->past_InputDeviceID].audioDeviceID;
+        AudioDeviceID outputID = sDeviceInfos[past->past_OutputDeviceID].audioDeviceID;
+        if( inputID != outputID )
+        {
+            ERR_RPT(("PortAudio: input and output must use same CoreAudio device!\n"));
+            return paInvalidDeviceId;
+        }
+    }
 
-    pahsc->pahsc_UserBuffersPerHostBuffer = 1;
-    pahsc->pahsc_FramesPerHostBuffer = past->past_FramesPerUserBuffer;
-    pahsc->pahsc_NumHostBuffers = 2; // FIXME - dunno?!
+    PaHost_CalcHostBufferSize( past );
 
     {
         int msecLatency = (int) ((PaHost_GetTotalBufferFrames(past) * 1000) / past->past_SampleRate);
@@ -882,6 +937,7 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
     {
         result = PaHost_OpenOutputStream( past );
         if( result < 0 ) goto error;
+        pahsc->pahsc_AudioDeviceID = sDeviceInfos[past->past_OutputDeviceID].audioDeviceID;
     }
 
     /* ------------------ INPUT */
@@ -889,6 +945,7 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
     {
         result = PaHost_OpenInputStream( past );
         if( result < 0 ) goto error;
+        pahsc->pahsc_AudioDeviceID = sDeviceInfos[past->past_InputDeviceID].audioDeviceID;
     }
 
     return result;
@@ -901,53 +958,21 @@ error:
 /*************************************************************************/
 PaError PaHost_StartOutput( internalPortAudioStream *past )
 {
-    PaHostSoundControl *pahsc;
-    PaError          result = paNoError;
-    OSStatus  err = noErr;
-
-
-    pahsc = (PaHostSoundControl *) past->past_DeviceData;
-
-    if( past->past_OutputDeviceID != paNoDevice )
-    {
-        // Associate an IO proc with the device and pass a pointer to the audio data context
-        err = AudioDeviceAddIOProc(pahsc->pahsc_OutputAudioDeviceID, (AudioDeviceIOProc)appIOProc, past);
-        if (err != noErr) goto error;
-
-        // start playing sound through the device
-        err = AudioDeviceStart(pahsc->pahsc_OutputAudioDeviceID, (AudioDeviceIOProc)appIOProc);
-        if (err != noErr) goto error;
-    }
-
-error:
-    return result;
+    return 0;
 }
 
 /*************************************************************************/
 PaError PaHost_StartInput( internalPortAudioStream *past )
 {
-    PaError          result = paNoError;
-    PaHostSoundControl *pahsc;
-    pahsc = (PaHostSoundControl *) past->past_DeviceData;
-
-    if( past->past_InputDeviceID != paNoDevice )
-    {
-        // FIXME
-    }
-    return result;
+    return 0;
 }
 
 /*************************************************************************/
 PaError PaHost_StartEngine( internalPortAudioStream *past )
 {
+    OSStatus            err = noErr;
     PaError             result = paNoError;
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
-
-#if PA_USE_TIMER_CALLBACK
-    int                 resolution;
-    int                 bufsPerTimerCallback;
-    int                 msecPerBuffer;
-#endif /* PA_USE_TIMER_CALLBACK */
 
     past->past_StopSoon = 0;
     past->past_StopNow = 0;
@@ -955,64 +980,63 @@ PaError PaHost_StartEngine( internalPortAudioStream *past )
     pahsc->pahsc_FramesPlayed = 0.0;
     pahsc->pahsc_LastPosition = 0;
 
+    // Associate an IO proc with the device and pass a pointer to the audio data context
+    err = AudioDeviceAddIOProc(pahsc->pahsc_AudioDeviceID, (AudioDeviceIOProc)appIOProc, past);
+    if (err != noErr) goto error;
+
+    // start playing sound through the device
+    err = AudioDeviceStart(pahsc->pahsc_AudioDeviceID, (AudioDeviceIOProc)appIOProc);
+    if (err != noErr) goto error;
+    return result;
+
 #if PA_TRACE_START_STOP
     AddTraceMessage( "PaHost_StartEngine: TimeSlice() returned ", result );
 #endif
-    return result;
+
+error:
+    return paHostError; // FIXME - save host error
 }
 
 /*************************************************************************/
 PaError PaHost_StopEngine( internalPortAudioStream *past, int abort )
 {
-    int timeOut;
+    OSStatus  err = noErr;
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     if( pahsc == NULL ) return paNoError;
+    (void) abort;
 
     /* Tell background thread to stop generating more data and to let current data play out. */
     past->past_StopSoon = 1;
     /* If aborting, tell background thread to stop NOW! */
     if( abort ) past->past_StopNow = 1;
-
-    timeOut = PaHost_CalcTimeOut( past );
     past->past_IsActive = 0;
 
+#if PA_TRACE_START_STOP
+    AddTraceMessage( "PaHost_StopOutput: pahsc_HWaveOut ", (int) pahsc->pahsc_HWaveOut );
+#endif
+
+    // FIXME - we should ask proc to stop instead of stopping abruptly
+    err = AudioDeviceStop(pahsc->pahsc_AudioDeviceID, (AudioDeviceIOProc)appIOProc);
+    if (err != noErr) goto Bail;
+
+    err = AudioDeviceRemoveIOProc(pahsc->pahsc_AudioDeviceID, (AudioDeviceIOProc)appIOProc);
+    if (err != noErr) goto Bail;
+
     return paNoError;
+
+Bail:
+    return paHostError; // FIXME - save err
 }
 
 /*************************************************************************/
 PaError PaHost_StopInput( internalPortAudioStream *past, int abort )
 {
-    PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
-    if( pahsc == NULL ) return paNoError;
-    (void) abort;
-
-    // FIXME
     return paNoError;
 }
 
 /*************************************************************************/
 PaError PaHost_StopOutput( internalPortAudioStream *past, int abort )
 {
-    PaHostSoundControl *pahsc;
-    pahsc = (PaHostSoundControl *) past->past_DeviceData;
-    if( pahsc == NULL ) return paNoError;
-    (void) abort;
-
-#if PA_TRACE_START_STOP
-    AddTraceMessage( "PaHost_StopOutput: pahsc_HWaveOut ", (int) pahsc->pahsc_HWaveOut );
-#endif
-
-    // FIXME   if( pahsc->pahsc_OutputAudioDeviceID != ??? )
-    {
-        OSStatus  err = noErr;
-
-        err = AudioDeviceStop(pahsc->pahsc_OutputAudioDeviceID, (AudioDeviceIOProc)appIOProc);
-        if (err != noErr) goto Bail;
-
-        err = AudioDeviceRemoveIOProc(pahsc->pahsc_OutputAudioDeviceID, (AudioDeviceIOProc)appIOProc);
-        if (err != noErr) goto Bail;
-    }
-Bail:
     return paNoError;
 }
 
@@ -1028,9 +1052,6 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
 #if PA_TRACE_START_STOP
     AddTraceMessage( "PaHost_CloseStream: pahsc_HWaveOut ", (int) pahsc->pahsc_HWaveOut );
 #endif
-    /* Free data and device for output. */
-
-    /* Free data and device for input. */
 
     free( pahsc );
     past->past_DeviceData = NULL;
@@ -1040,33 +1061,23 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
 
 /*************************************************************************
 ** Determine minimum number of buffers required for this host based
-** on minimum latency. Latency can be optionally set by user by setting
-** an environment variable. For example, to set latency to 200 msec, put:
-**
-**    set PA_MIN_LATENCY_MSEC=200
-**
-** in the AUTOEXEC.BAT file and reboot.
-** If the environment variable is not set, then the latency will be determined
-** based on the OS. Windows NT has higher latency than Win95.
+** on minimum latency. 
 */
-#define PA_LATENCY_ENV_NAME  ("PA_MIN_LATENCY_MSEC")
-
-int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate )
+int Pa_GetMinNumBuffers( int framesPerUserBuffer, double sampleRate )
 {
-    int       minLatencyMsec = 0;
-    double    msecPerBuffer = (1000.0 * framesPerBuffer) / sampleRate;
-    int       minBuffers;
+    int   minUserBuffers;
+    int   minFramesPerHostBuffer;
 
-    /* Let user determine minimal latency by setting environment variable. */
-    {
-        minLatencyMsec = PA_MIN_LATENCY_MSEC;
-    }
+    // Calculate minimum and maximum sizes based on timing and sample rate.
+    minFramesPerHostBuffer = (int) (PA_MIN_LATENCY_MSEC * sampleRate / 1000.0);
+    // round up to nearest multiple of 8
+    minFramesPerHostBuffer = (minFramesPerHostBuffer + 7) & ~7;
+    DBUG(("Pa_GetMinNumBuffers: minFramesPerHostBuffer = %d\n", minFramesPerHostBuffer ));
 
-    DBUG(("PA - Minimum Latency set to %d msec!\n", minLatencyMsec ));
-    minBuffers = (int) (1.0 + ((double)minLatencyMsec / msecPerBuffer));
-    if( minBuffers < 2 ) minBuffers = 2;
+    minUserBuffers = (minFramesPerHostBuffer + framesPerUserBuffer - 1) / framesPerUserBuffer;
+    if( minUserBuffers < 1 ) minUserBuffers = 1;
 
-    return minBuffers;
+    return minUserBuffers;
 }
 
 /*************************************************************************
@@ -1076,29 +1087,18 @@ PaError PaHost_Term( void )
 {
     int i;
 
-    if( sNumDevices > 0 )
+    if( sDeviceInfos != NULL )
     {
-
-        if( sDevicePtrs != NULL )
+        for( i=0; i<sNumPaDevices; i++ )
         {
-
-            for( i=0; i<sNumDevices; i++ )
-            {
-                if( sDevicePtrs[i] != NULL )
-                {
-
-                    free( (char*)sDevicePtrs[i]->name );
-                    free( (void*)sDevicePtrs[i]->sampleRates );
-                    free( sDevicePtrs[i] );
-                }
-            }
-
-            free( sDevicePtrs );
-            sDevicePtrs = NULL;
+            if( sDeviceInfos[i].paInfo.name != NULL ) free( (char*)sDeviceInfos[i].paInfo.name );
+            if( sDeviceInfos[i].paInfo.sampleRates != NULL ) free( (void*)sDeviceInfos[i].paInfo.sampleRates );
         }
-
-        sNumDevices = 0;
+        free( sDeviceInfos );
+        sDeviceInfos = NULL;
     }
+
+    sNumPaDevices = 0;
     return paNoError;
 }
 
