@@ -1,6 +1,5 @@
 /*
  * $Id$
- * $Id$
  * patest_sine.c
  * Play a sine wave using the Portable Audio api for several seconds.
  *
