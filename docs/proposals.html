@@ -587,15 +587,15 @@ Pa_IsStreamActive() -> returns non-zero
 </PRE>
 
 <P>
-Three new constants: paContinue(0), paFinish(1) and paAbort(2) will be defined for use as return values from the callback. Both paFinish and paAbort cause PortAudio to stop calling the callback. paFinish will cause a transition to the Callback Finished state once all buffers have been played, paAbort indicates that PortAudio may to attempt to cancel pending buffers before transitioning to the Callback Finished state. Note that returning any other non-zero  value from the callback will have the same effect as returning paFinish, for maximum backwards compatibility.
+Three new constants: paContinue(0), paComplete(1) and paAbort(2) will be defined for use as return values from the callback. Both paComplete and paAbort cause PortAudio to stop calling the callback. paComplete will cause a transition to the Callback Finished state once all buffers have been played, paAbort indicates that PortAudio may to attempt to cancel pending buffers before transitioning to the Callback Finished state. Note that returning any other non-zero  value from the callback will have the same effect as returning paComplete, for maximum backwards compatibility.
 </P>
 
 <H5>A Note About Stop and Abort Behavior</H5>
 <P>
-As the host may buffer samples, it is possible for a perceptible delay to arise between the callback generating samples and them being heard. Sometimes it is desirable to wait for all generated samples to be played before closing a stream - for example when waiting for the end of a soundfile to complete playbeck. At other times it may be desirable to stop the stream as quickly as possible, without necessarily waiting for all queued samples to be played. This latter situation can occur when exiting an application or closing a document - providing good interactive performance to the end-user may necessitate aborting the stream rather than pausing for a significant period waiting for the queued samples to complete. These two use-cases are respectively addressed by the Pa_StopStream() and Pa_AbortStream() functions, and by the paFinish and paAbort callback return values.
+As the host may buffer samples, it is possible for a perceptible delay to arise between the callback generating samples and them being heard. Sometimes it is desirable to wait for all generated samples to be played before closing a stream - for example when waiting for the end of a soundfile to complete playbeck. At other times it may be desirable to stop the stream as quickly as possible, without necessarily waiting for all queued samples to be played. This latter situation can occur when exiting an application or closing a document - providing good interactive performance to the end-user may necessitate aborting the stream rather than pausing for a significant period waiting for the queued samples to complete. These two use-cases are respectively addressed by the Pa_StopStream() and Pa_AbortStream() functions, and by the paComplete and paAbort callback return values.
 </P>
 <P>
-It has been noted that not all host APIs support the cancellation of already queued samples or buffers, thus making it impossible to usefully implement Pa_AbortStream. In such cases, Pa_AbortStream() will have the same behavior as Pa_StopStream(), and returning paAbort from the callback will have the behavior as returning paFinish. 
+It has been noted that not all host APIs support the cancellation of already queued samples or buffers, thus making it impossible to usefully implement Pa_AbortStream. In such cases, Pa_AbortStream() will have the same behavior as Pa_StopStream(), and returning paAbort from the callback will have the behavior as returning paComplete. 
 </P>
 
 
