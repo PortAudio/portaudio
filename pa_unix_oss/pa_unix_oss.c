@@ -249,7 +249,7 @@ static PaError Pa_QueryDevice( const char *deviceName, internalPortAudioDevice *
      the correct order for OSS is: format, channels, sample rate
      
     */
-    if ( (tempDevHandle = open(deviceName,O_WRONLY))  == -1 )
+    if ( (tempDevHandle = open(deviceName,O_WRONLY|O_NONBLOCK))  == -1 )
     {
         DBUG(("Pa_QueryDevice: could not open %s\n", deviceName ));
         return paHostError;
@@ -777,7 +777,7 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
             pad = Pa_GetInternalDevice( past->past_OutputDeviceID );
             DBUG(("PaHost_OpenStream: attempt to open %s for O_RDWR\n", pad->pad_DeviceName ));
             pahsc->pahsc_OutputHandle = pahsc->pahsc_InputHandle =
-                                            open(pad->pad_DeviceName,O_RDWR);
+                                            open(pad->pad_DeviceName,O_RDWR|O_NONBLOCK);
             if(pahsc->pahsc_InputHandle==-1)
             {
                 ERR_RPT(("PaHost_OpenStream: could not open %s for O_RDWR\n", pad->pad_DeviceName ));
@@ -797,7 +797,7 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
         {
             pad = Pa_GetInternalDevice( past->past_OutputDeviceID );
             DBUG(("PaHost_OpenStream: attempt to open %s for O_WRONLY\n", pad->pad_DeviceName ));
-            pahsc->pahsc_OutputHandle = open(pad->pad_DeviceName,O_WRONLY);
+            pahsc->pahsc_OutputHandle = open(pad->pad_DeviceName,O_WRONLY|O_NONBLOCK);
             if(pahsc->pahsc_OutputHandle==-1)
             {
                 ERR_RPT(("PaHost_OpenStream: could not open %s for O_WRONLY\n", pad->pad_DeviceName ));
@@ -815,7 +815,7 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
         {
             pad = Pa_GetInternalDevice( past->past_InputDeviceID );
             DBUG(("PaHost_OpenStream: attempt to open %s for O_RDONLY\n", pad->pad_DeviceName ));
-            pahsc->pahsc_InputHandle = open(pad->pad_DeviceName,O_RDONLY);
+            pahsc->pahsc_InputHandle = open(pad->pad_DeviceName,O_RDONLY|O_NONBLOCK);
             if(pahsc->pahsc_InputHandle==-1)
             {
                 ERR_RPT(("PaHost_OpenStream: could not open %s for O_RDONLY\n", pad->pad_DeviceName ));
