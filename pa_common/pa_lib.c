@@ -70,8 +70,8 @@ O- maybe not allocate past_InputBuffer and past_OutputBuffer if not needed for c
 
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
-#define DBUG(x)  /* PRINT(x) */
-#define DBUGX(x) /* PRINT(x) */
+#define DBUG(x)  /* PRINT(x) /**/
+#define DBUGX(x) /* PRINT(x) /**/
 
 static int gInitCount = 0; /* Count number of times Pa_Initialize() called to allow nesting and overlapping. */
 
@@ -152,10 +152,10 @@ PaError Pa_OpenStream(
     int                        bitsPerInputSample;
     int                        bitsPerOutputSample;
     /* Print passed parameters. */
-    DBUG(("Pa_OpenStream( %p, %d, %d, %d, %p, /* input */ \n",
+    DBUG(("Pa_OpenStream( %p, dev=%d, numChan=%d, format=%d, info=%p, /* input */ \n",
           streamPtrPtr, inputDeviceID, numInputChannels,
           inputSampleFormat, inputDriverInfo ));
-    DBUG(("               %d, %d, %d, %p, /* output */\n",
+    DBUG(("               dev=%d, numChan=%d, format=%d, info=%p, /* output */\n",
           outputDeviceID, numOutputChannels,
           outputSampleFormat, outputDriverInfo ));
     DBUG(("               %g, %d, %d, 0x%x, , %p )\n",
