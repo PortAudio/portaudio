@@ -24,6 +24,7 @@ dnl Extra variables we want to substitute
 AC_SUBST(OTHER_OBJS)
 AC_SUBST(PADLL)
 AC_SUBST(SHARED_FLAGS)
+AC_SUBST(DLL_LIBS)
 
 dnl Determine the host operating system / platform
 AC_CANONICAL_HOST
@@ -36,6 +37,16 @@ case "${host_os}" in
 	LIBS="-framework CoreAudio -lm";
 	PADLL="libportaudio.dylib";
 	SHARED_FLAGS="-framework CoreAudio -dynamiclib";
+	;;
+
+  mingw* )
+	dnl MingW configuration
+
+	OTHER_OBJS="pa_win_wmme/pa_win_wmme.o";
+	LIBS="-lwinmm -lm";
+	PADLL="portaudio.dll";
+	SHARED_FLAGS="-shared -mthreads";
+	DLL_LIBS="-lwinmm";
 	;;
 
   *)

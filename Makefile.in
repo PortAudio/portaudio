@@ -12,6 +12,7 @@ AR = @AR@
 RANLIB = @RANLIB@
 INSTALL = @INSTALL@
 SHARED_FLAGS = @SHARED_FLAGS@
+DLL_LIBS = @DLL_LIBS@
 
 OTHER_OBJS = @OTHER_OBJS@
 
@@ -60,7 +61,7 @@ lib/$(PALIB): lib/ $(OBJS) Makefile $(PAINC)
 	$(RANLIB) lib/$(PALIB)
 
 lib/$(PADLLV): lib/ $(OBJS) Makefile $(PAINC)
-	$(CC) $(SHARED_FLAGS) -o lib/$(PADLLV) $(OBJS)
+	$(CC) $(SHARED_FLAGS) -o lib/$(PADLLV) $(OBJS) $(DLL_LIBS)
 
 $(TESTS): bin/%: lib/$(PALIB) Makefile $(PAINC) pa_tests/%.c
 	$(CC) -o $@ $(CFLAGS) pa_tests/$*.c lib/$(PALIB) $(LIBS)
