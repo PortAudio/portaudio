@@ -45,7 +45,7 @@
 #define TWOPI (M_PI * 2.0)
 
 #define DEFAULT_BUFFER_SIZE   (64)
-#define TABLE_SIZE   (200)
+
 typedef struct
 {
     double left_phase;
