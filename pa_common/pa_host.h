@@ -149,6 +149,11 @@ PaError PaHost_ValidateSampleRate( PaDeviceID id, double requestedFrameRate,
 /************ Common Utility Routines provided by PA ******************/
 /**********************************************************************/
 
+/* PaHost_IsInitialized() returns non-zero if PA is initialized, 0 otherwise */
+int PaHost_IsInitialized( void );
+
+internalPortAudioStream* PaHost_GetStreamRepresentation( PortAudioStream *stream );
+
 int PaHost_FindClosestTableEntry( double allowableError,  const double *rateTable,
                                   int numRates, double frameRate );
 
