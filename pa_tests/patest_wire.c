@@ -69,7 +69,6 @@ static int wireCallback( void *inputBuffer, void *outputBuffer,
     SAMPLE *out = (SAMPLE*)outputBuffer;
     SAMPLE *in = (SAMPLE*)inputBuffer;
     unsigned int i;
-    int finished = 0;
     (void) outTime;
 
     /* This may get called with NULL inputBuffer during initial setup. */
@@ -98,11 +97,12 @@ int main(void)
 {
     PortAudioStream *stream;
     PaError err;
-    int numDevices = Pa_CountDevices();
+    
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
-    printf("PortAudio Test: input device  = %d\n", Pa_GetDefaultInputDeviceID() );
-    printf("PortAudio Test: output device = %d\n", Pa_GetDefaultOutputDeviceID() );
+    
+    printf("PortAudio Test: input device ID  = %d\n", Pa_GetDefaultInputDeviceID() );
+    printf("PortAudio Test: output device ID = %d\n", Pa_GetDefaultOutputDeviceID() );
     err = Pa_OpenStream(
               &stream,
               Pa_GetDefaultInputDeviceID(), /* default output device */
@@ -120,14 +120,19 @@ int main(void)
               wireCallback,
               NULL );          /* no data */
     if( err != paNoError ) goto error;
+    
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
+    
     printf("Full duplex sound test in progress.\n");
-    printf("Hit ENTER to exit test.\n");
+    printf("Hit ENTER to exit test.\n");  fflush(stdout);
     getchar();
+    
+    printf("Closing stream.\n");
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
     Pa_Terminate();
+    
     printf("Full duplex sound test complete.\n"); fflush(stdout);
     return 0;
 error:
