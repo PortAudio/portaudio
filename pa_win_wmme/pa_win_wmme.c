@@ -49,6 +49,7 @@
  PLB20010816 - pass process instead of thread to SetPriorityClass()
  PLB20010927 - use number of frames instead of real-time for CPULoad calculation.
  JM20020118 - prevent hung thread when buffers underflow.
+ PLB20020321 - detect Win XP versus NT, 9x; fix DBUG typo; removed init of CurrentCount
 */
 
 #include <stdio.h>
@@ -70,12 +71,15 @@
 #define PA_TRACK_MEMORY          (0)
 
 #define PA_USE_TIMER_CALLBACK    (0)  /* Select between two options for background task. 0=thread, 1=timer */
-#define PA_USE_HIGH_LATENCY      (0)  /* For debugging glitches. */
 /* Switches for debugging. */
 #define PA_SIMULATE_UNDERFLOW    (0)  /* Set to one to force an underflow of the output buffer. */
+
 /* To trace program, enable TRACE_REALTIME_EVENTS in pa_trace.h */
 #define PA_TRACE_RUN             (0)
 #define PA_TRACE_START_STOP      (1)
+
+#define PA_USE_HIGH_LATENCY      (0)  /* For debugging glitches. */
+
 #if PA_USE_HIGH_LATENCY
  #define PA_MIN_MSEC_PER_HOST_BUFFER  (100)
  #define PA_MAX_MSEC_PER_HOST_BUFFER  (300) /* Do not exceed unless user buffer exceeds */
@@ -90,11 +94,13 @@
  #define PA_WIN_9X_LATENCY            (200)
 #endif
 #define MIN_TIMEOUT_MSEC                 (1000)
+
 /*
 ** Use higher latency for NT because it is even worse at real-time
 ** operation than Win9x.
 */
 #define PA_WIN_NT_LATENCY        (PA_WIN_9X_LATENCY * 2)
+#define PA_WIN_WDM_LATENCY       (PA_WIN_9X_LATENCY)
 
 #if PA_SIMULATE_UNDERFLOW
 static  gUnderCallbackCounter = 0;
@@ -104,7 +110,7 @@ static  gUnderCallbackCounter = 0;
 
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
-#define DBUG(x)  /* PRINT(x) */
+#define DBUG(x)  /* PRINT(x) /**/
 #define DBUGX(x) /* PRINT(x) */
 /************************************************* Definitions ********/
 /**************************************************************
@@ -187,7 +193,7 @@ static void Pa_StartUsageCalculation( internalPortAudioStream   *past )
 }
 static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
 {
-    LARGE_INTEGER CurrentCount = { 0, 0 };
+    LARGE_INTEGER CurrentCount;
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     if( pahsc == NULL ) return;
     /*
@@ -270,7 +276,7 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
     if( id < sNumInputDevices )
     {
         /* input device */
-        int inputMmID = id - 1; /* WAVE_MAPPER is -1 so we start with WAVE_MAPPER */
+        int inputMmID = PaDeviceIdToWinId(id);
         WAVEINCAPS wic;
         if( waveInGetDevCaps( inputMmID, &wic, sizeof( WAVEINCAPS ) ) != MMSYSERR_NOERROR )
             goto error;
@@ -328,7 +334,7 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
     else if( id - sNumInputDevices < sNumOutputDevices )
     {
         /* output device */
-        int outputMmID = id - sNumInputDevices - 1;
+        int outputMmID = PaDeviceIdToWinId(id);
         WAVEOUTCAPS woc;
         if( waveOutGetDevCaps( outputMmID, &woc, sizeof( WAVEOUTCAPS ) ) != MMSYSERR_NOERROR )
             goto error;
@@ -348,13 +354,42 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
         deviceInfo->maxOutputChannels = woc.wChannels;
         /* Sometimes a device can return a rediculously large number of channels.
         ** This happened with an SBLive card on a Windows ME box.
-        ** If that happens, then force it to 2 channels. PLB20010413
+        ** It also happens on Win XP!
         */
         if( (deviceInfo->maxOutputChannels < 1) || (deviceInfo->maxOutputChannels > 256) )
         {
-            ERR_RPT(("Pa_GetDeviceInfo: Num output channels reported as %d! Changed to 2.\n", deviceInfo->maxOutputChannels ));
+#if 1
             deviceInfo->maxOutputChannels = 2;
+#else
+        /* If channel max is goofy, then query for max channels. PLB20020228
+        ** This doesn't seem to help. Disable code for now. Remove it later.
+        */
+            ERR_RPT(("Pa_GetDeviceInfo: Num output channels reported as %d!", deviceInfo->maxOutputChannels ));
+            deviceInfo->maxOutputChannels = 0;
+			/* Attempt to find the correct maximum by querying the device. */
+			for( i=2; i<16; i += 2 )
+			{
+				WAVEFORMATEX wfx;
+				wfx.wFormatTag = WAVE_FORMAT_PCM;
+				wfx.nSamplesPerSec = 44100;
+				wfx.wBitsPerSample = 16;
+				wfx.cbSize = 0; /* ignored */
+				wfx.nChannels = (WORD) i;
+				wfx.nAvgBytesPerSec = wfx.nChannels * wfx.nSamplesPerSec * sizeof(short);
+				wfx.nBlockAlign = (WORD)(wfx.nChannels * sizeof(short));
+				if( waveOutOpen( NULL, outputMmID, &wfx, 0, 0, WAVE_FORMAT_QUERY ) == MMSYSERR_NOERROR )
+				{
+					deviceInfo->maxOutputChannels = i;
+				}
+				else
+				{
+					break;
+				}
+			}
+#endif
+            ERR_RPT((" Changed to %d.\n", deviceInfo->maxOutputChannels ));
         }
+
         /* Add a sample rate to the list if we can do stereo 16 bit at that rate
          * based on the format flags. */
         if( woc.dwFormats & WAVE_FORMAT_1M16 ||woc.dwFormats & WAVE_FORMAT_1S16 )
@@ -1103,8 +1138,8 @@ PaError PaHost_StartOutput( internalPortAudioStream *past )
             goto error;
         }
     }
-    DBUG(("PaHost_StartOutput: DSW_StartOutput returned = 0x%X.\n", hr));
 error:
+    DBUG(("PaHost_StartOutput: wave returned mr = 0x%X.\n", mr));
     return result;
 }
 /*************************************************************************/
@@ -1129,7 +1164,7 @@ PaError PaHost_StartInput( internalPortAudioStream *past )
         }
         pahsc->pahsc_CurrentInputBuffer = 0;
         mr = waveInStart( pahsc->pahsc_HWaveIn );
-        DBUG(("Pa_StartStream: waveInStart returned = 0x%X.\n", hr));
+        DBUG(("Pa_StartStream: waveInStart returned = 0x%X.\n", mr));
         if( mr != MMSYSERR_NOERROR )
         {
             result = paHostError;
@@ -1374,7 +1409,6 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
 int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate )
 {
     char      envbuf[PA_ENV_BUF_SIZE];
-    DWORD     hostVersion;
     DWORD     hresult;
     int       minLatencyMsec = 0;
     double    msecPerBuffer = (1000.0 * framesPerBuffer) / sampleRate;
@@ -1387,12 +1421,28 @@ int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate )
     }
     else
     {
-        /* Set minimal latency based on whether NT or Win95.
+        /* Set minimal latency based on whether NT or other OS.
          * NT has higher latency.
          */
-        hostVersion = GetVersion();
-        /* High bit clear if NT */
-        minLatencyMsec = ( (hostVersion & 0x80000000) == 0 ) ? PA_WIN_NT_LATENCY : PA_WIN_9X_LATENCY  ;
+        OSVERSIONINFO osvi;
+		osvi.dwOSVersionInfoSize = sizeof( osvi );
+		GetVersionEx( &osvi );
+        DBUG(("PA - PlatformId = 0x%x\n", osvi.dwPlatformId ));
+        DBUG(("PA - MajorVersion = 0x%x\n", osvi.dwMajorVersion ));
+        DBUG(("PA - MinorVersion = 0x%x\n", osvi.dwMinorVersion ));
+        /* Check for NT */
+		if( (osvi.dwMajorVersion == 4) && (osvi.dwPlatformId == 2) )
+		{
+			minLatencyMsec = PA_WIN_NT_LATENCY;
+		}
+		else if(osvi.dwMajorVersion >= 5)
+		{
+			minLatencyMsec = PA_WIN_WDM_LATENCY;
+		}
+		else
+		{
+			minLatencyMsec = PA_WIN_9X_LATENCY;
+		}
 #if PA_USE_HIGH_LATENCY
         PRINT(("PA - Minimum Latency set to %d msec!\n", minLatencyMsec ));
 #endif
