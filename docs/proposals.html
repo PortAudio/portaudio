@@ -564,8 +564,8 @@ In the Stopped state:
 Pa_StartStream() -> transitions to Active state
 Pa_StopStream() -> returns paStreamIsStopped error
 Pa_AbortStream()-> returns paStreamIsStopped error
-Pa_IsStreamStopped() -> returns non-zero
-Pa_IsStreamActive() -> returns zero
+Pa_IsStreamStopped() -> returns one (1), or error code
+Pa_IsStreamActive() -> returns zero (0), or error code
 
 In the Active state:
 Pa_StartStream() -> returns paStreamIsNotStopped error
@@ -575,15 +575,15 @@ Pa_StopStream() -> stops calling the callback and blocks until
 Pa_AbortStream()-> if possible, discards all queued buffers instead of
 	 waiting for them to be played, otherwise same as Pa_StopStream() 
 	: transitions to Stopped state
-Pa_IsStreamStopped() -> returns zero
-Pa_IsStreamActive() -> returns non-zero
+Pa_IsStreamStopped() -> returns zero (0), or error code
+Pa_IsStreamActive() -> returns one (1), or error code
 
 In the Callback Finished state:
 Pa_StartStream() -> returns paStreamIsNotStopped error
 Pa_StopStream() -> transitions to Stopped state
 Pa_AbortStream()-> transitions to Stopped state
-Pa_IsStreamStopped() -> returns zero
-Pa_IsStreamActive() -> returns non-zero
+Pa_IsStreamStopped() -> returns zero (0), or error code
+Pa_IsStreamActive() -> returns zero (0), or error code
 </PRE>
 
 <P>
