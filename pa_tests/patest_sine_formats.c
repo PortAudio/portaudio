@@ -40,7 +40,7 @@
 
 #define NUM_SECONDS        (20)
 #define SAMPLE_RATE        (44100)
-#define FRAMES_PER_BUFFER  (256)
+#define FRAMES_PER_BUFFER  (512)
 #define LEFT_FREQ          (SAMPLE_RATE/256.0)  /* So we hit 1.0 */
 #define RIGHT_FREQ         (500.0)
 #define AMPLITUDE          (1.0)
@@ -57,25 +57,22 @@ typedef unsigned char       SAMPLE_t;
 #define SAMPLE_ZERO         (0x80)
 #define DOUBLE_TO_SAMPLE(x) (SAMPLE_ZERO + (SAMPLE_t)(127.0 * (x)))
 #define FORMAT_NAME         "Unsigned 8 Bit"
-#endif
 
-#if TEST_INT8
+#elif TEST_INT8
 #define TEST_FORMAT         paInt8
 typedef char                SAMPLE_t;
 #define SAMPLE_ZERO         (0)
 #define DOUBLE_TO_SAMPLE(x) (SAMPLE_ZERO + (SAMPLE_t)(127.0 * (x)))
 #define FORMAT_NAME         "Signed 8 Bit"
-#endif
 
-#if TEST_INT16
+#elif TEST_INT16
 #define TEST_FORMAT         paInt16
 typedef short               SAMPLE_t;
 #define SAMPLE_ZERO         (0)
-#define DOUBLE_TO_SAMPLE(x) (SAMPLE_ZERO + (SAMPLE_t)(32767.0 * (x)))
+#define DOUBLE_TO_SAMPLE(x) (SAMPLE_ZERO + (SAMPLE_t)(32767 * (x)))
 #define FORMAT_NAME         "Signed 16 Bit"
-#endif
 
-#if TEST_FLOAT32
+#elif TEST_FLOAT32
 #define TEST_FORMAT         paFloat32
 typedef float               SAMPLE_t;
 #define SAMPLE_ZERO         (0.0)

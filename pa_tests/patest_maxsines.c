@@ -64,6 +64,7 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
+    float outSample;
     unsigned long i;
     int j;
     int finished = 0;
@@ -90,8 +91,9 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
             data->phases[j] = phase;
         }
 
-
-        *out++ = (float) (output / data->numSines);
+        outSample = (float) (output / data->numSines);
+        *out++ = outSample; /* Left */
+        *out++ = outSample; /* Right */
     }
     return finished;
 }
@@ -111,16 +113,16 @@ int main(void)
     if( err != paNoError ) goto error;
     err = Pa_OpenStream(
               &stream,
-              paNoDevice,/* default input device */
+              paNoDevice,
               0,              /* no input */
-              paFloat32,  /* 32 bit floating point input */
+              paFloat32,
               NULL,
               Pa_GetDefaultOutputDeviceID(), /* default output device */
-              1,          /* mono output */
+              2,              /* stereo output */
               paFloat32,      /* 32 bit floating point output */
               NULL,
               SAMPLE_RATE,
-              FRAMES_PER_BUFFER,            /* frames per buffer */
+              FRAMES_PER_BUFFER, 
               0,              /* number of buffers, if zero then use default minimum */
               paClipOff,      /* we won't output out of range samples so don't bother clipping them */
               patestCallback,
@@ -136,8 +138,9 @@ int main(void)
 
         load = Pa_GetCPULoad( stream );
         printf("numSines = %d, CPU load = %f\n", data.numSines, load );
+        fflush( stdout );
     }
-    while( load < 0.8 );
+    while( (load < 0.8) && (data.numSines < MAX_SINES) );
 
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;

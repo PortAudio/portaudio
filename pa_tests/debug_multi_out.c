@@ -125,6 +125,7 @@ int main(void)
     if( err != paNoError ) goto error;
 
     printf("Hit ENTER to stop sound.\n");
+    fflush(stdout);
     getchar();
 
     err = Pa_StopStream( stream );

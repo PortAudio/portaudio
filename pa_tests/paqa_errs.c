@@ -270,6 +270,31 @@ static int TestBadOpens( void )
                                QaCallback,
                                &myData )
                  ) == paInvalidFlag) );
+
+#if 0 /* FIXME - this is legal for some implementations. */
+    HOPEFOR( ( /* Use input device as output device. */
+                 (result = Pa_OpenStream(
+                               &stream,
+                               paNoDevice, 0, paFloat32, NULL,
+                               Pa_GetDefaultInputDeviceID(), 2, paFloat32, NULL,
+                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
+                               paClipOff,
+                               QaCallback,
+                               &myData )
+                 ) == paInvalidDeviceId) );
+
+    HOPEFOR( ( /* Use output device as input device. */
+                 (result = Pa_OpenStream(
+                               &stream,
+                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
+                               paNoDevice, 0, paFloat32, NULL,
+                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
+                               paClipOff,
+                               QaCallback,
+                               &myData )
+                 ) == paInvalidDeviceId) );
+#endif
+
     if( stream != NULL ) Pa_CloseStream( stream );
     return result;
 }

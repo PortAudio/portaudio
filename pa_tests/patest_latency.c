@@ -115,7 +115,7 @@ int main(void)
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
-        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
+        data.sine[i] = 0.90f * (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
     }
     data.sine[TABLE_SIZE] = data.sine[0]; // set guard point
     data.left_phase = data.right_phase = 0.0;
@@ -144,6 +144,7 @@ int main(void)
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
     printf("Play ASCII keyboard. Hit 'q' to stop. (Use RETURN key on Mac)\n");
+    fflush(stdout);
     while ( !done )
     {
         float  freq;

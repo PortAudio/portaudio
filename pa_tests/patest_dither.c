@@ -2,6 +2,7 @@
  * $Id$
  * patest_dither.c
  * Attempt to hear difference between dithered and non-dithered signal.
+ * This only has an effect if the native format is 16 bit.
  *
  * Author: Phil Burk  http://www.softsynth.com
  *
