@@ -21,7 +21,9 @@ name=KeyWords>
 </TD></TR></TBODY></TABLE></CENTER>
 <P><A href="http://www.portaudio.com/">PortAudio Home Page</A></P>
 
-<P>Updated: January 7, 2002 </P>
+
+<P>Updated: January 11, 2002 </P>
+<H2>Introduction</H2>
 <P>This document describes modifications to the PortAudio API currently being considered by the developer community. It is intended to capture the current state of discussions. The authors are the various members of the PortAudio community and are too numerous to mention. Please refer to the mailing list archives to see who said what. </P>
 <P>We are still at the design stage with all of these proposals - if you think something is missing, could be improved, or would just like to comment please do so on the PortAudio mailing list.</P>
 <P>&nbsp; <A HREF="http://techweb.rfa.org/mailman/listinfo/portaudio">http://techweb.rfa.org/mailman/listinfo/portaudio</A> </P>
@@ -30,19 +32,25 @@ name=KeyWords>
 <UL>
 <LI><A HREF="#Underflow">PortAudioCallback Underflow/Overflow Handling</A> </LI>
 <LI><A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A> * </LI>
-<LI><A HREF="#Latency">Improve Latency Mechanism</A>s * </LI>
-<LI><A HREF="#Blocking">Blocking Read/Write API</A> * </LI>
+<LI><A HREF="#Latency">Improve Latency Mechanisms</A> * </LI>
+<LI><A HREF="#AllowCallbackVariableFramesPerBuffer">Allow Callbacks to Accept Variable framesPerBuffer</A> *</LI>
+<LI><A HREF="#Blocking">Blocking Read/Write API</A> |C| </LI>
 <LI><A HREF="#Interleaved">Non-Interleaved Buffers</A> </LI>
-<LI><A HREF="#MultipleDriverModels">Support for Multiple Driver Models in a Single PortAudio Build</A> * </LI>
+<LI><A HREF="#MultipleDriverModels">Support for Multiple Driver Models in a Single PortAudio Build</A> |C| </LI>
 <LI><A HREF="#DriverModelSpecificPa_OpenStream">Driver Model Specific Pa_OpenStream() Parameters</A> |C| </LI>
 <LI><A HREF="#Error">Handling of Host-Specific Error Codes</A> * </LI>
-<LI><A HREF="#RenamePa_GetCPULoad">Rename Pa_GetCPULoad() to Pa_StreamCPULoad()</A> </LI>
+<LI><A HREF="#RenamePa_GetCPULoad">Rename Pa_GetCPULoad() and paInvalidDeviceId for Consistency</A> </LI>
 <LI><A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> * </LI>
 <LI><A HREF="#AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A> </LI>
 <LI><A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> *</LI></UL>
 
-<I><P>The proposals above which are marked with a * are under construction, those marked with |</I>C<I>| are essentially complete but require approval or comment before they are considered complete. The remaining proposals are essentially complete and will be implemented as-is unless significant objections are raised.</P>
-</I><P>____________</P>
+<I><P>The proposals above which are marked with a * are under construction, those marked with |</I>C<I>| are essentially complete but require community approval or comment before they are considered complete. The remaining proposals are essentially complete and will be implemented as-is unless significant objections are raised.</P>
+</I><H2>Status </H2>
+<P>This document describes proposals that range in complexity from clarifications of existing API functionality, through to renaming API functions for consistency, through to significant feature additions. Due to the interdependency of many of the proposed changes, we plan to introduce all API changes simultaneously as part of release 19.</P>
+<P>The developer community is in the process of reviewing all proposals. Most proposals are defined in sufficient detail to implement, however some completed proposals are dependent on proposals that are still under construction. Of the remaining unfinished proposals, only <A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A>, <A HREF="#Latency">Improve Latency Mechanisms</A>, <A HREF="#AllowCallbackVariableFramesPerBuffer">Allow Callbacks to Accept Variable framesPerBuffer</A>, and <A HREF="#Error">Handling of Host-Specific Error Codes</A> require significant attention. Both the <A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> and <A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> proposals only effect implementors and do not effect the API definition itself. Refinement of these proposals is desirable but not critical to the development of release 19. Interested readers are advised to consult the Dependencies section of each proposal for more detailed information.</P>
+<H2>Client Impact</H2>
+<P>Some of the proposed changes will break existing client code. Usually these breakages involve renaming of constant identifiers or function calls. In a small number of cases additional parameters will be added to existing API functions. Concerned readers are advised to consult the Impact Analysis section of each proposal for further details.</P>
+<P>____________</P>
 <H2>PortAudioCallback&nbsp;<A NAME="Underflow"></A>Underflow/Overflow Handling</H2>
 <H4>Status</H4>
 <P>This proposal is sufficiently well defined to be implemented</P>
@@ -87,12 +95,27 @@ These bits may be set in the statusFlags parameter.
 <P>It has been noted that the current method (Pa_GetDeviceInfo()) of querying devices for supported sample formats, channels and sample rates is weak. It does not cleanly differentiate between 'PortAudio supported' formats and 'native' formats, and it is incapable of representing formats where the parameters are interdependent (eg where full duplex is only supported for certain sample rates.) We have also found that a static structure is not a good match for many driver models where format discovery is performed by polling the driver. Even if a sound card supports arbitrary sample rates, the driver model may only allow a client to poll to see whether a rate is available rather than providing the available rate ranges.</P>
 <P>It has been noted that most (platform specific) audio APIs do a pretty bad job of allowing for device capability querying. Even the better APIs (ALSA is perhaps one) don't necessarily provide accurate information. This proposal should seek to maximise the amount of information that can be extracted from existing APIs while remaining expressive enough to take full advantage of APIs with more advanced capability querying systems should they become available in the future.</P>
 <H4>Proposal</H4>
-<P>Use PaDeviceInfo only for representing information that can be expressed without polling the driver multiple times, or only check for "standard" formats, or leave it unchanged, or do away with it completely.</P>
+<P>A number of options are being considered with regard to supplying clients with format information:</P>
+<P>Use PaDeviceInfo only for representing information that can be expressed without polling the driver multiple times, or only check for "standard" formats, or leave it unchanged.</P>
 <P>And/Or</P>
-<P>We could do things the way MME does: if Pa_OpenStream() is called with a NULL stream parameter then the stream isn't opened, but it is checked to see if the device supports the specified format - if the format is supported then paNoError would be returned, otherwise an error would be returned.</P>
-<P>And/Or</P>
-<P>Add an IsFormatSupported() function:</P>
-<PRE>Pa_IsFormatSupported( deviceId, inputDevice, numInputChannels, inputSampleFormat, inputDriverInfo, outputDevice, numOutputChannels, outputSampleFormat, outputDriverInfo, sampleRate );</PRE>
+<P>Add a Pa_IsFormatSupported() function:</P>
+<PRE>Pa_IsFormatSupported( PaDeviceID inputDevice, 
+                        int numInputChannels, 
+                        PaSampleFormat inputSampleFormat,
+                        void *inputDriverInfo, 
+                        PaDeviceID outputDevice, 
+                        int numOutputChannels, 
+                        PaSampleFormat outputSampleFormat, 
+                        void *outputDriverInfo, 
+                        double sampleRate );</PRE>
+<H4>Discussion</H4>
+<P>At present it seems desirable to retain Pa_GetDeviceInfo() and the PaDeviceInfo structure. At a minimum PaDeviceInfo needs to contain name and driver model type code fields:</P>
+<PRE>typedef struct{
+    int structVersion; 
+    const char *name;
+    PaDriverModelTypeCode driverModel;
+} PaDeviceInfo;</PRE>
+<P>It was suggested that we could do things the way MME does: if Pa_OpenStream() is called with a NULL stream parameter then the stream isn't opened, but it is checked to see if the device supports the specified format - if the format is supported then paNoError would be returned, otherwise an error code would be returned. However, this has been ruled to be unsatisfactory, since querying for supported formats is really a different function from opening a stream.</P>
 <H4>Impact Analysis</H4>
 <P>This proposal will provide clients with more expressive methods for querying device capabilities, which should improve the utility of PortAudio. It is not yet clear what the full impact of this proposal will be.</P>
 <P>____________</P>
@@ -105,49 +128,84 @@ These bits may be set in the statusFlags parameter.
 <P>See this thread: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-October/000196.html">http://techweb.rfa.org/pipermail/portaudio/2001-October/000196.html</A> </P>
 <H4>Proposal</H4>
 <P>The numBuffers parameter for Pa_OpenStream() could accept the following values in addition to the normal N&gt;0 values.&nbsp; Use PA_LATENCY_LOW for interactive performance, when response time is critical.&nbsp; Use PA_LATENCY_HIGH when playing sound files or other non-interactive uses, when glitch free operation is more critical. </P>
-<TT><P>#define PA_LATENCY_WHATEVER&nbsp;&nbsp; (0) /* or _NO_OPINION or? */</TT> <BR>
-<TT>#define PA_LATENCY_LOW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (-1)&nbsp; /* For interactive performance. */</TT> <BR>
-<TT>#define PA_LATENCY_HIGH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (-2)&nbsp; /* For playing sound files. */</TT> </P>
+<PRE>
+#define PA_LATENCY_WHATEVER&nbsp;&nbsp; (0) /* or _NO_OPINION or? */
+#define PA_LATENCY_LOW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (-1)&nbsp; /* For interactive performance. */
+#define PA_LATENCY_HIGH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (-2)&nbsp; /* For playing sound files. */</PRE>
 <P>Currently, when numBuffers&gt;0, Pa_OpenStream will constrain the actual numBuffers so that the latency is within a valid range determined by the driver, or an environment variables such as PA_MIN_LATENCY_MSEC. Propose changing the behaviour so that the requested value is honoured as much as possible. This will allow the user to override the minimum if they know their system can handle it. This might be used, for example on patched Linux kernels. By doing this we simplify the implementations and eliminate the need for adding a Pa_SetMinimumLatency() function. </P>
-<TT><P>/* Negative return values are (double) paError */</TT> <BR>
-<TT>double Pa_GetMinimumLatency( int deviceId, double frameRate );</TT> <BR>
-<TT>double Pa_GetPreferredLatency( int deviceId, double frameRate );</TT> <BR>
-<TT>double Pa_GetMaximumLatency( int deviceId, double frameRate );</TT> </P>
-<TT><P>/* This would only be valid after Pa_OpenStream() */</TT> <BR>
-<TT>double Pa_GetActualLatency( int deviceId, double frameRate );</TT> </P>
+<PRE>
+/* Negative return values are (double) paError */
+double Pa_GetMinimumLatency( int deviceId, double frameRate );
+double Pa_GetPreferredLatency( int deviceId, double frameRate );
+double Pa_GetMaximumLatency( int deviceId, double frameRate );
+/* the following would operate directly on streams */
+double Pa_StreamInputLatency( PortAudioStream *stream );
+double Pa_StreamOutputLatency(PortAudioStream *stream );</PRE>
 <H4>Discussion</H4>
 <P>This proposal does not yet address the question of whether there needs to be separate numInputBuffers and numOutputBuffers parameters for optimal latency specification.</P>
 <P>____________</P>
-<H2><A NAME="Blocking"></A>Blocking Read/Write API</H2>
+<H2><A NAME="Blocking"><A NAME="AllowCallbackVariableFramesPerBuffer"></A>Allow Callbacks to Accept Variable framesPerBuffer</A></H2>
 <H4>Status</H4>
-<P>This proposal is waiting to be written up (assigned to Roger Dannenberg.)</P>
+<P>This proposal is under construction.</P>
+<B><P>Background</B><BR>
+<BR>
+Some devices prefer, or even require, a particular value for framesPerBuffer. Some applications also prefer a particular buffer size because they may, for example, be doing FFTs. If possible, an integral number of application buffers can be fit into a device buffer. If an integral number of application buffers cannot be fit into an application buffer then some system for adapting between them is required. Stephane Letz implemented a block adapter for the ASIO driver that could perhaps be made part of a utility library for PortAudio.<BR>
+<BR>
+Adapting between different block size, unfortunately, involves extra memory movement and should be avoided. One way to avoid this is to allow an application to say "I can handle any value for framesPerBuffer". An example would be a simple algorithm like the one in "pa_tests/pa_fuzz.c". Its callback function could easily work with any value for FramesPerBuffer.<BR>
+<BR>
+<B>Proposal</B><BR>
+<BR>
+Pa_OpenStream() should be able to accept a zero value for framesPerBuffer. When framesPerBuffer is zero, the implementation can choose any value that it thinks will work best given the other constraints. That value will be passed to the user callback.<BR>
+<BR>
+To make the code more obvious, this constant could be used:<BR>
+<BR>
+<FONT FACE="Courier New" SIZE=2>#define paFramesPerBufferUnspecified (0)</FONT><BR>
+<BR>
+In order to find out what value the implementation chose, and also to help the application determine the actual latency, the following calls could be added:<BR>
+<BR>
+<FONT FACE="Courier New" SIZE=2>int Pa_GetFramesPerBuffer( PortAudioStream* stream );<BR>
+int Pa_GetNumOutputBuffers( PortAudioStream* stream );<BR>
+int Pa_GetNumInputBuffers( PortAudioStream* stream );</FONT><BR>
+</P>
+<P>____________</P>
+<H2>Blocking Read/Write API</H2>
+<H4>Status</H4>
+<P>This proposal is open for comment.</P>
 <H4>Background</H4>
-<P>Many PortAudio users have requested a blocking read/write API which will be supported in addition to the current callback based API. A blocking Read/Write API would allow a more natural style of multi-threaded programming, and facilitate single-threaded reactive applications, while insulating clients from platform-specific thread synchronisation facilities. A blocking read/write API would also be useful when binding PortAudio to languages that don't easily support callbacks such as Python, Java, Lisp and Smalltalk. However in this case it has been noted that a blocking API is not sufficient - the host language also needs to support native threads to interact efficiently with blocking.</P>
+<P>Many PortAudio users have requested a blocking read()/write() API that will be supported in addition to the current callback based API. A blocking Read/Write API would allow a more natural style of multi-threaded programming, and facilitate single-threaded reactive applications, while insulating clients from platform-specific thread synchronisation facilities. </P>
+<P>A blocking read/write API would also be useful when binding PortAudio to languages that don't easily support callbacks such as Python, Java, Lisp and Smalltalk. However in this case it has been noted that a blocking API is not sufficient - the host language also needs to support native threads to interact efficiently with blocking. Dannenberg observes that native thread support cannot be added without major redesign (based on a study of Python and Squeak), but given blocking calls, there are several ways to structure programs using non-native threads.</P>
 <P>Adding a blocking Read/Write interface to PortAudio has been discussed on a number of occasions, including the following threads:</P>
 <P><A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-August/000063.html">http://techweb.rfa.org/pipermail/portaudio/2001-August/000063.html</A> a long thread about blocking calls.</P>
 <P><A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-August/000137.html">http://techweb.rfa.org/pipermail/portaudio/2001-August/000137.html</A> this is Roger Dannenberg's proposal and a subsequent discussion</P>
 <P><A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-August/000144.html">http://techweb.rfa.org/pipermail/portaudio/2001-August/000144.html</A> is a thread discussing using blocking APIs with other languages</P>
 <H4>Proposal</H4>
-<P>This proposal needs further documentation, but some details are provided below.</P>
-<P>If a NULL callback parameter is passed to Pa_OpenStream() then the stream is opened in blocking mode. This enables users to call Pa_WriteStream() and Pa_ReadStream() to read and write sample data.</P>
-<P>For a while there was a talk about only requiring implementations to implement blocking calls and that callbacks would always be implemented on top of blocking. The current direction is that this decision will be made independently for each driver-model.</P>
-<P>There needs to be a way to call the read and write functions without them blocking or to determine in advance how many samples can be read or written without blocking. One proposal to avoid blocking in environments without native threads is to ask PortAudio how many frames are available, and then to sleep() (using non-native thread management) until the next buffer boundary.</P>
-<P>Roger Dannenberg wrote the following email that is included here because it didn't seem to make it into the mailing list archive:</P>
-<BLOCKQUOTE>&gt; It would be nice if the buffer could be returned to PortAudio as soon<BR>
-&gt; as the client had finished with it. For example, in the MME<BR>
-&gt; implementation this would allow the buffer to be requeued with<BR>
-&gt; the driver sooner.<BR>
-<BR>
-My model is that, in general, you should target the worst case where audio processing takes most of the CPU time. In that case, the app finishes reading and writing buffers just before it's time to start the next buffer. In that case, there's little to gain by trying to return buffers early. Alternatively, if CPU time is negligible, wouldn't returning the buffer immediately (to MME) effectively increase the buffer count by one? In other words, you could just allocate one extra buffer and not return read buffers until later.<BR>
-<BR>
-I agree that ideally you should return the buffer when you can, but this adds complexity to the application and is not typical of a blocking read interface. If the call to release the buffer was *optional*, I'd have no objection, but that puts some additional bookkeeping back on the library side.<BR>
-<BR>
-&gt; Is GetAvailable() the best way to implement non-blocking i/o?<BR>
-It works in practice. Some systems including Windows do not implement this function very well, i.e. the reported available space comes in fits and starts. But at least you can find out if an IO call would block or fail. I'd like to avoid the extra system call when possible though.</BLOCKQUOTE>
+<P>If a NULL callback parameter is passed to Pa_OpenStream() then the stream will be opened in blocking mode. This enables users to call Pa_WriteStream() and Pa_ReadStream() to read and write sample data. (The PaErrorNum item "paNullCallback" becomes obsolete.)</P>
+<P>Pa_WriteStream() writes a buffer of frames to a stream. The length of the buffer is arbitrary and specified by the frames parameter. Pa_WriteStream() returns when all samples have been copied from buffer. If necessary, Pa_WriteStream() will wait until buffer space becomes available. (Waiting on Unix will be the by-product of an I/O system call, waiting in Win32 will be implemented by waiting on an Event object, and waiting on MacOS 9 will probably require a busy wait.) High performance applications will want to match the length of the buffer to framesPerBuffer, but this is not a requirement.</P>
+<P>The buffer parameter has the same semantics and format as the inputbuffer and outputbuffer parameters of a PortAudioCallback function. In particular, non-interleaved data is handled in the same way.</P>
+<P>Pa_ReadStream() is similar, but it reads rather than writes. </P>
+<PRE>PaError Pa_WriteStream( PortAudioStream *stream,
+                        void *buffer,
+                        unsigned long frames );
+
+PaError Pa_ReadStream( PortAudioStream *stream,
+                       void *buffer,
+                       unsigned long frames );</PRE>
+<P>Pa_ReadStream() returns <I>paInputUnderflow</I> if input data was discarded by PortAudio after the previous call and before this call. Pa_WriteStream() returns <I>paOutputUnderflow</I> if output data was inserted after the previous call and before this call. The mode flag <I>paNeverDropInput</I> is ignored because Pa_ReadStream() and Pa_WriteStream() are not synchronized.</P>
+<P>There are two functions to determine the number of frames available for writing and reading. These functions may be called to determine whether calls to Pa_WriteStream() or Pa_ReadStream() will return immediately or will wait. The return value, if non-negative, is the maximum number of frames that can be written or read without blocking or busy waiting. A negative value is a PaErrorNum.</P>
+<PRE>long Pa_StreamWriteAvailable( PortAudioStream *stream );
+
+long Pa_StreamReadAvailable( PortAudioStream *stream );</PRE>
+<P>The stream functions Pa_CloseStream(), Pa_StartStream(), Pa_StopStream(), Pa_AbortStream(), Pa_StreamActive(), and Pa_StreamTime() work with the blocking API as well as with callbacks. Pa_StreamCPULoad() does not work with the blocking API. PortAudio might be extended to give applications access to the internal routines that compute Pa_StreamCPULoad(). Applications using blocking calls could then bracket audio computation with these calls to determine the CPU load. (This additional functionality is not being proposed here.)</P>
+<H4>Discussion</H4>
+<P>A rejected alternative is to allow Pa_WriteStream() and Pa_ReadStream() to return the number of frames actually written or read so that a Mac implementation could return immediately and avoid blocking. This would require applications to be prepared to handle partial read/writes. It seems simpler and more consistent to use "Available" to determine in advance whether blocking or busy waiting will occur if that is a concern. Also, note that data is almost certainly copied; however, it seems likely that the copy will be folded into any format conversion.</P>
+<P>Implementations may want to provide a way for applications to be notified when data can be written or read. For example, one might want to know the file ID of an ALSA or OSS stream for use in a select() system call. Since this sort of information will be platform-specific and non-portable, no interface is defined here, but implementations can include a device-model-specific access function. If applications commonly need this information, we can think about how to make this more standardized.</P>
 <H4>Implementation Notes</H4>
-<P>Implementing blocking i/o will be quite simple for driver models where the underlying API is blocking-based, and quite difficult to do well under Windows where much fun will be had with Win32 synchronisation primitives.</P>
+<P>Implementing blocking i/o will be quite simple for driver models where the underlying API is blocking-based. Under Windows (MME), the arrival of a buffer will signal an Event passed to waveOutOpen(). Pa_WriteStream() and Pa_ReadStream() will do all the work (no server threads necessary). Writes will make waveOutWrite calls. When no buffer is available, the writer will wait on the event and try again. Reading is similar. On the Mac, a double-buffer scheme can be set up where the Mac callbacks pick up data placed in buffers by Pa_WriteStream(). The double-buffer adds to the latency. Alternatively (and preferably) callbacks can be used only for notification, and Pa_WriteStream() can issue all the calls to write samples.</P>
+<P>PABLIO currently contains a busy-wait ring buffer in "ringbuffer.c" which is generic, used in many projects and is pretty solid. This code could be a useful starting point for implementing the new blocking API on some platforms.</P>
+<P>Pa_WriteStream() and Pa_ReadStream() are not thread safe. Applications wanting to call these from multiple threads should manage their own mutual exclusion. <I>[Roger: Is any of PortAudio thread safe? I don't think so. This is good because it avoids many system calls for mutual exclusion.]</P>
+</I><P>At one time it was suggested that implementations only implement blocking calls and that callbacks would be required to implement callbacks in terms of the blocking API. The current direction is that this decision should be made independently for each driver-model.</P>
 <H4>Impact Analysis</H4>
-<P>This proposal would extend the functionality of PortAudio without requiring any changes to client code. </P>
+<P>This proposal would extend the functionality of PortAudio without requiring any changes to client code with the exception that the PaErrorNum paNullCallback will no longer be defined. As noted above, implementation complexity is dependent on the target platform.</P>
 <P>____________</P>
 <H2>Non-<A NAME="Interleaved"></A>Interleaved Buffers</H2>
 <H4>Status</H4>
@@ -158,7 +216,7 @@ It works in practice. Some systems including Windows do not implement this funct
 <P>The current PortAudio/ASIO implementation works as follows : ASIO native buffers are non-interleaved and the de-interleaving, format conversion and copying the data into PortAudio interleaved buffers is done in one loop. But if PortAudio supported non-interleaved buffers then we could use efficient vector operations even for native buffer &lt;==&gt; port audio buffers transfers. </P>
 <H4>Proposal</H4>
 <P>A new sample format could be defined: </P>
-<PRE>#define paNonInterleaved ((PaSampleFormat) (1&lt;&lt;32)) </PRE>
+<PRE>#define paNonInterleaved ((PaSampleFormat) (1&lt;&lt;31)) </PRE>
 <P>&nbsp;</P>
 <P>This could be used as a modifier flag to the buffer format fields of Pa_OpenStream(). When present, this flag would indicate that non-interleaved buffers would be passed to the callback. When not present, interleaved buffers would be used as is currently always the case. For example, the following code would open an interleaved stream:</P>
 <PRE>
@@ -337,8 +395,8 @@ int Pa_GetMinNumBuffers( PaDeviceID id, int framesPerBuffer, double sampleRate )
 <H4>Implementation Notes</H4>
 <P>The implementation will follow the methodology currently employed in PortMIDI described here: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-December/000295.html">http://techweb.rfa.org/pipermail/portaudio/2001-December/000295.html</A></P>
 <P>An implementation of the driver model neutral "Fa&ccedil;ade" of this proposal exists here: </P>
-<P><A HREF="pa_drivermodel.c.txt">pa_drivermodel.c.txt</A></P>
-<P><A HREF="pa_drivermodel.h.txt">pa_drivermodel.h.txt</A></P>
+<P><A HREF="http://www.portaudio.com/docs/pa_drivermodel.c.txt">http://www.portaudio.com/docs/pa_drivermodel.c.txt</A></P>
+<P><A HREF="http://www.portaudio.com/docs/pa_drivermodel.h.txt">http://www.portaudio.com/docs/pa_drivermodel.h.txt</A></P>
 <P>This proposal will involve the changes described below. Note that the string &lt;DM&gt; will be replaced with a driver model tag for each implementation.</P>
 <P>Each driver model will have it's own Initialize function which PortAudio will call in response to client calls to Pa_Initialize and Pa_Terminate respectively. This will be the only identifier each driver model implementation will be required to expose.</P>
 <PRE>PaError Pa&lt;DM&gt;_MultiDriverInitialize( PaDriverModelImplementation **impl );</PRE>
@@ -363,6 +421,10 @@ int Pa_GetMinNumBuffers( PaDeviceID id, int framesPerBuffer, double sampleRate )
     fptr start;
     fptr stop;
     fptr abort;
+    fptr read;
+    fptr write;
+    fptr readAvailable;
+    fptr writeAvailable;
     fptr active;
     fptr time;
     fptr cpuLoad;
@@ -431,15 +493,17 @@ WAVERR_BADFORMAT to paSampleFormatNotSupported (already defined) </P>
 <H4>Impact Analysis</H4>
 <P>This proposal improves the quality of PortAudio diagnostics. Client code that depends on paHostError code to flag certain conditions may be effected.</P>
 <P>____________</P>
-<H2><A NAME="RenamePa_GetCPULoad">Rename Pa_GetCPULoad() to Pa_StreamCPULoad()</A></H2>
+<H2><A NAME="RenamePa_GetCPULoad">Rename Pa_GetCPULoad() </A>and paInvalidDeviceId for Consistency</H2>
 <H4>Status</H4>
 <P>Proposal is sufficiently well defined to be implemented. No objections have been raised.</P>
 <H4>Background</H4>
 <P>PortAudio functions that return global information typically have names of the form Pa_Get*() (eg. Pa_GetDeviceInfo). Almost all functions operating on PortAudio streams conform to the following implicit naming convention: Pa_*Stream( stream ) performs an action on a stream (eg Pa_StartStream() ) and Pa_Stream*( stream ) returns a stream attribute (eg. Pa_StreamTime() ). The only exception to this convention is the confusingly named Pa_GetCPULoad() which actually returns the CPU consumption of a particular stream's callback. </P>
+<P>PortAudio functions and parameter names that operate on integer identifiers use the string ID (all uppercase.) The paInvalidDeviceId error code is an exception to this convention.</P>
 <H4>Proposal</H4>
-<P>Rename PaGetCPULoad() to Pa_StreamCPULoad() in order to conform to established naming conventions.</P>
+<P>Rename PaGetCPULoad() to Pa_StreamCPULoad() in order to conform to the established naming conventions.</P>
+<P>Rename the paInvalidDeviceId error code to paInvalidDeviceID to conform to the established naming conventions.</P>
 <H4>Impact Analysis</H4>
-<P>This proposal improves the consistency of the naming scheme making the API easier to learn and remember. All clients which call Pa_GetCPULoad() will need to alter their code by renaming the function call.</P>
+<P>This proposal improves the consistency of the naming scheme making the API easier to learn and remember. All clients which call Pa_GetCPULoad() will need to alter their code by renaming the function call. Clients who explicitly check for the paInvalidDeviceId error code will have to edit its capitalisation.</P>
 <P>____________</P>
 <H2><A NAME="CodingStyleGuidelines">Coding Style Guidelines</A></H2>
 <H4>Status</H4>
@@ -465,9 +529,9 @@ WAVERR_BADFORMAT to paSampleFormatNotSupported (already defined) </P>
 <LI>In almost all cases, a PortAudio error code should be preferred to returning PaHostError. If a new PortAudio error code is needed it should be discussed with the maintainer to coordinate updating port_audio.h </LI>
 <LI>PortAudio code should not cause resource leaks. After Pa_Terminate() is called, implementations should guarantee that all dynamically allocated resources have been freed. </LI>
 <LI>The definition of the PortAudio API should minimise "implementation defined behaviour". For example, calling functions such as Pa_Initialize() after PortAudio is initialised, or Pa_Terminate() after PortAudio has been terminated should have well defined behaviour. (In this example, both calls should be safe and simply return an error code.) </LI>
-<LI>Minimise dependence on ANSI C runtime on platforms where it would have to be loaded separately (eg on Win32 prefer Win32 API functions such as GlobalAlloc() to ANSI C functions such as malloc().)</LI></UL>
+<LI>Minimise dependence on ANSI C runtime on platforms where it would have to be loaded separately (eg on Win32 prefer Win32 API functions such as GlobalAlloc() to ANSI C functions such as malloc().) <I>(Ross: this may be problematic, since some portable parts of the implementation may need to allocate memory -- perhaps we should define our own internal memory allocation functions.)</LI></UL>
 
-<P>It has been suggested that we make an effort to minimise the use of global and static data in PortAudio implementations. Another related goal is to reduce name pollution in the global scope. Some possible guidelines in this regard are:</P>
+</I><P>It has been suggested that we make an effort to minimise the use of global and static data in PortAudio implementations. Another related goal is to reduce name pollution in the global scope. Some possible guidelines in this regard are:</P>
 
 <UL>
 <LI>Implementations should avoid exporting any symbols except where absolutely necessary. Specifically, global data must be declared statically. We will need a naming convention for non-public global symbols, such as internal functions defined in one module and used in another. </LI>
@@ -527,7 +591,7 @@ PaError Pa_Terminate( void );</PRE>
 <P>The conversion functions could look something like:</P>
 <PRE>void ConversionFunction_DestType_DestInterleave_SrcType_SrcInterleave_ ( void *dest, int destChannels, void *src, int srcChannels, int frames );</PRE>
 <P>The dest and src parameters have the same format as those supplied to the PortAudio client callback.</P>
-<P>Rather than have each implementation call these conversion functions directly, a 'factory function' could be implemented that returnes a pointer to a conversion function based on parameters specifying the format of the source and destination buffers. This factory function could be called as needed when a stream is opened. The conversion functions could then be made static and hidden from the rest of PortAudio. The 'factory function' could have the following form:</P>
+<P>Rather than have each implementation call these conversion functions directly, a 'factory function' could be implemented that returns a pointer to a conversion function based on parameters specifying the format of the source and destination buffers. This factory function could be called as needed when a stream is opened. The conversion functions could then be made static and hidden from the rest of PortAudio. The 'factory function' could have the following form:</P>
 <PRE>enum PaEndiannes { paBigEndian, paSmallEndian, paHostEndian };
 
 PaBufferConversionFunction* Pa_GetBufferConversionFunction( 
@@ -536,7 +600,7 @@ PaBufferConversionFunction* Pa_GetBufferConversionFunction(
 <P>Note that the interleave/deinterleave status is encoded in the destFormat and srcFormat parameters. paHostEndian is used to represent the endianness of the current platform since some driver models (eg ASIO) allow the driver to use samples in a different endianness from the host endianness. Another alternative is to encode sample endianness in PaSampleFormat - this would allow clients to write sample data of either endianness to PortAudio (e.g. soundfile playback direct from file) and benefit from PortAudio's byte swapping code.</P>
 <P>The redundant use of channel parameters in both the conversion functions and the factory function is intentional and would allow channel-optimised conversion functions to be supplied for common cases such as 16-bit stereo.</P>
 <H4>Discussion</H4>
-<P>This proposal currently only addresses buffer conversion functions, but we would like to identify other common code fragments which could be placed in the shared PortAudio library.</P>
+<P>This proposal currently only addresses buffer conversion functions, however it is important to identify other common code fragments that could be placed in the shared PortAudio library.</P>
 <P>This proposal has not yet addressed the fact that the conversion functions also need to handle clipping and dithering.</P>
 <P>It is not clear whether additional conversion functions will be needed to accommodate the MME interleaved stereo pairs for multichannel devices proposal.</P>
 <P>It hasn't been established whether PortAudio will be extended to support all PaSampleFormats on all devices.</P>
