@@ -56,7 +56,7 @@
 #define TABLE_SIZE   (400)
 typedef struct
 {
-    float sine[TABLE_SIZE + 1]; // add one for guard point for interpolation
+    float sine[TABLE_SIZE + 1]; /* add one for guard point for interpolation */
     float phase_increment;
     float left_phase;
     float right_phase;
@@ -117,7 +117,7 @@ int main(void)
     {
         data.sine[i] = 0.90f * (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
     }
-    data.sine[TABLE_SIZE] = data.sine[0]; // set guard point
+    data.sine[TABLE_SIZE] = data.sine[0];       /* set guard point */
     data.left_phase = data.right_phase = 0.0;
     data.phase_increment = CalcPhaseIncrement(MIN_FREQ);
 
