@@ -131,7 +131,7 @@ typedef unsigned long PaSampleFormat;
 typedef int PaDeviceID;
 #define paNoDevice -1
 
-int Pa_CountDevices();
+int Pa_CountDevices( void );
 
 typedef struct
 {
