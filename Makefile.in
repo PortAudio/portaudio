@@ -4,19 +4,20 @@
 # Dominic Mazzoni
 #
 
+PREFIX = @prefix@
 CC = @CC@
 CFLAGS = @CFLAGS@ -Ipa_common
 LIBS = @LIBS@
 AR = @AR@
 RANLIB = @RANLIB@
 INSTALL = @INSTALL@
-PREFIX = @prefix@
+SHARED_FLAGS = @SHARED_FLAGS@
 
 OTHER_OBJS = @OTHER_OBJS@
 
 PALIB = libportaudio.a
-PADLL = libportaudio.so
-PADLLV = libportaudio.so.0.0.18
+PADLL = @PADLL@
+PADLLV = $(PADLL).0.0.18
 PAINC = pa_common/portaudio.h
 
 COMMON_OBJS = \
@@ -59,7 +60,7 @@ lib/$(PALIB): lib/ $(OBJS) Makefile $(PAINC)
 	$(RANLIB) lib/$(PALIB)
 
 lib/$(PADLLV): lib/ $(OBJS) Makefile $(PAINC)
-	$(CC) -shared -o lib/$(PADLLV) $(OBJS)
+	$(CC) $(SHARED_FLAGS) -o lib/$(PADLLV) $(OBJS)
 
 $(TESTS): bin/%: lib/$(PALIB) Makefile $(PAINC) pa_tests/%.c
 	$(CC) -o $@ $(CFLAGS) pa_tests/$*.c lib/$(PALIB) $(LIBS)
