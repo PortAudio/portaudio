@@ -761,6 +761,23 @@ static int PaHost_CalcTimeOut( internalPortAudioStream *past )
     return timeOut;
 }
 #endif
+
+
+/*******************************************************************/
+/* Attempt to set device sample rate. */
+static PaError PaHost_SetSampleRate( AudioDeviceID devID, Boolean isInput, double sampleRate )
+{
+    AudioStreamBasicDescription formatDesc;
+    OSStatus err;
+    memset( &formatDesc, 0, sizeof(AudioStreamBasicDescription) );
+    formatDesc.mSampleRate = sampleRate;
+    err = AudioDeviceSetProperty( devID, 0, 0,
+        isInput, kAudioDevicePropertyStreamFormat, sizeof(formatDesc), &formatDesc);
+
+    if (err != kAudioHardwareNoError) return paInvalidSampleRate;
+   	else return paNoError;
+}
+
 /*******************************************************************/
 PaError PaHost_OpenInputStream( internalPortAudioStream   *past )
 {
@@ -782,6 +799,10 @@ PaError PaHost_OpenInputStream( internalPortAudioStream   *past )
     }
     hostDeviceInfo = &sDeviceInfos[past->past_InputDeviceID];
 
+    /* Try to set sample rate. */
+    result = PaHost_SetSampleRate( hostDeviceInfo->audioDeviceID, IS_INPUT, past->past_SampleRate );
+	if( result != paNoError ) return result;
+
     if( past->past_NumInputChannels != hostDeviceInfo->paInfo.maxInputChannels )
     {
 #if 1
@@ -793,10 +814,10 @@ FIXME - should this be set on a stream basis? Is it possible to change?
         OSStatus err;
         memset( &formatDesc, 0, sizeof(AudioStreamBasicDescription) );
         formatDesc.mChannelsPerFrame = past->past_NumInputChannels;
-	err = AudioDeviceSetProperty(pahsc->pahsc_AudioDeviceID, 0, 0,
+        
+        err = AudioDeviceSetProperty( hostDeviceInfo->audioDeviceID, 0, 0,
             IS_INPUT, kAudioDevicePropertyStreamFormat, sizeof(formatDesc), &formatDesc);
-
-	if (err != kAudioHardwareNoError)
+        if (err != kAudioHardwareNoError)
         {
             result = paInvalidChannelCount;
             goto error;
@@ -849,7 +870,11 @@ PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
         return paInvalidDeviceId;
     }
     hostDeviceInfo = &sDeviceInfos[past->past_OutputDeviceID];
-    
+
+    /* Try to set sample rate. */
+    result = PaHost_SetSampleRate( hostDeviceInfo->audioDeviceID, IS_OUTPUT, past->past_SampleRate );
+	if( result != paNoError ) return result;
+
     if( past->past_NumOutputChannels != hostDeviceInfo->paInfo.maxOutputChannels )
     {
 #if 1
@@ -860,10 +885,10 @@ PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
         OSStatus err;
         memset( &formatDesc, 0, sizeof(AudioStreamBasicDescription) );
         formatDesc.mChannelsPerFrame = past->past_NumOutputChannels;
-	err = AudioDeviceSetProperty(pahsc->pahsc_AudioDeviceID, 0, 0,
+        err = AudioDeviceSetProperty( hostDeviceInfo->audioDeviceID, 0, 0,
             IS_OUTPUT, kAudioDevicePropertyStreamFormat, sizeof(formatDesc), &formatDesc);
 
-	if (err != kAudioHardwareNoError)
+        if (err != kAudioHardwareNoError)
         {
             result = paInvalidChannelCount;
             goto error;
@@ -976,33 +1001,17 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
     /* ------------------ OUTPUT */
     if( (past->past_OutputDeviceID != paNoDevice) && (past->past_NumOutputChannels > 0) )
     {
+        pahsc->pahsc_AudioDeviceID = sDeviceInfos[past->past_OutputDeviceID].audioDeviceID;
         result = PaHost_OpenOutputStream( past );
         if( result < 0 ) goto error;
-        pahsc->pahsc_AudioDeviceID = sDeviceInfos[past->past_OutputDeviceID].audioDeviceID;
     }
 
     /* ------------------ INPUT */
     if( (past->past_InputDeviceID != paNoDevice) && (past->past_NumInputChannels > 0) )
     {
+        pahsc->pahsc_AudioDeviceID = sDeviceInfos[past->past_InputDeviceID].audioDeviceID;
         result = PaHost_OpenInputStream( past );
         if( result < 0 ) goto error;
-        pahsc->pahsc_AudioDeviceID = sDeviceInfos[past->past_InputDeviceID].audioDeviceID;
-    }
-
-    /* Attempt to set device sample rate. */
-    {
-        AudioStreamBasicDescription formatDesc;
-        OSStatus err;
-        memset( &formatDesc, 0, sizeof(AudioStreamBasicDescription) );
-        formatDesc.mSampleRate = past->past_SampleRate;
-	err = AudioDeviceSetProperty(pahsc->pahsc_AudioDeviceID, 0, 0,
-            IS_OUTPUT, kAudioDevicePropertyStreamFormat, sizeof(formatDesc), &formatDesc);
-
-	if (err != kAudioHardwareNoError)
-        {
-            result = paInvalidSampleRate;
-            goto error;
-        }
     }
 
     return result;
