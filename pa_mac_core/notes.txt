@@ -20,6 +20,9 @@ BuiltIn audio is typically one CoreAudio device.
 
 User formats other than the native paFloat32 are not yet supported.
 
+If you request a non-supported sample rate then you just get a 
+supported rate with no error messages.
+
 DEVICE MAPPING
 
 CoreAudio devices can support both input and output. But the sample 
