@@ -52,6 +52,7 @@
  JM20020118 - prevent hung thread when buffers underflow.
  PLB20020321 - detect Win XP versus NT, 9x; fix DBUG typo; removed init of CurrentCount
  RDB20020411 - various renaming cleanups, factored streamData alloc and cpu usage init
+ RDB20020417 - stopped counting WAVE_MAPPER when there were no real devices
 */
 
 #include <stdio.h>
@@ -290,12 +291,21 @@ static void Pa_EndUsageCalculation( internalPortAudioStream   *stream )
 static PaError Pa_QueryDevices( void )
 {
     int numBytes;
-    /* Count the devices and add one extra for the WAVE_MAPPER */
-    sNumInputDevices = waveInGetNumDevs() + 1;
+ 
+    sNumInputDevices = waveInGetNumDevs();
+    if( sNumInputDevices > 0 )
+        sNumInputDevices += 1; /* add one extra for the WAVE_MAPPER */
+
     sDefaultInputDeviceID = 0;
-    sNumOutputDevices = waveOutGetNumDevs() + 1;
+
+    sNumOutputDevices = waveOutGetNumDevs();
+    if( sNumOutputDevices > 0 )
+        sNumOutputDevices += 1; /* add one extra for the WAVE_MAPPER */
+
     sDefaultOutputDeviceID = sNumInputDevices;
+
     sNumDevices = sNumInputDevices + sNumOutputDevices;
+    
     /* Allocate structures to hold device info. */
     /* PLB20010402 - was allocating too much memory. */
     /* numBytes = sNumDevices * sizeof(PaDeviceInfo);  // PLB20010402 */
