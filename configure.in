@@ -49,6 +49,16 @@ case "${host_os}" in
 	DLL_LIBS="-lwinmm";
 	;;
 
+  cygwin* )
+	dnl Cygwin configuration
+
+	OTHER_OBJS="pa_win_wmme/pa_win_wmme.o";
+	LIBS="-lwinmm -lm";
+	PADLL="portaudio.dll";
+	SHARED_FLAGS="-shared -mthreads";
+	DLL_LIBS="-lwinmm";
+	;;
+
   *)
 	dnl Unix OSS configuration
 
