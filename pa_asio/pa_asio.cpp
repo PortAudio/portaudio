@@ -55,6 +55,7 @@
         19-02-02 New Pa_ASIO_loadDriver that calls CoInitialize on each thread on Windows : Stephane Letz
         09-04-02 Correct error code management in PaHost_Term, removes various compiler warning : Stephane Letz
         12-04-02 Add Mac includes for <Devices.h> and <Timer.h> : Phil Burk
+        13-04-02 Removes another compiler warning : Stephane Letz
         
         TO DO :
         
@@ -1324,7 +1325,7 @@ static void Output_Float32_Int32 (ASIOBufferInfo* nativeBuffer, float *outBufPtr
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
 // MUST BE TESTED
 
- void Output_Float32_Float32 (ASIOBufferInfo* nativeBuffer, float *outBufPtr, int framePerBuffer, int NumInputChannels, int NumOuputChannels, int index, int hostFrameOffset, int userFrameOffset,uint32 flags,bool swap)
+ static void Output_Float32_Float32 (ASIOBufferInfo* nativeBuffer, float *outBufPtr, int framePerBuffer, int NumInputChannels, int NumOuputChannels, int index, int hostFrameOffset, int userFrameOffset,uint32 flags,bool swap)
 {
         long temp;
         int i,j;
