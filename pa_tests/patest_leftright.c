@@ -98,6 +98,7 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 
     return finished;
 }
+
 /*******************************************************************/
 int main(void);
 int main(void)
@@ -107,17 +108,21 @@ int main(void)
     paTestData data;
     int i;
     int timeout;
-    printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
+    
+    printf("Play different tone sine waves that alternate between left and right channel.\n");
+    printf("The low tone should be on the left channel.\n");
+    
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
         data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
     }
-    data.left_phase = data.right_phase = 0;
+    data.left_phase = data.right_phase = data.toggle = 0;
     data.countDown = SAMPLE_RATE;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
+    
     err = Pa_OpenStream(
               &stream,
               paNoDevice,/* default input device */
@@ -135,15 +140,15 @@ int main(void)
               patestCallback,
               &data );
     if( err != paNoError ) goto error;
+    
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
+    
     printf("Play for several seconds.\n");
     timeout = NUM_SECONDS * 4;
     while( timeout > 0 )
     {
-        printf("Countdown = %d, Toggle = %d\n", data.countDown, data.toggle );
-        fflush( stdout );
-        Pa_Sleep( 1000/4 );
+        Pa_Sleep( 300 );
         timeout -= 1;
     }
 
