@@ -56,6 +56,7 @@
         09-04-02 Correct error code management in PaHost_Term, removes various compiler warning : Stephane Letz
         12-04-02 Add Mac includes for <Devices.h> and <Timer.h> : Phil Burk
         13-04-02 Removes another compiler warning : Stephane Letz
+        30-04-02 Pa_ASIO_QueryDeviceInfo bug correction, memory allocation checking, better error handling : D Viens, P Burk, S Letz
         
         TO DO :
         
@@ -432,9 +433,13 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
         int           i;
         int           numDrivers;
 		ASIOError     asioError;
-        
-        /* Allocate names */
-        for (i = 0 ; i < PA_MAX_DEVICE_INFO ; i++) names[i] = (char*)PaHost_AllocateFastMemory(32);
+		
+	   /* Allocate names */
+        for (i = 0 ; i < PA_MAX_DEVICE_INFO ; i++) {
+        	names[i] = (char*)PaHost_AllocateFastMemory(32);
+        	/* check memory */
+        	if(!names[i]) return paInsufficientMemory;
+        }
         
         /* MUST BE CHECKED : to force fragments loading on Mac */
         Pa_ASIO_loadAsioDriver("dummy");
@@ -473,9 +478,8 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
 			}
 			else
 			{
-					
-                    /* Gets the name */
-                    dev = &(ipad[driver].pad_Info);
+		            /* Gets the name */
+                    dev = &(ipad[sNumDevices].pad_Info);
                     dev->name = names[driver];
                     names[driver] = 0;
                     
@@ -487,7 +491,12 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
                     DBUG(("PaASIO_QueryDeviceInfo: OutputChannels = %d\n", OutputChannels ));
                     
                     /* Make room in case device supports all rates. */
-                    sampleRates = (double*)PaHost_AllocateFastMemory( MAX_NUMSAMPLINGRATES * sizeof(double));
+                    sampleRates = (double*)PaHost_AllocateFastMemory(MAX_NUMSAMPLINGRATES * sizeof(double));
+                    /* check memory */
+                    if (!sampleRates) {
+                    	ASIOExit();
+                    	return paInsufficientMemory;
+                    }
                     dev->sampleRates = sampleRates;
                     dev->numSampleRates = 0;
                     
@@ -495,7 +504,7 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
                     for (int index = 0; index < MAX_NUMSAMPLINGRATES; index++) {
                             if (ASIOCanSampleRate(possibleSampleRates[index]) != ASE_NoClock) {
                                     DBUG(("PortAudio : possible sample rate = %d\n", (long)possibleSampleRates[index]));
-                                    dev->numSampleRates+=1;
+                                    dev->numSampleRates += 1;
                                     *sampleRates = possibleSampleRates[index];
                                     sampleRates++;
                             }
@@ -509,9 +518,7 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
                     dev->nativeSampleFormats = Pa_ASIO_Convert_SampleFormat(channelInfos.type);
                     
                     /* unload the driver */
-                    ASIODisposeBuffers();
                     ASIOExit();
-                    
                     sNumDevices++;
                 }
         }       
@@ -2560,8 +2567,9 @@ error:
 /***********************************************************************/
 PaError PaHost_Init( void )
 {
-        /* Have we already initialized the device info? */
-        return  (Pa_CountDevices() < 0 ) ? paHostError : paNoError;
+       /* Have we already initialized the device info? */
+        PaError err = (PaError) Pa_CountDevices();
+    	return ( err < 0 ) ? err : paNoError;
 }
 
 /***********************************************************************/
@@ -2578,10 +2586,11 @@ PaError PaHost_Term( void )
 	        for( i=0; i<sNumDevices; i++ ){
 	                dev =  &sDevices[i].pad_Info;
 	                rates = (double *) dev->sampleRates;
-	                if((rates != NULL)) PaHost_FreeFastMemory(rates, MAX_NUMSAMPLINGRATES * sizeof(double)); 
+	                if ((rates != NULL)) PaHost_FreeFastMemory(rates, MAX_NUMSAMPLINGRATES * sizeof(double)); 
 	                dev->sampleRates = NULL;
-	                if(dev->name != NULL) PaHost_FreeFastMemory((void *) dev->name, 32);
+	               if(dev->name != NULL) PaHost_FreeFastMemory((void *) dev->name, 32);
 	                dev->name = NULL;
+	                
 	        }
 	        
 	        sNumDevices = 0;
