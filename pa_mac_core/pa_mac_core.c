@@ -49,7 +49,8 @@
             Check for invalid sample rates and return an error.
             Check for getenv("PA_MIN_LATEWNCY_MSEC") to set latency externally.
             Better error checking for invalid channel counts and invalid devices.
-    
+ 3.29.2002 - Phil Burk - Fixed Pa_GetCPULoad() for small buffers.
+
 TODO:
 O- how do mono output?
 O- FIFO between input and output callbacks if different devices, like in pa_mac.c
@@ -75,8 +76,8 @@ O- FIFO between input and output callbacks if different devices, like in pa_mac.
 
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
-#define DBUG(x)  /* PRINT(x) */
-#define DBUGX(x) /* PRINT(x) */
+#define DBUG(x)    /* PRINT(x) /**/
+#define DBUGX(x)   /* PRINT(x) /**/
 
 // define value of isInput passed to CoreAudio routines
 #define IS_INPUT    (true)
@@ -97,8 +98,8 @@ typedef struct PaHostSoundControl
     int                pahsc_FramesPerHostBuffer;
     int                pahsc_UserBuffersPerHostBuffer;    
     /* For measuring CPU utilization. */
-    struct timeval   pahsc_EntryTime;
-    double           pahsc_InverseMicrosPerBuffer; /* 1/Microseconds of real-time audio per user buffer. */
+    struct timeval     pahsc_EntryTime;
+    double             pahsc_InverseMicrosPerHostBuffer; /* 1/Microseconds of real-time audio per user buffer. */
 }
 PaHostSoundControl;
 
@@ -187,7 +188,7 @@ static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
     {
         usecsElapsed = SubtractTime_AminusB( &currentTime, &pahsc->pahsc_EntryTime );
         /* Use inverse because it is faster than the divide. */
-        newUsage =  usecsElapsed * pahsc->pahsc_InverseMicrosPerBuffer;
+        newUsage =  usecsElapsed * pahsc->pahsc_InverseMicrosPerHostBuffer;
 
         past->past_Usage = (LOWPASS_COEFFICIENT_0 * past->past_Usage) +
                            (LOWPASS_COEFFICIENT_1 * newUsage);
@@ -632,10 +633,8 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
                              AudioBufferList*  outOutputData )
 {
     PaError           result = 0;
-    char             *inputNativeBufferfPtr;
-    char             *outputNativeBufferfPtr;
-    int               gotInput = 0;
-    int               gotOutput = 0;
+    char             *inputNativeBufferfPtr = NULL;
+    char             *outputNativeBufferfPtr = NULL;
     int               i;
     int               buffersProcessed = 0;
     int               done = 0;
@@ -651,20 +650,15 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
     Pa_StartUsageCalculation( past );
 
     /* If we are using output, then we need an empty output buffer. */
-    gotOutput = 0;
     if( past->past_NumOutputChannels > 0 )
     {
-        outputNativeBufferfPtr =  (char*)outOutputData->mBuffers[0].mData,
-                     gotOutput = 1;
+        outputNativeBufferfPtr =  (char*)outOutputData->mBuffers[0].mData;
     }
 
     /* If we are using input, then we need a full input buffer. */
-    gotInput = 0;
-    inputNativeBufferfPtr = NULL;
     if(  past->past_NumInputChannels > 0  )
     {
-        inputNativeBufferfPtr = (char*)inInputData->mBuffers[0].mData,
-                   gotInput = 1;
+        inputNativeBufferfPtr = (char*)inInputData->mBuffers[0].mData;
     }
 
     buffersProcessed += 1;
@@ -674,7 +668,7 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
     {
         if( done )
         {
-            if( gotOutput )
+            if( outputNativeBufferfPtr )
             {
                 /* Clear remainder of wave buffer if we are waiting for stop. */
                 AddTraceMessage("Pa_TimeSlice: zero rest of wave buffer ", i );
@@ -687,8 +681,8 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
             result = PaConvert_Process( past, inputNativeBufferfPtr, outputNativeBufferfPtr );
             if( result != 0) done = 1;
         }
-        if( gotInput ) inputNativeBufferfPtr += pahsc->pahsc_BytesPerUserNativeInputBuffer;
-        if( gotOutput) outputNativeBufferfPtr += pahsc->pahsc_BytesPerUserNativeOutputBuffer;
+        if( inputNativeBufferfPtr ) inputNativeBufferfPtr += pahsc->pahsc_BytesPerUserNativeInputBuffer;
+        if( outputNativeBufferfPtr) outputNativeBufferfPtr += pahsc->pahsc_BytesPerUserNativeOutputBuffer;
     }
 
     Pa_EndUsageCalculation( past );
@@ -996,7 +990,7 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
     }
     
     /* Setup constants for CPU load measurement. */
-    pahsc->pahsc_InverseMicrosPerBuffer = past->past_SampleRate / (1000000.0 * 	past->past_FramesPerUserBuffer);
+    pahsc->pahsc_InverseMicrosPerHostBuffer = past->past_SampleRate / (1000000.0 * 	pahsc->pahsc_FramesPerHostBuffer);
 
     /* ------------------ OUTPUT */
     if( (past->past_OutputDeviceID != paNoDevice) && (past->past_NumOutputChannels > 0) )
@@ -1202,12 +1196,14 @@ PaError PaHost_Term( void )
 /*************************************************************************/
 void Pa_Sleep( long msec )
 {
-    /*       struct timeval timeout;
-           timeout.tv_sec = msec / 1000;
-           timeout.tv_usec = (msec % 1000) * 1000;
-           select( 0, NULL, NULL, NULL, &timeout );
-    */
+#if 0
+    struct timeval timeout;
+    timeout.tv_sec = msec / 1000;
+	timeout.tv_usec = (msec % 1000) * 1000;
+	select( 0, NULL, NULL, NULL, &timeout );
+#else
     usleep( msec * 1000 );
+#endif
 }
 
 /*************************************************************************
