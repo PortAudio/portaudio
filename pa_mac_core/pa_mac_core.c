@@ -202,7 +202,7 @@ static PaDeviceID Pa_QueryDefaultInputDevice( void )
     UInt32  count;
     int          i;
     AudioDeviceID tempDeviceID = kAudioDeviceUnknown;
-    PaDeviceID  defaultDeviceID;
+    PaDeviceID  defaultDeviceID = paNoDevice;
 
     // get the default output device for the HAL
     // it is required to pass the size of the data to be returned
@@ -232,7 +232,7 @@ static PaDeviceID Pa_QueryDefaultOutputDevice( void )
     UInt32  count;
     int          i;
     AudioDeviceID tempDeviceID = kAudioDeviceUnknown;
-    PaDeviceID  defaultDeviceID;
+    PaDeviceID  defaultDeviceID = paNoDevice;
 
     // get the default output device for the HAL
     // it is required to pass the size of the data to be returned
