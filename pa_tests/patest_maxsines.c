@@ -59,7 +59,7 @@ typedef struct paTestData
 {
     int numSines;
     float sine[TABLE_SIZE + 1]; /* add one for guard point for interpolation */
-    double phases[MAX_SINES];
+    float phases[MAX_SINES];
 }
 paTestData;
 
@@ -105,8 +105,8 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
     for( i=0; i<framesPerBuffer; i++ )
     {
         float output = 0.0;
-        double phaseInc = MIN_PHASE_INC;
-        double phase;
+        float phaseInc = MIN_PHASE_INC;
+        float phase;
         for( j=0; j<data->numSines; j++ )
         {
             /* Advance phase of next oscillator. */
@@ -117,7 +117,7 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
             output += LookupSine(data, phase); 
             data->phases[j] = phase;
             
-            phaseInc *= 1.02;
+            phaseInc *= 1.02f;
             if( phaseInc > MAX_PHASE_INC ) phaseInc = MIN_PHASE_INC;
         }
 
