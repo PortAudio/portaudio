@@ -31,17 +31,22 @@ name=KeyWords>
 <UL>
 <LI><A HREF="#Underflow">PortAudioCallback Underflow/Overflow Handling</A> </LI>
 <LI><A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A> * </LI>
-<LI><A HREF="#Latency">Improve Latency Mechanisms</A> * </LI>
+<LI><A HREF="#Latency">Improve Latency Mechanisms</A> </LI>
 <LI><A HREF="#AllowCallbackVariableFramesPerBuffer">Allow Callbacks to Accept Variable framesPerBuffer</A> * </LI>
 <LI><A HREF="#Blocking">Blocking Read/Write API</A> </LI>
 <LI><A HREF="#Interleaved">Non-Interleaved Buffers</A> </LI>
 <LI><A HREF="#MultipleDriverModels">Support for Multiple Host APIs in a Single PortAudio Build</A> |C| </LI>
 <LI><A HREF="#DriverModelSpecificPa_OpenStream">Host API Specific Pa_OpenStream() Parameters</A> |C| </LI>
 <LI><A HREF="#Error">Handling of Host API Specific Error Codes</A> * </LI>
+<LI><A HREF="#StreamStates">Clarify Stream State Machine and State Querying Functions</A> </LI>
 <LI><A HREF="#RenamePa_GetCPULoad">Rename Pa_GetCPULoad(), PaDeviceID etc. for Consistency</A> </LI>
 <LI><A HREF="#AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A> </LI>
 <LI><A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> * </LI>
-<LI><A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> *</LI></UL>
+<LI><A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> *</LI>
+
+</UL>
+
+
 
 <I><P>The proposals above which are marked with a * are under construction, those marked with |</I>C<I>| are essentially complete but require community approval or comment before they are considered complete. The remaining proposals are essentially complete and will be implemented as-is unless significant objections are raised.</P>
 </I><H2>Status </H2>
@@ -212,7 +217,7 @@ PaError Pa_ReadStream( PaStream* stream,
 <PRE>long Pa_StreamWriteAvailable( PaStream* stream );
 
 long Pa_StreamReadAvailable( PaStream* stream );</PRE>
-<P>The stream functions Pa_CloseStream(), Pa_StartStream(), Pa_StopStream(), Pa_AbortStream(), Pa_StreamActive(), and Pa_StreamTime() work with the blocking API as well as with callbacks. Pa_StreamCPULoad() does not work with the blocking API. PortAudio might be extended to give applications access to the internal routines that compute Pa_StreamCPULoad(). Applications using blocking calls could then bracket audio computation with these calls to determine the CPU load. (This additional functionality is not being proposed here.)</P>
+<P>The stream functions Pa_CloseStream(), Pa_StartStream(), Pa_StopStream(), Pa_AbortStream(), and Pa_StreamTime() work with the blocking API as well as with callbacks. Pa_StreamCPULoad() does not work with the blocking API and will return 0 when called on a blocking stream. PortAudio might be extended to give applications access to the internal routines that compute Pa_StreamCPULoad(). Applications using blocking calls could then bracket audio computation with these calls to determine the CPU load. (This additional functionality is not being proposed here.)</P>
 <H4>Discussion</H4>
 <P>A rejected alternative is to allow Pa_WriteStream() and Pa_ReadStream() to return the number of frames actually written or read so that a Mac implementation could return immediately and avoid blocking. This would require applications to be prepared to handle partial read/writes. It seems simpler and more consistent to use "Available" to determine in advance whether blocking or busy waiting will occur if that is a concern. Also, note that data is almost certainly copied; however, it seems likely that the copy will be folded into any format conversion.</P>
 <P>Implementations may want to provide a way for applications to be notified when data can be written or read. For example, one might want to know the file ID of an ALSA or OSS stream for use in a select() system call. Since this sort of information will be platform-specific and non-portable, no interface is defined here, but implementations can include a device-model-specific access function. If applications commonly need this information, we can think about how to make this more standardized.</P>
@@ -512,6 +517,97 @@ WAVERR_BADFORMAT to paSampleFormatNotSupported (already defined) </P>
 <H4>Impact Analysis</H4>
 <P>This proposal improves the quality of PortAudio diagnostics. Client code that depends on paHostError code to flag certain conditions may be effected.</P>
 <P>____________</P>
+<H2><A NAME="StreamStates">Clarify Stream State Machine and State Querying Functions</A></H2>
+<H4>Status</H4>
+<P>
+This proposal is sufficiently well defined to be implemented.
+</P>
+
+<H4>Background</H4>
+<P>
+Interaction between Pa_StartStream(), Pa_StopStream() and Pa_AbortStream(), and the ability to stop a stream
+by returning non-zero from the callback function was never clearly documented. After returning non-zero from the callback it was not clear whether the stream was stopped (meaning that Pa_StartStream() could be called immediately) or whether the Stream was in some intermediate state, requiring Pa_StopStream() to be called prior to being Started again. The availability of Pa_StreamActive() implied the latter case, but it was never documented.
+</P>
+<P>
+In order for the common infrastructure to manage some stream state transitions (such as automatically stopping an active stream when closing it) a function to query whether the stream is stopped is required.
+</P>
+<P>
+It has been suggested that it should be possible for the callback return value to indicate whether a stream should
+stop immediately or that it should stop after all queued buffers have been played (current behavior.) Thus providing similar behavior to Pa_StopStream()/Pa_AbortStream() from the callback.
+</P>
+<P>
+This proposal documents the previously implicit state machine for PortAudio Streams and provides a new accessor function for determining whether the stream is stopped. It also defines 3 new constants which can be used as return values from the callback.
+</P>
+
+<H4>Proposal</H4>
+<P>
+PortAudio streams will function according to the following state machine:
+</P>
+<P>
+<IMG src="PaStreamStateDiagram.GIF">
+</P>
+<P>
+A new function Pa_IsStreamStopped() will be added to allow clients to determine whether the Stream is in the Stopped state.
+<P>
+<P>
+New error codes paStreamIsStopped and paStreamIsNotStopped will be added (see below for usage.)
+</P>
+<P>Stream functions will interact with the state machine as follows:</P>
+
+<PRE>
+Pa_OpenStream() -> creates a stream in the Stopped state
+Pa_CloseStream() -> always closes a stream, 
+	if the stream is not Stopped it will be automatically
+	aborted using Pa_AbortStream() before being closed.
+
+In the Stopped state:
+Pa_StartStream() -> transitions to Active state
+Pa_StopStream() -> returns paStreamIsStopped error
+Pa_AbortStream()-> returns paStreamIsStopped error
+Pa_IsStreamStopped() -> returns non-zero
+Pa_IsStreamActive() -> returns zero
+
+In the Active state:
+Pa_StartStream() -> returns paStreamIsNotStopped error
+Pa_StopStream() -> stops calling the callback and blocks until 
+	all buffers have been played 
+	: transitions to Stopped state
+Pa_AbortStream()-> if possible, discards all queued buffers instead of
+	 waiting for them to be played, otherwise same as Pa_StopStream() 
+	: transitions to Stopped state
+Pa_IsStreamStopped() -> returns zero
+Pa_IsStreamActive() -> returns non-zero
+
+In the Callback Finished state:
+Pa_StartStream() -> returns paStreamIsNotStopped error
+Pa_StopStream() -> transitions to Stopped state
+Pa_AbortStream()-> transitions to Stopped state
+Pa_IsStreamStopped() -> returns zero
+Pa_IsStreamActive() -> returns non-zero
+</PRE>
+
+<P>
+Three new constants: paContinue(0), paFinish(1) and paAbort(2) will be defined for use as return values from the callback. Both paFinish and paAbort cause PortAudio to stop calling the callback. paFinish will cause a transition to the Callback Finished state once all buffers have been played, paAbort indicates that PortAudio may to attempt to cancel pending buffers before transitioning to the Callback Finished state. Note that returning any other non-zero  value from the callback will have the same effect as returning paFinish, for maximum backwards compatibility.
+</P>
+
+<H5>A Note About Stop and Abort Behavior</H5>
+<P>
+As the host may buffer samples, it is possible for a perceptible delay to arise between the callback generating samples and them being heard. Sometimes it is desirable to wait for all generated samples to be played before closing a stream - for example when waiting for the end of a soundfile to complete playbeck. At other times it may be desirable to stop the stream as quickly as possible, without necessarily waiting for all queued samples to be played. This latter situation can occur when exiting an application or closing a document - providing good interactive performance to the end-user may necessitate aborting the stream rather than pausing for a significant period waiting for the queued samples to complete. These two use-cases are respectively addressed by the Pa_StopStream() and Pa_AbortStream() functions, and by the paFinish and paAbort callback return values.
+</P>
+<P>
+It has been noted that not all host APIs support the cancellation of already queued samples or buffers, thus making it impossible to usefully implement Pa_AbortStream. In such cases, Pa_AbortStream() will have the same behavior as Pa_StopStream(), and returning paAbort from the callback will have the behavior as returning paFinish. 
+</P>
+
+
+<H4>Discussion</H4>
+<P>The multi-host-API common infrastructure requires a function like Pa_IsStreamStopped() so that it can automatically call Pa_AbortStream() if Pa_CloseStream() is called on an Active stream. The availability of this state information may also be used to implement error results when actions are not valid for the current stream state (calling Pa_StartStream() on a Active stream for example.)</P>
+
+<H4>Impact Analysis</H4>
+<P>
+Clients who currently return 2 from the callback will need to change the callback return value to paFinish to retain the expected behavior.
+</P>
+
+<P>____________</P>
 <H2><A NAME="RenamePa_GetCPULoad">Rename Pa_GetCPULoad(), PaDeviceID etc. for Consistency</A></H2>
 <H4>Status</H4>
 <P>Proposal is sufficiently well defined to be implemented. No objections have been raised.</P>
@@ -539,7 +635,7 @@ Pa_GetDefaultOutputDeviceID() -> Pa_GetDefaultOutputDevice()
 <p>The use of the term index in PaDeviceIndex clearly denotes that the types has values within a closed range and may be incremented or decremented to access adjacent values. The ommission of "Index" from paInvalidDevice and the Pa_GetDefault* functions is justified by the fact that the only public representation of a device is its index.
 </p>
 <H4>Impact Analysis</H4>
-<P>This proposal improves the consistency of the naming scheme making the API easier to learn and remember. All clients which currently call Pa_GetCPULoad(), Pa_StreamTime(), Pa_StreamActive(), Pa_GetDefaultInputDevice(), or Pa_GetDefaultOutputDevice() will need to alter their code by renaming the function call. Clients who explicitly check for the paInvalidDeviceId error code, or use the PaDeviceID type will have to edit the spelling of these identifiers.</P>
+<P>This proposal improves the consistency of the naming scheme making the API easier to learn and remember. All clients which currently call Pa_GetCPULoad(), Pa_StreamTime(), Pa_StreamActive(), Pa_GetDefaultInputDeviceID(), or Pa_GetDefaultOutputDeviceID() will need to alter their code by renaming the function call. Clients who explicitly check for the paInvalidDeviceId error code, or use the PaDeviceID type will have to edit the spelling of these identifiers.</P>
 <P>____________</P>
 <H2><A NAME="AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A></H2>
 <H4>Status</H4>
@@ -648,3 +744,4 @@ PaBufferConversionFunction* Pa_GetBufferConversionFunction(
 <P>This proposal only effects PortAudio implementors. Increasing the utility of shared code will improve the quality of all PortAudio implementations in terms of speed, size, and robustness. It should also reduce the effort involved in porting PortAudio to a new host API.</P>
 <P>____________</P></TT></BODY>
 </HTML>
+  
