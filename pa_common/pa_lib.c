@@ -217,7 +217,7 @@ PaError Pa_OpenStream(
 
     past->past_Magic = PA_MAGIC;  /* Set ID to catch bugs. */
     past->past_FramesPerUserBuffer = framesPerBuffer;
-    past->past_NumUserBuffers = numberOfBuffers; /* NOTE - PaHost_OpenStream() NMUST CHECK FOR ZERO! */
+    past->past_NumUserBuffers = numberOfBuffers; /* NOTE - PaHost_OpenStream() MUST CHECK FOR ZERO! */
     past->past_Callback = callback;
     past->past_UserData = userData;
     past->past_OutputSampleFormat = outputSampleFormat;
@@ -248,7 +248,7 @@ PaError Pa_OpenStream(
 #else
         past->past_SampleRate = sampleRate;
 #endif
-        /* Allocate single Input buffer. */
+        /* Allocate single Input buffer for passing formatted samples to user callback. */
         past->past_InputBufferSize = framesPerBuffer * numInputChannels * ((bitsPerInputSample+7) / 8);
         past->past_InputBuffer = PaHost_AllocateFastMemory(past->past_InputBufferSize);
         if( past->past_InputBuffer == NULL )
@@ -481,10 +481,11 @@ double Pa_GetCPULoad(  PortAudioStream* stream)
 /*************************************************************
 ** Calculate 2 LSB dither signal with a triangular distribution.
 ** Ranged properly for adding to a 32 bit integer prior to >>15.
+** Range of output is +/- 32767
 */
-#define DITHER_BITS   (15)
-#define DITHER_SCALE  (1.0f / ((1<<DITHER_BITS)-1))
-static long Pa_TriangularDither( void )
+#define PA_DITHER_BITS   (15)
+#define PA_DITHER_SCALE  (1.0f / ((1<<PA_DITHER_BITS)-1))
+long PaConvert_TriangularDither( void )
 {
     static unsigned long previous = 0;
     static unsigned long randSeed1 = 22222;
@@ -493,8 +494,12 @@ static long Pa_TriangularDither( void )
     /* Generate two random numbers. */
     randSeed1 = (randSeed1 * 196314165) + 907633515;
     randSeed2 = (randSeed2 * 196314165) + 907633515;
-    /* Generate triangular distribution about 0. */
-    current = (((long)randSeed1)>>(32-DITHER_BITS)) + (((long)randSeed2)>>(32-DITHER_BITS));
+    /* Generate triangular distribution about 0.
+     * Shift before adding to prevent overflow which would skew the distribution.
+     * Also shift an extra bit for the high pass filter. 
+     */
+#define DITHER_SHIFT  ((32 - PA_DITHER_BITS) + 1)
+    current = (((long)randSeed1)>>DITHER_SHIFT) + (((long)randSeed2)>>DITHER_SHIFT);
     /* High pass filter to reduce audibility. */
     highPass = current - previous;
     previous = current;
@@ -513,8 +518,6 @@ long Pa_CallConvertInt16( internalPortAudioStream   *past,
                           short *nativeOutputBuffer )
 {
     long              temp;
-    long              bytesEmpty = 0;
-    long              bytesFilled = 0;
     int               userResult;
     unsigned int      i;
     void             *inputBuffer = NULL;
@@ -576,7 +579,7 @@ long Pa_CallConvertInt16( internalPortAudioStream   *past,
                     for( i=0; i<samplesPerBuffer; i++ )
                     {
                         temp = nativeInputBuffer[i];
-                        temp += Pa_TriangularDither() >> 8; /* PLB20010820 */
+                        temp += PaConvert_TriangularDither() >> 8; /* PLB20010820 */
                         temp = ((temp < -0x8000) ? -0x8000 : ((temp > 0x7FFF) ? 0x7FFF : temp));
                         inBufPtr[i] = (char)(temp >> 8);
                     }
@@ -602,7 +605,7 @@ long Pa_CallConvertInt16( internalPortAudioStream   *past,
                     for( i=0; i<samplesPerBuffer; i++ )
                     {
                         temp = nativeInputBuffer[i];
-                        temp += Pa_TriangularDither() >> 8; /* PLB20010820 */
+                        temp += PaConvert_TriangularDither() >> 8; /* PLB20010820 */
                         temp = ((temp < -0x8000) ? -0x8000 : ((temp > 0x7FFF) ? 0x7FFF : temp));
                         inBufPtr[i] = (unsigned char)((temp>>8) + 0x80); /* PLB20010820 */
                     }
@@ -669,7 +672,7 @@ long Pa_CallConvertInt16( internalPortAudioStream   *past,
                     /* If you dither then you have to clip because dithering could push the signal out of range! */
                     for( i=0; i<samplesPerBuffer; i++ )
                     {
-                        float dither  = Pa_TriangularDither()*DITHER_SCALE;
+                        float dither  = PaConvert_TriangularDither()*PA_DITHER_SCALE;
                         float dithered = (outBufPtr[i] * (32767.0f)) + dither;
                         temp = (long) (dithered);
                         *nativeOutputBuffer++ = (short)((temp < -0x8000) ? -0x8000 : ((temp > 0x7FFF) ? 0x7FFF : temp));
@@ -693,7 +696,7 @@ long Pa_CallConvertInt16( internalPortAudioStream   *past,
                     for( i=0; i<samplesPerBuffer; i++ )
                     {
                         /* Shift one bit down before dithering so that we have room for overflow from add. */
-                        temp = (outBufPtr[i] >> 1) + Pa_TriangularDither();
+                        temp = (outBufPtr[i] >> 1) + PaConvert_TriangularDither();
                         temp = temp >> 15;
                         *nativeOutputBuffer++ = (short)((temp < -0x8000) ? -0x8000 : ((temp > 0x7FFF) ? 0x7FFF : temp));
                     }
@@ -727,55 +730,6 @@ long Pa_CallConvertInt16( internalPortAudioStream   *past,
 
     }
 
-    return userResult;
-}
-
-/*************************************************************************
-** Called by host code.
-** Convert input from Float32, call user code, then convert output
-** to Float32 format for native use.
-** Assumes host native format is Float32.
-** Returns result from user callback.
-** FIXME - Unimplemented for formats other than paFloat32!!!!
-*/
-long Pa_CallConvertFloat32( internalPortAudioStream   *past,
-                            float *nativeInputBuffer,
-                            float *nativeOutputBuffer )
-{
-    long              bytesEmpty = 0;
-    long              bytesFilled = 0;
-    int               userResult;
-    void             *inputBuffer = NULL;
-    void             *outputBuffer = NULL;
-
-    /* Get native data from DirectSound. */
-    if( (past->past_NumInputChannels > 0) && (nativeInputBuffer != NULL) )
-    {
-        inputBuffer = nativeInputBuffer;  /* FIXME */
-    }
-
-    /* Are we doing output time? */
-    if( (past->past_NumOutputChannels > 0) && (nativeOutputBuffer != NULL) )
-    {
-        /* May already be in native format so just write directly to native buffer. */
-        outputBuffer = (past->past_OutputSampleFormat == paFloat32) ?
-                       nativeOutputBuffer : past->past_OutputBuffer;
-    }
-    /*
-     AddTraceMessage("Pa_CallConvertInt16: inputBuffer = ", (int) inputBuffer );
-     AddTraceMessage("Pa_CallConvertInt16: outputBuffer = ", (int) outputBuffer );
-    */
-    /* Call user callback routine. */
-    userResult = past->past_Callback(
-                     inputBuffer,
-                     outputBuffer,
-                     past->past_FramesPerUserBuffer,
-                     past->past_FrameCount,
-                     past->past_UserData );
-
-    past->past_FrameCount += (PaTimestamp) past->past_FramesPerUserBuffer;
-
-    /* Convert to native format if necessary. */  /* FIXME */
     return userResult;
 }
 

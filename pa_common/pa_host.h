@@ -36,6 +36,8 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+ 
+#include "portaudio.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -59,6 +61,12 @@ extern "C"
     typedef unsigned short uint16;
 #endif
 
+/* Used to convert between various sample formats. */
+typedef void (PortAudioConverter)(
+    void *inputBuffer, int inputStride,
+    void *outputBuffer, int outputStride,
+    int numSamples );
+
 #define PA_MAGIC    (0x18273645)
 
 /************************************************************************************/
@@ -76,7 +84,9 @@ typedef struct internalPortAudioStream
     int                       past_NumOutputChannels;
     PaDeviceID                past_InputDeviceID;
     PaDeviceID                past_OutputDeviceID;
+    PaSampleFormat            past_NativeInputSampleFormat;
     PaSampleFormat            past_InputSampleFormat;
+    PaSampleFormat            past_NativeOutputSampleFormat;
     PaSampleFormat            past_OutputSampleFormat;
     void                     *past_DeviceData;
     PortAudioCallback        *past_Callback;
@@ -99,11 +109,19 @@ typedef struct internalPortAudioStream
     double                    past_AverageTotalCount;
     double                    past_Usage;
     int                       past_IfLastExitValid;
+    /* Format Conversion */
+    /* These are setup by PaConversion_Setup() */
+    PortAudioConverter       *past_InputConversionProc;
+    int                       past_InputConversionSourceStride;
+    int                       past_InputConversionTargetStride;
+    PortAudioConverter       *past_OutputConversionProc;
+    int                       past_OutputConversionSourceStride;
+    int                       past_OutputConversionTargetStride;
 }
 internalPortAudioStream;
 
 /************************************************************************************/
-/****************** Prototypes ******************************************************/
+/******** These functions must be provided by a platform implementation. ************/
 /************************************************************************************/
 
 PaError PaHost_Init( void );
@@ -120,21 +138,41 @@ PaError PaHost_StartEngine( internalPortAudioStream   *past );
 PaError PaHost_StopEngine( internalPortAudioStream *past, int abort );
 PaError PaHost_StreamActive( internalPortAudioStream   *past );
 
-long Pa_CallConvertInt16( internalPortAudioStream   *past,
-                          short *nativeInputBuffer,
-                          short *nativeOutputBuffer );
-
-long Pa_CallConvertFloat32( internalPortAudioStream   *past,
-                            float *nativeInputBuffer,
-                            float *nativeOutputBuffer );
-
 void   *PaHost_AllocateFastMemory( long numBytes );
 void    PaHost_FreeFastMemory( void *addr, long numBytes );
 
+/* This only called if PA_VALIDATE_RATE IS CALLED. */
 PaError PaHost_ValidateSampleRate( PaDeviceID id, double requestedFrameRate,
                                    double *closestFrameRatePtr );
+
+/**********************************************************************/
+/************ Common Utility Routines provided by PA ******************/
+/**********************************************************************/
+
 int PaHost_FindClosestTableEntry( double allowableError,  const double *rateTable,
                                   int numRates, double frameRate );
+
+long Pa_CallConvertInt16( internalPortAudioStream   *past,
+                          short *nativeInputBuffer,
+                          short *nativeOutputBuffer );
+                          
+/* Calculate 2 LSB dither signal with a triangular distribution.
+** Ranged properly for adding to a 32 bit 1.31 fixed point value prior to >>15.
+** Range of output is +/- 65535
+** Multiply by PA_DITHER_SCALE to get a float between -2.0 and 2.0. */
+#define PA_DITHER_BITS   (15)
+#define PA_DITHER_SCALE  (1.0f / ((1<<PA_DITHER_BITS)-1))
+long PaConvert_TriangularDither( void );
+
+PaError PaConvert_SetupInput( internalPortAudioStream   *past,
+    PaSampleFormat   nativeInputSampleFormat );
+
+PaError PaConvert_SetupOutput( internalPortAudioStream   *past,
+    PaSampleFormat   nativeOutputSampleFormat );
+
+long PaConvert_Process( internalPortAudioStream   *past,
+            void *nativeInputBuffer,
+            void *nativeOutputBuffer );
 
 #ifdef __cplusplus
 }
