@@ -1,0 +1,156 @@
+<HTML>
+<HEAD>
+<TITLE>Coding Style Guidelines for PortAudio Implementors</TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=windows-1252">
+<META content="Phil Burk, Ross Bencina" name=Author>
+<META content="coding and design style guide" name=Description>
+<META 
+content="audio, tutorial, library, portable, open-source, DirectSound,sound, music, synthesis, coding, style" 
+name=KeyWords>
+</HEAD>
+<BODY LINK="#0000ff" VLINK="#800080">&nbsp; 
+<CENTER>
+<TABLE bgColor=#fada7a cols=1 width="100%">
+  <TBODY>
+  <TR>
+    <TD>
+      <CENTER>
+      <H1>Coding Style Guidelines for PortAudio Implementors</H1>
+	</CENTER>
+</TD></TR></TBODY></TABLE></CENTER>
+<P><A href="http://www.portaudio.com/">PortAudio Home Page</A></P>
+
+<P>Updated: June 12, 2002 </P>
+
+<H2>Introduction</H2>
+<P>
+This document provides coding guidelines for PortAudio implementors. Some of the guildelines pertain to mechanical style, others to quality of implementation issues. Since the PortAudio code is commonly edited on many different platforms using different editors these guideline should be followed to improve readability and consistency.
+</P>
+
+<H2>PortAudio API Design Guidelines</H2>
+<P>
+The design guidelines of the PortAudio project are stated here
+as some of them apply to implementation as well as to API design.
+</P>
+<ul>
+	<li>
+	Implementation should be possible on all common computer
+	music platforms.
+	</li>
+	<li>
+	Clients of PortAudio should be able to gain efficient, 
+	and ideally optimal use of the audio services
+	on all target platforms.
+	</li>
+	<li>
+	The API should be simple enough to be used by music
+	students with minimal experience in C programming.
+	</li>
+	<li>
+	The API should seek to provide only low-level audio
+	services, and to only support those services directly
+	available on the host platform.
+	</li>
+</ul>
+
+<P>
+Note that the final guideline has been bent with regard to audio 
+sample formats and user buffer sizes - PortAudio can convert between 
+a number of sample formats and can adapt to the user's buffer size requirements.
+</P>
+
+<H2>Formatting Conventions</H2>
+
+<P>
+The following formatting conventions should be adhered to in all PortAudio code:
+</P>
+
+<UL>
+<LI>TABs should not be used in .c and .h files; instead 4 spaces should be used. Makefiles should continue to use TABs since this is required by Make </LI>
+<LI>Line-emd characters will be consistent with the platform on which the source has been checked out of CVS (CVS handles this.)</LI>
+<LI>Brace placement will follow ANSI style, eg:
+<PRE>
+if( aCondition )
+{
+	DoSomething();
+}
+else
+{
+	DoSomethingElse();
+}
+</PRE>
+</LI>
+</UL>
+
+<P>AStyle ( <A HREF="http://astyle.sourceforge.net/">http://astyle.sourceforge.net/</A> ) has been proposed as helpful tool for cleaning code, however we don't intend to use it on an ongoing basis. It is expected that contributors of each implementation will take responsibility for keeping their code clean.</P>
+
+
+<H2>Quality of Implementation Guidelines</H2>
+
+<P>The following coding guidelines should be followed in order to establish a quality baseline for our implementations:</P>
+
+<UL>
+<LI>All code should be written in C++-compatible plain ANSI-C (i.e. no // comments). It has been suggested that all implementations should compile silently with both "gcc -ansi -pedantic -Wall" and "g++ -ansi -pedantic -Wall" </LI>
+<LI>Think of PortAudio as a heavyweight library rather than a lightweight wrapper. Always code defensively. Efficiency is important where it matters (eg in real-time callbacks) but safety is important everywhere. </LI>
+<LI>All parameters passed to PortAudio by the user should be validated, and error codes returned where necessary. All reasonable efforts should be made to minimise the risk of a crash resulting from passing incorrect parameters to PortAudio. </LI>
+<LI>Error handling should be complete. Every host function that can return an error condition should have its status checked. PortAudio may attempt to recover from errors in some cases, but generally error codes should be returned to the client. </LI>
+<LI>In almost all cases, a PortAudio error code should be preferred to returning PaHostError. If a new PortAudio error code is needed it should be discussed with the maintainer to coordinate updating portaudio.h </LI>
+<LI>PortAudio code should not cause resource leaks. After Pa_Terminate() is called, implementations should guarantee that all dynamically allocated resources have been freed. </LI>
+<LI>The definition of the PortAudio API should minimise "implementation defined behaviour". For example, calling functions such as Pa_Initialize() after PortAudio is initialised, or Pa_Terminate() after PortAudio has been terminated has well defined behaviour.</LI>
+<LI>Minimise dependence on ANSI C runtime on platforms where it would have to be loaded separately (eg on Win32 prefer Win32 API functions such as GlobalAlloc() to ANSI C functions such as malloc().) <I></LI></UL>
+
+</I><P>It has been suggested that we make an effort to minimise the use of global and static data in PortAudio implementations. Another related goal is to reduce name pollution in the global scope. Some possible guidelines in this regard are:</P>
+
+<UL>
+<LI>Implementations should avoid exporting any symbols except where absolutely necessary. Specifically, global data must be declared statically. The next section documents naming conventions for all PortAudio symbols.</LI>
+<LI>Implementations should minimise their use of static data. </LI></UL>
+
+<H2>Naming Conventions</H2>
+
+<ul>
+<li>All #defines begin with PA_</li>
+<li>All #defines local to a file end with _</li>
+<li>All global utility variables begin with paUtil</li>
+<li>All global utility types begin with PaUtil  (including function types)</li>
+<li>All global utility functions begin with PaUtil_</li>
+<li>All static variables end with _</li>
+<li>All static constants begin with const and end with _ (eg: constMyMagicNumber_)</li>
+<li>All static funtions have no special prefix/suffix</li>
+<li>
+Platform-specific shared functions should begin with Pa<PN>_ where PN is the
+platform name. eg. PaWin_ for windows, PaUnix_ for unix.
+</li>
+</ul>
+
+<p>
+In general, implementations should declare all of their members static,
+except for their initializer which should be exported. All exported names
+should be preceeded by Pa<MN>_ where <MN> is the module name, for example
+the windows mme initializer should be named PaWinMme_Initialize().
+</p>
+
+<p>
+If it is necessary for implementations to define non-static symbols, they should
+use the following naming conventions, where <MN> is the module name such as WinMme.
+</p>
+
+<ul>
+<li>global variables should begin with pa<MN></li>
+<li>global types should begin with Pa<MN></li>
+<li>global utility functions should begin with Pa<MN>_</li>
+</ul>
+
+<p>
+Two utilities for debug messages are provided. The PA_DEBUG macro defined in
+pa_implementation.h provides a simple way to print debug messages to stderr.
+Due to real-time performance issues, PA_DEBUG may not be suitable for use
+within the portaudio processing callback, or in other threads. In such cases
+the event tracing facility provided in pa_trace.h may be more appropriate.
+</p>
+<p>
+If PA_LOG_API_CALLS is defined, all calls to the public PortAudio API
+will be logged to stderr along with parameter and return values.
+</p>
+
+</BODY>
+</HTML>
