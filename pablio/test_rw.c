@@ -44,9 +44,10 @@
 ** full duplex audio (simultaneous record and playback).
 ** And some only support full duplex at lower sample rates.
 */
-#define SAMPLE_RATE         (22050)
-#define NUM_SECONDS             (15)
-#define SAMPLES_PER_FRAME       (2)
+#define SAMPLE_RATE          (44100)
+#define NUM_SECONDS              (5)
+#define SAMPLES_PER_FRAME        (2)
+#define FRAMES_PER_BLOCK        (64)
 
 /* Select whether we will use floats or shorts. */
 #if 1
@@ -62,7 +63,7 @@ int main(void);
 int main(void)
 {
     int      i;
-    SAMPLE   samples[SAMPLES_PER_FRAME];
+    SAMPLE   samples[SAMPLES_PER_FRAME * FRAMES_PER_BLOCK];
     PaError  err;
     PABLIO_Stream     *aStream;
 
@@ -75,13 +76,12 @@ int main(void)
     if( err != paNoError ) goto error;
 
     /* Process samples in the foreground. */
-    for( i=0; i<(NUM_SECONDS * SAMPLE_RATE); i++ )
+    for( i=0; i<(NUM_SECONDS * SAMPLE_RATE); i += FRAMES_PER_BLOCK )
     {
-        /* Read one frame of data into sample array from audio input. */
-        ReadAudioStream( aStream, samples, 1 );
-        /* Write that same frame of data to output. */
-        /* samples[1] = (i&256) * (1.0f/256.0f); /* sawtooth */
-        WriteAudioStream( aStream, samples, 1 );
+        /* Read one block of data into sample array from audio input. */
+        ReadAudioStream( aStream, samples, FRAMES_PER_BLOCK );
+        /* Write that same block of data to output. */
+        WriteAudioStream( aStream, samples, FRAMES_PER_BLOCK );
     }
 
     CloseAudioStream( aStream );
