@@ -1,0 +1,46 @@
+# Make PortAudio for Linux
+# Updated 2001/08/25 Bill Eldridge bill@rfa.org
+# Updated 2001/10/16, philburk@softsynth.com, s/unix_oss/unix_oss/
+
+# A pretty bare makefile, that figures out all the test files
+# and compiles them against the library in the pa_unix_oss directory.
+
+# Do "make all" and then when happy, "make libinstall"
+# (if not happy, "make clean")
+
+# The ldconfig stuff in libinstall is the wrong way to do it - 
+# someone tell me the right way, please
+
+
+LIBS =  -lm -lpthread
+
+CDEFINES = -I../pa_common
+CFLAGS = -g
+LIBINST = /usr/local/lib
+
+TESTS:= $(wildcard pa_tests/pa*.c pa_tests/debug*.c)
+
+LIBFILES:= ./pa_common/pa_lib.c ./pa_unix_oss/pa_unix_oss.c
+
+.c.o:
+	-gcc -c -I./pa_common $< -o $*.o
+	-gcc $*.o -o $* -Lpa_unix_oss $(LIBS) -lportaudio
+
+all: sharedlib tests
+
+sharedlib:	$(LIBFILES:.c=.o)
+	gcc -shared -o ./pa_unix_oss/libportaudio.so ./pa_common/pa_lib.o ./pa_unix_oss/pa_unix_oss.o
+
+libinstall:	./pa_unix_oss/libportaudio.so
+	@cp -f ./pa_unix_oss/libportaudio.so $(LIBINST)
+	@/sbin/ldconfig -v
+
+tests:	$(TESTS:.c=.o)
+
+clean:
+	-@rm -f $(TESTS:.c=.o)
+	-@rm -f $(TESTS:.c=)
+	-@rm -f $(LIBFILES:.c=.o)
+	-@rm -f ./pa_unix_oss/libportaudio.so
+
+
