@@ -134,7 +134,7 @@ int main(void)
     do
     {
         data.numSines++;
-        Pa_Sleep( 200 );
+        Pa_Sleep( 100 );
 
         load = Pa_GetCPULoad( stream );
         printf("numSines = %d, CPU load = %f\n", data.numSines, load );
@@ -150,13 +150,16 @@ int main(void)
         printf("STRESSING: numSines = %d, CPU load = %f\n", data.numSines, load );
     }
     
-    printf("Suffer for 10 seconds.\n");
-    Pa_Sleep( 10000 );
+    printf("Suffer for 5 seconds.\n");
+    Pa_Sleep( 5000 );
     
+    printf("Stop stream.\n");
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
+    
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
+    
     Pa_Terminate();
     printf("Test finished.\n");
     return err;
