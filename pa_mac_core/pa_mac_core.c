@@ -50,6 +50,7 @@
             Check for getenv("PA_MIN_LATEWNCY_MSEC") to set latency externally.
             Better error checking for invalid channel counts and invalid devices.
  3.29.2002 - Phil Burk - Fixed Pa_GetCPULoad() for small buffers.
+ 3.31.2002 - Phil Burk - Use getrusage() instead of gettimeofday() for CPU Load calculation.
 
 TODO:
 O- how do mono output?
@@ -59,6 +60,7 @@ O- FIFO between input and output callbacks if different devices, like in pa_mac.
 #include <CoreServices/CoreServices.h>
 #include <CoreAudio/CoreAudio.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include "portaudio.h"
@@ -98,7 +100,7 @@ typedef struct PaHostSoundControl
     int                pahsc_FramesPerHostBuffer;
     int                pahsc_UserBuffersPerHostBuffer;    
     /* For measuring CPU utilization. */
-    struct timeval     pahsc_EntryTime;
+    struct rusage      pahsc_EntryRusage;
     double             pahsc_InverseMicrosPerHostBuffer; /* 1/Microseconds of real-time audio per user buffer. */
 }
 PaHostSoundControl;
@@ -156,8 +158,8 @@ static void Pa_StartUsageCalculation( internalPortAudioStream   *past )
 {
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     if( pahsc == NULL ) return;
-    /* Query system timer for usage analysis and to prevent overuse of CPU. */
-    gettimeofday( &pahsc->pahsc_EntryTime, NULL );
+    /* Query user CPU timer for usage analysis and to prevent overuse of CPU. */
+    getrusage( RUSAGE_SELF, &pahsc->pahsc_EntryRusage );
 }
 
 static long SubtractTime_AminusB( struct timeval *timeA, struct timeval *timeB )
@@ -174,7 +176,7 @@ static long SubtractTime_AminusB( struct timeval *timeA, struct timeval *timeB )
 */
 static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
 {
-    struct timeval currentTime;
+    struct rusage currentRusage;
     long  usecsElapsed;
     double newUsage;
 
@@ -183,10 +185,11 @@ static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
 
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     if( pahsc == NULL ) return;
-
-    if( gettimeofday( &currentTime, NULL ) == 0 )
+    
+    if( getrusage( RUSAGE_SELF, &currentRusage ) == 0 )
     {
-        usecsElapsed = SubtractTime_AminusB( &currentTime, &pahsc->pahsc_EntryTime );
+        usecsElapsed = SubtractTime_AminusB( &currentRusage.ru_utime, &pahsc->pahsc_EntryRusage.ru_utime );
+        
         /* Use inverse because it is faster than the divide. */
         newUsage =  usecsElapsed * pahsc->pahsc_InverseMicrosPerHostBuffer;
 
