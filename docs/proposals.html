@@ -21,7 +21,7 @@ name=KeyWords>
 </TD></TR></TBODY></TABLE></CENTER>
 <P><A href="http://www.portaudio.com/">PortAudio Home Page</A></P>
 
-<P>Updated: May 14, 2002 </P>
+<P>Updated: May 16, 2002 </P>
 <H2>Introduction</H2>
 <P>This document describes modifications to the PortAudio API currently being considered by the developer community. It is intended to capture the current state of discussions. The authors are the various members of the PortAudio community and are too numerous to mention. Please refer to the mailing list archives to see who said what. </P>
 <P>We are still at the design stage with all of these proposals - if you think something is missing, could be improved, or would just like to comment please do so on the PortAudio mailing list.</P>
@@ -33,14 +33,14 @@ name=KeyWords>
 <LI><A HREF="#ImproveDeviceFormatQuerySystem">Improve Device Format Query System</A> * </LI>
 <LI><A HREF="#Latency">Improve Latency Mechanisms</A> * </LI>
 <LI><A HREF="#AllowCallbackVariableFramesPerBuffer">Allow Callbacks to Accept Variable framesPerBuffer</A> * </LI>
-<LI><A HREF="#Blocking">Blocking Read/Write API</A></LI>
+<LI><A HREF="#Blocking">Blocking Read/Write API</A> </LI>
 <LI><A HREF="#Interleaved">Non-Interleaved Buffers</A> </LI>
 <LI><A HREF="#MultipleDriverModels">Support for Multiple Host APIs in a Single PortAudio Build</A> |C| </LI>
 <LI><A HREF="#DriverModelSpecificPa_OpenStream">Host API Specific Pa_OpenStream() Parameters</A> |C| </LI>
 <LI><A HREF="#Error">Handling of Host API Specific Error Codes</A> * </LI>
 <LI><A HREF="#RenamePa_GetCPULoad">Rename Pa_GetCPULoad() and paInvalidDeviceId for Consistency</A> </LI>
 <LI><A HREF="#AdditionalPa_TerminateBehaviour">Additional Pa_Terminate() Behaviour</A> </LI>
-<LI><A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> *</LI>
+<LI><A HREF="#CodingStyleGuidelines">Coding Style Guidelines</A> * </LI>
 <LI><A HREF="#ReviseInternalHostAPI">Revise Internal Host API</A> *</LI></UL>
 
 <I><P>The proposals above which are marked with a * are under construction, those marked with |</I>C<I>| are essentially complete but require community approval or comment before they are considered complete. The remaining proposals are essentially complete and will be implemented as-is unless significant objections are raised.</P>
@@ -62,20 +62,20 @@ name=KeyWords>
 <H4>Proposal</H4>
 <P>For streams providing input, the inputBuffer parameter will always point to a valid memory location containing framesPerBuffer frames of sample data in the requested format. The inputBuffer parameter will be NULL for output only streams. Similarly, the outputBuffer parameter will be NULL for input only streams, otherwise it will point to a valid memory location containing framesPerBuffer frames of sample data.</P>
 <P>A new parameter will be added to the PortAudioCallback Function that gives the status of the data as bit flags. </P>
-<TT><PRE>typedef int (PortAudioCallback)(</TT> 
-<TT>&nbsp; void *inputBuffer, void *outputBuffer,</TT> 
-<TT>&nbsp; unsigned long framesPerBuffer,</TT> 
-<TT>&nbsp; PaTimestamp outTime, 
-  unsigned long&nbsp; statusFlags,
-  void *userData );</TT> 
-
-These bits may be set in the statusFlags parameter. 
-<TT>#define paInputUnderflow&nbsp;&nbsp; (1&lt;&lt;0) /* Input data is all zeros because no real data is available. */</TT> 
+<PRE>
+typedef int (PortAudioCallback)(
+  void *inputBuffer, void *outputBuffer,
+  unsigned long framesPerBuffer,
+  PaTimestamp outTime, 
+  unsigned long statusFlags,
+  void *userData );</PRE>
+<P>These bits may be set in the statusFlags parameter. </P>
+<PRE>
+#define paInputUnderflow&nbsp;&nbsp; (1&lt;&lt;0) /* Input data is all zeros because no real data is available. */ 
 #define paInputOverflow    (1&lt;&lt;1) /* Input data was discarded by PortAudio */
-<TT>#define </TT>paOutputUnderflow  <TT>(1&lt;&lt;2) </TT>/* Output data was inserted by PortAudio because the callback is using too much CPU */
-#define paOutputOverflow   (1&lt;&lt;3) <TT>/* Output data will be ignored because no room is available. */
-</TT></PRE>
-<P>New rules will govern when the <TT>PortAudioCallback</TT> is called:</P>
+#define paOutputUnderflow  (1&lt;&lt;2) /* Output data was inserted by PortAudio because the callback is using too much CPU */
+#define paOutputOverflow   (1&lt;&lt;3) /* Output data will be ignored because no room is available. */</PRE>
+<P>New rules will govern when the PortAudioCallback is called:</P>
 
 <UL>
 <LI>For input-only streams, the callback will be called for every available input buffer. If the callback takes too long to complete and input samples have to be discarded the paInputOverflow flag will be set the next time the callback is called. An input-only stream will never be called with the paInputUnderflow flag set. </LI>
@@ -106,14 +106,13 @@ These bits may be set in the statusFlags parameter.
                         int numOutputChannels, 
                         PaSampleFormat outputSampleFormat, 
                         void *outputDriverInfo, 
-                        double sampleRate );
-</PRE>
+                        double sampleRate );</PRE>
 <P>At a minimum this call would need to return values indicating whether the requested format(s) are supported natively, or will undergo conversion by PortAudio. The result could be a set of flags indicating:</P>
 
 <UL>
-<LI>Input byte order (native/converted)</LI>
-<LI>Input sample format (native/converted)</LI>
-<LI>Output byte order (native/converted)</LI>
+<LI>Input byte order (native/converted) </LI>
+<LI>Input sample format (native/converted) </LI>
+<LI>Output byte order (native/converted) </LI>
 <LI>Output sample format (native/converted)</LI></UL>
 
 <P>There also needs to be a method for accommodating host-API-specific return flags.</P>
@@ -136,18 +135,21 @@ These bits may be set in the statusFlags parameter.
 <P>A related issue is the need to improve the interface available to determine default latency parameters. The most recent proposal is documented below, however there is still some debate as to whether this is satisfactory. </P>
 <P>See this thread: <A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-October/000196.html">http://techweb.rfa.org/pipermail/portaudio/2001-October/000196.html</A> </P>
 <H4>Proposal</H4>
-<P>The numBuffers parameter to Pa_OpenStream() could be removed, and replaced by two new parameters inputLatencySamples and outputLatencySamples. These parameters allow clients to fine-tune latency in a portable manner. PortAudio implementations should make every reasonable to select buffer sizes based on these parameters, but for various reasons they may choose the closest viable buffer size and latency instead. In such cases PortAudio implementations should round-up (ie always provide equal or higher latency than requested.) </P>
+<P>The numBuffers parameter to Pa_OpenStream() could be removed, and replaced by two new parameters inputLatencyFrames and outputLatencyFrames. These parameters allow clients to fine-tune latency in a portable manner. PortAudio implementations should select buffer sizes based on these parameters, if this is not possible they may choose the closest viable buffer size and latency instead. In such cases the PortAudio implementations should round-up (ie always provide equal or higher latency than requested.) </P>
 <P>The special latency value of 0 indicates that the implementation should use the default latency values, this will produce the same behavior as passing 0 for numBuffers in existing PortAudio implementations. Clients may retrieve recommended safe latency settings using the following two functions:</P>
-<PRE> int Pa_GetRecommendedLowLatencySamples( PaDeviceID deviceID ); /* For interactive performance. */
- int Pa_GetRecommendedHighLatencySamples( PaDeviceID deviceID ); /* For playing sound files. */</PRE>
+<PRE> int Pa_GetRecommendedLowLatencyFrames( PaDeviceID deviceID ); /* For interactive performance. */
+ int Pa_GetRecommendedHighLatencyFrames( PaDeviceID deviceID ); /* For playing sound files. */</PRE>
 <P>&nbsp;</P>
 <P>Currently, when numBuffers&gt;0, Pa_OpenStream will constrain the actual numBuffers so that the latency is within a valid range determined by the host API, or an environment variables such as PA_MIN_LATENCY_MSEC. Propose changing the behavior so that the requested value is honored as much as possible. This will allow the user to override the minimum if they know their system can handle it. This might be used, for example on patched Linux kernels</P>
 <P>In addition to the portable latency setting mechanism just described, implementations may use the inputDriverInfo and outputDriverInfo Pa_OpenStream() parameters to provide host API specific latency setting mechanisms which directly reflect the underlying buffer passing scheme. For example, the MME driverInfo structure would provide a way to directly set the bufferSize and numberOfBuffers parameters for input and output. When driverInfo structures are passed to Pa_OpenStream(), using 0 values for their API specific latency settings should cause PortAudio to use Pa_OpenStream()'s latencySamples parameters.</P>
 <P>In cases where Host API specific latency parameters may be limited to certain allowable ranges (buffer sizes in ASIO for example) a method for querying these limits should be provided. This will consist of host-API specific query functions declared in a host-api specific header file. These header files will also contain the declaration of the host API specific driverInfo structure.</P>
 <P>The following two functions have been proposed to retrieve the estimated input and output latency of a stream. Both return the estimated latency in ms.</P>
-<PRE>/* the following would operate directly on streams */
+<PRE>
+/* the following would operate directly on streams */
 double Pa_StreamInputLatency( PortAudioStream *stream );
-double Pa_StreamOutputLatency(PortAudioStream *stream );</PRE>
+double Pa_StreamOutputLatency(PortAudioStream *stream );
+</PRE>
+<P>The Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate ); function will be removed, as it's functionality is fulfilled by the get recommended latency functions.</P>
 <H4>Discussion</H4>
 <P>This proposal provides both a high level mechanism for portable latency tuning, and suggests method for providing a host-API specific latency tuning interface. The provision of both default latency settings (via 0 valued latencySamples parameters) and query functions for recommended latency settings provide the needed flexibility for simple, and portable applications.</P>
 <P>It is not clear whether a 0 latencySamples parameter produces the same latency as returned by Pa_GetRecommendedHighLatencySamples() or whether there is a separate default latency value, in which case there should also be a Pa_GetDefaultLatencySamples() function.</P>
@@ -171,14 +173,14 @@ Pa_OpenStream() should be able to accept a zero value for framesPerBuffer. When 
 <BR>
 To make the code more obvious, this constant could be used:<BR>
 <BR>
-<FONT FACE="Courier New" SIZE=2>#define paFramesPerBufferUnspecified (0)</FONT><BR>
+#define paFramesPerBufferUnspecified (0)<BR>
 <BR>
 In order to find out what value the implementation chose, and also to help the application determine the actual latency, the following calls could be added:<BR>
 <BR>
-<FONT FACE="Courier New" SIZE=2>int Pa_GetFramesPerBuffer( PortAudioStream* stream );<BR>
+int Pa_GetFramesPerBuffer( PortAudioStream* stream );<BR>
 int Pa_GetNumOutputBuffers( PortAudioStream* stream );<BR>
 int Pa_GetNumInputBuffers( PortAudioStream* stream );</P>
-</FONT><H4>Impact Analysis</H4>
+<H4>Impact Analysis</H4>
 <P>This proposal will not effect existing client code, since all clients will currently specify a non-zero framesPerBuffer parameter. Clients whose code can operate with a flexible number of framesPerBuffer may benefit from improved efficiency in some cases simply by specifying paFramesPerBufferUnspecified.</P>
 <P>____________</P>
 <H2><A NAME="Blocking"></A>Blocking Read/Write API</H2>
@@ -224,7 +226,7 @@ long Pa_StreamReadAvailable( PortAudioStream *stream );</PRE>
 <H4>Status</H4>
 <P>This proposal is sufficiently well defined to be implemented. No objections have been raised.</P>
 <H4>Background</H4>
-<P><A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-October/000210.html">http://techweb.rfa.org/pipermail/portaudio/2001-October/000210.html</A> </P>
+<P><A HREF="http://techweb.rfa.org/pipermail/portaudio/2001-October/000210.html">http://techweb.rfa.org/pipermail/portaudio/2001-October/000210.html</A></P>
 <P>Some native APIs use non-interleaved buffers, particularly those that support N&gt;2 channels. Additionally, many client applications use non-interleaved buffers internally. In order to avoid adding unnecessary overhead, PortAudio should support both interleaved and non-interleaved buffers on all platforms. </P>
 <P>The current PortAudio/ASIO implementation works as follows : ASIO native buffers are non-interleaved and the de-interleaving, format conversion and copying the data into PortAudio interleaved buffers is done in one loop. But if PortAudio supported non-interleaved buffers then we could use efficient vector operations even for native buffer &lt;==&gt; port audio buffers transfers. </P>
 <H4>Proposal</H4>
@@ -623,5 +625,5 @@ PaBufferConversionFunction* Pa_GetBufferConversionFunction(
 <P>Memory allocation should probably be handled with platform specific functions such as Win32 GlobalAlloc() rather than using malloc()</P>
 <H4>Impact Analysis</H4>
 <P>This proposal only effects PortAudio implementors. Increasing the utility of shared code will improve the quality of all PortAudio implementations in terms of speed, size, and robustness. It should also reduce the effort involved in porting PortAudio to a new host API.</P>
-<P>____________</P></BODY>
+<P>____________</P></TT></BODY>
 </HTML>
