@@ -1,6 +1,6 @@
 /*
  * $Id$
- * Hear the latency caused by bug buffers.
+ * Hear the latency caused by big buffers.
  * Play a sine wave and change frequency based on letter input.
  *
  * Author: Phil Burk <philburk@softsynth.com>, and Darren Gibbs
