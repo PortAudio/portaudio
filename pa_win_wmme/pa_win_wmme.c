@@ -67,6 +67,8 @@
 #include "pa_trace.h"
 
 /************************************************* Constants ********/
+#define PA_TRACK_MEMORY          (0)
+
 #define PA_USE_TIMER_CALLBACK    (0)  /* Select between two options for background task. 0=thread, 1=timer */
 #define PA_USE_HIGH_LATENCY      (0)  /* For debugging glitches. */
 /* Switches for debugging. */
@@ -159,6 +161,8 @@ static int sDefaultOutputDeviceID = paNoDevice;
 static int sPaHostError = 0;
 static const char sMapperSuffixInput[] = " - Input";
 static const char sMapperSuffixOutput[] = " - Output";
+static int sNumAllocations = 0;
+
 /************************************************* Macros ********/
 /* Convert external PA ID to an internal ID that includes WAVE_MAPPER */
 #define PaDeviceIdToWinId(id) (((id) < sNumInputDevices) ? (id - 1) : (id - sNumInputDevices - 1))
@@ -169,6 +173,9 @@ static void CALLBACK Pa_TimerCallback(UINT uID, UINT uMsg,
 PaError PaHost_GetTotalBufferFrames( internalPortAudioStream   *past );
 static PaError PaHost_UpdateStreamTime( PaHostSoundControl *pahsc );
 static PaError PaHost_BackgroundManager( internalPortAudioStream   *past );
+
+static void *PaHost_AllocateTrackedMemory( long numBytes );
+static void PaHost_FreeTrackedMemory( void *addr );
 
 /********************************* BEGIN CPU UTILIZATION MEASUREMENT ****/
 static void Pa_StartUsageCalculation( internalPortAudioStream   *past )
@@ -212,7 +219,7 @@ static PaError Pa_QueryDevices( void )
     /* PLB20010402 - was allocating too much memory. */
     /* numBytes = sNumDevices * sizeof(PaDeviceInfo);  // PLB20010402 */
     numBytes = sNumDevices * sizeof(PaDeviceInfo *); /* PLB20010402 */
-    sDevicePtrs = (PaDeviceInfo **) GlobalAlloc( GPTR, numBytes ); /* MEM */
+    sDevicePtrs = (PaDeviceInfo **) PaHost_AllocateTrackedMemory( numBytes ); /* MEM */
     if( sDevicePtrs == NULL ) return paInsufficientMemory;
     return paNoError;
 }
@@ -251,13 +258,13 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
     {
         return sDevicePtrs[ id ];
     }
-    deviceInfo = (PaDeviceInfo *)GlobalAlloc( GPTR, sizeof(PaDeviceInfo) ); /* MEM */
+    deviceInfo = (PaDeviceInfo *)PaHost_AllocateTrackedMemory( sizeof(PaDeviceInfo) ); /* MEM */
     if( deviceInfo == NULL ) return NULL;
     deviceInfo->structVersion = 1;
     deviceInfo->maxInputChannels = 0;
     deviceInfo->maxOutputChannels = 0;
     deviceInfo->numSampleRates = 0;
-    sampleRates = (double*)GlobalAlloc( GPTR, MAX_NUMSAMPLINGRATES * sizeof(double) ); /* MEM */
+    sampleRates = (double*)PaHost_AllocateTrackedMemory( MAX_NUMSAMPLINGRATES * sizeof(double) ); /* MEM */
     deviceInfo->sampleRates = sampleRates;
     deviceInfo->nativeSampleFormats = paInt16;       /* should query for higher bit depths below */
     if( id < sNumInputDevices )
@@ -271,13 +278,13 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
         /* Append I/O suffix to WAVE_MAPPER device. */
         if( inputMmID == WAVE_MAPPER )
         {
-            s = (char *) GlobalAlloc( GMEM_FIXED, strlen( wic.szPname ) + 1 + sizeof(sMapperSuffixInput) ); /* MEM */
+            s = (char *) PaHost_AllocateTrackedMemory( strlen( wic.szPname ) + 1 + sizeof(sMapperSuffixInput) ); /* MEM */
             strcpy( s, wic.szPname );
             strcat( s, sMapperSuffixInput );
         }
         else
         {
-            s = (char *) GlobalAlloc( GMEM_FIXED, strlen( wic.szPname ) + 1 ); /* MEM */
+            s = (char *) PaHost_AllocateTrackedMemory( strlen( wic.szPname ) + 1 ); /* MEM */
             strcpy( s, wic.szPname );
         }
         deviceInfo->name = s;
@@ -328,13 +335,13 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
         /* Append I/O suffix to WAVE_MAPPER device. */
         if( outputMmID == WAVE_MAPPER )
         {
-            s = (char *) GlobalAlloc( GMEM_FIXED, strlen( woc.szPname ) + 1 + sizeof(sMapperSuffixOutput) );  /* MEM */
+            s = (char *) PaHost_AllocateTrackedMemory( strlen( woc.szPname ) + 1 + sizeof(sMapperSuffixOutput) );  /* MEM */
             strcpy( s, woc.szPname );
             strcat( s, sMapperSuffixOutput );
         }
         else
         {
-            s = (char *) GlobalAlloc( GMEM_FIXED, strlen( woc.szPname ) + 1 );  /* MEM */
+            s = (char *) PaHost_AllocateTrackedMemory( strlen( woc.szPname ) + 1 );  /* MEM */
             strcpy( s, woc.szPname );
         }
         deviceInfo->name = s;
@@ -377,8 +384,8 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID id )
     sDevicePtrs[ id ] = deviceInfo;
     return deviceInfo;
 error:
-    GlobalFree( sampleRates ); /* MEM */
-    GlobalFree( deviceInfo ); /* MEM */
+    PaHost_FreeTrackedMemory( sampleRates ); /* MEM */
+    PaHost_FreeTrackedMemory( deviceInfo ); /* MEM */
 
     return NULL;
 }
@@ -448,6 +455,11 @@ PaDeviceID Pa_GetDefaultOutputDeviceID( void )
 */
 PaError PaHost_Init( void )
 {
+    
+#if PA_TRACK_MEMORY
+    PRINT(("PaHost_Init: sNumAllocations = %d\n", sNumAllocations ));
+#endif
+
 #if PA_SIMULATE_UNDERFLOW
     PRINT(("WARNING - Underflow Simulation Enabled - Expect a Big Glitch!!!\n"));
 #endif
@@ -793,7 +805,7 @@ PaError PaHost_OpenInputStream( internalPortAudioStream   *past )
         goto error;
     }
     /* Allocate an array to hold the buffer pointers. */
-    pahsc->pahsc_InputBuffers = (WAVEHDR *) GlobalAlloc( GMEM_FIXED | GMEM_ZEROINIT, sizeof(WAVEHDR)*pahsc->pahsc_NumHostBuffers ); /* MEM */
+    pahsc->pahsc_InputBuffers = (WAVEHDR *) PaHost_AllocateTrackedMemory( sizeof(WAVEHDR)*pahsc->pahsc_NumHostBuffers ); /* MEM */
     if( pahsc->pahsc_InputBuffers == NULL )
     {
         result = paInsufficientMemory;
@@ -802,7 +814,7 @@ PaError PaHost_OpenInputStream( internalPortAudioStream   *past )
     /* Allocate each buffer. */
     for( i=0; i<pahsc->pahsc_NumHostBuffers; i++ )
     {
-        pahsc->pahsc_InputBuffers[i].lpData = (char *)GlobalAlloc( GMEM_FIXED, pahsc->pahsc_BytesPerHostInputBuffer ); /* MEM */
+        pahsc->pahsc_InputBuffers[i].lpData = (char *)PaHost_AllocateTrackedMemory( pahsc->pahsc_BytesPerHostInputBuffer ); /* MEM */
         if( pahsc->pahsc_InputBuffers[i].lpData == NULL )
         {
             result = paInsufficientMemory;
@@ -878,7 +890,7 @@ PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
         goto error;
     }
     /* Allocate an array to hold the buffer pointers. */
-    pahsc->pahsc_OutputBuffers = (WAVEHDR *) GlobalAlloc( GMEM_FIXED | GMEM_ZEROINIT, sizeof(WAVEHDR)*pahsc->pahsc_NumHostBuffers ); /* MEM */
+    pahsc->pahsc_OutputBuffers = (WAVEHDR *) PaHost_AllocateTrackedMemory( sizeof(WAVEHDR)*pahsc->pahsc_NumHostBuffers ); /* MEM */
     if( pahsc->pahsc_OutputBuffers == NULL )
     {
         result = paInsufficientMemory;
@@ -887,7 +899,7 @@ PaError PaHost_OpenOutputStream( internalPortAudioStream   *past )
     /* Allocate each buffer. */
     for( i=0; i<pahsc->pahsc_NumHostBuffers; i++ )
     {
-        pahsc->pahsc_OutputBuffers[i].lpData = (char *) GlobalAlloc( GMEM_FIXED, pahsc->pahsc_BytesPerHostOutputBuffer ); /* MEM */
+        pahsc->pahsc_OutputBuffers[i].lpData = (char *) PaHost_AllocateTrackedMemory( pahsc->pahsc_BytesPerHostOutputBuffer ); /* MEM */
         if( pahsc->pahsc_OutputBuffers[i].lpData == NULL )
         {
             result = paInsufficientMemory;
@@ -1317,9 +1329,9 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
             for( i=0; i<pahsc->pahsc_NumHostBuffers; i++ )
             {
                 waveOutUnprepareHeader( pahsc->pahsc_HWaveOut, &pahsc->pahsc_OutputBuffers[i], sizeof(WAVEHDR) );
-                GlobalFree( pahsc->pahsc_OutputBuffers[i].lpData ); /* MEM */
+                PaHost_FreeTrackedMemory( pahsc->pahsc_OutputBuffers[i].lpData ); /* MEM */
             }
-            GlobalFree( pahsc->pahsc_OutputBuffers ); /* MEM */
+            PaHost_FreeTrackedMemory( pahsc->pahsc_OutputBuffers ); /* MEM */
         }
         waveOutClose( pahsc->pahsc_HWaveOut );
     }
@@ -1331,9 +1343,9 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
             for( i=0; i<pahsc->pahsc_NumHostBuffers; i++ )
             {
                 waveInUnprepareHeader( pahsc->pahsc_HWaveIn, &pahsc->pahsc_InputBuffers[i], sizeof(WAVEHDR) );
-                GlobalFree( pahsc->pahsc_InputBuffers[i].lpData ); /* MEM */
+                PaHost_FreeTrackedMemory( pahsc->pahsc_InputBuffers[i].lpData ); /* MEM */
             }
-            GlobalFree( pahsc->pahsc_InputBuffers ); /* MEM */
+            PaHost_FreeTrackedMemory( pahsc->pahsc_InputBuffers ); /* MEM */
         }
         waveInClose( pahsc->pahsc_HWaveIn );
     }
@@ -1405,16 +1417,21 @@ PaError PaHost_Term( void )
             {
                 if( sDevicePtrs[i] != NULL )
                 {
-                    GlobalFree( (char*)sDevicePtrs[i]->name ); /* MEM */
-                    GlobalFree( (void*)sDevicePtrs[i]->sampleRates ); /* MEM */
-                    GlobalFree( sDevicePtrs[i] ); /* MEM */
+                    PaHost_FreeTrackedMemory( (char*)sDevicePtrs[i]->name ); /* MEM */
+                    PaHost_FreeTrackedMemory( (void*)sDevicePtrs[i]->sampleRates ); /* MEM */
+                    PaHost_FreeTrackedMemory( sDevicePtrs[i] ); /* MEM */
                 }
             }
-            GlobalFree( sDevicePtrs ); /* MEM */
+            PaHost_FreeTrackedMemory( sDevicePtrs ); /* MEM */
             sDevicePtrs = NULL;
         }
         sNumDevices = 0;
     }
+
+#if PA_TRACK_MEMORY
+    PRINT(("PaHost_Term: sNumAllocations = %d\n", sNumAllocations ));
+#endif
+
     return paNoError;
 }
 /*************************************************************************/
@@ -1431,8 +1448,7 @@ void Pa_Sleep( long msec )
  */
 void *PaHost_AllocateFastMemory( long numBytes )
 {
-    void *addr = GlobalAlloc( GPTR, numBytes ); /* FIXME - do we need physical memory? Use VirtualLock() */ /* MEM */
-    return addr;
+    return PaHost_AllocateTrackedMemory( numBytes ); /* FIXME - do we need physical memory? Use VirtualLock() */ /* MEM */
 }
 /*************************************************************************
  * Free memory that could be accessed in real-time.
@@ -1440,8 +1456,32 @@ void *PaHost_AllocateFastMemory( long numBytes )
  */
 void PaHost_FreeFastMemory( void *addr, long numBytes )
 {
-    if( addr != NULL ) GlobalFree( addr ); /* MEM */
+    PaHost_FreeTrackedMemory( addr ); /* MEM */
 }
+
+/*************************************************************************
+ * Track memory allocations to avoid leaks.
+ */
+static void *PaHost_AllocateTrackedMemory( long numBytes )
+{
+    void *addr = GlobalAlloc( GPTR, numBytes ); /* MEM */
+#if PA_TRACK_MEMORY
+    if( addr != NULL ) sNumAllocations += 1;
+#endif
+    return addr;
+}
+
+static void PaHost_FreeTrackedMemory( void *addr )
+{
+    if( addr != NULL )
+    {
+        GlobalFree( addr ); /* MEM */
+#if PA_TRACK_MEMORY
+        sNumAllocations -= 1;
+#endif
+    }
+}
+
 /***********************************************************************/
 PaError PaHost_StreamActive( internalPortAudioStream   *past )
 {
