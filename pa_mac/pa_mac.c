@@ -44,8 +44,11 @@
    PLB20011009 - Use NewSndCallBackUPP() for CARBON
    PLB20020417 - I used to call Pa_GetMinNumBuffers() which doesn't take into account the
                  variable minFramesPerHostBuffer. Now I call PaMac_GetMinNumBuffers() which will
-                 gove lower latency when virtual memory is turned off.
+                 give lower latency when virtual memory is turned off.
                  Thanks Kristoffer Jensen and Georgios Marentakis for spotting this bug.
+   PLB20020423 - Use new method to calculate CPU load similar to other ports. Based on num frames calculated.
+                 Fixed Pa_StreamTime(). Now estimates how many frames have played based on MicroSecond timer.
+                 Added PA_MAX_USAGE_ALLOWED to prevent Mac form hanging when CPU load approaches 100%.
 */
 
 /*
@@ -100,6 +103,16 @@ O- Determine default devices somehow.
  #define TRUE   (!FALSE)
 #endif
 
+/* #define TARGET_API_MAC_CARBON (1) */
+
+/*
+ * Define maximum CPU load that will be allowed. User callback will
+ * be skipped if load exceeds this limit. This is to prevent the Mac
+ * from hanging when the CPU is hogged by the sound thread.
+ * On my PowerBook G3, the mac hung when I used 94% of CPU ( usage = 0.94 ).
+ */
+#define PA_MAX_USAGE_ALLOWED    (0.92)
+
 /* Debugging output macros. */
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
@@ -108,7 +121,7 @@ O- Determine default devices somehow.
 
 #define MAC_PHYSICAL_FRAMES_PER_BUFFER   (512)  /* Minimum number of stereo frames per SoundManager double buffer. */
 #define MAC_VIRTUAL_FRAMES_PER_BUFFER   (4096) /* Need this many when using Virtual Memory for recording. */
-#define PA_MIN_NUM_HOST_BUFFERS           (2)
+#define PA_MIN_NUM_HOST_BUFFERS            (2)
 #define PA_MAX_NUM_HOST_BUFFERS           (16)   /* Do not exceed!! */
 #define PA_MAX_DEVICE_INFO                (32)
 
@@ -133,7 +146,8 @@ MultiBuffer;
 typedef struct PaHostSoundControl
 {
     UInt64                  pahsc_EntryCount;
-    UInt64                  pahsc_LastExitCount;
+	double                  pahsc_InverseMicrosPerHostBuffer; /* 1/Microseconds of real-time audio per user buffer. */
+
     /* Use char instead of Boolean for atomic operation. */
     volatile char           pahsc_IsRecording;   /* Recording in progress. Set by foreground. Cleared by background. */
     volatile char           pahsc_StopRecording; /* Signal sent to background. */
@@ -141,22 +155,23 @@ typedef struct PaHostSoundControl
     /* Input */
     SPB                     pahsc_InputParams;
     SICompletionUPP         pahsc_InputCompletionProc;
-    MultiBuffer    pahsc_InputMultiBuffer;
-    int32     pahsc_BytesPerInputHostBuffer;
+    MultiBuffer             pahsc_InputMultiBuffer;
+    int32                   pahsc_BytesPerInputHostBuffer;
     int32                   pahsc_InputRefNum;
     /* Output */
     CmpSoundHeader          pahsc_SoundHeaders[PA_MAX_NUM_HOST_BUFFERS];
     int32                   pahsc_BytesPerOutputHostBuffer;
-    SndChannelPtr   pahsc_Channel;
+    SndChannelPtr           pahsc_Channel;
     SndCallBackUPP          pahsc_OutputCompletionProc;
     int32                   pahsc_NumOutsQueued;
     int32                   pahsc_NumOutsPlayed;
     PaTimestamp             pahsc_NumFramesDone;
+    UInt64                  pahsc_WhenFramesDoneIncremented;
     /* Init Time -------------- */
     int32                   pahsc_NumHostBuffers;
     int32                   pahsc_FramesPerHostBuffer;
     int32                   pahsc_UserBuffersPerHostBuffer;
-    int32     pahsc_MinFramesPerHostBuffer; /* Can vary depending on virtual memory usage. */
+    int32                   pahsc_MinFramesPerHostBuffer; /* Can vary depending on virtual memory usage. */
 }
 PaHostSoundControl;
 
@@ -184,7 +199,8 @@ static int                 sDefaultInputDeviceID;
 /************************************************************************************/
 static PaError PaMac_TimeSlice( internalPortAudioStream   *past,  int16 *macOutputBufPtr );
 static PaError PaMac_CallUserLoop( internalPortAudioStream   *past, int16 *outPtr );
-static PaError PaMac_RecordNext( internalPortAudioStream   *past );static void    StartLoadCalculation( internalPortAudioStream   *past );
+static PaError PaMac_RecordNext( internalPortAudioStream   *past );
+static void    PaMac_StartLoadCalculation( internalPortAudioStream   *past );
 static int     PaMac_GetMinNumBuffers( int minFramesPerHostBuffer, int framesPerBuffer, double sampleRate );
 static double *PaMac_GetSampleRatesFromHandle ( int numRates, Handle h );
 static PaError PaMac_ScanInputDevices( void );
@@ -703,8 +719,8 @@ PaDeviceID Pa_GetDefaultOutputDeviceID( void )
     return sDefaultOutputDeviceID;
 }
 
-/**************************************************************************/
-static void StartLoadCalculation( internalPortAudioStream   *past )
+/********************************* BEGIN CPU UTILIZATION MEASUREMENT ****/
+static void PaMac_StartLoadCalculation( internalPortAudioStream   *past )
 {
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     UnsignedWide widePad;
@@ -714,38 +730,36 @@ static void StartLoadCalculation( internalPortAudioStream   *past )
     pahsc->pahsc_EntryCount = UnsignedWideToUInt64( widePad );
 }
 
+/******************************************************************************
+** Measure fractional CPU load based on real-time it took to calculate
+** buffers worth of output.
+*/
 /**************************************************************************/
 static void PaMac_EndLoadCalculation( internalPortAudioStream   *past )
 {
     UnsignedWide widePad;
-    UInt64    CurrentCount;
-    long      InsideCount;
-    long      TotalCount;
+    UInt64    currentCount;
+    long      usecsElapsed;
+    double    newUsage;
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     if( pahsc == NULL ) return;
+    
     /* Measure CPU utilization during this callback. Note that this calculation
     ** assumes that we had the processor the whole time.
     */
-#define LOWPASS_COEFFICIENT_0   (0.9)
+#define LOWPASS_COEFFICIENT_0   (0.95)
 #define LOWPASS_COEFFICIENT_1   (0.99999 - LOWPASS_COEFFICIENT_0)
     Microseconds( &widePad );
-    CurrentCount = UnsignedWideToUInt64( widePad );
-    if( past->past_IfLastExitValid )
-    {
-        InsideCount = (long) U64Subtract(CurrentCount, pahsc->pahsc_EntryCount);
-        TotalCount  = (long) U64Subtract(CurrentCount, pahsc->pahsc_LastExitCount);
-        /* Low pass filter the result because sometimes we get called several times in a row.
-        * That can cause the TotalCount to be very low which can cause the usage to appear
-        * unnaturally high. So we must filter numerator and denominator separately!!!
-        */
-        past->past_AverageInsideCount = (( LOWPASS_COEFFICIENT_0 * past->past_AverageInsideCount) +
-                                         (LOWPASS_COEFFICIENT_1 * InsideCount));
-        past->past_AverageTotalCount = (( LOWPASS_COEFFICIENT_0 * past->past_AverageTotalCount) +
-                                        (LOWPASS_COEFFICIENT_1 * TotalCount));
-        past->past_Usage = past->past_AverageInsideCount / past->past_AverageTotalCount;
-    }
-    pahsc->pahsc_LastExitCount = CurrentCount;
-    past->past_IfLastExitValid = 1;
+    currentCount = UnsignedWideToUInt64( widePad );
+
+	usecsElapsed = (long) U64Subtract(currentCount, pahsc->pahsc_EntryCount);
+	
+        /* Use inverse because it is faster than the divide. */
+	newUsage =  usecsElapsed * pahsc->pahsc_InverseMicrosPerHostBuffer;
+	
+	past->past_Usage = (LOWPASS_COEFFICIENT_0 * past->past_Usage) +
+                           (LOWPASS_COEFFICIENT_1 * newUsage);
+ 
 }
 
 /***********************************************************************
@@ -836,6 +850,14 @@ static void PaMac_InitSoundHeader( internalPortAudioStream   *past, CmpSoundHead
     sndHeader->format = kSoundNotCompressed;
 }
 
+static void SetFramesDone( PaHostSoundControl *pahsc, PaTimestamp framesDone )
+{
+	UnsignedWide     now;
+ 	Microseconds( &now );
+ 	pahsc->pahsc_NumFramesDone = framesDone;
+ 	pahsc->pahsc_WhenFramesDoneIncremented = UnsignedWideToUInt64( now );
+}
+
 /***********************************************************************/
 PaError PaHost_StartOutput( internalPortAudioStream   *past )
 {
@@ -851,7 +873,8 @@ PaError PaHost_StartOutput( internalPortAudioStream   *past )
     past->past_IsActive = 1;
     pahsc->pahsc_NumOutsQueued = 0;
     pahsc->pahsc_NumOutsPlayed = 0;
-    pahsc->pahsc_NumFramesDone = 0.0;
+    
+    SetFramesDone( pahsc, 0.0 );
 
     /* Pause channel so it does not do back ground processing while we are still filling the queue. */
     pauseCommand.cmd = pauseCmd;
@@ -864,7 +887,7 @@ PaError PaHost_StartOutput( internalPortAudioStream   *past )
     {
         PaMac_PlayNext( past, i );
     }
-
+    
     /* Resume channel now that the queue is full. */
     resumeCommand.cmd = resumeCmd;
     resumeCommand.param1 = resumeCommand.param2 = 0;
@@ -1043,6 +1066,9 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
     }
 
     PaHost_CalcNumHostBuffers( past );
+    
+    /* Setup constants for CPU load measurement. */
+    pahsc->pahsc_InverseMicrosPerHostBuffer = past->past_SampleRate / (1000000.0 * 	pahsc->pahsc_FramesPerHostBuffer);
 
     /* ------------------ OUTPUT */
     if( past->past_NumOutputChannels > 0 )
@@ -1316,11 +1342,37 @@ void PaHost_FreeFastMemory( void *addr, long numBytes )
 /*************************************************************************/
 PaTimestamp Pa_StreamTime( PortAudioStream *stream )
 {
+	PaTimestamp   framesDone1;
+	PaTimestamp   framesDone2;
+	UInt64        whenIncremented;
+	UnsignedWide  now;
+	UInt64        now64;
+	long          microsElapsed;
+	long          framesElapsed;
+	
     PaHostSoundControl *pahsc;
     internalPortAudioStream   *past = (internalPortAudioStream *) stream;
     if( past == NULL ) return paBadStreamPtr;
     pahsc = (PaHostSoundControl *) past->past_DeviceData;
-    return pahsc->pahsc_NumFramesDone;
+    
+/* Capture information from audio thread.
+ * We have to be careful that we don't get interrupted in the middle.
+ * So we grab the pahsc_NumFramesDone twice and make sure it didn't change.
+ */
+ 	do
+ 	{
+ 		framesDone1 = pahsc->pahsc_NumFramesDone;
+ 		whenIncremented = pahsc->pahsc_WhenFramesDoneIncremented;
+ 		framesDone2 = pahsc->pahsc_NumFramesDone;
+ 	} while( framesDone1 != framesDone2 );
+ 	
+ /* Calculate how many microseconds have elapsed and convert to frames. */
+ 	Microseconds( &now );
+ 	now64 = UnsignedWideToUInt64( now );
+ 	microsElapsed = U64Subtract( now64, whenIncremented );
+ 	framesElapsed = microsElapsed * past->past_SampleRate * 0.000001;
+ 	
+	return pahsc->pahsc_NumFramesDone + framesElapsed;
 }
 
 /**************************************************************************
@@ -1358,7 +1410,8 @@ pascal void PaMac_InputCompletionProc(SPBPtr recParams)
      */
     if(past->past_NumOutputChannels == 0)
     {
-        pahsc->pahsc_NumFramesDone += pahsc->pahsc_FramesPerHostBuffer; // Advance for recording
+		SetFramesDone( pahsc,
+			pahsc->pahsc_NumFramesDone + pahsc->pahsc_FramesPerHostBuffer );
         result = PaMac_CallUserLoop( past, NULL );
     }
 
@@ -1389,6 +1442,7 @@ static PaError PaMac_CallUserLoop( internalPortAudioStream   *past, int16 *outPt
     PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
     int16              *inPtr = NULL;
     int                 i;
+    
 
     /* Advance read index for sound input FIFO here, independantly of record/write process. */
     if(past->past_NumInputChannels > 0)
@@ -1403,22 +1457,33 @@ static PaError PaMac_CallUserLoop( internalPortAudioStream   *past, int16 *outPt
     /* Call user code enough times to fill buffer. */
     if( (inPtr != NULL) || (outPtr != NULL) )
     {
-        StartLoadCalculation( past ); /* CPU usage */
+        PaMac_StartLoadCalculation( past ); /* CPU usage */
 
-        for( i=0; i<pahsc->pahsc_UserBuffersPerHostBuffer; i++ )
-        {
-            result = (PaError) Pa_CallConvertInt16( past, inPtr, outPtr );
-            if( result != 0)
-            {
-                /* Recording might be in another process, so tell it to stop with a flag. */
-                pahsc->pahsc_StopRecording = pahsc->pahsc_IsRecording;
-                break;
-            }
-            /* Advance sample pointers. */
-            if(inPtr != NULL) inPtr += past->past_FramesPerUserBuffer * past->past_NumInputChannels;
-            if(outPtr != NULL) outPtr += past->past_FramesPerUserBuffer * past->past_NumOutputChannels;
-        }
-
+#ifdef PA_MAX_USAGE_ALLOWED
+	/* If CPU usage exceeds limit, skip user callback to prevent hanging CPU. */
+		if( past->past_Usage > PA_MAX_USAGE_ALLOWED )
+	    {
+	    	past->past_FrameCount += (PaTimestamp) pahsc->pahsc_FramesPerHostBuffer;
+		}
+		else
+#endif
+		{
+		
+	        for( i=0; i<pahsc->pahsc_UserBuffersPerHostBuffer; i++ )
+	        {
+	            result = (PaError) Pa_CallConvertInt16( past, inPtr, outPtr );
+	            if( result != 0)
+	            {
+	                /* Recording might be in another process, so tell it to stop with a flag. */
+	                pahsc->pahsc_StopRecording = pahsc->pahsc_IsRecording;
+	                break;
+	            }
+	            /* Advance sample pointers. */
+	            if(inPtr != NULL) inPtr += past->past_FramesPerUserBuffer * past->past_NumInputChannels;
+	            if(outPtr != NULL) outPtr += past->past_FramesPerUserBuffer * past->past_NumOutputChannels;
+	        }
+	    }
+		
         PaMac_EndLoadCalculation( past );
     }
     return result;
@@ -1505,8 +1570,10 @@ static pascal void PaMac_OutputCompletionProc (SndChannelPtr theChannel, SndComm
 
     pahsc = (PaHostSoundControl *) past->past_DeviceData;
     pahsc->pahsc_NumOutsPlayed += 1;
-    pahsc->pahsc_NumFramesDone += pahsc->pahsc_FramesPerHostBuffer;
 
+	SetFramesDone( pahsc,
+			pahsc->pahsc_NumFramesDone + pahsc->pahsc_FramesPerHostBuffer );
+			
     PaMac_BackgroundManager( past, theCallBackCmd->param1 );
 }
 
@@ -1558,16 +1625,19 @@ static void PaMac_PlayNext ( internalPortAudioStream *past, int index )
 
     /* If this was the last buffer, or abort requested, then just be done. */
     if ( past->past_StopSoon ) goto done;
+    
     /* Load buffer with sound. */
     result = PaMac_FillNextOutputBuffer ( past, index );
     if( result > 0 ) past->past_StopSoon = 1; /* Stop generating audio but wait until buffers play. */
     else if( result < 0 ) goto done;
+    
     /* Play the next buffer. */
     playCmd.cmd = bufferCmd;
     playCmd.param1 = 0;
     playCmd.param2 = (long) &pahsc->pahsc_SoundHeaders[ index ];
     error = SndDoCommand (pahsc->pahsc_Channel, &playCmd, true );
     if( error != noErr ) goto gotError;
+    
     /* Ask for a callback when it is done. */
     callbackCmd.cmd = callBackCmd;
     callbackCmd.param1 = index;
