@@ -235,7 +235,8 @@ static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
 }
 /****************************************** END CPU UTILIZATION *******/
 
-
+#ifndef AFMT_S16_NE
+#define AFMT_S16_NE  Get_AFMT_S16_NE()
 /*********************************************************************
  * Some versions of OSS do not define AFMT_S16_NE. So check CPU.
  * PowerPC is Big Endian. X86 is Little Endian.
@@ -247,6 +248,7 @@ static int Get_AFMT_S16_NE( void )
     int isLittle = ( *ptr == 1 ); /* Does address point to least significant byte? */
     return isLittle ? AFMT_S16_LE : AFMT_S16_BE;
 }
+#endif
 
 /*********************************************************************
  * Try to open the named device.
@@ -286,7 +288,7 @@ static PaError Pa_QueryDevice( const char *deviceName, internalPortAudioDevice *
         goto error;
     }
     if( format & AFMT_U8 )     pad->pad_Info.nativeSampleFormats |= paUInt8;
-    if( format & Get_AFMT_S16_NE() ) pad->pad_Info.nativeSampleFormats |= paInt16;
+    if( format & AFMT_S16_NE ) pad->pad_Info.nativeSampleFormats |= paInt16;
 
     /* Negotiate for the maximum number of channels for this device. PLB20010927
      * Consider up to 16 as the upper number of channels.
@@ -825,13 +827,13 @@ static PaError Pa_SetupDeviceFormat( int devHandle, int numChannels, int sampleR
 
     /* Set format, channels, and rate in this order to keep OSS happy. */
     /* Set data format. FIXME - handle more native formats. */
-    tmp = Get_AFMT_S16_NE();
+    tmp = AFMT_S16_NE;
     if( ioctl(devHandle,SNDCTL_DSP_SETFMT,&tmp) == -1)
     {
         ERR_RPT(("Pa_SetupDeviceFormat: could not SNDCTL_DSP_SETFMT\n" ));
         return paHostError;
     }
-    if( tmp != Get_AFMT_S16_NE() )
+    if( tmp != AFMT_S16_NE )
     {
         ERR_RPT(("Pa_SetupDeviceFormat: HW does not support AFMT_S16_NE\n" ));
         return paHostError;
