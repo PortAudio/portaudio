@@ -51,17 +51,18 @@
         11-08-01 New Pa_ASIO_Adaptor_Init function to init Callback adpatation variables, cleanup of Pa_ASIO_Callback_Input: Stephane Letz 
 		11-29-01 Break apart device loading to debug random failure in Pa_ASIO_QueryDeviceInfo ; Phil Burk
 		01-03-02 Desallocate all resources in PaHost_Term for cases where Pa_CloseStream is not called properly :  Stephane Letz
+        02-01-02 Cleanup, test of multiple-stream opening : Stephane Letz
         
         TO DO :
         
         - Check Pa_StopSteam and Pa_AbortStream
         - Optimization for Input only or Ouput only (really necessary ??)
-        - Opening of several streams   
 */
 
 
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #include "portaudio.h"
 #include "pa_host.h"
@@ -167,16 +168,6 @@ typedef struct PaHostSoundControl
 
 
 //----------------------------------------------------------
-// name of the ASIO device to be used
-#if WINDOWS
-        //#define ASIO_DRIVER_NAME    "ASIO Multimedia Driver"
-        #define ASIO_DRIVER_NAME    "ASIO Sample"
-#elif MAC
-        //#define ASIO_DRIVER_NAME      "Apple Sound Manager"
-        #define ASIO_DRIVER_NAME                "ASIO Delta1010"
-        //#define ASIO_DRIVER_NAME      "DigiDesign DirectIO"
-#endif
-
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
 
@@ -269,34 +260,6 @@ void Pa_ASIO_Clear_User_Buffers();
 extern AsioDrivers* asioDrivers ;
 bool loadAsioDriver(char *name);
 unsigned long get_sys_reference_time();
-
-
-// For callback debugging on Mac : to be removed in the final version
-
-/*
-#define MidiSharePPC_68k
-#include <MidiShare.h>
-
-void SendVal (long val)
-{
-        MidiEvPtr ev = MidiNewEv(typeTempo);
-        if (ev) {
-                Tempo(ev) = val;
-                MidiSendIm(0,ev);
-        }
-}
-
-void MidiPrintText ( char * s)
-{
-        MidiEvPtr e;
-        long c = 0;
-
-        if (e = MidiNewEv(typeTextual)){
-                for (c = 0 ; *s ; s++,c++) MidiAddField (e ,*s);
-                MidiSendIm (0, e);
-        }
-}
-*/
 
 
 /************************************************************************************/
@@ -2620,8 +2583,8 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
         ASIOError                       err;
         int32                           device;
         
-        /*  TO DO : Check if a stream already runs */
-        //if (asioDriverInfo.past != NULL) return paHostError; (does not work)
+        /*  Check if a stream already runs */
+        if (asioDriverInfo.past != NULL) return paHostError;
                         
         /* Check the device number */
         if ((past->past_InputDeviceID != paNoDevice)
