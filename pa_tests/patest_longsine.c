@@ -1,7 +1,7 @@
 /*
  * $Id$
  * patest_longsine.c
- * Play a sine wave using the Portable Audio api forever.
+ * Play a sine wave using the Portable Audio api until ENTER hit.
  *
  * Author: Phil Burk  http://www.softsynth.com
  *
@@ -36,10 +36,13 @@
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
+
 #define SAMPLE_RATE   (44100)
+
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
+
 #define TABLE_SIZE   (200)
 typedef struct
 {
@@ -48,6 +51,7 @@ typedef struct
     int right_phase;
 }
 paTestData;
+
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
@@ -72,6 +76,7 @@ static int patestCallback( void *inputBuffer, void *outputBuffer,
     }
     return 0;
 }
+
 /*******************************************************************/
 int main(void);
 int main(void)
@@ -81,14 +86,17 @@ int main(void)
     paTestData data;
     int i;
     printf("PortAudio Test: output sine wave.\n");
+
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
         data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
     }
     data.left_phase = data.right_phase = 0;
+
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
+
     err = Pa_OpenStream(
               &stream,
               paNoDevice,/* default input device */
@@ -106,15 +114,20 @@ int main(void)
               patestCallback,
               &data );
     if( err != paNoError ) goto error;
+
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
+
     printf("Hit ENTER to stop program.\n");
     getchar();
+
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
     Pa_Terminate();
+
     printf("Test finished.\n");
     return err;
+
 error:
     Pa_Terminate();
     fprintf( stderr, "An error occured while using the portaudio stream\n" );
