@@ -52,6 +52,7 @@
 		11-29-01 Break apart device loading to debug random failure in Pa_ASIO_QueryDeviceInfo ; Phil Burk
 		01-03-02 Desallocate all resources in PaHost_Term for cases where Pa_CloseStream is not called properly :  Stephane Letz
         02-01-02 Cleanup, test of multiple-stream opening : Stephane Letz
+		19-02-02 New Pa_ASIO_loadDriver that calls CoInitialize on each thread on Windows: Stephane Letz
         
         TO DO :
         
@@ -282,6 +283,16 @@ unsigned long get_sys_reference_time();
 #endif
 
 
+bool Pa_ASIO_loadAsioDriver(char *name)
+{
+	#ifdef	WINDOWS
+		CoInitialize(0);
+	#endif
+	return loadAsioDriver(name);
+}
+ 
+
+
 // Utilities for alignement buffer size computation
 int PGCD (int a, int b) {return (b == 0) ? a : PGCD (b,a%b);}
 int PPCM (int a, int b) {return (a*b) / PGCD (a,b);}
@@ -420,7 +431,7 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
         for (i = 0 ; i < PA_MAX_DEVICE_INFO ; i++) names[i] = (char*)PaHost_AllocateFastMemory(32);
         
         /* MUST BE CHECKED : to force fragments loading on Mac */
-        loadAsioDriver("dummy");
+        Pa_ASIO_loadAsioDriver("dummy");
         
         /* Get names of all available ASIO drivers */
         asioDrivers->getDriverNames(names,PA_MAX_DEVICE_INFO);
@@ -442,7 +453,7 @@ static PaError Pa_ASIO_QueryDeviceInfo( internalPortAudioDevice * ipad )
             #endif
   
             /* If the driver can be loaded : */
-            if ( !loadAsioDriver(names[driver]) )
+            if ( !Pa_ASIO_loadAsioDriver(names[driver]) )
 			{
 				DBUG(("PaASIO_QueryDeviceInfo could not loadAsioDriver %s\n", names[driver]));
 			}
@@ -713,7 +724,7 @@ unsigned long get_sys_reference_time()
         // get the system reference time
         #if WINDOWS
                 return timeGetTime();
-        #elif MAC
+	     #elif MAC
                 static const double twoRaisedTo32 = 4294967296.;
                 UnsignedWide ys;
                 Microseconds(&ys);
@@ -2402,7 +2413,7 @@ static PaError Pa_ASIO_loadDevice (long device)
 {
         PaDeviceInfo * dev = &(sDevices[device].pad_Info);
 
-        if (!loadAsioDriver((char *) dev->name)) return paHostError;
+        if (!Pa_ASIO_loadAsioDriver((char *) dev->name)) return paHostError;
         if (ASIOInit(&asioDriverInfo.pahsc_driverInfo) != ASE_OK) return paHostError;
         if (ASIOGetChannels(&asioDriverInfo.pahsc_NumInputChannels, &asioDriverInfo.pahsc_NumOutputChannels) != ASE_OK) return paHostError;
         if (ASIOGetBufferSize(&asioDriverInfo.pahsc_minSize, &asioDriverInfo.pahsc_maxSize, &asioDriverInfo.pahsc_preferredSize, &asioDriverInfo.pahsc_granularity) != ASE_OK) return paHostError;
