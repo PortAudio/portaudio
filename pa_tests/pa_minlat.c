@@ -41,7 +41,7 @@
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
-#define DEFAULT_BUFFER_SIZE   (128)
+#define DEFAULT_BUFFER_SIZE   (64)
 #define TABLE_SIZE   (200)
 typedef struct
 {
@@ -121,7 +121,7 @@ void main( int argc, char **argv )
                   paFloat32,      /* 32 bit floating point output */
                   NULL,
                   sampleRate,
-                  framesPerBuffer,/* 46 msec buffers */
+                  framesPerBuffer,
                   numBuffers,     /* number of buffers */
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   paminlatCallback,
