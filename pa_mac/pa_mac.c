@@ -49,6 +49,7 @@
    PLB20020423 - Use new method to calculate CPU load similar to other ports. Based on num frames calculated.
                  Fixed Pa_StreamTime(). Now estimates how many frames have played based on MicroSecond timer.
                  Added PA_MAX_USAGE_ALLOWED to prevent Mac form hanging when CPU load approaches 100%.
+   PLB20020424 - Fixed return value in Pa_StreamTime
 */
 
 /*
@@ -1372,7 +1373,7 @@ PaTimestamp Pa_StreamTime( PortAudioStream *stream )
  	microsElapsed = U64Subtract( now64, whenIncremented );
  	framesElapsed = microsElapsed * past->past_SampleRate * 0.000001;
  	
-	return pahsc->pahsc_NumFramesDone + framesElapsed;
+	return framesDone1 + framesElapsed;
 }
 
 /**************************************************************************
