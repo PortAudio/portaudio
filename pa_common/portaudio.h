@@ -63,6 +63,7 @@ typedef enum {
 /*
  Pa_Initialize() is the library initialisation function - call this before
  using the library.
+
 */
 
 PaError Pa_Initialize( void );
@@ -70,19 +71,25 @@ PaError Pa_Initialize( void );
 /*
  Pa_Terminate() is the library termination function - call this after
  using the library.
+
 */
 
 PaError Pa_Terminate( void );
 
 /*
- Return host specific error.
- This can be called after receiving a paHostError.
+ Pa_GetHostError() returns a host specific error code.
+ This can be called after receiving a PortAudio error code of paHostError.
+
 */
+
 long Pa_GetHostError( void );
 
 /*
- Translate the error number into a human readable message.
+ Pa_GetErrorText() translates the supplied PortAudio error number
+ into a human readable message.
+ 
 */
+
 const char *Pa_GetErrorText( PaError errnum );
 
 /*
@@ -92,11 +99,12 @@ const char *Pa_GetErrorText( PaError errnum );
  stream. Each device has a "native" format which may be used when optimum
  efficiency or control over conversion is required.
  
- Formats marked "always available" are supported (emulated) by all devices.
+ Formats marked "always available" are supported (emulated) by all 
+ PortAudio implementations.
  
  The floating point representation uses +1.0 and -1.0 as the respective
  maximum and minimum.
- 
+
 */
 
 typedef unsigned long PaSampleFormat;
@@ -106,23 +114,26 @@ typedef unsigned long PaSampleFormat;
 #define paInt24        ((PaSampleFormat) (1<<3))
 #define paPackedInt24  ((PaSampleFormat) (1<<4))
 #define paInt8         ((PaSampleFormat) (1<<5))
-#define paUInt8        ((PaSampleFormat) (1<<6))    /* unsigned 8 bit, 128 is "ground" */
+#define paUInt8        ((PaSampleFormat) (1<<6)) /* unsigned 8 bit, 128 is "ground" */
 #define paCustomFormat ((PaSampleFormat) (1<<16))
 
 /*
  Device enumeration mechanism.
  
-    Device ids range from 0 to Pa_CountDevices()-1.
+ Device ids range from 0 to Pa_CountDevices()-1.
  
  Devices may support input, output or both. Device 0 is always the "default"
  device and should support at least stereo in and out if that is available
- on the taget platform _even_ if this involves kludging an input/output
+ on the target platform _even_ if this involves kludging an input/output
  device on platforms that usually separate input from output. Other platform
  specific devices are specified by positive device ids.
+
 */
 
 typedef int PaDeviceID;
 #define paNoDevice -1
+
+int Pa_CountDevices();
 
 typedef struct
 {
@@ -138,12 +149,10 @@ typedef struct
 }
 PaDeviceInfo;
 
-
-int Pa_CountDevices();
 /*
- Pa_GetDefaultInputDeviceID(), Pa_GetDefaultOutputDeviceID()
- 
- Return the default device ID or paNoDevice if there is no devices.
+ Pa_GetDefaultInputDeviceID(), Pa_GetDefaultOutputDeviceID() return the
+ default device ids for input and output respectively, or paNoDevice if
+ no device is available.
  The result can be passed to Pa_OpenStream().
  
  On the PC, the user can specify a default device by
@@ -151,34 +160,40 @@ int Pa_CountDevices();
  
   set PA_RECOMMENDED_OUTPUT_DEVICE=1
  
- The user should first determine the available device ID by using
+ The user should first determine the available device ids by using
  the supplied application "pa_devs".
+
 */
+
 PaDeviceID Pa_GetDefaultInputDeviceID( void );
 PaDeviceID Pa_GetDefaultOutputDeviceID( void );
 
+
+
+/*
+ Pa_GetDeviceInfo() returns a pointer to an immutable PaDeviceInfo structure
+ for the device specified.
+ If the device parameter is out of range the function returns NULL.
+
+ PortAudio manages the memory referenced by the returned pointer, the client
+ must not manipulate or free the memory. The pointer is only guaranteed to be
+ valid between calls to Pa_Initialize() and Pa_Terminate().
+
+*/
+
+const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID device );
+
 /*
  PaTimestamp is used to represent a continuous sample clock with arbitrary
- start time useful for syncronisation. The type is used in the outTime
- argument to the callback function and the result of Pa_StreamTime()
+ start time that can be used for syncronization. The type is used for the
+ outTime argument to the PortAudioCallback and as the result of Pa_StreamTime()
+
 */
 
 typedef double PaTimestamp;
 
 /*
- Pa_GetDeviceInfo() returns a pointer to an immutable PaDeviceInfo structure
- referring to the device specified by id.
- If id is out of range the function returns NULL.
- 
- The returned structure is owned by the PortAudio implementation and must
- not be manipulated or freed. The pointer is only guaranteed to be valid
- between calls to Pa_Initialize() and Pa_Terminate().
-*/
-
-const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID devID );
-
-/*
- PortAudioCallback is implemented by clients of the portable audio api.
+ PortAudioCallback is implemented by PortAudio clients.
  
  inputBuffer and outputBuffer are arrays of interleaved samples,
  the format, packing and number of channels used by the buffers are
@@ -194,15 +209,15 @@ const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceID devID );
  intended for storing synthesis data etc.
  
  return value:
- The callback can return a nonzero value to stop the stream. This may be
+ The callback can return a non-zero value to stop the stream. This may be
  useful in applications such as soundfile players where a specific duration
  of output is required. However, it is not necessary to utilise this mechanism
  as StopStream() will also terminate the stream. A callback returning a
- nonzero value must fill the entire outputBuffer.
+ non-zero value must fill the entire outputBuffer.
  
  NOTE: None of the other stream functions may be called from within the
  callback function except for Pa_GetCPULoad().
- 
+
 */
 
 typedef int (PortAudioCallback)(
@@ -216,12 +231,11 @@ typedef int (PortAudioCallback)(
  
  These flags may be supplied (ored together) in the streamFlags argument to
  the Pa_OpenStream() function.
- 
- [ suggestions? ]
+
 */
 
 #define   paNoFlag      (0)
-#define   paClipOff     (1<<0)   /* disable defult clipping of out of range samples */
+#define   paClipOff     (1<<0)   /* disable default clipping of out of range samples */
 #define   paDitherOff   (1<<1)   /* disable default dithering */
 #define   paPlatformSpecificFlags (0x00010000)
 typedef   unsigned long PaStreamFlags;
@@ -246,15 +260,15 @@ typedef void PortAudioStream;
  
  numInputChannels is the number of channels of sound to be delivered to the
  callback. It can range from 1 to the value of maxInputChannels in the
- device input record for the device specified in the inputDevice parameter.
+ PaDeviceInfo record for the device specified by the inputDevice parameter.
  If inputDevice is paNoDevice numInputChannels is ignored.
  
- inputSampleFormat is the format of inputBuffer provided to the callback
+ inputSampleFormat is the sample format of inputBuffer provided to the callback
  function. inputSampleFormat may be any of the formats described by the
  PaSampleFormat enumeration (see above). PortAudio guarantees support for
- the sound devices native formats (nativeSampleFormats in the device info
- record) and additionally 16 and 32 bit integer and 32 bit floating point
- formats. Support for other formats is implementation defined.
+ the device's native formats (nativeSampleFormats in the device info record)
+ and additionally 16 and 32 bit integer and 32 bit floating point formats.
+ Support for other formats is implementation defined.
  
  inputDriverInfo is a pointer to an optional driver specific data structure
  containing additional information for device setup or stream processing.
@@ -276,24 +290,24 @@ typedef void PortAudioStream;
  outputDriverInfo is never required for correct operation. If not used
  outputDriverInfo should be NULL.
  
- sampleRate is the desired sampleRate for input and output
+ sampleRate is the desired sampleRate. For full-duplex streams it is the
+ sample rate for both input and output
  
  framesPerBuffer is the length in sample frames of all internal sample buffers
  used for communication with platform specific audio routines. Wherever
  possible this corresponds to the framesPerBuffer parameter passed to the
  callback function.
  
- numberOfBuffers is the number of buffers used for 
- multibuffered communication with the platform specific audio 
- routines. If you pass zero, then an optimum value will be 
- chosen for you internally. This parameter is provided only 
- as a guide - and does not imply that an implementation must 
- use multibuffered i/o when reliable double buffering is 
- available (such as SndPlayDoubleBuffer() on the Macintosh.) 
+ numberOfBuffers is the number of buffers used for multibuffered communication
+ with the platform specific audio routines. If you pass zero, then an optimum
+ value will be chosen for you internally. This parameter is provided only
+ as a guide - and does not imply that an implementation must use multibuffered
+ i/o when reliable double buffering is available (such as SndPlayDoubleBuffer()
+ on the Macintosh.)
  
  streamFlags may contain a combination of flags ORed together.
- These flags modify the behavior of the
- streaming process. Some flags may only be relevant to certain buffer formats.
+ These flags modify the behaviour of the streaming process. Some flags may only
+ be relevant to certain buffer formats.
  
  callback is a pointer to a client supplied function that is responsible
  for processing and filling input and output buffers (see above for details.)
@@ -303,10 +317,10 @@ typedef void PortAudioStream;
  for processing the audio buffers.
  
  return value:
- Apon success Pa_OpenStream() returns PaNoError and places a pointer to a
+ Upon success Pa_OpenStream() returns PaNoError and places a pointer to a
  valid PortAudioStream in the stream argument. The stream is inactive (stopped).
- If a call to Pa_OpenStream() fails a nonzero error code is returned (see
- PAError above) and the value of stream is invalid.
+ If a call to Pa_OpenStream() fails a non-zero error code is returned (see
+ PaError above) and the value of stream is invalid.
  
 */
 
@@ -328,15 +342,16 @@ PaError Pa_OpenStream( PortAudioStream** stream,
 
 
 /*
- Pa_OpenDefaultStream() is a simplified version of Pa_OpenStream() that
- opens the default input and/or ouput devices. Most parameters have
- identical meaning to their Pa_OpenStream() counterparts, with the following
- exceptions:
+ Pa_OpenDefaultStream() is a simplified version of Pa_OpenStream() that opens
+ the default input and/or output devices. Most parameters have identical meaning
+ to their Pa_OpenStream() counterparts, with the following exceptions:
  
  If either numInputChannels or numOutputChannels is 0 the respective device
- is not opened (same as passing paNoDevice in the device arguments to Pa_OpenStream() )
+ is not opened. This has the same effect as passing paNoDevice in the device
+ arguments to Pa_OpenStream().
  
  sampleFormat applies to both the input and output buffers.
+
 */
 
 PaError Pa_OpenDefaultStream( PortAudioStream** stream,
@@ -351,15 +366,17 @@ PaError Pa_OpenDefaultStream( PortAudioStream** stream,
 
 /*
  Pa_CloseStream() closes an audio stream, flushing any pending buffers.
+
 */
 
 PaError Pa_CloseStream( PortAudioStream* );
 
 /*
-  Pa_StartStream() and Pa_StopStream() begin and terminate audio processing.
+ Pa_StartStream() and Pa_StopStream() begin and terminate audio processing.
  Pa_StopStream() waits until all pending audio buffers have been played.
-    Pa_AbortStream() stops playing immediately without waiting for pending
-    buffers to complete.
+ Pa_AbortStream() stops playing immediately without waiting for pending
+ buffers to complete.
+    
 */
 
 PaError Pa_StartStream( PortAudioStream *stream );
@@ -369,37 +386,43 @@ PaError Pa_StopStream( PortAudioStream *stream );
 PaError Pa_AbortStream( PortAudioStream *stream );
 
 /*
- Pa_StreamActive() returns one when the stream is playing audio,
- zero when not playing, or a negative error number if the
- stream is invalid.
+ Pa_StreamActive() returns one (1) when the stream is active (ie playing
+ or recording audio), zero (0) when not playing, or a negative error number
+ if the stream is invalid.
  The stream is active between calls to Pa_StartStream() and Pa_StopStream(),
  but may also become inactive if the callback returns a non-zero value.
  In the latter case, the stream is considered inactive after the last
  buffer has finished playing.
+ 
 */
 
 PaError Pa_StreamActive( PortAudioStream *stream );
 
 /*
- Pa_StreamTime() returns the current output time for the stream in samples.
- This time may be used as a time reference (for example syncronising audio to
+ Pa_StreamTime() returns the current output time in samples for the stream .
+ This time may be used as a time reference (for example synchronizing audio to
  MIDI).
+ 
 */
 
 PaTimestamp Pa_StreamTime( PortAudioStream *stream );
 
 /*
- The "CPU Load" is a fraction of total CPU time consumed by the
- stream's audio processing.
+ Pa_GetCPULoad() returns the CPU Load for the stream.
+ The "CPU Load" is a fraction of total CPU time consumed by the stream's
+ audio processing routines including, but not limited to the client supplied
+ callback.
  A value of 0.5 would imply that PortAudio and the sound generating
  callback was consuming roughly 50% of the available CPU time.
  This function may be called from the callback function or the application.
+ 
 */
+
 double Pa_GetCPULoad( PortAudioStream* stream );
 
 /*
- Use Pa_GetMinNumBuffers() to determine minimum number of buffers required for
- the current host based on minimum latency. 
+ Pa_GetMinNumBuffers() returns the minimum number of buffers required by
+ the current host based on minimum latency.
  On the PC, for the DirectSound implementation, latency can be optionally set
  by user by setting an environment variable.
  For example, to set latency to 200 msec, put:
@@ -409,22 +432,32 @@ double Pa_GetCPULoad( PortAudioStream* stream );
  in the AUTOEXEC.BAT file and reboot.
  If the environment variable is not set, then the latency will be determined
  based on the OS. Windows NT has higher latency than Win95.
+ 
 */
 
 int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate );
 
 /*
- Sleep for at least 'msec' milliseconds.
- You may sleep longer than the requested time so don't rely
- on this for accurate musical timing.
+ Pa_Sleep() puts the caller to sleep for at least 'msec' milliseconds.
+ You may sleep longer than the requested time so don't rely on this for
+ accurate musical timing.
+ 
+ Pa_Sleep() is provided as a convenience for authors of portable code (such as
+ the tests and examples in the PortAudio distribution.)
+ 
 */
+
 void Pa_Sleep( long msec );
 
 /*
- Return size in bytes of a single sample in a given PaSampleFormat
- or paSampleFormatNotSupported. 
+ Pa_GetSampleSize() returns the size in bytes of a single sample in the
+ supplied PaSampleFormat, or paSampleFormatNotSupported if the format is
+ no supported.
+  
 */
+
 PaError Pa_GetSampleSize( PaSampleFormat format );
+
 
 #ifdef __cplusplus
 }
