@@ -42,15 +42,17 @@
 #define SAMPLE_RATE     (22050)
 #define NUM_SECONDS     (10)
 #define SLEEP_DUR_MSEC  (200)
-#define REC_BUF_FRAMES  (1<<10)
+#define FRAMES_PER_BUFFER  (1<<10)
 #define NUM_REC_BUFS    (0)
-#if 0
+
+#if 1
 #define PA_SAMPLE_TYPE  paFloat32
 typedef float SAMPLE;
 #else
 #define PA_SAMPLE_TYPE  paInt16
 typedef short SAMPLE;
 #endif
+
 typedef struct
 {
     long         frameIndex;  /* Index into sample array. */
@@ -195,7 +197,7 @@ int main(void)
               PA_SAMPLE_TYPE,
               NULL,
               SAMPLE_RATE,
-              REC_BUF_FRAMES,            /* frames per buffer */
+              FRAMES_PER_BUFFER,            /* frames per buffer */
               NUM_REC_BUFS,               /* number of buffers, if zero then use default minimum */
               paClipOff,       /* we won't output out of range samples so don't bother clipping them */
               recordCallback,
@@ -203,6 +205,7 @@ int main(void)
     if( err != paNoError ) goto error;
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
+
     printf("Now recording!\n"); fflush(stdout);
     for( i=0; i<(NUM_SECONDS*1000/SLEEP_DUR_MSEC); i++ )
     {
@@ -217,8 +220,9 @@ int main(void)
             break;
         }
         Pa_Sleep(100);
-        printf("index = %d\n", data.frameIndex );
+        printf("index = %d\n", data.frameIndex ); fflush(stdout);
     }
+
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
     /* Playback recorded data. */
@@ -235,7 +239,7 @@ int main(void)
               PA_SAMPLE_TYPE,
               NULL,
               SAMPLE_RATE,
-              1024,            /* frames per buffer */
+              FRAMES_PER_BUFFER,            /* frames per buffer */
               0,               /* number of buffers, if zero then use default minimum */
               paClipOff,       /* we won't output out of range samples so don't bother clipping them */
               playCallback,
@@ -265,7 +269,7 @@ int main(void)
         printf("Largest recorded sample = %d\n", max );
     }
     /* Write recorded data to a file. */
-#if 0
+#if 1
     {
         FILE  *fid;
         fid = fopen("recorded.raw", "wb");
