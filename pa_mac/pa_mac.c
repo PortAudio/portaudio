@@ -42,7 +42,12 @@
    PLB20010907 - Pass unused event to WaitNextEvent to prevent Mac OSX crash. Thanks Dominic Mazzoni.
    PLB20010908 - Use requested number of input channels. Thanks Dominic Mazzoni.
    PLB20011009 - Use NewSndCallBackUPP() for CARBON
+   PLB20020417 - I used to call Pa_GetMinNumBuffers() which doesn't take into account the
+                 variable minFramesPerHostBuffer. Now I call PaMac_GetMinNumBuffers() which will
+                 gove lower latency when virtual memory is turned off.
+                 Thanks Kristoffer Jensen and Georgios Marentakis for spotting this bug.
 */
+
 /*
 COMPATIBILITY
 This Macintosh implementation is designed for use with Mac OS 7, 8 and
@@ -72,6 +77,7 @@ O- Determine default devices somehow.
 #include <string.h>
 #include <memory.h>
 #include <math.h>
+
 /* Mac specific includes */
 #include "OSUtils.h"
 #include <MacTypes.h>
@@ -84,6 +90,7 @@ O- Determine default devices somehow.
 #include <DateTimeUtils.h>
 #include <Timer.h>
 #include <Gestalt.h>
+
 #include "portaudio.h"
 #include "pa_host.h"
 #include "pa_trace.h"
@@ -942,8 +949,8 @@ int Mac_IsVirtualMemoryOn( void )
 }
 
 /*******************************************************************
-* Determine number of WAVE Buffers
-* and how many User Buffers we can put into each WAVE buffer.
+* Determine number of host Buffers
+* and how many User Buffers we can put into each host buffer.
 */
 static void PaHost_CalcNumHostBuffers( internalPortAudioStream *past )
 {
@@ -954,16 +961,23 @@ static void PaHost_CalcNumHostBuffers( internalPortAudioStream *past )
     int32  userBuffersPerHostBuffer;
     int32  framesPerHostBuffer;
     int32  numHostBuffers;
-    /* Calculate minimum and maximum sizes based on timing and sample rate. */
+    
     minFramesPerHostBuffer = pahsc->pahsc_MinFramesPerHostBuffer;
     minFramesPerHostBuffer = (minFramesPerHostBuffer + 7) & ~7;
     DBUG(("PaHost_CalcNumHostBuffers: minFramesPerHostBuffer = %d\n", minFramesPerHostBuffer ));
+    
     /* Determine number of user buffers based on minimum latency. */
-    minNumBuffers = Pa_GetMinNumBuffers( past->past_FramesPerUserBuffer, past->past_SampleRate );
+	/* PLB20020417 I used to call Pa_GetMinNumBuffers() which doesn't take into account the
+	**    variable minFramesPerHostBuffer. Now I call PaMac_GetMinNumBuffers() which will
+	**    gove lower latency when virtual memory is turned off. */
+    /* minNumBuffers = Pa_GetMinNumBuffers( past->past_FramesPerUserBuffer, past->past_SampleRate ); WRONG */
+    minNumBuffers = PaMac_GetMinNumBuffers( minFramesPerHostBuffer, past->past_FramesPerUserBuffer, past->past_SampleRate );
+    
     past->past_NumUserBuffers = ( minNumBuffers > past->past_NumUserBuffers ) ? minNumBuffers : past->past_NumUserBuffers;
     DBUG(("PaHost_CalcNumHostBuffers: min past_NumUserBuffers = %d\n", past->past_NumUserBuffers ));
     minTotalFrames = past->past_NumUserBuffers * past->past_FramesPerUserBuffer;
-    /* We cannot make the WAVE buffers too small because they may not get serviced quickly enough. */
+    
+    /* We cannot make the buffers too small because they may not get serviced quickly enough. */
     if( (int32) past->past_FramesPerUserBuffer < minFramesPerHostBuffer )
     {
         userBuffersPerHostBuffer =
@@ -975,16 +989,17 @@ static void PaHost_CalcNumHostBuffers( internalPortAudioStream *past )
         userBuffersPerHostBuffer = 1;
     }
     framesPerHostBuffer = past->past_FramesPerUserBuffer * userBuffersPerHostBuffer;
-    /* Calculate number of WAVE buffers needed. Round up to cover minTotalFrames. */
+    
+    /* Calculate number of host buffers needed. Round up to cover minTotalFrames. */
     numHostBuffers = (minTotalFrames + framesPerHostBuffer - 1) / framesPerHostBuffer;
-    /* Make sure we have anough WAVE buffers. */
+    /* Make sure we have enough host buffers. */
     if( numHostBuffers < PA_MIN_NUM_HOST_BUFFERS)
     {
         numHostBuffers = PA_MIN_NUM_HOST_BUFFERS;
     }
     else
     {
-        /* If we have too many WAVE buffers, try to put more user buffers in a wave buffer. */
+        /* If we have too many host buffers, try to put more user buffers in a host buffer. */
         while(numHostBuffers > PA_MAX_NUM_HOST_BUFFERS)
         {
             userBuffersPerHostBuffer += 1;
@@ -1219,6 +1234,9 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
 /*************************************************************************/
 int Pa_GetMinNumBuffers( int framesPerUserBuffer, double sampleRate )
 {
+/* We use the MAC_VIRTUAL_FRAMES_PER_BUFFER because we might be recording.
+** This routine doesn't have enough information to determine the best value
+** and is being depracated. */
     return PaMac_GetMinNumBuffers( MAC_VIRTUAL_FRAMES_PER_BUFFER, framesPerUserBuffer, sampleRate );
 }
 /*************************************************************************/
