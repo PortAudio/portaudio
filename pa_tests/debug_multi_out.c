@@ -1,9 +1,8 @@
 /*
  * $Id$
- * debug_multi.c
- * Play a sine wave on each of multiple channels,
+ * debug_multi_out.c
+ * Play a different sine wave on each channels,
  * using the Portable Audio api.
- * Hacked test for debugging PA.
  *
  * Author: Phil Burk  http://www.softsynth.com
  *
@@ -38,28 +37,24 @@
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
-#define NUM_CHANNELS        (8)
-// #define OUTPUT_DEVICE       (Pa_GetDefaultOutputDeviceID())
-#define OUTPUT_DEVICE       (18)
-#define NUM_SECONDS         (NUM_CHANNELS*4)
+
+#define OUTPUT_DEVICE       (Pa_GetDefaultOutputDeviceID())
 #define SAMPLE_RATE         (44100)
-#define FRAMES_PER_CHANNEL  (SAMPLE_RATE/2)
 #define FRAMES_PER_BUFFER   (256)
-#define MIN_LATENCY_MSEC    (400)
-#define NUM_BUFFERS         ((MIN_LATENCY_MSEC * SAMPLE_RATE) / (FRAMES_PER_BUFFER * 1000))
+#define FREQ_INCR           (300.0 / SAMPLE_RATE)
+#define MAX_CHANNELS        (64)
+
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
-#define TABLE_SIZE   (800)
+
 typedef struct
 {
-    float sine[TABLE_SIZE];
-    int   phase;
-    int   liveChannel;
-    int   count;
-    unsigned int sampsToGo;
+    int      numChannels;
+    double   phases[MAX_CHANNELS];
 }
 paTestData;
+
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
@@ -70,38 +65,25 @@ static int patestCallback( void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
-    int i, j;
+    int frameIndex, channelIndex;
     int finished = 0;
     (void) outTime; /* Prevent unused variable warnings. */
     (void) inputBuffer;
 
-    if( data->sampsToGo < framesPerBuffer )
+    for( frameIndex=0; frameIndex<(int)framesPerBuffer; frameIndex++ )
     {
-        finished = 1;
-    }
-    else
-    {
-        for( i=0; i<(int)framesPerBuffer; i++ )
+        for( channelIndex=0; channelIndex<data->numChannels; channelIndex++ )
         {
-            for( j=0; j<NUM_CHANNELS; j++ )
-            {
-                /* Output sine wave only on live channel. */
-                *out++ = (j==data->liveChannel) ? data->sine[data->phase] : 0.0f;
-                /* Play each channel at a higher frequency. */
-                data->phase += 1 + data->liveChannel;
-                if( data->phase >= TABLE_SIZE ) data->phase -= TABLE_SIZE;
-            }
-            /* Switch channels every so often. */
-            if( --data->count <= 0 )
-            {
-                data->count = FRAMES_PER_CHANNEL;
-                data->liveChannel += 1;
-                if( data->liveChannel >= NUM_CHANNELS ) data->liveChannel = 0;
-            }
+            /* Output sine wave on every channel. */
+            *out++ = (float) sin(data->phases[channelIndex]);
+
+            /* Play each channel at a higher frequency. */
+            data->phases[channelIndex] += FREQ_INCR * (4 + channelIndex);
+            if( data->phases[channelIndex] >= (2.0 * M_PI) ) data->phases[channelIndex] -= (2.0 * M_PI);
         }
-        data->sampsToGo -= framesPerBuffer;
     }
-    return finished;
+
+    return 0;
 }
 /*******************************************************************/
 int main(void);
@@ -109,21 +91,18 @@ int main(void)
 {
     PortAudioStream *stream;
     PaError err;
-    paTestData data;
-    int i;
-    int totalSamps;
-    printf("PortAudio Test: output sine wave. %d buffers\n", NUM_BUFFERS );
-    /* initialise sinusoidal wavetable */
-    for( i=0; i<TABLE_SIZE; i++ )
-    {
-        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
-    }
-    data.phase = 0;
-    data.count = FRAMES_PER_CHANNEL;
-    data.liveChannel = 0;
-    data.sampsToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
+    const PaDeviceInfo *pdi;
+    paTestData data = {0};
+    printf("PortAudio Test: output sine wave on each channel.\n" );
+
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
+
+    pdi = Pa_GetDeviceInfo( OUTPUT_DEVICE );
+    data.numChannels = pdi->maxOutputChannels;
+    if( data.numChannels > MAX_CHANNELS ) data.numChannels = MAX_CHANNELS;
+    printf("Number of Channels = %d\n", data.numChannels );
+    
     err = Pa_OpenStream(
               &stream,
               paNoDevice, /* default input device */
@@ -131,27 +110,26 @@ int main(void)
               paFloat32,  /* 32 bit floating point input */
               NULL,
               OUTPUT_DEVICE,
-              NUM_CHANNELS,
+              data.numChannels,
               paFloat32,  /* 32 bit floating point output */
               NULL,
               SAMPLE_RATE,
               FRAMES_PER_BUFFER,  /* frames per buffer */
-              NUM_BUFFERS,    /* number of buffers, if zero then use default minimum */
+              0,    /* number of buffers, if zero then use default minimum */
               paClipOff,      /* we won't output out of range samples so don't bother clipping them */
               patestCallback,
               &data );
     if( err != paNoError ) goto error;
+
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
-    printf("Is callback being called?\n");
-    for( i=0; i<NUM_SECONDS; i++ )
-    {
-        printf("data.sampsToGo = %d\n", data.sampsToGo );
-        Pa_Sleep( 1000 );
-    }
-    /* Stop sound until ENTER hit. */
+
+    printf("Hit ENTER to stop sound.\n");
+    getchar();
+
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
+
     Pa_CloseStream( stream );
     Pa_Terminate();
     printf("Test finished.\n");
