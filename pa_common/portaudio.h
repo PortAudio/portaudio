@@ -102,8 +102,10 @@ const char *Pa_GetErrorText( PaError errnum );
  Formats marked "always available" are supported (emulated) by all 
  PortAudio implementations.
  
- The floating point representation uses +1.0 and -1.0 as the respective
- maximum and minimum.
+ The floating point representation (paFloat32) uses +1.0 and -1.0 as the 
+ maximum and minimum respectively.
+
+ paUInt8 is an unsigned 8 bit format where 128 is considered "ground"
 
 */
 
@@ -114,7 +116,7 @@ typedef unsigned long PaSampleFormat;
 #define paInt24        ((PaSampleFormat) (1<<3))
 #define paPackedInt24  ((PaSampleFormat) (1<<4))
 #define paInt8         ((PaSampleFormat) (1<<5))
-#define paUInt8        ((PaSampleFormat) (1<<6)) /* unsigned 8 bit, 128 is "ground" */
+#define paUInt8        ((PaSampleFormat) (1<<6))
 #define paCustomFormat ((PaSampleFormat) (1<<16))
 
 /*
@@ -122,11 +124,7 @@ typedef unsigned long PaSampleFormat;
  
  Device ids range from 0 to Pa_CountDevices()-1.
  
- Devices may support input, output or both. Device 0 is always the "default"
- device and should support at least stereo in and out if that is available
- on the target platform _even_ if this involves kludging an input/output
- device on platforms that usually separate input from output. Other platform
- specific devices are specified by positive device ids.
+ Devices may support input, output or both.
 
 */
 
