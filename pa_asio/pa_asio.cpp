@@ -54,6 +54,7 @@
         02-01-02 Cleanup, test of multiple-stream opening : Stephane Letz
         19-02-02 New Pa_ASIO_loadDriver that calls CoInitialize on each thread on Windows : Stephane Letz
         09-04-02 Correct error code management in PaHost_Term, removes various compiler warning : Stephane Letz
+        12-04-02 Add Mac includes for <Devices.h> and <Timer.h> : Phil Burk
         
         TO DO :
         
@@ -74,7 +75,10 @@
 #include "asio.h"
 #include "asiodrivers.h"
 
+
 #if MAC
+#include <Devices.h>
+#include <Timer.h>
 #include <Math64.h>
 #else
 #include <math.h>
