@@ -1,0 +1,32 @@
+Notes on Core Audio Implementation of PortAudio
+
+by Phil Burk and Darren Gibbs
+
+Document last updated Feb 7, 2002
+
+WHAT WORKS
+
+Output with very low latency, <10 msec.
+Half duplex input or output.
+Full duplex on the same CoreAudio device.
+The paFLoat32 sample format.
+
+KNOWN BUGS OR LIMITATIONS
+
+We do not yet support simultaneous input and output on different 
+devices. Note that some CoreAudio devices like the Roland UH30 look 
+like one device but are actually two different CoreAudio devices. The 
+BuiltIn audio is typically one CoreAudio device.
+
+User formats other than the native paFloat32 are not yet supported.
+
+DEVICE MAPPING
+
+CoreAudio devices can support both input and output. But the sample 
+rates supported may be different. So we have map one or two PortAudio 
+device to each CoreAudio device depending on whether it supports 
+input, output or both.
+
+When we query devices, we first get a list of CoreAudio devices. Then 
+we scan the list and add a PortAudio device for each CoreAudio device 
+that supports input. Then we make a scan for output devices.
