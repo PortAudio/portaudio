@@ -397,7 +397,7 @@ PaError Pa_AbortStream( PortAudioStream *stream );
 PaError Pa_StreamActive( PortAudioStream *stream );
 
 /*
- Pa_StreamTime() returns the current output time in samples for the stream .
+ Pa_StreamTime() returns the current output time in samples for the stream.
  This time may be used as a time reference (for example synchronizing audio to
  MIDI).
  
