@@ -41,6 +41,8 @@
              fixed device queries for numChannels and sampleRates,
     one CoreAudio device now maps to separate input and output PaDevices,
     audio input works if using same CoreAudio device (some HW devices make separate CoreAudio devices).
+ 2.22.2002 - Stephane Letz - Explicit cast needed for compilation with Code Warrior 7
+
     
 TODO:
 O- conversion for other user formats besides paFloat32
@@ -278,7 +280,7 @@ static PaError Pa_QueryDevices( void )
         ERR_RPT(("No Devices Available\n"));
 
     // make space for the devices we are about to get
-    sCoreDeviceIDs = malloc(outSize);
+    sCoreDeviceIDs =  (AudioDeviceID *)malloc(outSize);
 
     // get an array of AudioDeviceIDs
     err = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &outSize, (void *)sCoreDeviceIDs);
@@ -331,7 +333,7 @@ char *deviceNameFromID(AudioDeviceID deviceID, Boolean isInput )
     err =  AudioDeviceGetPropertyInfo(deviceID, 0, isInput, kAudioDevicePropertyDeviceName, &outSize, &outWritable);
     if (err == noErr)
     {
-        deviceName = malloc( outSize + 1);
+        deviceName =  (char*)malloc( outSize + 1);
         if( deviceName )
         {
             err = AudioDeviceGetProperty(deviceID, 0, isInput, kAudioDevicePropertyDeviceName, &outSize, deviceName);
@@ -671,7 +673,7 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
     gotOutput = 0;
     if( past->past_NumOutputChannels > 0 )
     {
-        outBufPtr =  outOutputData->mBuffers[0].mData,
+        outBufPtr =  (char*)outOutputData->mBuffers[0].mData,
                      gotOutput = 1;
     }
 
@@ -680,7 +682,7 @@ static PaError Pa_TimeSlice( internalPortAudioStream   *past, const AudioBufferL
     inBufPtr = NULL;
     if(  past->past_NumInputChannels > 0  )
     {
-        inBufPtr = inInputData->mBuffers[0].mData,
+        inBufPtr = (char*)inInputData->mBuffers[0].mData,
                    gotInput = 1;
     }
 
@@ -877,7 +879,7 @@ PaError PaHost_GetTotalBufferFrames( internalPortAudioStream   *past )
 */
 static void PaHost_CalcHostBufferSize( internalPortAudioStream *past )
 {
-    PaHostSoundControl *pahsc = past->past_DeviceData;
+    PaHostSoundControl *pahsc = ( PaHostSoundControl *)past->past_DeviceData;
     unsigned int  minNumUserBuffers;
 
     // Determine number of user buffers based on minimum latency.
