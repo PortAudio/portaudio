@@ -58,9 +58,14 @@ Modfication History
   PLB20010927 - Phil - Improved negotiation for numChannels.
   SG20011005 - Stewart Greenhill - set numChannels back to reasonable value after query.
   DH20010115 - David Herring - fixed uninitialized handle.
+
+  DM20020218 - Dominic Mazzoni - Try to open in nonblocking mode first, in case
+                                 the device is already open.  New implementation of
+                                 Pa_StreamTime that uses SNDCTL_DSP_GETOPTR but
+                                 uses our own counter to avoid wraparound.
+
   
 TODO
-O- change Pa_StreamTime() to query device (patest_sync.c)
 O- put semaphore lock around shared data?
 O- handle native formats better
 O- handle stereo-only device better ???
@@ -159,6 +164,10 @@ typedef struct PaHostSoundControl
     /* For measuring CPU utilization. */
     struct timeval   pahsc_EntryTime;
     double           pahsc_InverseMicrosPerBuffer; /* 1/Microseconds of real-time audio per user buffer. */
+
+   /* For calculating stream time */
+    int              pahsc_LastPosPtr;
+    double           pahsc_LastStreamBytes;
 }
 PaHostSoundControl;
 
@@ -511,6 +520,8 @@ static PaError Pa_AudioThreadProc( internalPortAudioStream   *past )
     PaError    result = 0;
     PaHostSoundControl             *pahsc;
     short    bytes_read = 0;
+    count_info info;
+    int        delta;
 
 #ifdef GNUSTEP
     GSRegisterCurrentThread(); /* SB20010904 */
@@ -526,12 +537,12 @@ static PaError Pa_AudioThreadProc( internalPortAudioStream   *past )
 
         if (sched_setscheduler(0, SCHEDULER_POLICY, &schp) != 0)
         {
-            perror("sched_setscheduler");
-            printf("PortAudio: only superuser can use real-time priority.\n");
+            DBUG(("sched_setscheduler"));
+            DBUG(("PortAudio: only superuser can use real-time priority.\n"));
         }
         else
         {
-            printf("PortAudio: callback priority set to level %d!\n", schp.sched_priority);
+            DBUG(("PortAudio: callback priority set to level %d!\n", schp.sched_priority));
         }
     }
 #endif
@@ -578,6 +589,17 @@ static PaError Pa_AudioThreadProc( internalPortAudioStream   *past )
                   (void *)pahsc->pahsc_NativeOutputBuffer,
                   pahsc->pahsc_BytesPerOutputBuffer);
         }
+
+
+        /* Update current stream time (using a double so that
+           we don't wrap around like info.bytes does) */
+        if( pahsc->pahsc_NativeOutputBuffer )
+           ioctl(pahsc->pahsc_OutputHandle, SNDCTL_DSP_GETOPTR, &info);
+        else
+           ioctl(pahsc->pahsc_InputHandle, SNDCTL_DSP_GETIPTR, &info);
+        delta = (info.bytes - pahsc->pahsc_LastPosPtr) & 0x000FFFFF;
+        pahsc->pahsc_LastStreamBytes += delta;
+        pahsc->pahsc_LastPosPtr = info.bytes;
     }
 
     past->past_IsActive = 0;
@@ -776,8 +798,20 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
         {
             pad = Pa_GetInternalDevice( past->past_OutputDeviceID );
             DBUG(("PaHost_OpenStream: attempt to open %s for O_RDWR\n", pad->pad_DeviceName ));
+
+            /* dmazzoni: test it first in nonblocking mode to
+               make sure the device is not busy */
+            pahsc->pahsc_InputHandle = open(pad->pad_DeviceName,O_RDWR|O_NONBLOCK);
+            if(pahsc->pahsc_InputHandle==-1)
+            {
+                ERR_RPT(("PaHost_OpenStream: could not open %s for O_RDWR\n", pad->pad_DeviceName ));
+                result = paHostError;
+                goto error;
+            }
+            close(pahsc->pahsc_InputHandle);
+
             pahsc->pahsc_OutputHandle = pahsc->pahsc_InputHandle =
-                                            open(pad->pad_DeviceName,O_RDWR|O_NONBLOCK);
+                                            open(pad->pad_DeviceName,O_RDWR);
             if(pahsc->pahsc_InputHandle==-1)
             {
                 ERR_RPT(("PaHost_OpenStream: could not open %s for O_RDWR\n", pad->pad_DeviceName ));
@@ -797,7 +831,18 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
         {
             pad = Pa_GetInternalDevice( past->past_OutputDeviceID );
             DBUG(("PaHost_OpenStream: attempt to open %s for O_WRONLY\n", pad->pad_DeviceName ));
+            /* dmazzoni: test it first in nonblocking mode to
+               make sure the device is not busy */
             pahsc->pahsc_OutputHandle = open(pad->pad_DeviceName,O_WRONLY|O_NONBLOCK);
+            if(pahsc->pahsc_OutputHandle==-1)
+            {
+                ERR_RPT(("PaHost_OpenStream: could not open %s for O_WRONLY\n", pad->pad_DeviceName ));
+                result = paHostError;
+                goto error;
+            }
+            close(pahsc->pahsc_OutputHandle);
+
+            pahsc->pahsc_OutputHandle = open(pad->pad_DeviceName,O_WRONLY);
             if(pahsc->pahsc_OutputHandle==-1)
             {
                 ERR_RPT(("PaHost_OpenStream: could not open %s for O_WRONLY\n", pad->pad_DeviceName ));
@@ -815,7 +860,18 @@ PaError PaHost_OpenStream( internalPortAudioStream   *past )
         {
             pad = Pa_GetInternalDevice( past->past_InputDeviceID );
             DBUG(("PaHost_OpenStream: attempt to open %s for O_RDONLY\n", pad->pad_DeviceName ));
+            /* dmazzoni: test it first in nonblocking mode to
+               make sure the device is not busy */ 
             pahsc->pahsc_InputHandle = open(pad->pad_DeviceName,O_RDONLY|O_NONBLOCK);
+            if(pahsc->pahsc_InputHandle==-1)
+            {
+                ERR_RPT(("PaHost_OpenStream: could not open %s for O_RDONLY\n", pad->pad_DeviceName ));
+                result = paHostError;
+                goto error;
+            }
+            close(pahsc->pahsc_InputHandle);
+
+            pahsc->pahsc_InputHandle = open(pad->pad_DeviceName,O_RDONLY);
             if(pahsc->pahsc_InputHandle==-1)
             {
                 ERR_RPT(("PaHost_OpenStream: could not open %s for O_RDONLY\n", pad->pad_DeviceName ));
@@ -1058,11 +1114,24 @@ PaError PaHost_StreamActive( internalPortAudioStream   *past )
 PaTimestamp Pa_StreamTime( PortAudioStream *stream )
 {
     internalPortAudioStream *past = (internalPortAudioStream *) stream;
-    /* FIXME - return actual frames played, not frames generated.
-    ** Need to query the output device somehow.
-    */
+    PaHostSoundControl *pahsc = (PaHostSoundControl *) past->past_DeviceData;
+    PaTimestamp   streamTime;
+    count_info    info;
+    int           delta;
+
     if( past == NULL ) return paBadStreamPtr;
-    return past->past_FrameCount;
+
+    if( pahsc->pahsc_NativeOutputBuffer ) {
+       ioctl(pahsc->pahsc_OutputHandle, SNDCTL_DSP_GETOPTR, &info);
+       delta = (info.bytes - pahsc->pahsc_LastPosPtr) & 0x000FFFFF;
+       return (pahsc->pahsc_LastStreamBytes + delta) / (past->past_NumOutputChannels * sizeof(short));
+    }
+    else {
+       ioctl(pahsc->pahsc_InputHandle, SNDCTL_DSP_GETIPTR, &info);
+       delta = (info.bytes - pahsc->pahsc_LastPosPtr) & 0x000FFFFF;
+       return (pahsc->pahsc_LastStreamBytes + delta) / (past->past_NumInputChannels * sizeof(short));
+
+    }
 }
 
 /***********************************************************************/
