@@ -478,6 +478,17 @@ double Pa_GetCPULoad(  PortAudioStream* stream)
     return past->past_Usage;
 }
 
+/*************************************************************************/
+internalPortAudioStream* PaHost_GetStreamRepresentation( PortAudioStream *stream )
+{
+    internalPortAudioStream* result = (internalPortAudioStream*) stream;
+
+    if( result == NULL || result->past_Magic != PA_MAGIC )
+        return NULL;
+    else
+        return result;
+}
+
 /*************************************************************
 ** Calculate 2 LSB dither signal with a triangular distribution.
 ** Ranged properly for adding to a 32 bit integer prior to >>15.
@@ -752,6 +763,11 @@ PaError Pa_Terminate( void )
         DumpTraceMessages();
     }
     return result;
+}
+
+int PaHost_IsInitialized()
+{
+    return gInitCount;
 }
 
 /*************************************************************************/
