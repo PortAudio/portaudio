@@ -3,7 +3,7 @@
  * Hear the latency caused by bug buffers.
  * Play a sine wave and change frequency based on letter input.
  *
- * Author: Phil Burk <philburk@softsynth.com>
+ * Author: Phil Burk <philburk@softsynth.com>, and Darren Gibbs
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -36,15 +36,18 @@
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
+
 #define OUTPUT_DEVICE       (Pa_GetDefaultOutputDeviceID())
 #define SAMPLE_RATE         (44100)
-#define FRAMES_PER_BUFFER   (256)
-#if 1
+#define FRAMES_PER_BUFFER   (64)
+
+#if 0
 #define MIN_LATENCY_MSEC    (2000)
 #define NUM_BUFFERS         ((MIN_LATENCY_MSEC * SAMPLE_RATE) / (FRAMES_PER_BUFFER * 1000))
 #else
 #define NUM_BUFFERS         (0)
 #endif
+
 #define MIN_FREQ            (100.0f)
 #define CalcPhaseIncrement(freq)  ((freq)/SAMPLE_RATE)
 #ifndef M_PI
@@ -108,7 +111,7 @@ int main(void)
     paTestData data;
     int i;
     int done = 0;
-    printf("PortAudio Test: output sine sweep. ask for %d buffers\n", NUM_BUFFERS );
+    printf("PortAudio Test: enter letter then hit ENTER. numBuffers = %d\n", NUM_BUFFERS );
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
@@ -117,6 +120,7 @@ int main(void)
     data.sine[TABLE_SIZE] = data.sine[0]; // set guard point
     data.left_phase = data.right_phase = 0.0;
     data.phase_increment = CalcPhaseIncrement(MIN_FREQ);
+
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
     printf("PortAudio Test: output device = %d\n", OUTPUT_DEVICE );
