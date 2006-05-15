@@ -1,9 +1,9 @@
+/** @file patest_saw.c
+	@brief Play a simple (aliasing) sawtooth wave.
+	@author Phil Burk  http://www.softsynth.com
+*/
 /*
  * $Id$
- * patest_saw.c
- * Play a simple sawtooth wave.
- *
- * Author: Phil Burk  http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -38,26 +38,29 @@
 #include "portaudio.h"
 #define NUM_SECONDS   (4)
 #define SAMPLE_RATE   (44100)
+
 typedef struct
 {
     float left_phase;
     float right_phase;
 }
 paTestData;
+
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback( void *inputBuffer, void *outputBuffer,
+static int patestCallback( const void *inputBuffer, void *outputBuffer,
                            unsigned long framesPerBuffer,
-                           PaTimestamp outTime, void *userData )
+                           const PaStreamCallbackTimeInfo* timeInfo,
+                           PaStreamCallbackFlags statusFlags,
+                           void *userData )
 {
     /* Cast data passed through stream to our structure. */
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
     unsigned int i;
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused variable warning. */
 
     for( i=0; i<framesPerBuffer; i++ )
     {
@@ -73,35 +76,39 @@ static int patestCallback( void *inputBuffer, void *outputBuffer,
     }
     return 0;
 }
+
 /*******************************************************************/
 static paTestData data;
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
+    PaStream *stream;
     PaError err;
+    
     printf("PortAudio Test: output sawtooth wave.\n");
     /* Initialize our data for use by callback. */
     data.left_phase = data.right_phase = 0.0;
     /* Initialize library before making any other calls. */
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
+    
     /* Open an audio I/O stream. */
-    err = Pa_OpenDefaultStream(
-              &stream,
-              0,              /* no input channels */
-              2,              /* stereo output */
-              paFloat32,      /* 32 bit floating point output */
-              SAMPLE_RATE,
-              256,            /* frames per buffer */
-              0,              /* number of buffers, if zero then use default minimum */
-              patestCallback,
-              &data );
+    err = Pa_OpenDefaultStream( &stream,
+                                0,          /* no input channels */
+                                2,          /* stereo output */
+                                paFloat32,  /* 32 bit floating point output */
+                                SAMPLE_RATE,
+                                256,        /* frames per buffer */
+                                patestCallback,
+                                &data );
     if( err != paNoError ) goto error;
+
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
+
     /* Sleep for several seconds. */
     Pa_Sleep(NUM_SECONDS*1000);
+
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
     err = Pa_CloseStream( stream );

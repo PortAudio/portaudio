@@ -1,9 +1,9 @@
+/** @file patest_buffer.c
+	@brief Test opening streams with different buffer sizes.
+	@author Phil Burk  http://www.softsynth.com
+*/
 /*
  * $Id$
- * patest_buffer.c
- * Test opening streams with different buffer sizes.
- *
- * Author: Phil Burk  http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -37,15 +37,15 @@
 #include <stdlib.h>
 #include <math.h>
 #include "portaudio.h"
-#define NUM_SECONDS   (1)
+#define NUM_SECONDS   (3)
 #define SAMPLE_RATE   (44100)
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
 #define TABLE_SIZE   (200)
 
-#define BUFFER_TABLE  9
-long buffer_table[] = {200,256,500,512,600, 723, 1000, 1024, 2345};
+#define BUFFER_TABLE  14
+long buffer_table[] = {paFramesPerBufferUnspecified,16,32,64,128,200,256,500,512,600,723,1000,1024,2345};
 
 typedef struct
 {
@@ -55,25 +55,23 @@ typedef struct
     unsigned int sampsToGo;
 }
 paTestData;
-PaError TestOnce( int buffersize );
+PaError TestOnce( int buffersize, PaDeviceIndex );
 
-static int patest1Callback( void *inputBuffer, void *outputBuffer,
-                            unsigned long framesPerBuffer,
-                            PaTimestamp outTime, void *userData );
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patest1Callback( void *inputBuffer, void *outputBuffer,
+static int patest1Callback( const void *inputBuffer, void *outputBuffer,
                             unsigned long framesPerBuffer,
-                            PaTimestamp outTime, void *userData )
+                            const PaStreamCallbackTimeInfo* timeInfo,
+                            PaStreamCallbackFlags statusFlags,
+                            void *userData )
 {
     paTestData *data = (paTestData*)userData;
     short *out = (short*)outputBuffer;
     unsigned int i;
     int finished = 0;
     (void) inputBuffer; /* Prevent "unused variable" warnings. */
-    (void) outTime;
 
     if( data->sampsToGo < framesPerBuffer )
     {
@@ -112,27 +110,37 @@ static int patest1Callback( void *inputBuffer, void *outputBuffer,
     }
     return finished;
 }
+
 /*******************************************************************/
-int main(void);
-int main(void)
+int main(int argc, char **args);
+int main(int argc, char **args)
 {
     int i;
+    int device = -1;
     PaError err;
-    printf("Test opening streams with different buffer sizes\n\n");
+    printf("Test opening streams with different buffer sizes\n");
+    if( argc > 1 ) {
+       device=atoi( args[1] );
+       printf("Using device number %d.\n\n", device );
+    } else {
+       printf("Using default device.\n\n" );
+    }
 
     for (i = 0 ; i < BUFFER_TABLE; i++)
     {
-        printf("Buffer size %d\n", buffer_table[i]);
-        err = TestOnce(buffer_table[i]);
+        printf("Buffer size %ld\n", buffer_table[i]);
+        err = TestOnce(buffer_table[i], device);
         if( err < 0 ) return 0;
 
     }
+    return 0;
 }
 
 
-PaError TestOnce( int buffersize )
+PaError TestOnce( int buffersize, PaDeviceIndex device )
 {
-    PortAudioStream *stream;
+    PaStreamParameters outputParameters;
+    PaStream *stream;
     PaError err;
     paTestData data;
     int i;
@@ -146,20 +154,22 @@ PaError TestOnce( int buffersize )
     data.sampsToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
+    
+    if( device == -1 )
+        outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
+    else
+        outputParameters.device = device ;
+    outputParameters.channelCount = 2;                      /* stereo output */
+    outputParameters.sampleFormat = paInt16;                /* 32 bit floating point output */
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
     err = Pa_OpenStream(
               &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              paInt16,  /* sample format */
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,              /* stereo output */
-              paInt16,        /* sample format */
-              NULL,
+              NULL,                         /* no input */
+              &outputParameters,
               SAMPLE_RATE,
-              buffersize,           /* frames per buffer */
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+              buffersize,                   /* frames per buffer */
+              (paClipOff | paDitherOff),
               patest1Callback,
               &data );
     if( err != paNoError ) goto error;
@@ -167,7 +177,7 @@ PaError TestOnce( int buffersize )
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
     printf("Waiting for sound to finish.\n");
-    Pa_Sleep(1000);
+    Pa_Sleep(1000*NUM_SECONDS);
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
     Pa_Terminate();
@@ -177,5 +187,6 @@ error:
     fprintf( stderr, "An error occured while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
+    fprintf( stderr, "Host Error message: %s\n", Pa_GetLastHostErrorInfo()->errorText );
     return err;
 }

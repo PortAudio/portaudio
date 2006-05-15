@@ -1,0 +1,23 @@
+import os.path, sys
+
+class ConfigurationError(Exception):
+    def __init__(self, reason):
+        Exception.__init__(self, "Configuration failed: %s" % reason)
+
+env = Environment()
+
+# sunos, aix, hpux, irix, sunos appear to be platforms known by SCons, assuming they're POSIX compliant
+Posix = ("linux", "darwin", "sunos", "aix", "hpux", "irix", "sunos")
+Windows = ("win32", "cygwin")
+
+if env["PLATFORM"] == "posix":
+    if sys.platform[:5] == "linux":
+        Platform = "linux"
+    else:
+        raise ConfigurationError("Unknown platform %s" % sys.platform)
+else:
+    if not env["PLATFORM"] in ("win32", "cygwin") + Posix:
+        raise ConfigurationError("Unknown platform %s" % env["PLATFORM"])
+    Platform = env["PLATFORM"]
+
+Export("Platform", "Posix", "ConfigurationError")

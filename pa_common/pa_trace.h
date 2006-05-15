@@ -32,9 +32,15 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+/** @file
+ @brief Event trace mechanism for debugging.
 
-#define TRACE_REALTIME_EVENTS     (0)   /* Keep log of various real-time events. */
-#define MAX_TRACE_RECORDS      (2048)
+ Allows data to be written to the buffer at interrupt time and dumped later.
+*/
+
+
+#define PA_TRACE_REALTIME_EVENTS     (0)   /* Keep log of various real-time events. */
+#define PA_MAX_TRACE_RECORDS      (2048)
 
 #ifdef __cplusplus
 extern "C"
@@ -42,23 +48,20 @@ extern "C"
 #endif /* __cplusplus */
 
 
-    /************************************************************************************/
-    /****************** Prototypes ******************************************************/
-    /************************************************************************************/
+#if PA_TRACE_REALTIME_EVENTS
 
-#if TRACE_REALTIME_EVENTS
-
-    void DumpTraceMessages();
-    void ResetTraceMessages();
-    void AddTraceMessage( char *msg, int data );
-
+void PaUtil_ResetTraceMessages();
+void PaUtil_AddTraceMessage( const char *msg, int data );
+void PaUtil_DumpTraceMessages();
+    
 #else
 
-#define AddTraceMessage(msg,data) /* noop */
-#define ResetTraceMessages() /* noop */
-#define DumpTraceMessages() /* noop */
+#define PaUtil_ResetTraceMessages() /* noop */
+#define PaUtil_AddTraceMessage(msg,data) /* noop */
+#define PaUtil_DumpTraceMessages() /* noop */
 
 #endif
+
 
 #ifdef __cplusplus
 }

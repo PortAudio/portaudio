@@ -1,42 +1,61 @@
 #
-# PortAudio Makefile.in
+# PortAudio V19 Makefile.in
 #
 # Dominic Mazzoni
 #
 
 PREFIX = @prefix@
 CC = @CC@
-CFLAGS = @CFLAGS@ -Ipa_common
+CFLAGS = @CFLAGS@ -Ipa_common @DEFS@
 LIBS = @LIBS@
 AR = @AR@
 RANLIB = @RANLIB@
 INSTALL = @INSTALL@
 SHARED_FLAGS = @SHARED_FLAGS@
 DLL_LIBS = @DLL_LIBS@
+CXXFLAGS = @CXXFLAGS@
+NASM = @NASM@
+NASMOPT = @NASMOPT@
 
 OTHER_OBJS = @OTHER_OBJS@
 
 PALIB = libportaudio.a
 PADLL = @PADLL@
-PADLLV = $(PADLL).0.0.18
+PADLLV = $(PADLL).0.0.19
 PAINC = pa_common/portaudio.h
 
 COMMON_OBJS = \
-	pa_common/pa_convert.o \
-	pa_common/pa_lib.o
+	pa_common/pa_allocation.o \
+	pa_common/pa_converters.o \
+	pa_common/pa_cpuload.o \
+	pa_common/pa_dither.o \
+	pa_common/pa_front.o \
+	pa_common/pa_process.o \
+	pa_common/pa_skeleton.o \
+	pa_common/pa_stream.o \
+	pa_common/pa_trace.o
 
 TESTS = \
+	bin/paqa_devs \
+	bin/paqa_errs \
+	bin/patest1 \
 	bin/patest_buffer \
+	bin/patest_callbackstop \
 	bin/patest_clip \
 	bin/patest_dither \
 	bin/patest_hang \
+	bin/patest_in_overflow \
 	bin/patest_latency \
 	bin/patest_leftright \
 	bin/patest_longsine \
 	bin/patest_many \
 	bin/patest_maxsines \
 	bin/patest_multi_sine \
+	bin/patest_out_underflow \
 	bin/patest_pink \
+	bin/patest_prime \
+	bin/patest_read_record \
+	bin/patest_read_write_wire \
 	bin/patest_record \
 	bin/patest_ringmix \
 	bin/patest_saw \
@@ -44,11 +63,66 @@ TESTS = \
 	bin/patest_sine \
 	bin/patest_sine_formats \
 	bin/patest_sine_time \
+	bin/patest_start_stop \
 	bin/patest_stop \
 	bin/patest_sync \
 	bin/patest_toomanysines \
 	bin/patest_underflow \
-	bin/patest_wire
+	bin/patest_wire \
+	bin/patest_write_sine \
+	bin/pa_devs \
+	bin/pa_fuzz \
+	bin/pa_minlat
+
+# Most of these don't compile yet.  Put them in TESTS, above, if
+# you want to try to compile them...
+ALL_TESTS = \
+	bin/debug_convert \
+	bin/debug_dither_calc \
+	bin/debug_dual \
+	bin/debug_multi_in \
+	bin/debug_multi_out \
+	bin/debug_record \
+	bin/debug_record_reuse \
+	bin/debug_sine_amp \
+	bin/debug_sine \
+	bin/debug_sine_formats \
+	bin/debug_srate \
+	bin/debug_test1 \
+	bin/pa_devs \
+	bin/pa_fuzz \
+	bin/pa_minlat \
+	bin/paqa_devs \
+	bin/paqa_errs \
+	bin/patest1 \
+	bin/patest_buffer \
+	bin/patest_clip \
+	bin/patest_dither \
+	bin/patest_hang \
+	bin/patest_in_overflow \
+	bin/patest_latency \
+	bin/patest_leftright \
+	bin/patest_longsine \
+	bin/patest_many \
+	bin/patest_maxsines \
+	bin/patest_multi_sine \
+	bin/patest_out_underflow \
+	bin/patest_pink \
+	bin/patest_read_record \
+	bin/patest_record \
+	bin/patest_ringmix \
+	bin/patest_saw \
+	bin/patest_sine8 \
+	bin/patest_sine \
+	bin/patest_sine_formats \
+	bin/patest_sine_time \
+	bin/patest_start_stop \
+	bin/patest_stop \
+	bin/patest_sync \
+	bin/patest_toomanysines \
+	bin/patest_underflow \
+	bin/patest_wire \
+	bin/patest_write_sine
 
 OBJS = $(COMMON_OBJS) $(OTHER_OBJS)
 
@@ -66,11 +140,15 @@ lib/$(PADLLV): lib/ $(OBJS) Makefile $(PAINC)
 $(TESTS): bin/%: lib/$(PALIB) Makefile $(PAINC) pa_tests/%.c
 	$(CC) -o $@ $(CFLAGS) pa_tests/$*.c lib/$(PALIB) $(LIBS)
 
-install: lib/$(PALIB) lib/$(PADLLV)
+install: lib/$(PALIB) lib/$(PADLLV) portaudio-2.0.pc
+	$(INSTALL) -d $(PREFIX)/lib
 	$(INSTALL) -m 644 lib/$(PADLLV) $(PREFIX)/lib/$(PADLLV)
 	$(INSTALL) -m 644 lib/$(PALIB) $(PREFIX)/lib/$(PALIB)
 	cd $(PREFIX)/lib && rm -f $(PADLL) && ln -s $(PADLLV) $(PADLL)
+	$(INSTALL) -d $(PREFIX)/include
 	$(INSTALL) -m 644 pa_common/portaudio.h $(PREFIX)/include/portaudio.h
+	$(INSTALL) -d $(PREFIX)/lib/pkgconfig
+	$(INSTALL) -m 644 portaudio-2.0.pc $(PREFIX)/lib/pkgconfig/portaudio-2.0.pc
 	@echo ""
 	@echo "------------------------------------------------------------"
 	@echo "PortAudio was successfully installed."
@@ -82,14 +160,29 @@ install: lib/$(PALIB) lib/$(PADLLV)
 	@echo "------------------------------------------------------------"
 	@echo ""
 
+uninstall:
+	rm -f $(PREFIX)/lib/$(PADLLV)
+	rm -f $(PREFIX)/lib/$(PALIB)
+	rm -f $(PREFIX)/lib/$(PADLL)
+	rm -f $(PREFIX)/include/portaudio.h
+
 clean:
-	rm -f $(OBJS) $(TESTS) lib/$(PALIB)
+	rm -f $(OBJS) $(TESTS) lib/$(PALIB) lib/$(PADLLV)
 
 %.o: %.c Makefile $(PAINC)
 	$(CC) -c $(CFLAGS) $< -o $@
+
+%.o: %.cpp Makefile $(PAINC)
+	$(CXX) -c $(CXXFLAGS) $< -o $@
+
+%.o: %.asm
+	$(NASM) $(NASMOPT) -o $@ $<
 
 bin:
 	mkdir bin
 
 lib:
 	mkdir lib
+
+
+

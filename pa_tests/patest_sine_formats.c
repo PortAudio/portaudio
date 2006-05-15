@@ -1,10 +1,9 @@
+/** @file patest_sine_formats.c
+	@brief Play a sine wave for several seconds. Test various data formats.
+	@author Phil Burk
+*/
 /*
  * $Id$
- * patest_sine_formats.c
- * Play a sine wave using the Portable Audio api for several seconds.
- * Test various data formats.
- *
- * Author: Phil Burk
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.audiomulch.com/portaudio/
@@ -38,7 +37,7 @@
 #include <math.h>
 #include "portaudio.h"
 
-#define NUM_SECONDS        (20)
+#define NUM_SECONDS        (10)
 #define SAMPLE_RATE        (44100)
 #define FRAMES_PER_BUFFER  (512)
 #define LEFT_FREQ          (SAMPLE_RATE/256.0)  /* So we hit 1.0 */
@@ -96,17 +95,19 @@ paTestData;
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback( void *inputBuffer, void *outputBuffer,
+static int patestCallback( const void *inputBuffer,
+                           void *outputBuffer,
                            unsigned long framesPerBuffer,
-                           PaTimestamp outTime, void *userData )
+                           const PaStreamCallbackTimeInfo* timeInfo,
+                           PaStreamCallbackFlags statusFlags,
+                           void *userData )
 {
     paTestData *data = (paTestData*)userData;
     SAMPLE_t *out = (SAMPLE_t *)outputBuffer;
     int i;
     int framesToCalc;
     int finished = 0;
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused variable warnings. */
 
     if( data->framesToGo < framesPerBuffer )
     {
@@ -142,42 +143,42 @@ static int patestCallback( void *inputBuffer, void *outputBuffer,
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
+    PaStream *stream;
+    PaStreamParameters outputParameters;
     PaError err;
     paTestData data;
     int totalSamps;
 
     printf("PortAudio Test: output " FORMAT_NAME "\n");
 
-
     data.left_phase = data.right_phase = 0.0;
     data.framesToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
-    err = Pa_OpenStream(
-              &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              TEST_FORMAT,
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,          /* stereo output */
-              TEST_FORMAT,
-              NULL,
-              SAMPLE_RATE,
-              FRAMES_PER_BUFFER,
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-              patestCallback,
-              &data );
+
+    outputParameters.device           = Pa_GetDefaultOutputDevice(); /* Default output device. */
+    outputParameters.channelCount     = 2;                           /* Stereo output */
+    outputParameters.sampleFormat     = TEST_FORMAT;                 /* Selected above. */
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    err = Pa_OpenStream( &stream,
+                         NULL,                  /* No input. */
+                         &outputParameters,     /* As above. */
+                         SAMPLE_RATE,
+                         FRAMES_PER_BUFFER,
+                         paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+                         patestCallback,
+                         &data );
     if( err != paNoError ) goto error;
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
 
     printf("Waiting %d seconds for sound to finish.\n", NUM_SECONDS );
-    while( Pa_StreamActive( stream ) ) Pa_Sleep(10);
+
+    while( ( err = Pa_IsStreamActive( stream ) ) == 1 ) Pa_Sleep(100);
+    if( err < 0 ) goto error;
 
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;

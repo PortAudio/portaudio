@@ -1,10 +1,11 @@
+/** @file paqa_errs.c
+	@brief Self Testing Quality Assurance app for PortAudio
+	Do lots of bad things to test error reporting.
+	@author Phil Burk  http://www.softsynth.com
+    Pieter Suurmond adapted to V19 API.
+*/
 /*
  * $Id$
- * paqa_devs.c
- * Self Testing Quality Assurance app for PortAudio
- * Do lots of bad things to test error reporting.
- *
- * Author: Phil Burk  http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -34,15 +35,18 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+ 
 #include <stdio.h>
 #include <math.h>
+
 #include "portaudio.h"
-/****************************************** Definitions ***********/
-#define MODE_INPUT      (0)
-#define MODE_OUTPUT     (1)
-#define FRAMES_PER_BUFFER       (64)
-#define SAMPLE_RATE        (44100.0)
-#define NUM_BUFFERS              (0)
+
+/*--------- Definitions ---------*/
+#define MODE_INPUT        (0)
+#define MODE_OUTPUT       (1)
+#define FRAMES_PER_BUFFER (64)
+#define SAMPLE_RATE       (44100.0)
+
 typedef struct PaQaData
 {
     unsigned long  framesLeft;
@@ -51,21 +55,14 @@ typedef struct PaQaData
     int            mode;
 }
 PaQaData;
-/****************************************** Prototypes ***********/
-static void TestDevices( int mode );
-static void TestFormats( int mode, PaDeviceID deviceID, double sampleRate,
-                         int numChannels );
-static int TestBadOpens( void );
-static int TestBadActions( void );
-static int QaCallback( void *inputBuffer, void *outputBuffer,
-                       unsigned long framesPerBuffer,
-                       PaTimestamp outTime, void *userData );
-/****************************************** Globals ***********/
-static int gNumPassed = 0;
+
+static int gNumPassed = 0; /* Two globals */
 static int gNumFailed = 0;
-/****************************************** Macros ***********/
-/* Print ERROR if it fails. Tally success or failure. */
-/* Odd do-while wrapper seems to be needed for some compilers. */
+
+/*------------------- Macros ------------------------------*/
+/* Print ERROR if it fails. Tally success or failure. Odd  */
+/* do-while wrapper seems to be needed for some compilers. */
+
 #define EXPECT(_exp) \
     do \
     { \
@@ -78,6 +75,7 @@ static int gNumFailed = 0;
             goto error; \
         } \
     } while(0)
+
 #define HOPEFOR(_exp) \
     do \
     { \
@@ -89,20 +87,24 @@ static int gNumFailed = 0;
             gNumFailed++; \
         } \
     } while(0)
-/*******************************************************************/
+
+/*-------------------------------------------------------------------------*/
 /* This routine will be called by the PortAudio engine when audio is needed.
-** It may be called at interrupt level on some machines so don't do anything
-** that could mess up the system like calling malloc() or free().
+   It may be called at interrupt level on some machines so don't do anything
+   that could mess up the system like calling malloc() or free().
 */
-static int QaCallback( void *inputBuffer, void *outputBuffer,
-                       unsigned long framesPerBuffer,
-                       PaTimestamp outTime, void *userData )
+static int QaCallback( const void*                      inputBuffer,
+                       void*                            outputBuffer,
+                       unsigned long                    framesPerBuffer,
+			           const PaStreamCallbackTimeInfo*  timeInfo,
+			           PaStreamCallbackFlags            statusFlags,
+                       void*                            userData )
 {
-    unsigned long i;
-    unsigned char *out = (unsigned char *) outputBuffer;
-    PaQaData *data = (PaQaData *) userData;
-    (void) inputBuffer; /* Prevent "unused variable" warnings. */
-    (void) outTime;
+    unsigned long   i;
+    unsigned char*  out = (unsigned char *) outputBuffer;
+    PaQaData*       data = (PaQaData *) userData;
+    
+    (void)inputBuffer; /* Prevent "unused variable" warnings. */
 
     /* Zero out buffer so we don't hear terrible noise. */
     if( data->mode == MODE_OUTPUT )
@@ -125,206 +127,254 @@ static int QaCallback( void *inputBuffer, void *outputBuffer,
         return 1;
     }
 }
-/*******************************************************************/
+
+static PaDeviceIndex FindInputOnlyDevice(void)
+{
+    PaDeviceIndex result = Pa_GetDefaultInputDevice();
+    if( result != paNoDevice && Pa_GetDeviceInfo(result)->maxOutputChannels == 0 )
+        return result;
+
+    for( result = 0; result < Pa_GetDeviceCount(); ++result )
+    {
+        if( Pa_GetDeviceInfo(result)->maxOutputChannels == 0 )
+            return result;
+    }
+
+    return paNoDevice;
+}
+
+static PaDeviceIndex FindOutputOnlyDevice(void)
+{
+    PaDeviceIndex result = Pa_GetDefaultOutputDevice();
+    if( result != paNoDevice && Pa_GetDeviceInfo(result)->maxInputChannels == 0 )
+        return result;
+
+    for( result = 0; result < Pa_GetDeviceCount(); ++result )
+    {
+        if( Pa_GetDeviceInfo(result)->maxInputChannels == 0 )
+            return result;
+    }
+
+    return paNoDevice;
+}
+
+/*-------------------------------------------------------------------------------------------------*/
+static int TestBadOpens( void )
+{
+    PaStream*           stream = NULL;
+    PaError             result;
+    PaQaData            myData;
+    PaStreamParameters  ipp, opp;
+    
+    /* Setup data for synthesis thread. */
+    myData.framesLeft = (unsigned long) (SAMPLE_RATE * 100); /* 100 seconds */
+    myData.numChannels = 1;
+    myData.mode = MODE_OUTPUT;
+
+    /*----------------------------- No devices specified: */
+    ipp.device                    = opp.device                    = paNoDevice;
+    ipp.channelCount              = opp.channelCount              = 0; /* Also no channels. */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    /* Take the low latency of the default device for all subsequent tests. */
+    ipp.suggestedLatency          = Pa_GetDeviceInfo(Pa_GetDefaultInputDevice())->defaultLowInputLatency;
+    opp.suggestedLatency          = Pa_GetDeviceInfo(Pa_GetDefaultOutputDevice())->defaultLowOutputLatency;
+    HOPEFOR(((result = Pa_OpenStream(&stream, &ipp, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidDevice));
+
+    /*----------------------------- No devices specified #2: */
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, NULL,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidDevice));
+
+    /*----------------------------- Out of range input device specified: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = Pa_GetDeviceCount(); /* And no output device, and no channels. */
+    opp.channelCount = 0;           opp.device = paNoDevice;
+    HOPEFOR(((result = Pa_OpenStream(&stream, &ipp, NULL,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidDevice));
+
+    /*----------------------------- Out of range output device specified: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice; /* And no input device, and no channels. */
+    opp.channelCount = 0;           opp.device = Pa_GetDeviceCount();
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidDevice));
+
+    /*----------------------------- Zero input channels: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = Pa_GetDefaultInputDevice();
+    opp.channelCount = 0;           opp.device = paNoDevice;    /* And no output device, and no output channels. */   
+    HOPEFOR(((result = Pa_OpenStream(&stream, &ipp, NULL,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidChannelCount));
+
+    /*----------------------------- Zero output channels: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice; /* And no input device, and no input channels. */
+    opp.channelCount = 0;           opp.device = Pa_GetDefaultOutputDevice();
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidChannelCount));
+
+    /*----------------------------- Nonzero input and output channels but no output device: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 2;           ipp.device = Pa_GetDefaultInputDevice();        /* Both stereo. */
+    opp.channelCount = 2;           opp.device = paNoDevice;
+    HOPEFOR(((result = Pa_OpenStream(&stream, &ipp, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidDevice));
+
+    /*----------------------------- Nonzero input and output channels but no input device: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 2;           ipp.device = paNoDevice;
+    opp.channelCount = 2;           opp.device = Pa_GetDefaultOutputDevice();
+    HOPEFOR(((result = Pa_OpenStream(&stream, &ipp, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paInvalidDevice));
+
+    /*----------------------------- NULL stream pointer: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice;           /* Output is more likely than input. */
+    opp.channelCount = 2;           opp.device = Pa_GetDefaultOutputDevice();    /* Only 2 output channels. */
+    HOPEFOR(((result = Pa_OpenStream(NULL, &ipp, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paBadStreamPtr));
+
+    /*----------------------------- Low sample rate: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice;
+    opp.channelCount = 2;           opp.device = Pa_GetDefaultOutputDevice();
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                     1.0, FRAMES_PER_BUFFER, /* 1 cycle per second (1 Hz) is too low. */
+                                     paClipOff, QaCallback, &myData )) == paInvalidSampleRate));
+
+    /*----------------------------- High sample rate: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice;
+    opp.channelCount = 2;           opp.device = Pa_GetDefaultOutputDevice();
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                     10000000.0, FRAMES_PER_BUFFER, /* 10^6 cycles per second (10 MHz) is too high. */
+                                     paClipOff, QaCallback, &myData )) == paInvalidSampleRate));
+
+    /*----------------------------- NULL callback: */
+    /* NULL callback is valid in V19 -- it means use blocking read/write stream
+    
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice;
+    opp.channelCount = 2;           opp.device = Pa_GetDefaultOutputDevice();
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff,
+                                     NULL,
+                                     &myData )) == paNullCallback));
+    */
+
+    /*----------------------------- Bad flag: */
+    ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+    ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+    ipp.channelCount = 0;           ipp.device = paNoDevice;
+    opp.channelCount = 2;           opp.device = Pa_GetDefaultOutputDevice();
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     255,                      /* Is 8 maybe legal V19 API? */
+                                     QaCallback, &myData )) == paInvalidFlag));
+
+    /*----------------------------- using input device as output device: */
+    if( FindInputOnlyDevice() != paNoDevice )
+    {
+        ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+        ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+        ipp.channelCount = 0;           ipp.device = paNoDevice; /* And no input device, and no channels. */
+        opp.channelCount = 2;           opp.device = FindInputOnlyDevice();
+        HOPEFOR(((result = Pa_OpenStream(&stream, NULL, &opp,
+                                         SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                         paClipOff, QaCallback, &myData )) == paInvalidChannelCount));
+    }
+
+    /*----------------------------- using output device as input device: */
+    if( FindOutputOnlyDevice() != paNoDevice )
+    {
+        ipp.hostApiSpecificStreamInfo = opp.hostApiSpecificStreamInfo = NULL;
+        ipp.sampleFormat              = opp.sampleFormat              = paFloat32;
+        ipp.channelCount = 2;           ipp.device = FindOutputOnlyDevice();
+        opp.channelCount = 0;           opp.device = paNoDevice;  /* And no output device, and no channels. */
+        HOPEFOR(((result = Pa_OpenStream(&stream, &ipp, NULL,
+                                         SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                         paClipOff, QaCallback, &myData )) == paInvalidChannelCount));
+
+    }
+
+    if( stream != NULL ) Pa_CloseStream( stream );
+    return result;
+}
+
+/*-----------------------------------------------------------------------------------------*/
+static int TestBadActions( void )
+{
+    PaStream*           stream = NULL;
+    PaError             result;
+    PaQaData            myData;
+    PaStreamParameters  opp;
+
+    /* Setup data for synthesis thread. */
+    myData.framesLeft = (unsigned long)(SAMPLE_RATE * 100); /* 100 seconds */
+    myData.numChannels = 1;
+    myData.mode = MODE_OUTPUT;
+
+    opp.device                    = Pa_GetDefaultOutputDevice(); /* Default output. */
+    opp.channelCount              = 2;                           /* Stereo output.  */
+    opp.hostApiSpecificStreamInfo = NULL;
+    opp.sampleFormat              = paFloat32;
+    opp.suggestedLatency          = Pa_GetDeviceInfo(opp.device)->defaultLowOutputLatency;
+
+    HOPEFOR(((result = Pa_OpenStream(&stream, NULL, /* Take NULL as input parame-     */
+                                     &opp,          /* ters, meaning try only output. */
+                                     SAMPLE_RATE, FRAMES_PER_BUFFER,
+                                     paClipOff, QaCallback, &myData )) == paNoError));
+
+    HOPEFOR(((result = Pa_StartStream(NULL))    == paBadStreamPtr));
+    HOPEFOR(((result = Pa_StopStream(NULL))     == paBadStreamPtr));
+    HOPEFOR(((result = Pa_IsStreamStopped(NULL)) == paBadStreamPtr));
+    HOPEFOR(((result = Pa_IsStreamActive(NULL)) == paBadStreamPtr));
+    HOPEFOR(((result = Pa_CloseStream(NULL))    == paBadStreamPtr));
+    HOPEFOR(((result = Pa_SetStreamFinishedCallback(NULL, NULL)) == paBadStreamPtr));
+    HOPEFOR(((result = !Pa_GetStreamInfo(NULL))));
+    HOPEFOR(((result = Pa_GetStreamTime(NULL))  == 0.0));
+    HOPEFOR(((result = Pa_GetStreamCpuLoad(NULL))  == 0.0));
+    HOPEFOR(((result = Pa_ReadStream(NULL, NULL, 0))  == paBadStreamPtr));
+    HOPEFOR(((result = Pa_WriteStream(NULL, NULL, 0))  == paBadStreamPtr));
+
+    /** @todo test Pa_GetStreamReadAvailable and Pa_GetStreamWriteAvailable */
+
+    if (stream != NULL) Pa_CloseStream(stream);
+    return result;
+}
+
+/*---------------------------------------------------------------------*/
 int main(void);
 int main(void)
 {
     PaError result;
-    EXPECT( ((result=Pa_Initialize()) == 0) );
+    
+    EXPECT(((result = Pa_Initialize()) == paNoError));
     TestBadOpens();
     TestBadActions();
 error:
     Pa_Terminate();
-    printf("QA Report: %d passed, %d failed.\n", gNumPassed, gNumFailed );
+    printf("QA Report: %d passed, %d failed.\n", gNumPassed, gNumFailed);
     return 0;
-}
-/*******************************************************************/
-static int TestBadOpens( void )
-{
-    PortAudioStream *stream = NULL;
-    PaError result;
-    PaQaData myData;
-    /* Setup data for synthesis thread. */
-    myData.framesLeft = (unsigned long) (SAMPLE_RATE * 100); /* 100 seconds */
-    myData.numChannels = 1;
-    myData.mode = MODE_OUTPUT;
-    HOPEFOR( (/* No devices specified. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               paNoDevice, 0, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidDeviceId) );
-    HOPEFOR( ( /* Out of range input device specified. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               Pa_CountDevices(), 0, paFloat32, NULL,
-                               paNoDevice, 0, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidDeviceId) );
-
-    HOPEFOR( ( /* Out of range output device specified. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_CountDevices(), 0, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidDeviceId) );
-    HOPEFOR( ( /* Zero input channels. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               Pa_GetDefaultInputDeviceID(), 0, paFloat32, NULL,
-                               paNoDevice, 0, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidChannelCount) );
-    HOPEFOR( ( /* Zero output channels. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 0, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidChannelCount) );
-    HOPEFOR( ( /* Nonzero input channels but no device. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               Pa_GetDefaultInputDeviceID(), 2, paFloat32, NULL,
-                               paNoDevice, 2, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidChannelCount) );
-
-    HOPEFOR( ( /* Nonzero output channels but no device. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 2, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidChannelCount) );
-    HOPEFOR( ( /* NULL stream pointer. */
-                 (result = Pa_OpenStream(
-                               NULL,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paBadStreamPtr) );
-    HOPEFOR( ( /* Low sample rate. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               1.0, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidSampleRate) );
-    HOPEFOR( ( /* High sample rate. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               10000000.0, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidSampleRate) );
-    HOPEFOR( ( /* NULL callback. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               NULL,
-                               &myData )
-                 ) == paNullCallback) );
-    HOPEFOR( ( /* Bad flag. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               (1<<3),
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidFlag) );
-
-#if 0 /* FIXME - this is legal for some implementations. */
-    HOPEFOR( ( /* Use input device as output device. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               paNoDevice, 0, paFloat32, NULL,
-                               Pa_GetDefaultInputDeviceID(), 2, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidDeviceId) );
-
-    HOPEFOR( ( /* Use output device as input device. */
-                 (result = Pa_OpenStream(
-                               &stream,
-                               Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                               paNoDevice, 0, paFloat32, NULL,
-                               SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                               paClipOff,
-                               QaCallback,
-                               &myData )
-                 ) == paInvalidDeviceId) );
-#endif
-
-    if( stream != NULL ) Pa_CloseStream( stream );
-    return result;
-}
-/*******************************************************************/
-static int TestBadActions( void )
-{
-    PortAudioStream *stream = NULL;
-    PaError result;
-    PaQaData myData;
-    /* Setup data for synthesis thread. */
-    myData.framesLeft = (unsigned long) (SAMPLE_RATE * 100); /* 100 seconds */
-    myData.numChannels = 1;
-    myData.mode = MODE_OUTPUT;
-    /* Default output. */
-    EXPECT( ((result = Pa_OpenStream(
-                           &stream,
-                           paNoDevice, 0, paFloat32, NULL,
-                           Pa_GetDefaultOutputDeviceID(), 2, paFloat32, NULL,
-                           SAMPLE_RATE, FRAMES_PER_BUFFER, NUM_BUFFERS,
-                           paClipOff,
-                           QaCallback,
-                           &myData )
-             ) == 0) );
-    HOPEFOR( ((result = Pa_StartStream( NULL )) == paBadStreamPtr) );
-    HOPEFOR( ((result = Pa_StopStream( NULL )) == paBadStreamPtr) );
-    HOPEFOR( ((result = Pa_StreamActive( NULL )) == paBadStreamPtr) );
-    HOPEFOR( ((result = Pa_CloseStream( NULL )) == paBadStreamPtr) );
-    HOPEFOR( ((result = (PaError)Pa_StreamTime( NULL )) != 0) );
-    HOPEFOR( ((result = (PaError)Pa_GetCPULoad( NULL )) != 0) );
-error:
-    if( stream != NULL ) Pa_CloseStream( stream );
-    return result;
 }

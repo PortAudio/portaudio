@@ -1,10 +1,12 @@
+/** @file patest_dither.c
+	@brief Attempt to hear difference between dithered and non-dithered signal.
+
+	This only has an effect if the native format is 16 bit.
+
+	@author Phil Burk  http://www.softsynth.com
+*/
 /*
  * $Id$
- * patest_dither.c
- * Attempt to hear difference between dithered and non-dithered signal.
- * This only has an effect if the native format is 16 bit.
- *
- * Author: Phil Burk  http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -36,39 +38,40 @@
  */
 #include <stdio.h>
 #include <math.h>
+
 #include "portaudio.h"
-#define NUM_SECONDS   (4)
+
+#define NUM_SECONDS   (5)
 #define SAMPLE_RATE   (44100)
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
 #define TABLE_SIZE   (200)
+
 typedef struct paTestData
 {
     float sine[TABLE_SIZE];
     float amplitude;
-    int left_phase;
-    int right_phase;
+    int   left_phase;
+    int   right_phase;
 }
 paTestData;
-PaError PlaySine( paTestData *data, PaStreamFlags flags, float amplitude );
-static int sineCallback( void *inputBuffer, void *outputBuffer,
-                         unsigned long framesPerBuffer,
-                         PaTimestamp outTime, void *userData );
+                         
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int sineCallback( void *inputBuffer, void *outputBuffer,
+static int sineCallback( const void *inputBuffer, void *outputBuffer,
                          unsigned long framesPerBuffer,
-                         PaTimestamp outTime, void *userData )
+			             const PaStreamCallbackTimeInfo *timeInfo,
+			             PaStreamCallbackFlags statusFlags, void *userData )
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
     float amplitude = data->amplitude;
     unsigned int i;
-    (void) outTime;
     (void) inputBuffer;
+    
     for( i=0; i<framesPerBuffer; i++ )
     {
         *out++ = amplitude * data->sine[data->left_phase];  /* left */
@@ -80,14 +83,69 @@ static int sineCallback( void *inputBuffer, void *outputBuffer,
     }
     return 0;
 }
+
+/*****************************************************************************/
+/*
+    V18 version did not call Pa_Terminate() if Pa_Initialize() failed.
+    This V19 version ALWAYS calls Pa_Terminate(). PS.
+*/
+PaError PlaySine( paTestData *data, PaStreamFlags flags, float amplitude );
+PaError PlaySine( paTestData *data, PaStreamFlags flags, float amplitude )
+{
+    PaStream*           stream;
+    PaStreamParameters  outputParameters;
+    PaError             err;
+
+    data->left_phase = data->right_phase = 0;
+    data->amplitude  = amplitude;
+
+    err = Pa_Initialize();
+    if (err != paNoError)
+        goto done;
+
+    outputParameters.device = Pa_GetDefaultOutputDevice();  /* default output device */
+    outputParameters.channelCount = 2;                      /* stereo output */
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.sampleFormat = paFloat32;      /* 32 bit floating point output. */
+                                                    /* When you change this, also    */
+                                                    /* adapt the callback routine!   */ 
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )
+                                        ->defaultLowOutputLatency;   /* Low latency. */
+    err = Pa_OpenStream( &stream,
+                         NULL,                              /* No input. */
+                         &outputParameters,
+                         SAMPLE_RATE,
+                         1024,                              /* frames per buffer */
+                         flags,
+                         sineCallback,
+                         (void*)data );
+    if (err != paNoError)
+        goto done;
+
+    err = Pa_StartStream( stream );
+    if (err != paNoError)
+        goto done;
+
+    Pa_Sleep( NUM_SECONDS * 1000 );
+    printf("CPULoad = %8.6f\n", Pa_GetStreamCpuLoad(stream));
+    
+    err = Pa_CloseStream( stream );
+done:
+    Pa_Sleep( 250 );  /* Just a small silence. */
+    Pa_Terminate();
+    return err;
+}
+
+
 /*******************************************************************/
 int main(void);
 int main(void)
 {
-    PaError err;
-    paTestData DATA;
-    int i;
-    float amplitude = 32.0 / (1<<15);
+    PaError     err;
+    paTestData  DATA;
+    int         i;
+    float       amplitude = 4.0 / (1<<15);
+    
     printf("PortAudio Test: output EXTREMELY QUIET sine wave with and without dithering.\n");
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
@@ -96,57 +154,25 @@ int main(void)
     }
     printf("\nNo treatment..\n"); fflush(stdout);
     err = PlaySine( &DATA, paClipOff | paDitherOff, amplitude );
-    if( err < 0 ) goto error;
-    printf("\nClip.\n");
+    if( err < 0 ) goto done;
+
+    printf("\nClip..\n");
     fflush(stdout);
     err = PlaySine( &DATA, paDitherOff, amplitude );
-    if( err < 0 ) goto error;
-    printf("\nClip and Dither.\n");
+    if( err < 0 ) goto done;
+
+    printf("\nClip and Dither..\n");
     fflush(stdout);
     err = PlaySine( &DATA, paNoFlag, amplitude );
-    if( err < 0 ) goto error;
-    return 0;
-error:
-    fprintf( stderr, "An error occured while using the portaudio stream\n" );
-    fprintf( stderr, "Error number: %d\n", err );
-    fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
-    return -1;
-}
-/*****************************************************************************/
-PaError PlaySine( paTestData *data, PaStreamFlags flags, float amplitude )
-{
-    PortAudioStream *stream;
-    PaError err;
-    data->left_phase = data->right_phase = 0;
-    data->amplitude = amplitude;
-    err = Pa_Initialize();
-    if( err != paNoError ) goto error;
-    err = Pa_OpenStream(
-              &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              paFloat32,  /* 32 bit floating point input */
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,              /* stereo output */
-              paFloat32,      /* 32 bit floating point output */
-              NULL,
-              SAMPLE_RATE,
-              1024,
-              0,              /* number of buffers, if zero then use default minimum */
-              flags,      /* we won't output out of range samples so don't bother clipping them */
-              sineCallback,
-              (void *)data );
-    if( err != paNoError ) goto error;
-
-    err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
-    Pa_Sleep( NUM_SECONDS * 1000 );
-    printf("CPULoad = %8.6f\n", Pa_GetCPULoad( stream ) );
-    err = Pa_CloseStream( stream );
-    if( err != paNoError ) goto error;
-    Pa_Terminate();
-    return paNoError;
-error:
-    return err;
+done:
+    if (err)
+        {
+        fprintf( stderr, "An error occured while using the portaudio stream\n" );
+        fprintf( stderr, "Error number: %d\n", err );
+        fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
+        err = 1; /* Though PlaySine() already called Pa_Terminate(), */
+        }        /* we may still call Pa_GetErrorText().             */
+    else
+        printf("\n(Don't forget to turn the VOLUME DOWN after listening so carefully.)\n");
+    return err;  /* 0 or 1. */
 }

@@ -1,9 +1,9 @@
+/** @file pa_fuzz.c
+    @brief Distort input like a fuzz boz.
+	@author Phil Burk  http://www.softsynth.com
+*/
 /*
  * $Id$
- * pa_fuzz.c
- * Distort input like a fuzz boz.
- *
- * Author: Phil Burk  http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -48,9 +48,11 @@
 typedef float SAMPLE;
 
 float CubicAmplifier( float input );
-static int fuzzCallback( void *inputBuffer, void *outputBuffer,
+static int fuzzCallback( const void *inputBuffer, void *outputBuffer,
                          unsigned long framesPerBuffer,
-                         PaTimestamp outTime, void *userData );
+                         const PaStreamCallbackTimeInfo* timeInfo,
+                         PaStreamCallbackFlags statusFlags,
+                         void *userData );
 
 /* Non-linear amplifier with soft distortion curve. */
 float CubicAmplifier( float input )
@@ -76,14 +78,17 @@ static int gNumNoInputs = 0;
 ** It may be called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int fuzzCallback( void *inputBuffer, void *outputBuffer,
+static int fuzzCallback( const void *inputBuffer, void *outputBuffer,
                          unsigned long framesPerBuffer,
-                         PaTimestamp outTime, void *userData )
+                         const PaStreamCallbackTimeInfo* timeInfo,
+                         PaStreamCallbackFlags statusFlags,
+                         void *userData )
 {
     SAMPLE *out = (SAMPLE*)outputBuffer;
-    SAMPLE *in = (SAMPLE*)inputBuffer;
+    const SAMPLE *in = (const SAMPLE*)inputBuffer;
     unsigned int i;
-    (void) outTime; /* Prevent unused variable warnings. */
+    (void) timeInfo; /* Prevent unused variable warnings. */
+    (void) statusFlags;
     (void) userData;
 
     if( inputBuffer == NULL )
@@ -103,33 +108,41 @@ static int fuzzCallback( void *inputBuffer, void *outputBuffer,
             *out++ = *in++;          /* right - clean */
         }
     }
-    return 0;
+    
+    return paContinue;
 }
 
 /*******************************************************************/
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
+    PaStreamParameters inputParameters, outputParameters;
+    PaStream *stream;
     PaError err;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
+
+    inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
+    inputParameters.channelCount = 2;       /* stereo input */
+    inputParameters.sampleFormat = PA_SAMPLE_TYPE;
+    inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
+    inputParameters.hostApiSpecificStreamInfo = NULL;
+
+    outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
+    outputParameters.channelCount = 2;       /* stereo output */
+    outputParameters.sampleFormat = PA_SAMPLE_TYPE;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+
     err = Pa_OpenStream(
               &stream,
-              Pa_GetDefaultInputDeviceID(), /* default output device */
-              2,               /* stereo input */
-              PA_SAMPLE_TYPE,
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,               /* stereo output */
-              PA_SAMPLE_TYPE,
-              NULL,
+              &inputParameters,
+              &outputParameters,
               SAMPLE_RATE,
               FRAMES_PER_BUFFER,
-              0,             /* number of buffers, if zero then use default minimum */
-              0, // paClipOff,     /* we won't output out of range samples so don't bother clipping them */
+              0, /* paClipOff, */  /* we won't output out of range samples so don't bother clipping them */
               fuzzCallback,
               NULL );
     if( err != paNoError ) goto error;

@@ -1,0 +1,159 @@
+#  Portaudio v1.9-devel VC6 DLL makefile 1.0
+#  
+#  David Viens, davidv@plogue.com
+#  (im far from a VC6 makefile expert, so please bear with me :)
+#  
+#  For more info, look at readme.txt
+#
+#if you keep the ASIODIR as ".", it will use the SDK files that direclty in "pa_win/msvc" dir
+ASIODIR=.
+ASIOINC=/I ".\host" /I ".\host\pc" /I ".\common" 
+#
+
+LIBZ=kernel32.lib user32.lib gdi32.lib wininet.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib winmm.lib dsound.lib dxguid.lib 
+
+CPP=cl.exe
+LINK32=link.exe 
+
+#release
+CFLAGS=/nologo /MD  /W3 /GX /O2 /Ob2 /I "src" /I "Win32" /I "$(MSVCDir)\Include" /D "WIN32" /D "NDEBUG"  /D "_USRDLL"   /YX /FD
+DLL_LINK_FLAGS= /nologo /dll /incremental:no /libpath:"$(MSVCDir)\Lib" $(LIBZ) /pdb:"portaudio.pdb" /implib:".\portaudio.lib"    /machine:I386 /out:"portaudio.dll" 
+
+
+COMMONINC=/I "..\..\pa_common" /I "."
+
+#====================================================================
+# Targets
+
+ALL : portaudio.dll
+
+CLEAN :
+    -@erase "*.obj"
+
+#====================================================================
+
+
+LINK32_OBJS= \
+	".\pa_allocation.obj" \
+	".\pa_converters.obj" \
+	".\pa_x86_plain_converters.obj" \
+#   ".\pa_cppHelp.obj" \
+	".\pa_cpuload.obj" \
+	".\pa_dither.obj" \
+	".\pa_front.obj" \
+	".\pa_process.obj" \
+	".\pa_skeleton.obj" \
+	".\pa_stream.obj" \
+	".\pa_trace.obj" \
+#
+	".\pa_win_hostapis.obj" \
+	".\pa_win_util.obj" \
+#
+	".\pa_win_wmme.obj" \
+#
+	".\pa_win_ds.obj" \
+	".\dsound_wrapper.obj" \
+#
+	".\pa_asio.obj" \
+#
+	".\asio.obj" \
+	".\ASIOConvertSamples.obj" \
+	".\asiodrivers.obj" \
+	".\asiolist.obj" \
+	".\combase.obj" \
+	".\debugmessage.obj" \
+#	".\dllentry.obj" \
+	".\register.obj" 
+
+
+portaudio.dll : $(LINK32_OBJS) ".\portaudio.def"
+    $(LINK32) $(DLL_LINK_FLAGS) /def:".\portaudio.def" $(LINK32_OBJS)
+
+#====================================================================
+# asio files (need to agree to steinberg agreement)
+# this makefile assumes all files have being copied in the pa_win/msvc dir (for now)
+# see readme.txt for details
+
+".\asio.obj" : ".\common\asio.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\asio.obj" /c ".\common\asio.cpp"
+    
+".\ASIOConvertSamples.obj" : ".\host\ASIOConvertSamples.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\ASIOConvertSamples.obj" /c ".\host\ASIOConvertSamples.cpp"
+    
+".\asiodrivers.obj" : ".\host\asiodrivers.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\asiodrivers.obj" /c ".\host\asiodrivers.cpp"
+    
+".\asiolist.obj" : ".\host\pc\asiolist.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\asiolist.obj" /c ".\host\pc\asiolist.cpp"
+    
+".\combase.obj" : ".\common\combase.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\combase.obj" /c ".\common\combase.cpp"
+    
+".\debugmessage.obj" : ".\common\debugmessage.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\debugmessage.obj" /c ".\common\debugmessage.cpp"
+    
+".\register.obj" : ".\common\register.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) /Fo".\register.obj" /c ".\common\register.cpp"
+
+#====================================================================
+#  Portaudio Common
+# 
+".\pa_allocation.obj" : "..\..\pa_common\pa_allocation.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_allocation.obj" /c "..\..\pa_common\pa_allocation.c"
+
+".\pa_converters.obj" : "..\..\pa_common\pa_converters.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_converters.obj" /c "..\..\pa_common\pa_converters.c"
+
+".\pa_cppHelp.obj" : "..\..\pa_common\pa_cppHelp.cpp" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_cppHelp.obj" /c "..\..\pa_common\pa_cppHelp.cpp"
+
+".\pa_cpuload.obj" : "..\..\pa_common\pa_cpuload.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_cpuload.obj" /c "..\..\pa_common\pa_cpuload.c"
+
+".\pa_dither.obj" : "..\..\pa_common\pa_dither.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_dither.obj" /c "..\..\pa_common\pa_dither.c"
+
+".\pa_front.obj" : "..\..\pa_common\pa_front.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_front.obj" /c "..\..\pa_common\pa_front.c"
+
+".\pa_process.obj" : "..\..\pa_common\pa_process.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_process.obj" /c "..\..\pa_common\pa_process.c"
+
+".\pa_skeleton.obj" : "..\..\pa_common\pa_skeleton.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_skeleton.obj" /c "..\..\pa_common\pa_skeleton.c"
+
+".\pa_stream.obj" : "..\..\pa_common\pa_stream.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_stream.obj" /c "..\..\pa_common\pa_stream.c"
+    
+".\pa_trace.obj" : "..\..\pa_common\pa_trace.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_trace.obj" /c "..\..\pa_common\pa_trace.c"
+
+#====================================================================
+#  Portaudio implementations
+# 
+
+".\pa_win_hostapis.obj" : "..\..\pa_win\pa_win_hostapis.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_win_hostapis.obj" /c "..\..\pa_win\pa_win_hostapis.c"
+    
+".\pa_win_util.obj" : "..\..\pa_win\pa_win_util.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_win_util.obj" /c "..\..\pa_win\pa_win_util.c"
+
+".\pa_x86_plain_converters.obj" : "..\..\pa_win\pa_x86_plain_converters.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_x86_plain_converters.obj" /c "..\..\pa_win\pa_x86_plain_converters.c"
+
+".\pa_asio.obj" : "..\..\pa_asio\pa_asio.cpp" 
+    $(CPP) $(CFLAGS) $(ASIOINC) $(COMMONINC) /Fo".\pa_asio.obj" /c "..\..\pa_asio\pa_asio.cpp"
+
+".\pa_win_wmme.obj" : "..\..\pa_win_wmme\pa_win_wmme.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_win_wmme.obj" /c "..\..\pa_win_wmme\pa_win_wmme.c"
+
+".\pa_win_ds.obj" : "..\..\pa_win_ds\pa_win_ds.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\pa_win_ds.obj" /c "..\..\pa_win_ds\pa_win_ds.c"
+
+".\dsound_wrapper.obj" : "..\..\pa_win_ds\dsound_wrapper.c" 
+    $(CPP) $(CFLAGS) $(COMMONINC) /Fo".\dsound_wrapper.obj" /c "..\..\pa_win_ds\dsound_wrapper.c"
+
+
+# End of Makefile
+#====================================================================
+#

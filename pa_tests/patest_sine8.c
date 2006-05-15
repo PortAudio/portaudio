@@ -1,10 +1,9 @@
+/** @file patest_sine8.c
+	@brief Test 8 bit data: play a sine wave for several seconds.
+	@author Ross Bencina <rossb@audiomulch.com>
+*/
 /*
  * $Id$
- * patest_sine8.c
- * Play a sine wave using the Portable Audio api for several seconds.
- * Test 8 bit data.
- *
- * Author: Ross Bencina <rossb@audiomulch.com>
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.audiomulch.com/portaudio/
@@ -34,21 +33,26 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
+
 #define NUM_SECONDS   (8)
 #define SAMPLE_RATE   (44100)
-#define TEST_UNSIGNED    (1)
+#define TABLE_SIZE    (200)
+#define TEST_UNSIGNED (0)
+
 #if TEST_UNSIGNED
-#define TEST_FORMAT     paUInt8
+#define TEST_FORMAT   paUInt8
 #else
-#define TEST_FORMAT     paInt8
+#define TEST_FORMAT   paInt8
 #endif
+
 #ifndef M_PI
-#define M_PI  (3.14159265)
+#define M_PI (3.14159265)
 #endif
-#define TABLE_SIZE   (200)
+
 typedef struct
 {
 #if TEST_UNSIGNED
@@ -61,21 +65,23 @@ typedef struct
     unsigned int framesToGo;
 }
 paTestData;
+
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback( void *inputBuffer, void *outputBuffer,
+static int patestCallback( const void *inputBuffer, void *outputBuffer,
                            unsigned long framesPerBuffer,
-                           PaTimestamp outTime, void *userData )
+                           const PaStreamCallbackTimeInfo* timeInfo,
+                           PaStreamCallbackFlags statusFlags,
+                           void *userData )
 {
     paTestData *data = (paTestData*)userData;
     char *out = (char*)outputBuffer;
     int i;
     int framesToCalc;
     int finished = 0;
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused variable warnings. */
 
     if( data->framesToGo < framesPerBuffer )
     {
@@ -112,15 +118,18 @@ static int patestCallback( void *inputBuffer, void *outputBuffer,
     }
     return finished;
 }
+
 /*******************************************************************/
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
-    PaError err;
-    paTestData data;
-    int i;
-    int totalSamps;
+    PaStreamParameters  outputParameters;
+    PaStream*           stream;
+    PaError             err;
+    paTestData          data;
+    PaTime              streamOpened;
+    int                 i, totalSamps;
+
 #if TEST_UNSIGNED
     printf("PortAudio Test: output UNsigned 8 bit sine wave.\n");
 #else
@@ -133,45 +142,64 @@ int main(void)
 #if TEST_UNSIGNED
         data.sine[i] += (unsigned char) 0x80;
 #endif
-
     }
     data.left_phase = data.right_phase = 0;
     data.framesToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
+
     err = Pa_Initialize();
-    if( err != paNoError ) goto error;
-    err = Pa_OpenStream(
-              &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              TEST_FORMAT,
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,          /* stereo output */
-              TEST_FORMAT,
-              NULL,
-              SAMPLE_RATE,
-              256,            /* frames per buffer */
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-              patestCallback,
-              &data );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
+    outputParameters.device = Pa_GetDefaultOutputDevice(); /* Default output device. */
+    outputParameters.channelCount = 2;                     /* Stereo output. */
+    outputParameters.sampleFormat = TEST_FORMAT;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    err = Pa_OpenStream( &stream,
+                         NULL,      /* No input. */
+                         &outputParameters,
+                         SAMPLE_RATE,
+                         256,       /* Frames per buffer. */
+                         paClipOff, /* We won't output out of range samples so don't bother clipping them. */
+                         patestCallback,
+                         &data );
+    if( err != paNoError )
+        goto error;
+
+    streamOpened = Pa_GetStreamTime( stream ); /* Time in seconds when stream was opened (approx). */
+
     err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
     /* Watch until sound is halfway finished. */
-    while( Pa_StreamTime( stream ) < (totalSamps/2) ) Pa_Sleep(10);
-    /* Stop sound until ENTER hit. */
+    /* (Was ( Pa_StreamTime( stream ) < (totalSamps/2) ) in V18. */
+    while( (Pa_GetStreamTime( stream ) - streamOpened) < (PaTime)NUM_SECONDS / 2.0 )
+        Pa_Sleep(10);
+
+    /* Stop sound until ENTER hit. (Hu? don't see any keyboard-input here.) */
     err = Pa_StopStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
     printf("Pause for 2 seconds.\n");
     Pa_Sleep( 2000 );
 
     err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
     printf("Waiting for sound to finish.\n");
-    while( Pa_StreamActive( stream ) ) Pa_Sleep(10);
+
+    while( ( err = Pa_IsStreamActive( stream ) ) == 1 )
+        Pa_Sleep(100);
+    if( err < 0 )
+        goto error;
+
     err = Pa_CloseStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
     Pa_Terminate();
     printf("Test finished.\n");
     return err;

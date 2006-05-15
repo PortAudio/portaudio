@@ -1,10 +1,10 @@
+/** @file patest_toomanysines.c
+	@brief Play more sine waves than we can handle in real time as a stress test.
+	@author Ross Bencina <rossb@audiomulch.com>
+	@author Phil Burk <philburk@softsynth.com>
+*/
 /*
  * $Id$
- * Play more sine waves than we can handle in real time as a stress test,
- *
- * Authors:
- *    Ross Bencina <rossb@audiomulch.com>
- *    Phil Burk <philburk@softsynth.com>
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.audiomulch.com/portaudio/
@@ -58,17 +58,18 @@ paTestData;
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback(   void *inputBuffer, void *outputBuffer,
-                             unsigned long framesPerBuffer,
-                             PaTimestamp outTime, void *userData )
+static int patestCallback( const void *inputBuffer, void *outputBuffer,
+                           unsigned long framesPerBuffer,
+                           const PaStreamCallbackTimeInfo* timeInfo,
+                           PaStreamCallbackFlags statusFlags,
+                           void *userData )
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
     unsigned long i;
     int j;
     int finished = 0;
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused variable warning. */
 
     for( i=0; i<framesPerBuffer; i++ )
     {
@@ -89,8 +90,6 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
             output += (float) sin( phase );
             data->phases[j] = phase;
         }
-
-
         *out++ = (float) (output / data->numSines);
     }
     return finished;
@@ -100,32 +99,34 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
+    PaStreamParameters outputParameters;
+    PaStream *stream;
     PaError err;
     int numStress;
     paTestData data = {0};
     double load;
+
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d. MAX_LOAD = %f\n",
         SAMPLE_RATE, FRAMES_PER_BUFFER, MAX_LOAD );
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
+    
+    outputParameters.device = Pa_GetDefaultOutputDevice();  /* default output device */
+    outputParameters.channelCount = 1;                      /* mono output */
+    outputParameters.sampleFormat = paFloat32;              /* 32 bit floating point output */
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+
     err = Pa_OpenStream(
               &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              paFloat32,  /* 32 bit floating point input */
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              1,          /* mono output */
-              paFloat32,      /* 32 bit floating point output */
-              NULL,
+              NULL,         /* no input */
+              &outputParameters,
               SAMPLE_RATE,
-              FRAMES_PER_BUFFER,            /* frames per buffer */
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+              FRAMES_PER_BUFFER,
+              paClipOff,    /* we won't output out of range samples so don't bother clipping them */
               patestCallback,
-              &data );
+              &data );    
     if( err != paNoError ) goto error;
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
@@ -136,7 +137,7 @@ int main(void)
         data.numSines++;
         Pa_Sleep( 100 );
 
-        load = Pa_GetCPULoad( stream );
+        load = Pa_GetStreamCpuLoad( stream );
         printf("numSines = %d, CPU load = %f\n", data.numSines, load );
     }
     while( load < 0.5 );
@@ -146,7 +147,7 @@ int main(void)
     for( ; data.numSines < numStress; data.numSines++ )
     {
         Pa_Sleep( 200 );
-        load = Pa_GetCPULoad( stream );
+        load = Pa_GetStreamCpuLoad( stream );
         printf("STRESSING: numSines = %d, CPU load = %f\n", data.numSines, load );
     }
     

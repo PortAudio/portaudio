@@ -58,7 +58,7 @@ Important Files and Folders:
 Platform Implementations
     pa_asio                 = ASIO for Windows and Macintosh
     pa_beos                 = BeOS
-    pa_mac                  = Macintosh Sound Manager for OS 8,9 and Carbon
+    pa_mac_sm               = Macintosh Sound Manager for OS 8,9 and Carbon
     pa_mac_core             = Macintosh Core Audio for OS X
     pa_sgi                  = Silicon Graphics AL
     pa_unix_oss             = OSS implementation for various Unixes

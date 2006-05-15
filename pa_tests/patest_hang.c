@@ -1,10 +1,10 @@
+/** @file patest_hang.c
+	@brief Play a sine then hang audio callback to test watchdog.
+	@author Ross Bencina <rossb@audiomulch.com>
+	@author Phil Burk <philburk@softsynth.com>
+*/
 /*
  * $Id$
- * Play a sine then hang audio callback to test watchdog.
- *
- * Authors:
- *    Ross Bencina <rossb@audiomulch.com>
- *    Phil Burk <philburk@softsynth.com>
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.audiomulch.com/portaudio/
@@ -36,15 +36,15 @@
  */
 #include <stdio.h>
 #include <math.h>
+
 #include "portaudio.h"
 
-
-#define SAMPLE_RATE   (44100)
-#define FRAMES_PER_BUFFER  (1024)
+#define SAMPLE_RATE       (44100)
+#define FRAMES_PER_BUFFER (1024)
 #ifndef M_PI
-#define M_PI  (3.14159265)
+#define M_PI              (3.14159265)
 #endif
-#define TWOPI (M_PI * 2.0)
+#define TWOPI             (M_PI * 2.0)
 
 typedef struct paTestData
 {
@@ -57,9 +57,11 @@ paTestData;
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback(   void *inputBuffer, void *outputBuffer,
-                             unsigned long framesPerBuffer,
-                             PaTimestamp outTime, void *userData )
+static int patestCallback( const void *inputBuffer, void *outputBuffer,
+                           unsigned long framesPerBuffer,
+                           const PaStreamCallbackTimeInfo* timeInfo,
+                           PaStreamCallbackFlags statusFlags,
+                           void *userData )
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
@@ -68,8 +70,7 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
     double phaseInc = 0.02;
     double phase = data->phase;
     
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused argument warning. */
 
     for( i=0; i<framesPerBuffer; i++ )
     {
@@ -92,40 +93,40 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
-    PaError          err;
-    int              i;
-    paTestData       data = {0};
+    PaStream*           stream;
+    PaStreamParameters  outputParameters;
+    PaError             err;
+    int                 i;
+    paTestData          data = {0};
     
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n",
         SAMPLE_RATE, FRAMES_PER_BUFFER );
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
-    
-    err = Pa_OpenStream(
-              &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              paFloat32,  /* 32 bit floating point input */
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              1,          /* mono output */
-              paFloat32,      /* 32 bit floating point output */
-              NULL,
-              SAMPLE_RATE,
-              FRAMES_PER_BUFFER,            /* frames per buffer */
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-              patestCallback,
-              &data );
-    if( err != paNoError ) goto error;
+
+    outputParameters.device = Pa_GetDefaultOutputDevice(); /* Default output device. */
+    outputParameters.channelCount = 1;                     /* Mono output. */
+    outputParameters.sampleFormat = paFloat32;             /* 32 bit floating point. */
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.suggestedLatency          = Pa_GetDeviceInfo(outputParameters.device)
+                                                 ->defaultLowOutputLatency;
+    err = Pa_OpenStream(&stream,
+                        NULL,                    /* No input. */
+                        &outputParameters,
+                        SAMPLE_RATE,
+                        FRAMES_PER_BUFFER,
+                        paClipOff,               /* No out of range samples. */
+                        patestCallback,
+                        &data);
+    if (err != paNoError) goto error;
     
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
 
-/* Gradually increase sleep time. */
-    for( i=0; i<10000; i+= 1000 )
+    /* Gradually increase sleep time. */
+    /* Was: for( i=0; i<10000; i+= 1000 ) */
+    for(i=0; i <= 1000; i += 100)
     {
         printf("Sleep for %d milliseconds in audio callback.\n", i );
         data.sleepFor = i;

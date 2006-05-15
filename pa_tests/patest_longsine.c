@@ -1,9 +1,9 @@
+/** @file patest_longsine.c
+	@brief Play a sine wave until ENTER hit.
+	@author Phil Burk  http://www.softsynth.com
+*/
 /*
  * $Id$
- * patest_longsine.c
- * Play a sine wave using the Portable Audio api until ENTER hit.
- *
- * Author: Phil Burk  http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -33,8 +33,10 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+ 
 #include <stdio.h>
 #include <math.h>
+
 #include "portaudio.h"
 
 #define SAMPLE_RATE   (44100)
@@ -56,15 +58,17 @@ paTestData;
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback( void *inputBuffer, void *outputBuffer,
-                           unsigned long framesPerBuffer,
-                           PaTimestamp outTime, void *userData )
+static int patestCallback(const void*                     inputBuffer,
+                          void*                           outputBuffer,
+                          unsigned long                   framesPerBuffer,
+                          const PaStreamCallbackTimeInfo* timeInfo,
+                          PaStreamCallbackFlags           statusFlags,
+                          void*                           userData)
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
     unsigned int i;
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused argument warning. */
     for( i=0; i<framesPerBuffer; i++ )
     {
         *out++ = data->sine[data->left_phase];  /* left */
@@ -81,7 +85,8 @@ static int patestCallback( void *inputBuffer, void *outputBuffer,
 int main(void);
 int main(void)
 {
-    PortAudioStream *stream;
+    PaStreamParameters outputParameters;
+    PaStream *stream;
     PaError err;
     paTestData data;
     int i;
@@ -97,22 +102,20 @@ int main(void)
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
-    err = Pa_OpenStream(
-              &stream,
-              paNoDevice,/* default input device */
-              0,              /* no input */
-              paFloat32,  /* 32 bit floating point input */
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,          /* stereo output */
-              paFloat32,      /* 32 bit floating point output */
-              NULL,
-              SAMPLE_RATE,
-              256,            /* frames per buffer */
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-              patestCallback,
-              &data );
+    outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
+    outputParameters.channelCount = 2;                     /* stereo output */
+    outputParameters.sampleFormat = paFloat32;             /* 32 bit floating point output */
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+
+    err = Pa_OpenStream( &stream,
+                         NULL,              /* No input. */
+                         &outputParameters, /* As above. */
+                         SAMPLE_RATE,
+                         256,               /* Frames per buffer. */
+                         paClipOff,         /* No out of range samples expected. */
+                         patestCallback,
+                         &data );
     if( err != paNoError ) goto error;
 
     err = Pa_StartStream( stream );

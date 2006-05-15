@@ -1,11 +1,10 @@
+/** @file patest_maxsines.c
+	@brief How many sine waves can we calculate and play in less than 80% CPU Load.
+	@author Ross Bencina <rossb@audiomulch.com>
+	@author Phil Burk <philburk@softsynth.com>
+*/
 /*
  * $Id$
- * patest_maxsines.c
- * How many sine waves can we calculate and play in less than 80% CPU Load.
- *
- * Authors:
- *    Ross Bencina <rossb@audiomulch.com>
- *    Phil Burk <philburk@softsynth.com>
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.audiomulch.com/portaudio/
@@ -82,9 +81,12 @@ float LookupSine( paTestData *data, float phase )
 ** It may called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int patestCallback(   void *inputBuffer, void *outputBuffer,
-                             unsigned long framesPerBuffer,
-                             PaTimestamp outTime, void *userData )
+static int patestCallback(const void*                     inputBuffer,
+                          void*                           outputBuffer,
+                          unsigned long                   framesPerBuffer,
+                          const PaStreamCallbackTimeInfo* timeInfo,
+                          PaStreamCallbackFlags           statusFlags,
+                          void*                           userData )
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
@@ -94,10 +96,9 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
     unsigned long i;
     int j;
     int finished = 0;
-    (void) outTime; /* Prevent unused variable warnings. */
-    (void) inputBuffer;
+    (void) inputBuffer; /* Prevent unused argument warning. */
 
-/* Detemine amplitude scaling factor */
+    /* Determine amplitude scaling factor */
     numForScale = data->numSines;
     if( numForScale < 8 ) numForScale = 8;  /* prevent pops at beginning */
     scaler = 1.0f / numForScale;
@@ -132,11 +133,13 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 int main(void);
 int main(void)
 {
-	int i;
-    PortAudioStream *stream;
-    PaError err;
-    paTestData data = {0};
-    double load;
+	int                 i;
+    PaStream*           stream;
+    PaStreamParameters  outputParameters;
+    PaError             err;
+    paTestData          data = {0};
+    double              load;
+
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
 
     /* initialise sinusoidal wavetable */
@@ -147,43 +150,48 @@ int main(void)
     data.sine[TABLE_SIZE] = data.sine[0]; /* set guard point */
 
     err = Pa_Initialize();
-    if( err != paNoError ) goto error;
-    err = Pa_OpenStream(
-              &stream,
-              paNoDevice,
-              0,              /* no input */
-              paFloat32,
-              NULL,
-              Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,              /* stereo output */
-              paFloat32,      /* 32 bit floating point output */
-              NULL,
-              SAMPLE_RATE,
-              FRAMES_PER_BUFFER, 
-              0,              /* number of buffers, if zero then use default minimum */
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-              patestCallback,
-              &data );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+    outputParameters.device                    = Pa_GetDefaultOutputDevice(); /* Default output device. */
+    outputParameters.channelCount              = 2;                           /* Stereo output. */
+    outputParameters.sampleFormat              = paFloat32;                   /* 32 bit floating point output. */
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.suggestedLatency          = Pa_GetDeviceInfo(outputParameters.device)
+                                                 ->defaultHighOutputLatency;
+    err = Pa_OpenStream(&stream,
+                        NULL,               /* no input */
+                        &outputParameters,
+                        SAMPLE_RATE,
+                        FRAMES_PER_BUFFER,
+                        paClipOff,          /* No out of range samples should occur. */
+                        patestCallback,
+                        &data);
+    if( err != paNoError )
+        goto error;
+
     err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
 
-/* Play an increasing number of sine waves until we hit MAX_USAGE */
-    do
-    {
+    /* Play an increasing number of sine waves until we hit MAX_USAGE */
+    do  {
         data.numSines++;
-        Pa_Sleep( 200 );
-
-        load = Pa_GetCPULoad( stream );
+        Pa_Sleep(200);
+        load = Pa_GetStreamCpuLoad(stream);
         printf("numSines = %d, CPU load = %f\n", data.numSines, load );
-        fflush( stdout );
-    }
-    while( (load < MAX_USAGE) && (data.numSines < MAX_SINES) );
+        fflush(stdout);
+        } while((load < MAX_USAGE) && (data.numSines < MAX_SINES));
+
+    Pa_Sleep(2000);     /* Stay for 2 seconds around 80% CPU. */
 
     err = Pa_StopStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
     err = Pa_CloseStream( stream );
-    if( err != paNoError ) goto error;
+    if( err != paNoError )
+        goto error;
+
     Pa_Terminate();
     printf("Test finished.\n");
     return err;
