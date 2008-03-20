@@ -6,7 +6,7 @@
  * Author: Phil Burk, http://www.softsynth.com
  *
  * This program uses the PortAudio Portable Audio Library.
- * For more information see: http://www.audiomulch.com/portaudio/
+ * For more information see: http://www.portaudio.com
  * Copyright (c) 1999-2000 Ross Bencina and Phil Burk
  *
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -20,10 +20,6 @@
  * The above copyright notice and this permission notice shall be
  * included in all copies or substantial portions of the Software.
  *
- * Any person wishing to distribute modifications to the Software is
- * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version.
- *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -31,13 +27,24 @@
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
  */
+
+/*
+ * The text above constitutes the entire PortAudio license; however, 
+ * the PortAudio community also makes the following non-binding requests:
+ *
+ * Any person wishing to distribute modifications to the Software is
+ * requested to send the modifications to the original developer so that
+ * they can be incorporated into the canonical version. It is also 
+ * requested that these non-binding requests be included along with the 
+ * license above.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include "portaudio.h"
-#include "ringbuffer.h"
+#include "pa_ringbuffer.h"
 #include "pablio.h"
 #include <string.h>
 
@@ -75,12 +82,12 @@ static int blockingIOCallback( void *inputBuffer, void *outputBuffer,
     /* This may get called with NULL inputBuffer during initial setup. */
     if( inputBuffer != NULL )
     {
-        RingBuffer_Write( &data->inFIFO, inputBuffer, numBytes );
+        PaUtil_WriteRingBuffer( &data->inFIFO, inputBuffer, numBytes );
     }
     if( outputBuffer != NULL )
     {
         int i;
-        int numRead = RingBuffer_Read( &data->outFIFO, outputBuffer, numBytes );
+        int numRead = PaUtil_ReadRingBuffer( &data->outFIFO, outputBuffer, numBytes );
         /* Zero out remainder of buffer if we run out of data. */
         for( i=numRead; i<numBytes; i++ )
         {
@@ -98,7 +105,7 @@ static PaError PABLIO_InitFIFO( RingBuffer *rbuf, long numFrames, long bytesPerF
     char *buffer = (char *) malloc( numBytes );
     if( buffer == NULL ) return paInsufficientMemory;
     memset( buffer, 0, numBytes );
-    return (PaError) RingBuffer_Init( rbuf, numBytes, buffer );
+    return (PaError) PaUtil_InitializeRingBuffer( rbuf, numBytes, buffer );
 }
 
 /* Free buffer. */
@@ -120,7 +127,7 @@ long WriteAudioStream( PABLIO_Stream *aStream, void *data, long numFrames )
     long numBytes = aStream->bytesPerFrame * numFrames;
     while( numBytes > 0)
     {
-        bytesWritten = RingBuffer_Write( &aStream->outFIFO, p, numBytes );
+        bytesWritten = PaUtil_WriteRingBuffer( &aStream->outFIFO, p, numBytes );
         numBytes -= bytesWritten;
         p += bytesWritten;
         if( numBytes > 0) Pa_Sleep(10);
@@ -139,7 +146,7 @@ long ReadAudioStream( PABLIO_Stream *aStream, void *data, long numFrames )
     long numBytes = aStream->bytesPerFrame * numFrames;
     while( numBytes > 0)
     {
-        bytesRead = RingBuffer_Read( &aStream->inFIFO, p, numBytes );
+        bytesRead = PaUtil_ReadRingBuffer( &aStream->inFIFO, p, numBytes );
         numBytes -= bytesRead;
         p += bytesRead;
         if( numBytes > 0) Pa_Sleep(10);
@@ -153,7 +160,7 @@ long ReadAudioStream( PABLIO_Stream *aStream, void *data, long numFrames )
  */
 long GetAudioStreamWriteable( PABLIO_Stream *aStream )
 {
-    int bytesEmpty = RingBuffer_GetWriteAvailable( &aStream->outFIFO );
+    int bytesEmpty = PaUtil_GetRingBufferWriteAvailable( &aStream->outFIFO );
     return bytesEmpty / aStream->bytesPerFrame;
 }
 
@@ -163,7 +170,7 @@ long GetAudioStreamWriteable( PABLIO_Stream *aStream )
  */
 long GetAudioStreamReadable( PABLIO_Stream *aStream )
 {
-    int bytesFull = RingBuffer_GetReadAvailable( &aStream->inFIFO );
+    int bytesFull = PaUtil_GetRingBufferReadAvailable( &aStream->inFIFO );
     return bytesFull / aStream->bytesPerFrame;
 }
 
@@ -239,8 +246,8 @@ PaError OpenAudioStream( PABLIO_Stream **rwblPtr, double sampleRate,
         err = PABLIO_InitFIFO( &aStream->outFIFO, numFrames, aStream->bytesPerFrame );
         if( err != paNoError ) goto error;
         /* Make Write FIFO appear full initially. */
-        numBytes = RingBuffer_GetWriteAvailable( &aStream->outFIFO );
-        RingBuffer_AdvanceWriteIndex( &aStream->outFIFO, numBytes );
+        numBytes = PaUtil_GetRingBufferWriteAvailable( &aStream->outFIFO );
+        PaUtil_AdvanceRingBufferWriteIndex( &aStream->outFIFO, numBytes );
     }
 
     /* Open a PortAudio stream that we will use to communicate with the underlying
@@ -285,11 +292,11 @@ PaError CloseAudioStream( PABLIO_Stream *aStream )
     /* If we are writing data, make sure we play everything written. */
     if( byteSize > 0 )
     {
-        bytesEmpty = RingBuffer_GetWriteAvailable( &aStream->outFIFO );
+        bytesEmpty = PaUtil_GetRingBufferWriteAvailable( &aStream->outFIFO );
         while( bytesEmpty < byteSize )
         {
             Pa_Sleep( 10 );
-            bytesEmpty = RingBuffer_GetWriteAvailable( &aStream->outFIFO );
+            bytesEmpty = PaUtil_GetRingBufferWriteAvailable( &aStream->outFIFO );
         }
     }
 
