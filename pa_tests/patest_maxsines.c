@@ -40,43 +40,19 @@
 #include "portaudio.h"
 
 #define MAX_SINES     (500)
-#define MAX_USAGE     (0.8)
 #define SAMPLE_RATE   (44100)
-#define FREQ_TO_PHASE_INC(freq)   (freq/(float)SAMPLE_RATE)
-
-#define MIN_PHASE_INC  FREQ_TO_PHASE_INC(200.0f)
-#define MAX_PHASE_INC  (MIN_PHASE_INC * (1 << 5))
-
 #define FRAMES_PER_BUFFER  (512)
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
 #define TWOPI (M_PI * 2.0)
 
-#define TABLE_SIZE   (512)
-
 typedef struct paTestData
 {
     int numSines;
-    float sine[TABLE_SIZE + 1]; /* add one for guard point for interpolation */
-    float phases[MAX_SINES];
+    double phases[MAX_SINES];
 }
 paTestData;
-
-/* Convert phase between and 1.0 to sine value
- * using linear interpolation.
- */
-float LookupSine( paTestData *data, float phase );
-float LookupSine( paTestData *data, float phase )
-{
-    float fIndex = phase*TABLE_SIZE;
-    int   index = (int) fIndex;
-    float fract = fIndex - index;
-    float lo = data->sine[index];
-    float hi = data->sine[index+1];
-    float val = lo + fract*(hi-lo);
-    return val;
-}
 
 /* This routine will be called by the PortAudio engine when audio is needed.
 ** It may called at interrupt level on some machines so don't do anything
@@ -88,42 +64,34 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
-    float outSample;
-    float scaler;
-    int numForScale;
     unsigned long i;
     int j;
     int finished = 0;
     (void) outTime; /* Prevent unused variable warnings. */
     (void) inputBuffer;
 
-/* Detemine amplitude scaling factor */
-    numForScale = data->numSines;
-    if( numForScale < 8 ) numForScale = 8;  /* prevent pops at beginning */
-    scaler = 1.0f / numForScale;
-    
     for( i=0; i<framesPerBuffer; i++ )
     {
         float output = 0.0;
-        float phaseInc = MIN_PHASE_INC;
-        float phase;
+        double phaseInc = 0.02;
+        double phase;
         for( j=0; j<data->numSines; j++ )
         {
             /* Advance phase of next oscillator. */
             phase = data->phases[j];
             phase += phaseInc;
-            if( phase >= 1.0 ) phase -= 1.0;
+            if( phase > TWOPI ) phase -= TWOPI;
 
-            output += LookupSine(data, phase); 
+            phaseInc *= 1.02;
+            if( phaseInc > 0.5 ) phaseInc *= 0.5;
+
+            /* This is not a very efficient way to calc sines. */
+            output += (float) sin( phase );
             data->phases[j] = phase;
-            
-            phaseInc *= 1.02f;
-            if( phaseInc > MAX_PHASE_INC ) phaseInc = MIN_PHASE_INC;
         }
 
-        outSample = (float) (output * scaler);
-        *out++ = outSample; /* Left */
-        *out++ = outSample; /* Right */
+
+        *out++ = (float) (output / data->numSines);
     }
     return finished;
 }
@@ -132,34 +100,27 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
 int main(void);
 int main(void)
 {
-	int i;
     PortAudioStream *stream;
     PaError err;
     paTestData data = {0};
     double load;
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
-
     /* initialise sinusoidal wavetable */
-    for( i=0; i<TABLE_SIZE; i++ )
-    {
-        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
-    }
-    data.sine[TABLE_SIZE] = data.sine[0]; /* set guard point */
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
     err = Pa_OpenStream(
               &stream,
-              paNoDevice,
+              paNoDevice,/* default input device */
               0,              /* no input */
-              paFloat32,
+              paFloat32,  /* 32 bit floating point input */
               NULL,
               Pa_GetDefaultOutputDeviceID(), /* default output device */
-              2,              /* stereo output */
+              1,          /* mono output */
               paFloat32,      /* 32 bit floating point output */
               NULL,
               SAMPLE_RATE,
-              FRAMES_PER_BUFFER, 
+              FRAMES_PER_BUFFER,            /* frames per buffer */
               0,              /* number of buffers, if zero then use default minimum */
               paClipOff,      /* we won't output out of range samples so don't bother clipping them */
               patestCallback,
@@ -168,7 +129,6 @@ int main(void)
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
 
-/* Play an increasing number of sine waves until we hit MAX_USAGE */
     do
     {
         data.numSines++;
@@ -176,9 +136,8 @@ int main(void)
 
         load = Pa_GetCPULoad( stream );
         printf("numSines = %d, CPU load = %f\n", data.numSines, load );
-        fflush( stdout );
     }
-    while( (load < MAX_USAGE) && (data.numSines < MAX_SINES) );
+    while( load < 0.8 );
 
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;

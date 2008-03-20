@@ -42,34 +42,24 @@
 /* #define SAMPLE_RATE  (17932) /* Test failure to open with this value. */
 #define SAMPLE_RATE  (44100)
 #define NUM_SECONDS     (5)
-#define NUM_CHANNELS    (2)
-/* #define DITHER_FLAG     (paDitherOff)  /**/
-#define DITHER_FLAG     (0) /**/
 
 /* Select sample format. */
 #if 0
 #define PA_SAMPLE_TYPE  paFloat32
 typedef float SAMPLE;
-#define SAMPLE_SILENCE  (0.0f)
 #elif 0
 #define PA_SAMPLE_TYPE  paInt16
 typedef short SAMPLE;
-#define SAMPLE_SILENCE  (0)
-#elif 0
-#define PA_SAMPLE_TYPE  paInt8
-typedef char SAMPLE;
-#define SAMPLE_SILENCE  (0)
 #else
 #define PA_SAMPLE_TYPE  paUInt8
 typedef unsigned char SAMPLE;
-#define SAMPLE_SILENCE  (128)
-
 #endif
 
 typedef struct
 {
     int          frameIndex;  /* Index into sample array. */
     int          maxFrameIndex;
+    int          samplesPerFrame;
     SAMPLE      *recordedSamples;
 }
 paTestData;
@@ -83,7 +73,7 @@ static int recordCallback( void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     SAMPLE *rptr = (SAMPLE*)inputBuffer;
-    SAMPLE *wptr = &data->recordedSamples[data->frameIndex * NUM_CHANNELS];
+    SAMPLE *wptr = &data->recordedSamples[data->frameIndex * data->samplesPerFrame];
     long framesToCalc;
     long i;
     int finished;
@@ -106,8 +96,8 @@ static int recordCallback( void *inputBuffer, void *outputBuffer,
     {
         for( i=0; i<framesToCalc; i++ )
         {
-            *wptr++ = SAMPLE_SILENCE;  /* left */
-            if( NUM_CHANNELS == 2 ) *wptr++ = SAMPLE_SILENCE;  /* right */
+            *wptr++ = 0;  /* left */
+            *wptr++ = 0;  /* right */
         }
     }
     else
@@ -115,7 +105,7 @@ static int recordCallback( void *inputBuffer, void *outputBuffer,
         for( i=0; i<framesToCalc; i++ )
         {
             *wptr++ = *rptr++;  /* left */
-            if( NUM_CHANNELS == 2 ) *wptr++ = *rptr++;  /* right */
+            *wptr++ = *rptr++;  /* right */
         }
     }
     data->frameIndex += framesToCalc;
@@ -131,7 +121,7 @@ static int playCallback( void *inputBuffer, void *outputBuffer,
                          PaTimestamp outTime, void *userData )
 {
     paTestData *data = (paTestData*)userData;
-    SAMPLE *rptr = &data->recordedSamples[data->frameIndex * NUM_CHANNELS];
+    SAMPLE *rptr = &data->recordedSamples[data->frameIndex * data->samplesPerFrame];
     SAMPLE *wptr = (SAMPLE*)outputBuffer;
     unsigned int i;
     int finished;
@@ -145,12 +135,12 @@ static int playCallback( void *inputBuffer, void *outputBuffer,
         for( i=0; i<framesLeft; i++ )
         {
             *wptr++ = *rptr++;  /* left */
-            if( NUM_CHANNELS == 2 ) *wptr++ = *rptr++;  /* right */
+            *wptr++ = *rptr++;  /* right */
         }
         for( ; i<framesPerBuffer; i++ )
         {
             *wptr++ = 0;  /* left */
-            if( NUM_CHANNELS == 2 ) *wptr++ = 0;  /* right */
+            *wptr++ = 0;  /* right */
         }
         data->frameIndex += framesLeft;
         finished = 1;
@@ -160,7 +150,7 @@ static int playCallback( void *inputBuffer, void *outputBuffer,
         for( i=0; i<framesPerBuffer; i++ )
         {
             *wptr++ = *rptr++;  /* left */
-            if( NUM_CHANNELS == 2 ) *wptr++ = *rptr++;  /* right */
+            *wptr++ = *rptr++;  /* right */
         }
         data->frameIndex += framesPerBuffer;
         finished = 0;
@@ -184,7 +174,8 @@ int main(void)
 
     data.maxFrameIndex = totalFrames = NUM_SECONDS * SAMPLE_RATE; /* Record for a few seconds. */
     data.frameIndex = 0;
-    numSamples = totalFrames * NUM_CHANNELS;
+    data.samplesPerFrame = 2;
+    numSamples = totalFrames * data.samplesPerFrame;
 
     numBytes = numSamples * sizeof(SAMPLE);
     data.recordedSamples = (SAMPLE *) malloc( numBytes );
@@ -202,7 +193,7 @@ int main(void)
     err = Pa_OpenStream(
               &stream,
               Pa_GetDefaultInputDeviceID(),
-              NUM_CHANNELS,               /* stereo input */
+              data.samplesPerFrame,               /* stereo input */
               PA_SAMPLE_TYPE,
               NULL,
               paNoDevice,
@@ -212,7 +203,7 @@ int main(void)
               SAMPLE_RATE,
               1024,            /* frames per buffer */
               0,               /* number of buffers, if zero then use default minimum */
-              0, //paDitherOff,    /* flags */
+              paClipOff,  /* we won't output out of range samples so don't bother clipping them */
               recordCallback,
               &data );
     if( err != paNoError ) goto error;
@@ -243,20 +234,10 @@ int main(void)
         }
         average += val;
     }
-    
+    printf("sample max amplitude = %d\n", max );
     average = average / numSamples;
+    printf("sample average = %d\n", average );
 
-    if( PA_SAMPLE_TYPE == paFloat32 )
-    {
-        printf("sample max amplitude = %f\n", max );
-        printf("sample average = %f\n", average );
-    }
-    else
-    {
-        printf("sample max amplitude = %d\n", max );
-        printf("sample average = %d\n", average );
-    }
-    
     /* Write recorded data to a file. */
 #if 0
     {
@@ -268,7 +249,7 @@ int main(void)
         }
         else
         {
-            fwrite( data.recordedSamples, NUM_CHANNELS * sizeof(SAMPLE), totalFrames, fid );
+            fwrite( data.recordedSamples, data.samplesPerFrame * sizeof(SAMPLE), totalFrames, fid );
             fclose( fid );
             printf("Wrote data to 'recorded.raw'\n");
         }
@@ -285,7 +266,7 @@ int main(void)
               PA_SAMPLE_TYPE,
               NULL,
               Pa_GetDefaultOutputDeviceID(),
-              NUM_CHANNELS,               /* stereo output */
+              data.samplesPerFrame,               /* stereo output */
               PA_SAMPLE_TYPE,
               NULL,
               SAMPLE_RATE,

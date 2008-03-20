@@ -1,9 +1,9 @@
 /*
  * $Id$
- * Hear the latency caused by big buffers.
+ * Hear the latency caused by bug buffers.
  * Play a sine wave and change frequency based on letter input.
  *
- * Author: Phil Burk <philburk@softsynth.com>, and Darren Gibbs
+ * Author: Phil Burk <philburk@softsynth.com>
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -36,18 +36,15 @@
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
-
 #define OUTPUT_DEVICE       (Pa_GetDefaultOutputDeviceID())
 #define SAMPLE_RATE         (44100)
-#define FRAMES_PER_BUFFER   (64)
-
-#if 0
+#define FRAMES_PER_BUFFER   (256)
+#if 1
 #define MIN_LATENCY_MSEC    (2000)
 #define NUM_BUFFERS         ((MIN_LATENCY_MSEC * SAMPLE_RATE) / (FRAMES_PER_BUFFER * 1000))
 #else
 #define NUM_BUFFERS         (0)
 #endif
-
 #define MIN_FREQ            (100.0f)
 #define CalcPhaseIncrement(freq)  ((freq)/SAMPLE_RATE)
 #ifndef M_PI
@@ -56,7 +53,7 @@
 #define TABLE_SIZE   (400)
 typedef struct
 {
-    float sine[TABLE_SIZE + 1]; /* add one for guard point for interpolation */
+    float sine[TABLE_SIZE + 1]; // add one for guard point for interpolation
     float phase_increment;
     float left_phase;
     float right_phase;
@@ -111,16 +108,15 @@ int main(void)
     paTestData data;
     int i;
     int done = 0;
-    printf("PortAudio Test: enter letter then hit ENTER. numBuffers = %d\n", NUM_BUFFERS );
+    printf("PortAudio Test: output sine sweep. ask for %d buffers\n", NUM_BUFFERS );
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
-        data.sine[i] = 0.90f * (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
+        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
     }
-    data.sine[TABLE_SIZE] = data.sine[0];       /* set guard point */
+    data.sine[TABLE_SIZE] = data.sine[0]; // set guard point
     data.left_phase = data.right_phase = 0.0;
     data.phase_increment = CalcPhaseIncrement(MIN_FREQ);
-
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
     printf("PortAudio Test: output device = %d\n", OUTPUT_DEVICE );
@@ -144,7 +140,6 @@ int main(void)
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
     printf("Play ASCII keyboard. Hit 'q' to stop. (Use RETURN key on Mac)\n");
-    fflush(stdout);
     while ( !done )
     {
         float  freq;

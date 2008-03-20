@@ -38,21 +38,18 @@
 #include <stdlib.h>
 #include <math.h>
 #include "portaudio.h"
-
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
-#define TWOPI (M_PI * 2.0)
-
-#define DEFAULT_BUFFER_SIZE   (64)
-
+#define DEFAULT_BUFFER_SIZE   (128)
+#define TABLE_SIZE   (200)
 typedef struct
 {
-    double left_phase;
-    double right_phase;
+    float sine[TABLE_SIZE];
+    int left_phase;
+    int right_phase;
 }
 paTestData;
-
 /* Very simple synthesis routine to generate two sine waves. */
 static int paminlatCallback( void *inputBuffer, void *outputBuffer,
                              unsigned long framesPerBuffer,
@@ -61,25 +58,15 @@ static int paminlatCallback( void *inputBuffer, void *outputBuffer,
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
     unsigned int i;
-    double left_phaseInc = 0.02;
-    double right_phaseInc = 0.06;
-
-    double left_phase = data->left_phase;
-    double right_phase = data->right_phase;
-
     for( i=0; i<framesPerBuffer; i++ )
     {
-        left_phase += left_phaseInc;
-        if( left_phase > TWOPI ) left_phase -= TWOPI;
-        *out++ = (float) sin( left_phase );
-
-        right_phase += right_phaseInc;
-        if( right_phase > TWOPI ) right_phase -= TWOPI;
-        *out++ = (float) sin( right_phase );
+        *out++ = data->sine[data->left_phase];  /* left */
+        *out++ = data->sine[data->right_phase];  /* right */
+        data->left_phase += 1;
+        if( data->left_phase >= TABLE_SIZE ) data->left_phase -= TABLE_SIZE;
+        data->right_phase += 3; /* higher pitch so we can distinguish left and right. */
+        if( data->right_phase >= TABLE_SIZE ) data->right_phase -= TABLE_SIZE;
     }
-
-    data->left_phase = left_phase;
-    data->right_phase = right_phase;
     return 0;
 }
 void main( int argc, char **argv );
@@ -88,6 +75,7 @@ void main( int argc, char **argv )
     PortAudioStream *stream;
     PaError err;
     paTestData data;
+    int    i;
     int    go;
     int    numBuffers = 0;
     int    minBuffers = 0;
@@ -103,8 +91,12 @@ void main( int argc, char **argv )
     /* Get bufferSize from command line. */
     framesPerBuffer = ( argc > 1 ) ? atol( argv[1] ) : DEFAULT_BUFFER_SIZE;
     printf("Frames per buffer = %d\n", framesPerBuffer );
-
-    data.left_phase = data.right_phase = 0.0;
+    /* Initialise sinusoidal wavetable. */
+    for( i=0; i<TABLE_SIZE; i++ )
+    {
+        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
+    }
+    data.left_phase = data.right_phase = 0;
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
     /* Ask PortAudio for the recommended minimum number of buffers. */
@@ -129,7 +121,7 @@ void main( int argc, char **argv )
                   paFloat32,      /* 32 bit floating point output */
                   NULL,
                   sampleRate,
-                  framesPerBuffer,
+                  framesPerBuffer,/* 46 msec buffers */
                   numBuffers,     /* number of buffers */
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   paminlatCallback,

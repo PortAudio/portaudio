@@ -43,18 +43,16 @@
 #define NUM_SECONDS   (8)
 #define SAMPLE_RATE   (44100)
 #define FRAMES_PER_BUFFER  (64)
-#define NUM_BUFFERS   (0)
 #ifndef M_PI
 #define M_PI  (3.14159265)
 #endif
 #define TABLE_SIZE   (200)
 typedef struct
 {
-    float         sine[TABLE_SIZE];
-    int           left_phase;
-    int           right_phase;
-    int           framesToGo;
-    volatile PaTimestamp   outTime;
+    float sine[TABLE_SIZE];
+    int left_phase;
+    int right_phase;
+    int framesToGo;
 }
 paTestData;
 /* This routine will be called by the PortAudio engine when audio is needed.
@@ -73,8 +71,6 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
     (void) outTime; /* Prevent unused variable warnings. */
     (void) inputBuffer;
 
-    data->outTime = outTime;
-    
     if( data->framesToGo < framesPerBuffer )
     {
         framesToCalc = data->framesToGo;
@@ -105,43 +101,22 @@ static int patestCallback(   void *inputBuffer, void *outputBuffer,
     return finished;
 }
 /*******************************************************************/
-static void ReportStreamTime( PortAudioStream *stream, paTestData *data );
-static void ReportStreamTime( PortAudioStream *stream, paTestData *data )
-{
-    PaTimestamp  streamTime, latency, outTime;
-    
-    streamTime = Pa_StreamTime( stream );
-    outTime = data->outTime;
-    if( outTime < 0.0 )
-    {
-        printf("Stream time = %8.1f\n", streamTime );
-    }
-    else
-    {
-        latency = outTime - streamTime;
-        printf("Stream time = %8.1f, outTime = %8.1f, latency = %8.1f\n",
-            streamTime, outTime, latency );
-    }
-    fflush(stdout);
-}
-
-/*******************************************************************/
 int main(void);
 int main(void)
 {
     PortAudioStream *stream;
     PaError err;
-    paTestData DATA;
+    paTestData data;
     int i;
     int totalSamps;
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
-        DATA.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
+        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
     }
-    DATA.left_phase = DATA.right_phase = 0;
-    DATA.framesToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
+    data.left_phase = data.right_phase = 0;
+    data.framesToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
     err = Pa_OpenStream(
@@ -156,41 +131,26 @@ int main(void)
               NULL,
               SAMPLE_RATE,
               FRAMES_PER_BUFFER,            /* frames per buffer */
-              NUM_BUFFERS,              /* number of buffers, if zero then use default minimum */
+              0,              /* number of buffers, if zero then use default minimum */
               paClipOff,      /* we won't output out of range samples so don't bother clipping them */
               patestCallback,
-              &DATA );
+              &data );
     if( err != paNoError ) goto error;
-    
-    DATA.outTime = -1.0; // mark time for callback as undefined
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
-    
     /* Watch until sound is halfway finished. */
     printf("Play for %d seconds.\n", NUM_SECONDS/2 ); fflush(stdout);
-    do
-    {
-        ReportStreamTime( stream, &DATA );
-        Pa_Sleep(100);
-    } while( Pa_StreamTime( stream ) < (totalSamps/2) );
-    
+    while( Pa_StreamTime( stream ) < (totalSamps/2) ) Pa_Sleep(10);
     /* Stop sound until ENTER hit. */
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
     printf("Pause for 2 seconds.\n"); fflush(stdout);
     Pa_Sleep( 2000 );
 
-    DATA.outTime = -1.0; // mark time for callback as undefined
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
-    
     printf("Play until sound is finished.\n"); fflush(stdout);
-    do
-    {
-        ReportStreamTime( stream, &DATA );
-        Pa_Sleep(100);
-    } while( Pa_StreamActive( stream ) );
-    
+    while( Pa_StreamActive( stream ) ) Pa_Sleep(10);
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
     Pa_Terminate();

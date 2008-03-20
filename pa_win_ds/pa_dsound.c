@@ -33,7 +33,6 @@
 /* Modifications
  *    7/19/01 Mike Berry - casts for compiling with __MWERKS__ CodeWarrior
  *    9/27/01 Phil Burk - use number of frames instead of real-time for CPULoad calculation.
- *    4/19/02 Phil Burk - Check for Win XP for system latency calculation.
  */
 /* Compiler flags:
  SUPPORT_AUDIO_CAPTURE - define this flag if you want to SUPPORT_AUDIO_CAPTURE
@@ -50,12 +49,10 @@
 #include "pa_host.h"
 #include "pa_trace.h"
 #include "dsound_wrapper.h"
-
 #define PRINT(x) { printf x; fflush(stdout); }
 #define ERR_RPT(x) PRINT(x)
 #define DBUG(x)  /* PRINT(x) */
 #define DBUGX(x) /* PRINT(x) */
-
 #define PA_USE_HIGH_LATENCY   (0)
 #if PA_USE_HIGH_LATENCY
 #define PA_WIN_9X_LATENCY     (500)
@@ -64,9 +61,6 @@
 #define PA_WIN_9X_LATENCY     (140)
 #define PA_WIN_NT_LATENCY     (280)
 #endif
-
-#define PA_WIN_WDM_LATENCY       (120)
-
 /* Trigger an underflow for testing purposes. Should normally be (0). */
 #define PA_SIMULATE_UNDERFLOW (0)
 #if PA_SIMULATE_UNDERFLOW
@@ -74,7 +68,6 @@ static  gUnderCallbackCounter = 0;
 #define UNDER_START_GAP       (10)
 #define UNDER_STOP_GAP        (UNDER_START_GAP + 4)
 #endif
-
 /************************************************* Definitions ********/
 typedef struct internalPortAudioStream internalPortAudioStream;
 typedef struct internalPortAudioDevice
@@ -85,7 +78,6 @@ typedef struct internalPortAudioDevice
     PaDeviceInfo                     pad_Info;
 }
 internalPortAudioDevice;
-
 /* Define structure to contain all DirectSound and Windows specific data. */
 typedef struct PaHostSoundControl
 {
@@ -101,7 +93,6 @@ typedef struct PaHostSoundControl
     double           pahsc_InverseTicksPerUserBuffer;
 }
 PaHostSoundControl;
-
 /************************************************* Shared Data ********/
 /* FIXME - put Mutex around this shared data. */
 static int sNumDevices = 0;
@@ -124,7 +115,6 @@ static BOOL CALLBACK Pa_CountDevProc(LPGUID lpGUID,
 static Pa_QueryDevices( void );
 static void CALLBACK Pa_TimerCallback(UINT uID, UINT uMsg,
                                       DWORD dwUser, DWORD dw1, DWORD dw2);
-
 /********************************* BEGIN CPU UTILIZATION MEASUREMENT ****/
 static void Pa_StartUsageCalculation( internalPortAudioStream   *past )
 {
@@ -133,7 +123,6 @@ static void Pa_StartUsageCalculation( internalPortAudioStream   *past )
     /* Query system timer for usage analysis and to prevent overuse of CPU. */
     QueryPerformanceCounter( &pahsc->pahsc_EntryCount );
 }
-
 static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
 {
     LARGE_INTEGER CurrentCount = { 0, 0 };
@@ -153,7 +142,6 @@ static void Pa_EndUsageCalculation( internalPortAudioStream   *past )
                            (LOWPASS_COEFFICIENT_1 * newUsage);
     }
 }
-
 /****************************************** END CPU UTILIZATION *******/
 static PaError Pa_QueryDevices( void )
 {
@@ -885,38 +873,6 @@ PaError PaHost_CloseStream( internalPortAudioStream   *past )
     past->past_DeviceData = NULL;
     return paNoError;
 }
-
-/* Set minimal latency based on whether NT or Win95.
- * NT has higher latency.
- */
-static int PaHost_GetMinSystemLatency( void )
-{
-    int minLatencyMsec;
-    /* Set minimal latency based on whether NT or other OS.
-     * NT has higher latency.
-     */
-    OSVERSIONINFO osvi;
-	osvi.dwOSVersionInfoSize = sizeof( osvi );
-	GetVersionEx( &osvi );
-    DBUG(("PA - PlatformId = 0x%x\n", osvi.dwPlatformId ));
-    DBUG(("PA - MajorVersion = 0x%x\n", osvi.dwMajorVersion ));
-    DBUG(("PA - MinorVersion = 0x%x\n", osvi.dwMinorVersion ));
-    /* Check for NT */
-	if( (osvi.dwMajorVersion == 4) && (osvi.dwPlatformId == 2) )
-	{
-		minLatencyMsec = PA_WIN_NT_LATENCY;
-	}
-	else if(osvi.dwMajorVersion >= 5)
-	{
-		minLatencyMsec = PA_WIN_WDM_LATENCY;
-	}
-	else
-	{
-		minLatencyMsec = PA_WIN_9X_LATENCY;
-	}
-    return minLatencyMsec;
-}
-
 /*************************************************************************
 ** Determine minimum number of buffers required for this host based
 ** on minimum latency. Latency can be optionally set by user by setting
@@ -932,6 +888,7 @@ static int PaHost_GetMinSystemLatency( void )
 int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate )
 {
     char      envbuf[PA_ENV_BUF_SIZE];
+    DWORD     hostVersion;
     DWORD     hresult;
     int       minLatencyMsec = 0;
     double    msecPerBuffer = (1000.0 * framesPerBuffer) / sampleRate;
@@ -944,7 +901,12 @@ int Pa_GetMinNumBuffers( int framesPerBuffer, double sampleRate )
     }
     else
     {
-        minLatencyMsec = PaHost_GetMinSystemLatency();
+        /* Set minimal latency based on whether NT or Win95.
+         * NT has higher latency.
+         */
+        hostVersion = GetVersion();
+        /* High bit clear if NT */
+        minLatencyMsec = ( (hostVersion & 0x80000000) == 0 ) ? PA_WIN_NT_LATENCY : PA_WIN_9X_LATENCY  ;
 #if PA_USE_HIGH_LATENCY
         PRINT(("PA - Minimum Latency set to %d msec!\n", minLatencyMsec ));
 #endif
