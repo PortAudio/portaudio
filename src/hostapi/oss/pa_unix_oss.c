@@ -1507,7 +1507,6 @@ static PaError PaOssStream_Stop( PaOssStream *stream, int abort )
         result = paUnanticipatedHostError;
     }
 
-error:
     return result;
 }
 
@@ -1979,7 +1978,10 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 #endif
     return (PaOssStreamComponent_BufferSize( stream->playback ) - delay) / PaOssStreamComponent_FrameSize( stream->playback );
 
+/* Conditionally compile this to avoid warning about unused label */
+#ifdef SNDCTL_DSP_GETODELAY
 error:
     return result;
+#endif
 }
 
