@@ -58,6 +58,8 @@ PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
 
 PaUtilHostApiInitializer *paHostApiInitializers[] =
     {
+#ifdef __linux__
+
 #ifdef PA_USE_ALSA
         PaAlsa_Initialize,
 #endif
@@ -65,6 +67,18 @@ PaUtilHostApiInitializer *paHostApiInitializers[] =
 #ifdef PA_USE_OSS
         PaOSS_Initialize,
 #endif
+
+#else
+
+#ifdef PA_USE_OSS
+        PaOSS_Initialize,
+#endif
+
+#ifdef PA_USE_ALSA
+        PaAlsa_Initialize,
+#endif
+
+#endif  /* __linux__ */
 
 #ifdef PA_USE_JACK
         PaJack_Initialize,
