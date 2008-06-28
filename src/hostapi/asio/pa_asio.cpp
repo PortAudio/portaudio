@@ -965,13 +965,20 @@ PaError PaAsio_GetAvailableLatencyValues( PaDeviceIndex device,
     return result;
 }
 
-
+/* Unload whatever we loaded in LoadAsioDriver().
+   Also balance the call to CoInitialize(0).
+*/
+static void UnloadAsioDriver( void )
+{
+	ASIOExit();
+	CoUninitialize();
+}
 
 /*
     load the asio driver named by <driverName> and return statistics about
     the driver in info. If no error occurred, the driver will remain open
-    and must be closed by the called by calling ASIOExit() - if an error
-    is returned the driver will already be closed.
+    and must be closed by the called by calling UnloadAsioDriver() - if an error
+    is returned the driver will already be unloaded.
 */
 static PaError LoadAsioDriver( PaAsioHostApiRepresentation *asioHostApi, const char *driverName,
         PaAsioDriverInfo *driverInfo, void *systemSpecific )
@@ -980,12 +987,23 @@ static PaError LoadAsioDriver( PaAsioHostApiRepresentation *asioHostApi, const c
     ASIOError asioError;
     int asioIsInitialized = 0;
 
-    /* @todo note that the V18 version always called CoInitialize() here to ensure 
-        that COM was initialized before loading the driver. 
-        probably the docs need to require clients to initialize COM in new threads?
+    /* 
+	ASIO uses CoCreateInstance() to load a driver. That requires that
+	CoInitialize(0) be called for every thread that loads a driver.
+	It is OK to call CoInitialize(0) multiple times form one thread as long
+	as it is balanced by a call to CoUninitialize(). See UnloadAsioDriver().
+
+	The V18 version called CoInitialize() starting on 2/19/02.
+	That was removed from PA V19 for unknown reasons.
+	Phil Burk added it back on 6/27/08 so that JSyn would work.
     */
+	CoInitialize( 0 );
+
     if( !asioHostApi->asioDrivers->loadDriver( const_cast<char*>(driverName) ) )
     {
+		/* If this returns an error then it might be because CoInitialize(0) was removed.
+		  It should be called right before this.
+	    */
         result = paUnanticipatedHostError;
         PA_ASIO_SET_LAST_HOST_ERROR( 0, "Failed to load ASIO driver" );
         goto error;
@@ -1031,8 +1049,10 @@ static PaError LoadAsioDriver( PaAsioHostApiRepresentation *asioHostApi, const c
 
 error:
     if( asioIsInitialized )
-        ASIOExit();
-
+	{
+		ASIOExit();
+	}
+	CoUninitialize();
     return result;
 }
 
@@ -1275,7 +1295,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                 if( !asioDeviceInfo->asioChannelInfos )
                 {
                     result = paInsufficientMemory;
-                    goto error;
+                    goto error_unload;
                 }
 
                 int a;
@@ -1288,7 +1308,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                     {
                         result = paUnanticipatedHostError;
                         PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
-                        goto error;
+                        goto error_unload;
                     }
                 }
 
@@ -1301,13 +1321,13 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                     {
                         result = paUnanticipatedHostError;
                         PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
-                        goto error;
+                        goto error_unload;
                     }
                 }
 
 
                 /* unload the driver */
-                ASIOExit();
+                UnloadAsioDriver();
 
                 (*hostApi)->deviceInfos[ (*hostApi)->info.deviceCount ] = deviceInfo;
                 ++(*hostApi)->info.deviceCount;
@@ -1343,6 +1363,9 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                                       ReadStream, WriteStream, GetStreamReadAvailable, GetStreamWriteAvailable );
 
     return result;
+
+error_unload:
+	UnloadAsioDriver();
 
 error:
     if( asioHostApi )
@@ -1516,7 +1539,7 @@ done:
     /* close the device if it wasn't already open */
     if( asioHostApi->openAsioDeviceIndex == paNoDevice )
     {
-        ASIOExit(); /* not sure if we should check for errors here */
+        UnloadAsioDriver(); /* not sure if we should check for errors here */
     }
 
     if( result == paNoError )
@@ -1865,7 +1888,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( result == paNoError )
         asioIsInitialized = 1;
     else{
-        PA_DEBUG(("OpenStream ERROR1\n"));
+        PA_DEBUG(("OpenStream ERROR1 - LoadAsioDriver returned %d\n", result));
         goto error;
     }
 
@@ -2577,8 +2600,9 @@ error:
         ASIODisposeBuffers();
 
     if( asioIsInitialized )
-        ASIOExit();
-
+	{
+		UnloadAsioDriver();
+	}
     return result;
 }
 
@@ -2629,7 +2653,7 @@ static PaError CloseStream( PaStream* s )
     PaUtil_FreeMemory( stream );
 
     ASIODisposeBuffers();
-    ASIOExit();
+    UnloadAsioDriver();
 
     return result;
 }
@@ -3382,7 +3406,7 @@ static PaError ReadStream( PaStream      *s     ,
                data block is processed although it may be incomplete. */
 
             /* If the available amount of data frames is insufficient. */
-            if( PaUtil_GetRingBufferReadAvailable(pRb) < lFramesPerBlock )
+            if( PaUtil_GetRingBufferReadAvailable(pRb) < (long) lFramesPerBlock )
             {
                 /* Make sure, the event isn't already set! */
                 /* ResetEvent( blockingState->readFramesReadyEvent ); */
@@ -3557,7 +3581,7 @@ static PaError WriteStream( PaStream      *s     ,
                data block is processed although it may be incomplete. */
 
             /* If the available amount of buffers is insufficient. */
-            if( PaUtil_GetRingBufferWriteAvailable(pRb) < lFramesPerBlock )
+            if( PaUtil_GetRingBufferWriteAvailable(pRb) < (long) lFramesPerBlock )
             {
                 /* Make sure, the event isn't already set! */
                 /* ResetEvent( blockingState->writeBuffersReadyEvent ); */
@@ -3716,10 +3740,9 @@ PaError PaAsio_ShowControlPanel( PaDeviceIndex device, void* systemSpecific )
 
     asioDeviceInfo = (PaAsioDeviceInfo*)hostApi->deviceInfos[hostApiDevice];
 
-    /* @todo note that the V18 version always called CoInitialize() here to ensure 
-        that COM was initialized before loading the driver. 
-        probably the docs need to require clients to initialize COM in new threads?
-    */
+    /* See notes about CoInitialize(0) in LoadAsioDriver(). */
+	CoInitialize(0);
+
     if( !asioHostApi->asioDrivers->loadDriver( const_cast<char*>(asioDeviceInfo->commonDeviceInfo.name) ) )
     {
         result = paUnanticipatedHostError;
@@ -3768,13 +3791,17 @@ PA_DEBUG(("PaAsio_ShowControlPanel: ASIOControlPanel(): %s\n", PaAsio_GetAsioErr
         goto error;
     }
 
+	CoUninitialize();
 PA_DEBUG(("PaAsio_ShowControlPanel: ASIOExit(): %s\n", PaAsio_GetAsioErrorText(asioError) ));
 
     return result;
 
 error:
     if( asioIsInitialized )
-        ASIOExit();
+	{
+		ASIOExit();
+	}
+	CoUninitialize();
 
     return result;
 }
@@ -3885,7 +3912,7 @@ static int BlockingIoPaCallback(const void                     *inputBuffer    ,
         pRb = &blockingState->writeRingBuffer;
 
         /* If the blocking i/o buffer contains enough output data, */
-        if( PaUtil_GetRingBufferReadAvailable(pRb) >= framesPerBuffer )
+        if( PaUtil_GetRingBufferReadAvailable(pRb) >= (long) framesPerBuffer )
         {
             /* Extract the requested data from the ring buffer. */
             PaUtil_ReadRingBuffer( pRb, outputBuffer, framesPerBuffer );
@@ -3899,7 +3926,7 @@ static int BlockingIoPaCallback(const void                     *inputBuffer    ,
             (*pBp->outputZeroer)( outputBuffer, 1, pBp->outputChannelCount * framesPerBuffer );
 
             /* If playback is to be stopped */
-            if( blockingState->stopFlag && PaUtil_GetRingBufferReadAvailable(pRb) < framesPerBuffer )
+            if( blockingState->stopFlag && PaUtil_GetRingBufferReadAvailable(pRb) < (long) framesPerBuffer )
             {
                 /* Extract all the remaining data from the ring buffer,
                    whether it is a complete data block or not. */
@@ -3908,7 +3935,7 @@ static int BlockingIoPaCallback(const void                     *inputBuffer    ,
         }
 
         /* Set blocking i/o event? */
-        if( blockingState->writeBuffersRequestedFlag && PaUtil_GetRingBufferWriteAvailable(pRb) >= blockingState->writeBuffersRequested )
+        if( blockingState->writeBuffersRequestedFlag && PaUtil_GetRingBufferWriteAvailable(pRb) >= (long) blockingState->writeBuffersRequested )
         {
             /* Reset buffer request. */
             blockingState->writeBuffersRequestedFlag = FALSE;
@@ -3934,7 +3961,7 @@ static int BlockingIoPaCallback(const void                     *inputBuffer    ,
         pRb = &blockingState->readRingBuffer;
 
         /* If the blocking i/o buffer contains not enough input buffers */
-        if( PaUtil_GetRingBufferWriteAvailable(pRb) < framesPerBuffer )
+        if( PaUtil_GetRingBufferWriteAvailable(pRb) < (long) framesPerBuffer )
         {
             /* Signalize a read-buffer overflow. */
             blockingState->inputOverflowFlag = TRUE;
@@ -3947,7 +3974,7 @@ static int BlockingIoPaCallback(const void                     *inputBuffer    ,
         PaUtil_WriteRingBuffer( pRb, inputBuffer, framesPerBuffer );
 
         /* Set blocking i/o event? */
-        if( blockingState->readFramesRequestedFlag && PaUtil_GetRingBufferReadAvailable(pRb) >= blockingState->readFramesRequested )
+        if( blockingState->readFramesRequestedFlag && PaUtil_GetRingBufferReadAvailable(pRb) >= (long) blockingState->readFramesRequested )
         {
             /* Reset buffer request. */
             blockingState->readFramesRequestedFlag = FALSE;
