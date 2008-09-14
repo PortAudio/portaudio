@@ -3244,7 +3244,7 @@ static PaError StartStream( PaStream *s )
         if( result != paNoError ) goto error;
 
         /* Create thread that waits for audio buffers to be ready for processing. */
-        stream->processingThread = CreateThread( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId );
+        stream->processingThread = (HANDLE)_beginthreadex( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId );
         if( !stream->processingThread )
         {
             result = paUnanticipatedHostError;
