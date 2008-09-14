@@ -1517,7 +1517,7 @@ static PaError StartStream( PaStream *s )
 	}
 
     // Create a thread for this client.
-    stream->hThread = CreateThread(
+    stream->hThread = (HANDLE)_beginthreadex(
         NULL,              // no security attribute
         0,                 // default stack size
         ProcThread,
