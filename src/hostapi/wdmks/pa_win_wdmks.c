@@ -3010,7 +3010,7 @@ static DWORD WINAPI ProcessingThread(LPVOID pParam)
     }
 
     PA_LOGL_;
-    ExitThread(0);
+    _endthreadex(0);
     return 0;
 }
 
@@ -3045,7 +3045,7 @@ static PaError StartStream( PaStream *s )
       PA_DEBUG(("Class ret = %d;",ret));*/
 
     stream->streamStarted = 1;
-    stream->streamThread = CreateThread(NULL, 0, ProcessingThread, stream, 0, &dwID);
+    stream->streamThread = (HANDLE)_beginthreadex(NULL, 0, ProcessingThread, stream, 0, &dwID);
     if(stream->streamThread == NULL)
     {
         stream->streamStarted = 0;
