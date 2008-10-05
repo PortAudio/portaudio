@@ -151,6 +151,13 @@ Non-critical stuff for the future:
 #endif
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
+/* use CreateThread for CYGWIN, _beginthreadex for all others */
+#ifndef __CYGWIN__
+#define CREATE_THREAD (HANDLE)_beginthreadex( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId )
+#else
+#define CREATE_THREAD CreateThread( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId )
+#endif
+
 #if (defined(UNDER_CE))
 #pragma comment(lib, "Coredll.lib")
 #elif (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
@@ -3244,7 +3251,7 @@ static PaError StartStream( PaStream *s )
         if( result != paNoError ) goto error;
 
         /* Create thread that waits for audio buffers to be ready for processing. */
-        stream->processingThread = (HANDLE)_beginthreadex( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId );
+        stream->processingThread = CREATE_THREAD;
         if( !stream->processingThread )
         {
             result = paUnanticipatedHostError;
