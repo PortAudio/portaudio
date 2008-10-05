@@ -106,6 +106,20 @@
     #define DYNAMIC_GUID(data) DYNAMIC_GUID_THUNK(data)
 #endif
 
+/* use CreateThread for CYGWIN, _beginthreadex for all others */
+#ifndef __CYGWIN__
+#define CREATE_THREAD (HANDLE)_beginthreadex( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId )
+#else
+#define CREATE_THREAD CreateThread( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId )
+#endif
+
+/* use ExitThread for CYGWIN, _endthreadex for all others */
+#ifndef __CYGWIN__
+#define EXIT_THREAD _endthreadex(0)
+#else
+#define EXIT_THREAD ExitThread(0)
+#endif
+
 #ifdef _MSC_VER
     #define DYNAMIC_GUID(data) {data}
     #define _INC_MMREG
@@ -3010,7 +3024,7 @@ static DWORD WINAPI ProcessingThread(LPVOID pParam)
     }
 
     PA_LOGL_;
-    _endthreadex(0);
+    EXIT_THREAD;
     return 0;
 }
 
