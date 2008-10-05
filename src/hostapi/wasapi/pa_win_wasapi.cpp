@@ -56,6 +56,8 @@
 #include <functiondiscoverykeys.h>  // PKEY_Device_FriendlyName
 #endif
 
+#include <process.h>
+
 #include "pa_util.h"
 #include "pa_allocation.h"
 #include "pa_hostapi.h"
@@ -73,7 +75,12 @@
 #define PORTAUDIO_SHAREMODE     AUDCLNT_SHAREMODE_SHARED
 //#define PORTAUDIO_SHAREMODE   AUDCLNT_SHAREMODE_EXCLUSIVE
 
-
+/* use CreateThread for CYGWIN, _beginthreadex for all others */
+#ifndef __CYGWIN__
+#define CREATE_THREAD (HANDLE) _beginthreadex(NULL, 0, (unsigned (_stdcall *)(void *))ProcThread, (LPVOID) stream, 0, (unsigned *)&stream->dwThreadId)
+#else
+#define CREATE_THREAD CreateThread(NULL, 0, ProcThread, (LPVOID) stream, 0, &stream->dwThreadId)
+#endif
 
 /* prototypes for functions declared in this file */
 
@@ -1517,14 +1524,8 @@ static PaError StartStream( PaStream *s )
 	}
 
     // Create a thread for this client.
-    stream->hThread = CreateThread(
-        NULL,              // no security attribute
-        0,                 // default stack size
-        ProcThread,
-        (LPVOID) stream,    // thread parameter
-        0,                 // not suspended
-        &stream->dwThreadId);      // returns thread ID
-
+    stream->hThread = CREATE_THREAD;
+        
     if (stream->hThread == NULL)
         return paUnanticipatedHostError;
 
