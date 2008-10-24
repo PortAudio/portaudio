@@ -577,7 +577,7 @@ signed long GetStreamReadAvailable( PaStream* stream )
     VVDBUG(("GetStreamReadAvailable()\n"));
 
     return PaUtil_GetRingBufferReadAvailable( &blio->inputRingBuffer )
-                         / ( blio->outputSampleSizeActual * blio->outChan );
+                         / ( blio->inputSampleSizeActual * blio->inChan );
 }
 
 
