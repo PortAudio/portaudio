@@ -3703,6 +3703,118 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 }
 
 
+/* This routine will be called by the PortAudio engine when audio is needed.
+** It may called at interrupt level on some machines so don't do anything
+** that could mess up the system like calling malloc() or free().
+*/
+static int BlockingIoPaCallback(const void                     *inputBuffer    ,
+                                      void                     *outputBuffer   ,
+                                      unsigned long             framesPerBuffer,
+                                const PaStreamCallbackTimeInfo *timeInfo       ,
+                                      PaStreamCallbackFlags     statusFlags    ,
+                                      void                     *userData       )
+{
+    PaError result = paNoError; /* Initial return value. */
+    PaAsioStream *stream = *(PaAsioStream**)userData; /* The PA ASIO stream. */ /* This is a pointer to "theAsioStream", see OpenStream(). */
+    PaAsioStreamBlockingState *blockingState = stream->blockingState; /* Persume blockingState is valid, otherwise the callback wouldn't be running. */
+
+    /* Get a pointer to the stream's blocking i/o buffer processor. */
+    PaUtilBufferProcessor *pBp = &blockingState->bufferProcessor;
+    PaUtilRingBuffer      *pRb = NULL;
+
+    /* If output data has been requested. */
+    if( stream->outputChannelCount )
+    {
+        /* If the callback input argument signalizes a output underflow,
+           make sure the WriteStream() function knows about it, too! */
+        if( statusFlags & paOutputUnderflowed ) {
+            blockingState->outputUnderflowFlag = TRUE;
+        }
+
+        /* Access the corresponding ring buffer. */
+        pRb = &blockingState->writeRingBuffer;
+
+        /* If the blocking i/o buffer contains enough output data, */
+        if( PaUtil_GetRingBufferReadAvailable(pRb) >= (long) framesPerBuffer )
+        {
+            /* Extract the requested data from the ring buffer. */
+            PaUtil_ReadRingBuffer( pRb, outputBuffer, framesPerBuffer );
+        }
+        else /* If no output data is available :-( */
+        {
+            /* Signalize a write-buffer underflow. */
+            blockingState->outputUnderflowFlag = TRUE;
+
+            /* Fill the output buffer with silence. */
+            (*pBp->outputZeroer)( outputBuffer, 1, pBp->outputChannelCount * framesPerBuffer );
+
+            /* If playback is to be stopped */
+            if( blockingState->stopFlag && PaUtil_GetRingBufferReadAvailable(pRb) < (long) framesPerBuffer )
+            {
+                /* Extract all the remaining data from the ring buffer,
+                   whether it is a complete data block or not. */
+                PaUtil_ReadRingBuffer( pRb, outputBuffer, PaUtil_GetRingBufferReadAvailable(pRb) );
+            }
+        }
+
+        /* Set blocking i/o event? */
+        if( blockingState->writeBuffersRequestedFlag && PaUtil_GetRingBufferWriteAvailable(pRb) >= (long) blockingState->writeBuffersRequested )
+        {
+            /* Reset buffer request. */
+            blockingState->writeBuffersRequestedFlag = FALSE;
+            blockingState->writeBuffersRequested     = 0;
+            /* Signalize that requested buffers are ready. */
+            SetEvent( blockingState->writeBuffersReadyEvent );
+            /* What do we do if SetEvent() returns zero, i.e. the event
+               could not be set? How to return errors from within the
+               callback? - S.Fischer */
+        }
+    }
+
+    /* If input data has been supplied. */
+    if( stream->inputChannelCount )
+    {
+        /* If the callback input argument signalizes a input overflow,
+           make sure the ReadStream() function knows about it, too! */
+        if( statusFlags & paInputOverflowed ) {
+            blockingState->inputOverflowFlag = TRUE;
+        }
+
+        /* Access the corresponding ring buffer. */
+        pRb = &blockingState->readRingBuffer;
+
+        /* If the blocking i/o buffer contains not enough input buffers */
+        if( PaUtil_GetRingBufferWriteAvailable(pRb) < (long) framesPerBuffer )
+        {
+            /* Signalize a read-buffer overflow. */
+            blockingState->inputOverflowFlag = TRUE;
+
+            /* Remove some old data frames from the buffer. */
+            PaUtil_AdvanceRingBufferReadIndex( pRb, framesPerBuffer );
+        }
+
+        /* Insert the current input data into the ring buffer. */
+        PaUtil_WriteRingBuffer( pRb, inputBuffer, framesPerBuffer );
+
+        /* Set blocking i/o event? */
+        if( blockingState->readFramesRequestedFlag && PaUtil_GetRingBufferReadAvailable(pRb) >= (long) blockingState->readFramesRequested )
+        {
+            /* Reset buffer request. */
+            blockingState->readFramesRequestedFlag = FALSE;
+            blockingState->readFramesRequested     = 0;
+            /* Signalize that requested buffers are ready. */
+            SetEvent( blockingState->readFramesReadyEvent );
+            /* What do we do if SetEvent() returns zero, i.e. the event
+               could not be set? How to return errors from within the
+               callback? - S.Fischer */
+            /** @todo report an error with PA_DEBUG */
+        }
+    }
+
+    return paContinue;
+}
+
+
 PaError PaAsio_ShowControlPanel( PaDeviceIndex device, void* systemSpecific )
 {
     PaError result = paNoError;
@@ -3873,120 +3985,3 @@ error:
     return result;
 }
 
-
-
-
-
-
-
-
-/* This routine will be called by the PortAudio engine when audio is needed.
-** It may called at interrupt level on some machines so don't do anything
-** that could mess up the system like calling malloc() or free().
-*/
-static int BlockingIoPaCallback(const void                     *inputBuffer    ,
-                                      void                     *outputBuffer   ,
-                                      unsigned long             framesPerBuffer,
-                                const PaStreamCallbackTimeInfo *timeInfo       ,
-                                      PaStreamCallbackFlags     statusFlags    ,
-                                      void                     *userData       )
-{
-    PaError result = paNoError; /* Initial return value. */
-    PaAsioStream *stream = *(PaAsioStream**)userData; /* The PA ASIO stream. */ /* This is a pointer to "theAsioStream", see OpenStream(). */
-    PaAsioStreamBlockingState *blockingState = stream->blockingState; /* Persume blockingState is valid, otherwise the callback wouldn't be running. */
-
-    /* Get a pointer to the stream's blocking i/o buffer processor. */
-    PaUtilBufferProcessor *pBp = &blockingState->bufferProcessor;
-    PaUtilRingBuffer      *pRb = NULL;
-
-    /* If output data has been requested. */
-    if( stream->outputChannelCount )
-    {
-        /* If the callback input argument signalizes a output underflow,
-           make sure the WriteStream() function knows about it, too! */
-        if( statusFlags & paOutputUnderflowed ) {
-            blockingState->outputUnderflowFlag = TRUE;
-        }
-
-        /* Access the corresponding ring buffer. */
-        pRb = &blockingState->writeRingBuffer;
-
-        /* If the blocking i/o buffer contains enough output data, */
-        if( PaUtil_GetRingBufferReadAvailable(pRb) >= (long) framesPerBuffer )
-        {
-            /* Extract the requested data from the ring buffer. */
-            PaUtil_ReadRingBuffer( pRb, outputBuffer, framesPerBuffer );
-        }
-        else /* If no output data is available :-( */
-        {
-            /* Signalize a write-buffer underflow. */
-            blockingState->outputUnderflowFlag = TRUE;
-
-            /* Fill the output buffer with silence. */
-            (*pBp->outputZeroer)( outputBuffer, 1, pBp->outputChannelCount * framesPerBuffer );
-
-            /* If playback is to be stopped */
-            if( blockingState->stopFlag && PaUtil_GetRingBufferReadAvailable(pRb) < (long) framesPerBuffer )
-            {
-                /* Extract all the remaining data from the ring buffer,
-                   whether it is a complete data block or not. */
-                PaUtil_ReadRingBuffer( pRb, outputBuffer, PaUtil_GetRingBufferReadAvailable(pRb) );
-            }
-        }
-
-        /* Set blocking i/o event? */
-        if( blockingState->writeBuffersRequestedFlag && PaUtil_GetRingBufferWriteAvailable(pRb) >= (long) blockingState->writeBuffersRequested )
-        {
-            /* Reset buffer request. */
-            blockingState->writeBuffersRequestedFlag = FALSE;
-            blockingState->writeBuffersRequested     = 0;
-            /* Signalize that requested buffers are ready. */
-            SetEvent( blockingState->writeBuffersReadyEvent );
-            /* What do we do if SetEvent() returns zero, i.e. the event
-               could not be set? How to return errors from within the
-               callback? - S.Fischer */
-        }
-    }
-
-    /* If input data has been supplied. */
-    if( stream->inputChannelCount )
-    {
-        /* If the callback input argument signalizes a input overflow,
-           make sure the ReadStream() function knows about it, too! */
-        if( statusFlags & paInputOverflowed ) {
-            blockingState->inputOverflowFlag = TRUE;
-        }
-
-        /* Access the corresponding ring buffer. */
-        pRb = &blockingState->readRingBuffer;
-
-        /* If the blocking i/o buffer contains not enough input buffers */
-        if( PaUtil_GetRingBufferWriteAvailable(pRb) < (long) framesPerBuffer )
-        {
-            /* Signalize a read-buffer overflow. */
-            blockingState->inputOverflowFlag = TRUE;
-
-            /* Remove some old data frames from the buffer. */
-            PaUtil_AdvanceRingBufferReadIndex( pRb, framesPerBuffer );
-        }
-
-        /* Insert the current input data into the ring buffer. */
-        PaUtil_WriteRingBuffer( pRb, inputBuffer, framesPerBuffer );
-
-        /* Set blocking i/o event? */
-        if( blockingState->readFramesRequestedFlag && PaUtil_GetRingBufferReadAvailable(pRb) >= (long) blockingState->readFramesRequested )
-        {
-            /* Reset buffer request. */
-            blockingState->readFramesRequestedFlag = FALSE;
-            blockingState->readFramesRequested     = 0;
-            /* Signalize that requested buffers are ready. */
-            SetEvent( blockingState->readFramesReadyEvent );
-            /* What do we do if SetEvent() returns zero, i.e. the event
-               could not be set? How to return errors from within the
-               callback? - S.Fischer */
-            /** @todo report an error with PA_DEBUG */
-        }
-    }
-
-    return paContinue;
-}
