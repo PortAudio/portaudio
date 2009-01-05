@@ -1755,6 +1755,98 @@ static PaError ValidateAsioSpecificStreamInfo(
 }
 
 
+static bool IsUsingExternalClockSource()
+{
+    bool result = false;
+    ASIOError asioError;
+    ASIOClockSource clocks[32];
+    long numSources=32;
+
+    /* davidv: listing ASIO Clock sources. there is an ongoing investigation by
+       me about whether or not to call ASIOSetSampleRate if an external Clock is
+       used. A few drivers expected different things here */
+    
+    asioError = ASIOGetClockSources(clocks, &numSources);
+    if( asioError != ASE_OK ){
+        PA_DEBUG(("ERROR: ASIOGetClockSources: %s\n", PaAsio_GetAsioErrorText(asioError) ));
+    }else{
+        PA_DEBUG(("INFO ASIOGetClockSources listing %d clocks\n", numSources ));
+        for (int i=0;i<numSources;++i){
+            PA_DEBUG(("ASIOClockSource%d %s current:%d\n", i, clocks[i].name, clocks[i].isCurrentSource ));
+           
+            if (clocks[i].isCurrentSource)
+                result = true;
+        }
+    }
+
+    return result;
+}
+
+
+static PaError ValidateAndSetSampleRate( double sampleRate )
+{
+    PaError result = paNoError;
+    ASIOError asioError;
+
+    // check that the device supports the requested sample rate 
+
+    asioError = ASIOCanSampleRate( sampleRate );
+    PA_DEBUG(("ASIOCanSampleRate(%f):%d\n", sampleRate, asioError ));
+
+    if( asioError != ASE_OK )
+    {
+        result = paInvalidSampleRate;
+        PA_DEBUG(("ERROR: ASIOCanSampleRate: %s\n", PaAsio_GetAsioErrorText(asioError) ));
+        goto error;
+    }
+
+    // retrieve the current sample rate, we only change to the requested
+    // sample rate if the device is not already in that rate.
+
+    ASIOSampleRate oldRate;
+    asioError = ASIOGetSampleRate(&oldRate);
+    if( asioError != ASE_OK )
+    {
+        result = paInvalidSampleRate;
+        PA_DEBUG(("ERROR: ASIOGetSampleRate: %s\n", PaAsio_GetAsioErrorText(asioError) ));
+        goto error;
+    }
+    PA_DEBUG(("ASIOGetSampleRate:%f\n",oldRate));
+
+    if (oldRate != sampleRate){
+        /* Set sample rate */
+
+        PA_DEBUG(("before ASIOSetSampleRate(%f)\n",sampleRate));
+
+        /*
+            If you have problems with some drivers when externally clocked, 
+            try switching on the following line and commenting out the one after it.
+            See IsUsingExternalClockSource() for more info.
+        */
+        //if( IsUsingExternalClockSource() ){
+        if( false ){
+            asioError = ASIOSetSampleRate( 0 );
+        }else{
+            asioError = ASIOSetSampleRate( sampleRate );
+        }
+        if( asioError != ASE_OK )
+        {
+            result = paInvalidSampleRate;
+            PA_DEBUG(("ERROR: ASIOSetSampleRate: %s\n", PaAsio_GetAsioErrorText(asioError) ));
+            goto error;
+        }
+        PA_DEBUG(("after ASIOSetSampleRate(%f)\n",sampleRate));
+    }
+    else
+    {
+        PA_DEBUG(("No Need to change SR\n"));
+    }
+
+error:
+    return result;
+}
+
+
 /* see pa_hostapi.h for a list of validity guarantees made about OpenStream  parameters */
 
 static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
@@ -1786,7 +1878,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaAsioDriverInfo *driverInfo;
     int *inputChannelSelectors = 0;
     int *outputChannelSelectors = 0;
-    bool isExternal = false;
 
     /* Are we using blocking i/o interface? */
     int usingBlockingIo = ( !streamCallback ) ? TRUE : FALSE;
@@ -1917,76 +2008,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
     }
 
-
-    /* davidv: listing ASIO Clock sources, there is an ongoing investigation by
-       me about whether or not call ASIOSetSampleRate if an external Clock is
-       used. A few drivers expected different things here */
-    {
-        ASIOClockSource clocks[32];
-        long numSources=32;
-        asioError = ASIOGetClockSources(clocks, &numSources);
-        if( asioError != ASE_OK ){
-            PA_DEBUG(("ERROR: ASIOGetClockSources: %s\n", PaAsio_GetAsioErrorText(asioError) ));
-        }else{
-            PA_DEBUG(("INFO ASIOGetClockSources listing %d clocks\n", numSources ));
-            for (int i=0;i<numSources;++i){
-                PA_DEBUG(("ASIOClockSource%d %s current:%d\n", i,clocks[i].name, clocks[i].isCurrentSource ));
-               
-                /*
-                  If you have problems with some drivers when externally clocked, 
-                  uncomment the next two lines
-                 */
-                //if (clocks[i].isCurrentSource)
-                //    isExternal = true;
-            }
-        }
-    }
-
-    // check that the device supports the requested sample rate 
-
-    asioError = ASIOCanSampleRate( sampleRate );
-    PA_DEBUG(("ASIOCanSampleRate(%f):%d\n",sampleRate, asioError ));
-
-    if( asioError != ASE_OK )
-    {
-        result = paInvalidSampleRate;
-        PA_DEBUG(("ERROR: ASIOCanSampleRate: %s\n", PaAsio_GetAsioErrorText(asioError) ));
+    result = ValidateAndSetSampleRate( sampleRate );
+    if( result != paNoError )
         goto error;
-    }
-
-
-    // retrieve the current sample rate, we only change to the requested
-    // sample rate if the device is not already in that rate.
-
-    ASIOSampleRate oldRate;
-    asioError = ASIOGetSampleRate(&oldRate);
-    if( asioError != ASE_OK )
-    {
-        result = paInvalidSampleRate;
-        PA_DEBUG(("ERROR: ASIOGetSampleRate: %s\n", PaAsio_GetAsioErrorText(asioError) ));
-        goto error;
-    }
-    PA_DEBUG(("ASIOGetSampleRate:%f\n",oldRate));
-
-    if (oldRate != sampleRate){
-
-        PA_DEBUG(("before ASIOSetSampleRate(%f)\n",sampleRate));
-
-        asioError = ASIOSetSampleRate( isExternal?0:sampleRate );
-        /* Set sample rate */
-        if( asioError != ASE_OK )
-        {
-            result = paInvalidSampleRate;
-            PA_DEBUG(("ERROR: ASIOSetSampleRate: %s\n", PaAsio_GetAsioErrorText(asioError) ));
-            goto error;
-        }
-        PA_DEBUG(("after ASIOSetSampleRate(%f)\n",sampleRate));
-    }
-    else
-    {
-        PA_DEBUG(("No Need to change SR\n"));
-    }
-
 
     /*
         IMPLEMENT ME:
@@ -3994,5 +4018,54 @@ PaError PaAsio_GetOutputChannelName( PaDeviceIndex device, int channelIndex,
     
 error:
     return result;
+}
+
+
+/* NOTE: the following functions are ASIO-stream specific, and are called directly
+    by client code. We need to check for many more error conditions here because
+    we don't have the benefit of pa_front.c's parameter checking.
+*/
+
+static PaError GetAsioStreamPointer( PaAsioStream **stream, PaStream *s )
+{
+    PaError result;
+    PaUtilHostApiRepresentation *hostApi;
+    PaAsioHostApiRepresentation *asioHostApi;
+    
+    result = PaUtil_ValidateStreamPointer( s );
+    if( result != paNoError )
+        return result;
+
+    result = PaUtil_GetHostApiRepresentation( &hostApi, paASIO );
+    if( result != paNoError )
+        return result;
+
+    asioHostApi = (PaAsioHostApiRepresentation*)hostApi;
+    
+    if( PA_STREAM_REP( s )->streamInterface == &asioHostApi->callbackStreamInterface
+            || PA_STREAM_REP( s )->streamInterface == &asioHostApi->blockingStreamInterface )
+    {
+        /* s is an ASIO  stream */
+        *stream = (PaAsioStream *)s;
+        return paNoError;
+    }
+    else
+    {
+        return paIncompatibleStreamHostApi;
+    }
+}
+
+
+PaError PaAsio_SetStreamSampleRate( PaStream* s, double sampleRate )
+{
+    PaAsioStream *stream;
+    PaError result = GetAsioStreamPointer( &stream, s );
+    if( result != paNoError )
+        return result;
+
+    if( stream != theAsioStream )
+        return paBadStreamPtr;
+
+    return ValidateAndSetSampleRate( sampleRate );
 }
 
