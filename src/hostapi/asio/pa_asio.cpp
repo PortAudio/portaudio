@@ -1620,6 +1620,7 @@ typedef struct PaAsioStream
     HANDLE completedBuffersPlayedEvent;
 
     bool streamFinishedCallbackCalled;
+    int isStopped;
     volatile int isActive;
     volatile bool zeroOutput; /* all future calls to the callback will output silence */
 
@@ -1806,6 +1807,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         PA_DEBUG(("OpenStream paDeviceUnavailable\n"));
         return paDeviceUnavailable;
     }
+
+    assert( theAsioStream == 0 );
 
     if( inputParameters && outputParameters )
     {
@@ -2028,7 +2031,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         /* Blocking i/o is implemented by running callback mode, using a special blocking i/o callback. */
         streamCallback = BlockingIoPaCallback; /* Setup PA to use the ASIO blocking i/o callback. */
-        userData       = &theAsioStream;       /* The callback user data will be the PA ASIO stream. */
+        userData       = &stream;       /* The callback user data will be the PA ASIO stream. */
         PaUtil_InitializeStreamRepresentation( &stream->streamRepresentation,
                                                &asioHostApi->blockingStreamInterface, streamCallback, userData );
     }
@@ -2544,10 +2547,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->inputChannelCount = inputChannelCount;
     stream->outputChannelCount = outputChannelCount;
     stream->postOutput = driverInfo->postOutput;
+    stream->isStopped = 1;
     stream->isActive = 0;
-
+    
     asioHostApi->openAsioDeviceIndex = asioDeviceIndex;
 
+    theAsioStream = stream;
     *s = (PaStream*)stream;
 
     return result;
@@ -2654,6 +2659,8 @@ static PaError CloseStream( PaStream* s )
 
     ASIODisposeBuffers();
     UnloadAsioDriver();
+
+    theAsioStream = 0;
 
     return result;
 }
@@ -3156,16 +3163,19 @@ static PaError StartStream( PaStream *s )
 
     if( result == paNoError )
     {
-        theAsioStream = stream;
+        assert( theAsioStream == stream ); /* theAsioStream should be set correctly in OpenStream */
+
+        /* initialize these variables before the callback has a chance to be invoked */
+        stream->isStopped = 0;
+        stream->isActive = 1;
+        stream->streamFinishedCallbackCalled = false;
+
         asioError = ASIOStart();
-        if( asioError == ASE_OK )
+        if( asioError != ASE_OK )
         {
-            stream->isActive = 1;
-            stream->streamFinishedCallbackCalled = false;
-        }
-        else
-        {
-            theAsioStream = 0;
+            stream->isStopped = 1;
+            stream->isActive = 0;
+
             result = paUnanticipatedHostError;
             PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
         }
@@ -3174,6 +3184,18 @@ static PaError StartStream( PaStream *s )
     return result;
 }
 
+static void EnsureCallbackHasCompleted( PaAsioStream *stream )
+{
+    // make sure that the callback is not still in-flight after ASIOStop()
+    // returns. This has been observed to happen on the Hoontech DSP24 for
+    // example.
+    int count = 2000;  // only wait for 2 seconds, rather than hanging.
+    while( stream->reenterCount != -1 && count > 0 )
+    {
+        Sleep(1);
+        --count;
+    }
+}
 
 static PaError StopStream( PaStream *s )
 {
@@ -3224,7 +3246,7 @@ static PaError StopStream( PaStream *s )
             length is longer than the asio buffer size then that should
             be taken into account.
         */
-        if( WaitForSingleObject( theAsioStream->completedBuffersPlayedEvent,
+        if( WaitForSingleObject( stream->completedBuffersPlayedEvent,
                 (DWORD)(stream->streamRepresentation.streamInfo.outputLatency * 1000. * 4.) )
                     == WAIT_TIMEOUT )
         {
@@ -3233,13 +3255,17 @@ static PaError StopStream( PaStream *s )
     }
 
     asioError = ASIOStop();
-    if( asioError != ASE_OK )
+    if( asioError == ASE_OK )
+    {
+        EnsureCallbackHasCompleted( stream );
+    }
+    else
     {
         result = paUnanticipatedHostError;
         PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
     }
 
-    theAsioStream = 0;
+    stream->isStopped = 1;
     stream->isActive = 0;
 
     if( !stream->streamFinishedCallbackCalled )
@@ -3251,7 +3277,6 @@ static PaError StopStream( PaStream *s )
     return result;
 }
 
-
 static PaError AbortStream( PaStream *s )
 {
     PaError result = paNoError;
@@ -3261,31 +3286,17 @@ static PaError AbortStream( PaStream *s )
     stream->zeroOutput = true;
 
     asioError = ASIOStop();
-    if( asioError != ASE_OK )
+    if( asioError == ASE_OK )
+    {
+        EnsureCallbackHasCompleted( stream );
+    }
+    else
     {
         result = paUnanticipatedHostError;
         PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
     }
-    else
-    {
-        // make sure that the callback is not still in-flight when ASIOStop()
-        // returns. This has been observed to happen on the Hoontech DSP24 for
-        // example.
-        int count = 2000;  // only wait for 2 seconds, rather than hanging.
-        while( theAsioStream->reenterCount != -1 && count > 0 )
-        {
-            Sleep(1);
-            --count;
-        }
-    }
 
-    /* it is questionable whether we should zero theAsioStream if ASIOStop()
-        returns an error, because the callback could still be active. We assume
-        not - this is based on the fact that ASIOStop is unlikely to fail
-        if the callback is running - it's more likely to fail because the
-        callback is not running. */
-        
-    theAsioStream = 0;
+    stream->isStopped = 1;
     stream->isActive = 0;
 
     if( !stream->streamFinishedCallbackCalled )
@@ -3300,9 +3311,9 @@ static PaError AbortStream( PaStream *s )
 
 static PaError IsStreamStopped( PaStream *s )
 {
-    //PaAsioStream *stream = (PaAsioStream*)s;
-    (void) s; /* unused parameter */
-    return theAsioStream == 0;
+    PaAsioStream *stream = (PaAsioStream*)s;
+    
+    return stream->isStopped;
 }
 
 
@@ -3715,7 +3726,7 @@ static int BlockingIoPaCallback(const void                     *inputBuffer    ,
                                       void                     *userData       )
 {
     PaError result = paNoError; /* Initial return value. */
-    PaAsioStream *stream = *(PaAsioStream**)userData; /* The PA ASIO stream. */ /* This is a pointer to "theAsioStream", see OpenStream(). */
+    PaAsioStream *stream = *(PaAsioStream**)userData; /* The PA ASIO stream. */
     PaAsioStreamBlockingState *blockingState = stream->blockingState; /* Persume blockingState is valid, otherwise the callback wouldn't be running. */
 
     /* Get a pointer to the stream's blocking i/o buffer processor. */
