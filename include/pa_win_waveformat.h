@@ -157,16 +157,34 @@ typedef struct{
 #define PAWIN_INDEXOF_DWCHANNELMASK			(PAWIN_SIZEOF_WAVEFORMATEX+2)
 #define PAWIN_INDEXOF_SUBFORMAT				(PAWIN_SIZEOF_WAVEFORMATEX+6)
 
+
+/*
+    Valid values to pass for the waveFormatTag PaWin_InitializeWaveFormatEx and
+    PaWin_InitializeWaveFormatExtensible functions below. These must match
+    the standard Windows WAVE_FORMAT_* values.
+*/
+#define PAWIN_WAVE_FORMAT_PCM               (1)
+#define PAWIN_WAVE_FORMAT_IEEE_FLOAT        (3)
+#define PAWIN_WAVE_FORMAT_DOLBY_AC3_SPDIF   (0x0092)
+#define PAWIN_WAVE_FORMAT_WMA_SPDIF         (0x0164)
+
+
+/*
+    returns PAWIN_WAVE_FORMAT_PCM or PAWIN_WAVE_FORMAT_IEEE_FLOAT
+    depending on the sampleFormat parameter.
+*/
+int PaWin_SampleFormatToLinearWaveFormatTag( PaSampleFormat sampleFormat );
+
 /*
 	Use the following two functions to initialize the waveformat structure.
 */
 
 void PaWin_InitializeWaveFormatEx( PaWinWaveFormat *waveFormat, 
-		int numChannels, PaSampleFormat sampleFormat, double sampleRate );
+		int numChannels, PaSampleFormat sampleFormat, int waveFormatTag, double sampleRate );
 
 
 void PaWin_InitializeWaveFormatExtensible( PaWinWaveFormat *waveFormat, 
-		int numChannels, PaSampleFormat sampleFormat, double sampleRate,
+		int numChannels, PaSampleFormat sampleFormat, int waveFormatTag, double sampleRate,
 	    PaWinWaveFormatChannelMask channelMask );
 
 

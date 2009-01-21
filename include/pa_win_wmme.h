@@ -64,6 +64,10 @@ extern "C"
 */
 #define paWinMmeDontThrottleOverloadedProcessingThread  (0x08)
 
+/* flags for non-PCM spdif passthrough */
+#define paWinMmeWaveFormatDolbyAc3Spdif                 (0x10)
+#define paWinMmeWaveFormatWmaSpdif                      (0x20)
+
 
 typedef struct PaWinMmeDeviceAndChannelCount{
     PaDeviceIndex device;

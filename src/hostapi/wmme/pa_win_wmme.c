@@ -556,12 +556,14 @@ static PaError QueryFormatSupported( PaDeviceInfo *deviceInfo,
 
     /* @todo at the moment we only query with 16 bit sample format and directout speaker config*/
     PaWin_InitializeWaveFormatExtensible( &waveFormat, channels, 
-            paInt16, sampleRate, PAWIN_SPEAKER_DIRECTOUT );
+            paInt16, PaWin_SampleFormatToLinearWaveFormatTag( paInt16 ),
+            sampleRate, PAWIN_SPEAKER_DIRECTOUT );
 
     if( waveFormatExQueryFunction( winMmeDeviceId, (WAVEFORMATEX*)&waveFormat ) == paNoError )
         return paNoError;
 
-    PaWin_InitializeWaveFormatEx( &waveFormat, channels, paInt16, sampleRate );
+    PaWin_InitializeWaveFormatEx( &waveFormat, channels, paInt16, 
+            PaWin_SampleFormatToLinearWaveFormatTag( paInt16 ), sampleRate );
 
     return waveFormatExQueryFunction( winMmeDeviceId, (WAVEFORMATEX*)&waveFormat );
 }
@@ -1683,6 +1685,7 @@ typedef struct
 static void InitializeSingleDirectionHandlesAndBuffers( PaWinMmeSingleDirectionHandlesAndBuffers *handlesAndBuffers );
 static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostApi,
         PaWinMmeSingleDirectionHandlesAndBuffers *handlesAndBuffers,
+        unsigned long winMmeSpecificFlags,
         unsigned long bytesPerHostSample,
         double sampleRate, PaWinMmeDeviceAndChannelCount *devices,
         unsigned int deviceCount, PaWinWaveFormatChannelMask channelMask, int isInput );
@@ -1707,6 +1710,7 @@ static void InitializeSingleDirectionHandlesAndBuffers( PaWinMmeSingleDirectionH
 
 static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostApi,
         PaWinMmeSingleDirectionHandlesAndBuffers *handlesAndBuffers,
+        unsigned long winMmeSpecificFlags,
         unsigned long bytesPerHostSample,
         double sampleRate, PaWinMmeDeviceAndChannelCount *devices,
         unsigned int deviceCount, PaWinWaveFormatChannelMask channelMask, int isInput )
@@ -1714,6 +1718,8 @@ static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostA
     PaError result;
     MMRESULT mmresult;
     signed int i, j;
+    PaSampleFormat sampleFormat;
+    int waveFormatTag;
 
     /* for error cleanup we expect that InitializeSingleDirectionHandlesAndBuffers()
         has already been called to zero some fields */       
@@ -1741,6 +1747,15 @@ static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostA
             ((HWAVEOUT*)handlesAndBuffers->waveHandles)[i] = 0;
     }
 
+    /* @todo at the moment we only use 16 bit sample format */
+    sampleFormat = paInt16;
+    waveFormatTag = PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat );
+
+    if( winMmeSpecificFlags & paWinMmeWaveFormatDolbyAc3Spdif )
+        waveFormatTag = PAWIN_WAVE_FORMAT_DOLBY_AC3_SPDIF;
+    else if( winMmeSpecificFlags & paWinMmeWaveFormatWmaSpdif )
+        waveFormatTag = PAWIN_WAVE_FORMAT_WMA_SPDIF;
+
     for( i = 0; i < (signed int)deviceCount; ++i )
     {
         PaWinWaveFormat waveFormat;
@@ -1756,16 +1771,16 @@ static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostA
                 /* first, attempt to open the device using WAVEFORMATEXTENSIBLE, 
                     if this fails we fall back to WAVEFORMATEX */
 
-                /* @todo at the moment we only use 16 bit sample format */
                 PaWin_InitializeWaveFormatExtensible( &waveFormat, devices[i].channelCount, 
-                        paInt16, sampleRate, channelMask );
+                        sampleFormat, waveFormatTag, sampleRate, channelMask );
 
             }
             else
             {
                 /* retry with WAVEFORMATEX */
 
-                PaWin_InitializeWaveFormatEx( &waveFormat, devices[i].channelCount, paInt16, sampleRate );
+                PaWin_InitializeWaveFormatEx( &waveFormat, devices[i].channelCount, 
+                        sampleFormat, waveFormatTag, sampleRate );
             }
 
             /* REVIEW: consider not firing an event for input when a full duplex
@@ -2070,6 +2085,7 @@ struct PaWinMmeStream
 static PaError ValidateWinMmeSpecificStreamInfo(
         const PaStreamParameters *streamParameters,
         const PaWinMmeStreamInfo *streamInfo,
+        unsigned long *winMmeSpecificFlags,
         char *throttleProcessingThreadOnOverload,
         unsigned long *deviceCount )
 {
@@ -2080,6 +2096,8 @@ static PaError ValidateWinMmeSpecificStreamInfo(
 	    {
 	        return paIncompatibleHostApiSpecificStreamInfo;
 	    }
+
+        *winMmeSpecificFlags = streamInfo->flags;
 
 	    if( streamInfo->flags & paWinMmeDontThrottleOverloadedProcessingThread )
 	        *throttleProcessingThreadOnOverload = 0;
@@ -2224,8 +2242,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     unsigned long hostOutputBufferCount;
     unsigned long framesPerBufferProcessorCall;
     PaWinMmeDeviceAndChannelCount *inputDevices = 0;  /* contains all devices and channel counts as local host api ids, even when PaWinMmeUseMultipleDevices is not used */
+    unsigned long winMmeSpecificInputFlags = 0;
     unsigned long inputDeviceCount = 0;            
     PaWinMmeDeviceAndChannelCount *outputDevices = 0;
+    unsigned long winMmeSpecificOutputFlags = 0;
     unsigned long outputDeviceCount = 0;                /* contains all devices and channel counts as local host api ids, even when PaWinMmeUseMultipleDevices is not used */
     char throttleProcessingThreadOnOverload = 1;
 
@@ -2241,6 +2261,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		/* validate input hostApiSpecificStreamInfo */
         inputStreamInfo = (PaWinMmeStreamInfo*)inputParameters->hostApiSpecificStreamInfo;
 		result = ValidateWinMmeSpecificStreamInfo( inputParameters, inputStreamInfo,
+                &winMmeSpecificInputFlags,
 				&throttleProcessingThreadOnOverload,
 				&inputDeviceCount );
 		if( result != paNoError ) return result;
@@ -2290,6 +2311,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		/* validate output hostApiSpecificStreamInfo */
         outputStreamInfo = (PaWinMmeStreamInfo*)outputParameters->hostApiSpecificStreamInfo;
 		result = ValidateWinMmeSpecificStreamInfo( outputParameters, outputStreamInfo,
+                &winMmeSpecificOutputFlags,
 				&throttleProcessingThreadOnOverload,
 				&outputDeviceCount );
 		if( result != paNoError ) return result;
@@ -2437,6 +2459,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( inputParameters )
     {
         result = InitializeWaveHandles( winMmeHostApi, &stream->input,
+                winMmeSpecificInputFlags,
                 stream->bufferProcessor.bytesPerHostInputSample, sampleRate,
                 inputDevices, inputDeviceCount, inputChannelMask, 1 /* isInput */ );
         if( result != paNoError ) goto error;
@@ -2445,6 +2468,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( outputParameters )
     {
         result = InitializeWaveHandles( winMmeHostApi, &stream->output,
+                winMmeSpecificOutputFlags,
                 stream->bufferProcessor.bytesPerHostOutputSample, sampleRate,
                 outputDevices, outputDeviceCount, outputChannelMask, 0 /* isInput */ );
         if( result != paNoError ) goto error;

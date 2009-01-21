@@ -1401,12 +1401,14 @@ static HRESULT InitInputBuffer( PaWinDsStream *stream, PaSampleFormat sampleForm
 
     // first try WAVEFORMATEXTENSIBLE. if this fails, fall back to WAVEFORMATEX
     PaWin_InitializeWaveFormatExtensible( &waveFormat, nChannels, 
-                sampleFormat, nFrameRate, channelMask );
+                sampleFormat, PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat ),
+                nFrameRate, channelMask );
 
     if( IDirectSoundCapture_CreateCaptureBuffer( stream->pDirectSoundCapture,
                   &captureDesc, &stream->pDirectSoundInputBuffer, NULL) != DS_OK )
     {
-        PaWin_InitializeWaveFormatEx( &waveFormat, nChannels, sampleFormat, nFrameRate );
+        PaWin_InitializeWaveFormatEx( &waveFormat, nChannels, sampleFormat, 
+                PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat ), nFrameRate );
 
         if ((result = IDirectSoundCapture_CreateCaptureBuffer( stream->pDirectSoundCapture,
                     &captureDesc, &stream->pDirectSoundInputBuffer, NULL)) != DS_OK) return result;
@@ -1477,11 +1479,13 @@ static HRESULT InitOutputBuffer( PaWinDsStream *stream, PaSampleFormat sampleFor
 
     // first try WAVEFORMATEXTENSIBLE. if this fails, fall back to WAVEFORMATEX
     PaWin_InitializeWaveFormatExtensible( &waveFormat, nChannels, 
-                sampleFormat, nFrameRate, channelMask );
+                sampleFormat, PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat ),
+                nFrameRate, channelMask );
 
     if( IDirectSoundBuffer_SetFormat( pPrimaryBuffer, (WAVEFORMATEX*)&waveFormat) != DS_OK )
     {
-        PaWin_InitializeWaveFormatEx( &waveFormat, nChannels, sampleFormat, nFrameRate );
+        PaWin_InitializeWaveFormatEx( &waveFormat, nChannels, sampleFormat, 
+                PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat ), nFrameRate );
 
         if((result = IDirectSoundBuffer_SetFormat( pPrimaryBuffer, (WAVEFORMATEX*)&waveFormat)) != DS_OK) return result;
     }
