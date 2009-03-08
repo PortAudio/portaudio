@@ -473,12 +473,14 @@ static UINT LocalDeviceIndexToWinMmeDeviceId( PaWinMmeHostApiRepresentation *hos
 
 static int SampleFormatAndWinWmmeSpecificFlagsToLinearWaveFormatTag( PaSampleFormat sampleFormat, unsigned long winMmeSpecificFlags )
 {
-    int waveFormatTag = PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat );
+    int waveFormatTag = 0;
 
     if( winMmeSpecificFlags & paWinMmeWaveFormatDolbyAc3Spdif )
         waveFormatTag = PAWIN_WAVE_FORMAT_DOLBY_AC3_SPDIF;
     else if( winMmeSpecificFlags & paWinMmeWaveFormatWmaSpdif )
         waveFormatTag = PAWIN_WAVE_FORMAT_WMA_SPDIF;
+    else
+        waveFormatTag = PaWin_SampleFormatToLinearWaveFormatTag( sampleFormat );
 
     return waveFormatTag;
 }
