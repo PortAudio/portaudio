@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
               &outputParameters,
               SAMPLE_RATE,
               FRAMES_PER_BUFFER,
-              paClipOff | paDitherOff,  /* IMPORTANT must disable clipping and dithering for WMME AC3 */
+              0,
               patestCallback,
               &data );
     if( err != paNoError ) goto error;

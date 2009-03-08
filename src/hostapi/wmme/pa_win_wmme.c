@@ -2389,6 +2389,14 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidFlag; /* unexpected platform specific flag */
 
 
+    /* always disable clipping and dithering if we are outputting a raw spdif stream */
+    if( (winMmeSpecificOutputFlags & paWinMmeWaveFormatDolbyAc3Spdif)
+            || (winMmeSpecificOutputFlags & paWinMmeWaveFormatWmaSpdif) ){
+
+        streamFlags = streamFlags | paClipOff | paDitherOff;
+    }
+
+
     result = CalculateBufferSettings( &framesPerHostInputBuffer, &hostInputBufferCount,
                 &framesPerHostOutputBuffer, &hostOutputBufferCount,
                 inputChannelCount, hostInputSampleFormat, suggestedInputLatency, inputStreamInfo,
