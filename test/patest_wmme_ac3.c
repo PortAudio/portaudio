@@ -111,22 +111,23 @@ int main(int argc, char* argv[])
     int i;
     int deviceIndex;
     FILE *fp;
-    const char *fileName = "c:\\test_48k.ac3";
+    const char *fileName = "c:\\test_48k.ac3.spdif";
     data.buffer = NULL;
 
     printf("usage: patest_wmme_ac3 fileName [paDeviceIndex]\n");
-
-    printf("PortAudio Test: output a raw ac3 stream. SR = %d, BufSize = %d, Chans = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER, CHANNEL_COUNT);
+    printf("**IMPORTANT*** The provided file must include the spdif preamble at the start of every AC-3 frame. Using a normal ac3 file won't work."
+    printf("PortAudio Test: output a raw spdif ac3 stream. SR = %d, BufSize = %d, Chans = %d\n", 
+            SAMPLE_RATE, FRAMES_PER_BUFFER, CHANNEL_COUNT);
 
         
     if( argc >= 2 )
         fileName = argv[1];
 
-    printf( "reading ac3 raw stream file %s\n", fileName );
+    printf( "reading spdif ac3 raw stream file %s\n", fileName );
 
     fp = fopen( fileName, "rb" );
     if( !fp ){
-        fprintf( stderr, "error opening ac3 file.\n" );
+        fprintf( stderr, "error opening spdif ac3 file.\n" );
         return -1;
     }
     /* get file size */
