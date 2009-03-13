@@ -997,7 +997,7 @@ static unsigned long AdaptingInputOnlyProcess( PaUtilBufferProcessor *bp,
                         bp->framesPerUserBuffer, bp->timeInfo,
                         bp->callbackStatusFlags, bp->userData );
 
-                bp->timeInfo->inputBufferAdcTime += frameCount * bp->samplePeriod;
+                bp->timeInfo->inputBufferAdcTime += bp->framesPerUserBuffer * bp->samplePeriod;
             }
             
             bp->framesInTempInputBuffer = 0;
