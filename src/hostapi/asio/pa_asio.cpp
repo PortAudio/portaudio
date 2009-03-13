@@ -2055,7 +2055,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         /* Blocking i/o is implemented by running callback mode, using a special blocking i/o callback. */
         streamCallback = BlockingIoPaCallback; /* Setup PA to use the ASIO blocking i/o callback. */
-        userData       = &stream;       /* The callback user data will be the PA ASIO stream. */
+        userData       = &theAsioStream;       /* The callback user data will be the PA ASIO stream. */
         PaUtil_InitializeStreamRepresentation( &stream->streamRepresentation,
                                                &asioHostApi->blockingStreamInterface, streamCallback, userData );
     }
@@ -3470,11 +3470,8 @@ static PaError ReadStream( PaStream      *s     ,
                     /* If block processing has stopped, abort! */
                     if( blockingState->stopFlag ) { return result = paStreamIsStopped; }
 
-                    /* if a timeout is encountered, continue, perhaps we should give up eventually */
-                    continue;
-                    /* To give up eventually, we may increase the time out
-                       period and return an error if it fails anyway. */
-                    /* retrun result = paTimedOut; */
+                    /* If a timeout is encountered, give up eventually. */
+                    return result = paTimedOut;
                 }
             }
             /* Now, the ring buffer contains the required amount of data
@@ -3644,11 +3641,9 @@ static PaError WriteStream( PaStream      *s     ,
 
                     /* If block processing has stopped, abort! */
                     if( blockingState->stopFlag ) { return result = paStreamIsStopped; }
-                    /* if a timeout is encountered, continue, perhaps we should give up eventually */
-                    continue;
-                    /* To give up eventually, we may increase the time out
-                       period and return an error if it fails anyway. */
-                    /* retrun result = paTimedOut; */
+                    
+                    /* If a timeout is encountered, give up eventually. */
+                    return result = paTimedOut;
                 }
             }
             /* Now, the ring buffer contains the required amount of free
