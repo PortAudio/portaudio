@@ -518,7 +518,7 @@ PaError PaWinWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApi
 					if (value.pwszVal)
 						wcstombs(deviceName,   value.pwszVal,MAX_STR_LEN-1); //todo proper size	
 					else{
-						sprintf(deviceName,"baddev%d",i);
+						_snprintf_s(deviceName,MAX_STR_LEN-1,MAX_STR_LEN-1,"baddev%d",i);
 					}
 
                     deviceInfo->name = deviceName;
@@ -956,9 +956,9 @@ GetClosestFormat(IAudioClient * myClient, double sampleRate,const  PaStreamParam
 	HRESULT hResult=!S_OK;
 
 	if (*shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
-		hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,(WAVEFORMATEX*)outWavex,NULL);
+		hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,&outWavex->Format,NULL);
 	else
-		hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED,   (WAVEFORMATEX*)&outWavex,&sharedClosestMatch);
+		hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED,   &outWavex->Format,&sharedClosestMatch);
 
 	if (hResult == S_OK)
 		answer = paFormatIsSupported;
@@ -990,9 +990,9 @@ GetClosestFormat(IAudioClient * myClient, double sampleRate,const  PaStreamParam
 			WAVEFORMATEXTENSIBLE ext;
 			wasapiFillWFEXT(&ext,BestToWorst[i],sampleRate,params->channelCount);		
 			if (*shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
-				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,(WAVEFORMATEX*)&ext,NULL);
+				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,&ext.Format,NULL);
 			else
-				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED,   (WAVEFORMATEX*)&ext,&sharedClosestMatch);
+				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED,   &ext.Format,&sharedClosestMatch);
 
 			if (hResult == S_OK){
 				memcpy(outWavex,&ext,sizeof(WAVEFORMATEXTENSIBLE));
@@ -1015,9 +1015,9 @@ GetClosestFormat(IAudioClient * myClient, double sampleRate,const  PaStreamParam
 			pcm16WaveFormat.cbSize = 0;
 
 			if (*shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
-				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,(WAVEFORMATEX*)&pcm16WaveFormat,NULL);
+				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE,&pcm16WaveFormat,NULL);
 			else
-				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED,   (WAVEFORMATEX*)&pcm16WaveFormat,&sharedClosestMatch);
+				hResult = myClient->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED,   &pcm16WaveFormat,&sharedClosestMatch);
 
 			if (hResult == S_OK){
 				memcpy(outWavex,&pcm16WaveFormat,sizeof(WAVEFORMATEX));
