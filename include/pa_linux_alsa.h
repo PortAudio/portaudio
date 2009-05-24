@@ -87,6 +87,11 @@ PaError PaAlsa_GetStreamOutputCard( PaStream *s, int *card );
  */
 PaError PaAlsa_SetNumPeriods( int numPeriods );
 
+/** Set the maximum number of times to retry opening busy device (sleeping for a
+ * short interval inbetween).
+ */
+PaError PaAlsa_SetRetriesBusy( int retries );
+
 #ifdef __cplusplus
 }
 #endif

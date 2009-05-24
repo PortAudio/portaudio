@@ -100,6 +100,7 @@
 
 static int aErr_;               /* Used with ENSURE_ */
 static int numPeriods_ = 4;
+static int busyRetries_ = 100;
 
 int PaAlsa_SetNumPeriods( int numPeriods )
 {
@@ -539,7 +540,7 @@ static int IgnorePlugin( const char *pluginId )
  **/
 static int OpenPcm( snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream, int mode, int waitOnBusy )
 {
-    int tries = 0, maxTries = waitOnBusy ? 100 : 0;
+    int tries = 0, maxTries = waitOnBusy ? busyRetries_ : 0;
     int ret = snd_pcm_open( pcmp, name, stream, mode );
     for( tries = 0; tries < maxTries && -EBUSY == ret; ++tries )
     {
@@ -3669,4 +3670,10 @@ PaError PaAlsa_GetStreamOutputCard(PaStream* s, int* card) {
 
 error:
     return result;
+}
+
+PaError PaAlsa_SetRetriesBusy( int retries )
+{
+    busyRetries_ = retries;
+    return paNoError;
 }
