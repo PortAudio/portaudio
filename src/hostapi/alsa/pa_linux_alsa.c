@@ -2003,11 +2003,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     /* Ok, buffer processor is initialized, now we can deduce it's latency */
     if( numInputChannels > 0 )
-        stream->streamRepresentation.streamInfo.inputLatency = inputLatency + PaUtil_GetBufferProcessorInputLatency(
-                &stream->bufferProcessor );
+        stream->streamRepresentation.streamInfo.inputLatency = inputLatency + (PaTime)(
+                PaUtil_GetBufferProcessorInputLatency( &stream->bufferProcessor ) / sampleRate);
     if( numOutputChannels > 0 )
-        stream->streamRepresentation.streamInfo.outputLatency = outputLatency + PaUtil_GetBufferProcessorOutputLatency(
-                &stream->bufferProcessor );
+        stream->streamRepresentation.streamInfo.outputLatency = outputLatency + (PaTime)(
+                PaUtil_GetBufferProcessorOutputLatency( &stream->bufferProcessor ) / sampleRate);
 
     *s = (PaStream*)stream;
 
