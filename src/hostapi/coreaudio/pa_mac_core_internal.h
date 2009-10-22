@@ -61,9 +61,10 @@
 #ifndef PA_MAC_CORE_INTERNAL_H__
 #define PA_MAC_CORE_INTERNAL_H__
 
+#include <CoreAudio/CoreAudio.h>
+#include <CoreServices/CoreServices.h>
 #include <AudioUnit/AudioUnit.h>
 #include <AudioToolbox/AudioToolbox.h>
-
 
 #include "portaudio.h"
 #include "pa_util.h"
