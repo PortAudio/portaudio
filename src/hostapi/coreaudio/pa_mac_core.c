@@ -1714,19 +1714,18 @@ static OSStatus ringBufferIOProc( AudioConverterRef inAudioConverter,
                              void*inUserData )
 {
    void *dummyData;
-   long dummySize;
+   ring_buffer_size_t dummySize;
    PaUtilRingBuffer *rb = (PaUtilRingBuffer *) inUserData;
 
    VVDBUG(("ringBufferIOProc()\n"));
 
-   assert( sizeof( UInt32 ) == sizeof( long ) );
    if( PaUtil_GetRingBufferReadAvailable( rb ) == 0 ) {
       *outData = NULL;
       *ioDataSize = 0;
       return RING_BUFFER_EMPTY;
    }
    PaUtil_GetRingBufferReadRegions( rb, *ioDataSize,
-                                    outData, (long *)ioDataSize, 
+                                    outData, (ring_buffer_size_t *)ioDataSize, 
                                     &dummyData, &dummySize );
       
    assert( *ioDataSize );
@@ -1938,7 +1937,7 @@ static OSStatus AudioIOProc( void *inRefCon,
                because we have to do a little buffer processing that the
                AudioConverter would otherwise handle for us. */
             void *data1, *data2;
-            long size1, size2;
+            ring_buffer_size_t size1, size2;
             PaUtil_GetRingBufferReadRegions( &stream->inputRingBuffer,
                                              inChan*frames*flsz,
                                              &data1, &size1,
