@@ -1724,6 +1724,7 @@ static OSStatus ringBufferIOProc( AudioConverterRef inAudioConverter,
       *ioDataSize = 0;
       return RING_BUFFER_EMPTY;
    }
+   assert(sizeof(UInt32) == sizeof(ring_buffer_size_t));
    PaUtil_GetRingBufferReadRegions( rb, *ioDataSize,
                                     outData, (ring_buffer_size_t *)ioDataSize, 
                                     &dummyData, &dummySize );
