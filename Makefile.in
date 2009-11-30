@@ -84,6 +84,7 @@ TESTS = \
 	bin/patest_sine_channelmaps \
 	bin/patest_sine_formats \
 	bin/patest_sine_time \
+	bin/patest_sine_srate \
 	bin/patest_start_stop \
 	bin/patest_stop \
 	bin/patest_stop_playout \

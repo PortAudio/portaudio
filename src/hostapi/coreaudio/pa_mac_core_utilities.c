@@ -61,6 +61,7 @@
 #include <libkern/OSAtomic.h>
 #include <strings.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 PaError PaMacCore_SetUnixError( int err, int line )
 {
@@ -305,8 +306,13 @@ long computeRingBufferSize( const PaStreamParameters *inputParameters,
 /*
  * Durring testing of core audio, I found that serious crashes could occur
  * if properties such as sample rate were changed multiple times in rapid
- * succession. The function below has some fancy logic to make sure that changes
- * are acknowledged before another is requested. That seems to help a lot.
+ * succession. The function below could be used to with a condition variable.
+ * to prevent propertychanges from happening until the last property
+ * change is acknowledged. Instead, I implemented a busy-wait, which is simpler
+ * to implement b/c in second round of testing (nov '09) property changes occured
+ * quickly and so there was no real way to test the condition variable implementation.
+ * therefore, this function is not used, but it is aluded to in commented code below,
+ * since it represents a theoretically better implementation.
  */
 
 OSStatus propertyProc(
@@ -316,9 +322,7 @@ OSStatus propertyProc(
     AudioDevicePropertyID inPropertyID, 
     void* inClientData )
 {
-   MutexAndBool *mab = (MutexAndBool *) inClientData;
-   mab->once = TRUE;
-   pthread_mutex_unlock( &(mab->mutex) );
+   // this is where we would set the condition variable
    return noErr;
 }
 
@@ -337,8 +341,6 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
     void *outPropertyData )
 {
    OSStatus macErr;
-   int unixErr;
-   MutexAndBool mab;
    UInt32 outPropertyDataSize = inPropertyDataSize;
 
    /* First, see if it already has that value. If so, return. */
@@ -346,74 +348,63 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
                                  isInput, inPropertyID, 
                                  &outPropertyDataSize, outPropertyData );
    if( macErr )
-      goto failMac2;
+      goto failMac;
    if( inPropertyDataSize!=outPropertyDataSize )
       return paInternalError;
    if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) )
       return paNoError;
 
-   /* setup and lock mutex */
-   mab.once = FALSE;
-   unixErr = pthread_mutex_init( &mab.mutex, NULL );
-   if( unixErr )
-      goto failUnix2;
-   unixErr = pthread_mutex_lock( &mab.mutex );
-   if( unixErr )
-      goto failUnix;
+   /* Ideally, we'd use a condition variable to determine changes.
+      we could set that up here. */
 
-   /* add property listener */
-   macErr = AudioDeviceAddPropertyListener( inDevice, inChannel, isInput,
-                                   inPropertyID, propertyProc,
-                                   &mab ); 
-   if( macErr )
-      goto failMac;
+   /* If we were using a cond variable, we'd add a property listener here.
+      No more notes on that, but don't forget to remove the listener as well! */
+   //macErr = AudioDeviceAddPropertyListener( inDevice, inChannel, isInput,
+   //                                inPropertyID, propertyProc,
+   //                                NULL ); 
+   //if( macErr )
+   //   /* we couldn't add a listener. */
+   //   goto failMac;
+
    /* set property */
    macErr  = AudioDeviceSetProperty( inDevice, NULL, inChannel,
                                  isInput, inPropertyID,
                                  inPropertyDataSize, inPropertyData );
-   if( macErr ) {
-      /* we couldn't set the property, so we'll just unlock the mutex
-         and move on. */
-      pthread_mutex_unlock( &mab.mutex );
+   if( macErr )
+      goto failMac;
+
+   /* busy-wait up to 30 seconds for the property to change */
+   /* busy-wait is justified here only because the correct alternative (condition variable)
+      was hard to test, since most of the waiting ended up being for setting rather than
+      getting in OS X 10.5. This was not the case in earlier OS versions. */
+   struct timeval tv1, tv2;
+   gettimeofday( &tv1, NULL );
+   memcpy( &tv2, &tv1, sizeof( struct timeval ) );
+   while( tv2.tv_sec - tv1.tv_sec < 30 ) {
+      macErr = AudioDeviceGetProperty( inDevice, inChannel,
+                                    isInput, inPropertyID, 
+                                    &outPropertyDataSize, outPropertyData );
+      if( macErr )
+         goto failMac;
+      if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) ) {
+         return paNoError;
+      }
+      Pa_Sleep( 100 );
+      gettimeofday( &tv2, NULL );
    }
+   DBUG( ("Timeout waiting for device setting." ) );
+   
 
-   /* wait for property to change */                      
-   unixErr = pthread_mutex_lock( &mab.mutex );
-   if( unixErr )
-      goto failUnix;
-
-   /* now read the property back out */
+   ///* now read the property back out */
    macErr = AudioDeviceGetProperty( inDevice, inChannel,
                                  isInput, inPropertyID, 
                                  &outPropertyDataSize, outPropertyData );
    if( macErr )
       goto failMac;
-   /* cleanup */
-   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput,
-                                      inPropertyID, propertyProc );
-   unixErr = pthread_mutex_unlock( &mab.mutex );
-   if( unixErr )
-      goto failUnix2;
-   unixErr = pthread_mutex_destroy( &mab.mutex );
-   if( unixErr )
-      goto failUnix2;
 
-   return paNoError;
-
- failUnix:
-   pthread_mutex_destroy( &mab.mutex );
-   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput,
-                                      inPropertyID, propertyProc );
-
- failUnix2:
-   DBUG( ("Error #%d while setting a device property: %s\n", unixErr, strerror( unixErr ) ) );
    return paUnanticipatedHostError;
 
  failMac:
-   pthread_mutex_destroy( &mab.mutex );
-   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput,
-                                      inPropertyID, propertyProc );
- failMac2:
    return ERR( macErr );
 }
 
