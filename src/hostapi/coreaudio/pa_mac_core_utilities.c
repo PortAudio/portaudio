@@ -330,7 +330,11 @@ OSStatus propertyProc(
    be acknowledged, and returns the final value, which is not guaranteed
    by this function to be the same as the desired value. Obviously, this
    function can only be used for data whose input and output are the
-   same size and format, and their size and format are known in advance.*/
+   same size and format, and their size and format are known in advance.
+   whether or not the call succeeds, if the data is successfully read,
+   it is returned in outPropertyData. If it is not read successfully,
+   outPropertyData is zeroed, which may or may not be useful in
+   determining if the property was read. */
 PaError AudioDeviceSetPropertyNowAndWaitForChange(
     AudioDeviceID inDevice,
     UInt32 inChannel, 
@@ -347,8 +351,10 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
    macErr = AudioDeviceGetProperty( inDevice, inChannel,
                                  isInput, inPropertyID, 
                                  &outPropertyDataSize, outPropertyData );
-   if( macErr )
+   if( macErr ) {
+      memset( outPropertyData, 0, inPropertyDataSize );
       goto failMac;
+   }
    if( inPropertyDataSize!=outPropertyDataSize )
       return paInternalError;
    if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) )
@@ -385,8 +391,10 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
       macErr = AudioDeviceGetProperty( inDevice, inChannel,
                                     isInput, inPropertyID, 
                                     &outPropertyDataSize, outPropertyData );
-      if( macErr )
+      if( macErr ) {
+         memset( outPropertyData, 0, inPropertyDataSize );
          goto failMac;
+      }
       /* and compare... */
       if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) ) {
          return paNoError;
@@ -417,10 +425,6 @@ PaError setBestSampleRateForDevice( const AudioDeviceID device,
                                     const bool requireExact,
                                     const Float64 desiredSrate )
 {
-   /*FIXME: changing the sample rate is disruptive to other programs using the
-            device, so it might be good to offer a custom flag to not change the
-            sample rate and just do conversion. (in my casual tests, there is
-            no disruption unless the sample rate really does need to change) */
    const bool isInput = isOutput ? 0 : 1;
    Float64 srate;
    UInt32 propsize = sizeof( Float64 );
@@ -432,13 +436,15 @@ PaError setBestSampleRateForDevice( const AudioDeviceID device,
    VDBUG(("Setting sample rate for device %ld to %g.\n",device,(float)desiredSrate));
 
    /* -- try setting the sample rate -- */
+   srate = 0;
    err = AudioDeviceSetPropertyNowAndWaitForChange(
                                  device, 0, isInput,
                                  kAudioDevicePropertyNominalSampleRate,
                                  propsize, &desiredSrate, &srate );
-   if( err )
-      return err;
 
+   /* -- if the rate agrees, and was changed, we are done -- */
+   if( srate != 0 && srate == desiredSrate )
+      return paNoError;
    /* -- if the rate agrees, and we got no errors, we are done -- */
    if( !err && srate == desiredSrate )
       return paNoError;
@@ -491,18 +497,18 @@ PaError setBestSampleRateForDevice( const AudioDeviceID device,
 
    /* -- set the sample rate -- */
    propsize = sizeof( best );
+   srate = 0;
    err = AudioDeviceSetPropertyNowAndWaitForChange(
                                  device, 0, isInput,
                                  kAudioDevicePropertyNominalSampleRate,
                                  propsize, &best, &srate );
-   if( err )
-      return err;
+
+   /* -- if the set rate matches, we are done -- */
+   if( srate != 0 && srate == best )
+      return paNoError;
 
    if( err )
       return ERR( err );
-   /* -- if the set rate matches, we are done -- */
-   if( srate == best )
-      return paNoError;
 
    /* -- otherwise, something wierd happened: we didn't set the rate, and we got no errors. Just bail. */
    return paInternalError;
