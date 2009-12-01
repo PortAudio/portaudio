@@ -395,7 +395,7 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
       Pa_Sleep( 100 );
       gettimeofday( &tv2, NULL );
    }
-   DBUG( ("Timeout waiting for device setting." ) );
+   DBUG( ("Timeout waiting for device setting.\n" ) );
    
    return paUnanticipatedHostError;
 
