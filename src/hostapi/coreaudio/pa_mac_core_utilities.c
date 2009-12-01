@@ -381,27 +381,22 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
    gettimeofday( &tv1, NULL );
    memcpy( &tv2, &tv1, sizeof( struct timeval ) );
    while( tv2.tv_sec - tv1.tv_sec < 30 ) {
+      /* now read the property back out */
       macErr = AudioDeviceGetProperty( inDevice, inChannel,
                                     isInput, inPropertyID, 
                                     &outPropertyDataSize, outPropertyData );
       if( macErr )
          goto failMac;
+      /* and compare... */
       if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) ) {
          return paNoError;
       }
+      /* No match yet, so let's sleep and try again. */
       Pa_Sleep( 100 );
       gettimeofday( &tv2, NULL );
    }
    DBUG( ("Timeout waiting for device setting." ) );
    
-
-   ///* now read the property back out */
-   macErr = AudioDeviceGetProperty( inDevice, inChannel,
-                                 isInput, inPropertyID, 
-                                 &outPropertyDataSize, outPropertyData );
-   if( macErr )
-      goto failMac;
-
    return paUnanticipatedHostError;
 
  failMac:
