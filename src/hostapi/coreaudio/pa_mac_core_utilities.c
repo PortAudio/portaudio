@@ -363,14 +363,14 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
    /* Ideally, we'd use a condition variable to determine changes.
       we could set that up here. */
 
-   /* If we were using a cond variable, we'd add a property listener here.
-      No more notes on that, but don't forget to remove the listener as well! */
-   //macErr = AudioDeviceAddPropertyListener( inDevice, inChannel, isInput,
-   //                                inPropertyID, propertyProc,
-   //                                NULL ); 
-   //if( macErr )
-   //   /* we couldn't add a listener. */
-   //   goto failMac;
+   /* If we were using a cond variable, we'd do something useful here,
+      but for now, this is just to make 10.6 happy. */
+   macErr = AudioDeviceAddPropertyListener( inDevice, inChannel, isInput,
+                                   inPropertyID, propertyProc,
+                                   NULL ); 
+   if( macErr )
+      /* we couldn't add a listener. */
+      goto failMac;
 
    /* set property */
    macErr  = AudioDeviceSetProperty( inDevice, NULL, inChannel,
@@ -397,6 +397,7 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
       }
       /* and compare... */
       if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) ) {
+         AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc );
          return paNoError;
       }
       /* No match yet, so let's sleep and try again. */
@@ -405,9 +406,11 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
    }
    DBUG( ("Timeout waiting for device setting.\n" ) );
    
-   return paUnanticipatedHostError;
+   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc );
+   return paNoError;
 
  failMac:
+   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc );
    return ERR( macErr );
 }
 
