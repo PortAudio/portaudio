@@ -725,6 +725,40 @@ static PaError AddOutputDeviceInfoFromDirectSound(
                     winDsDeviceInfo->deviceOutputChannelCountIsKnown = 1;
                 }
 
+                /* Guess channels count from speaker configuration. We do it only when 
+                   pnpInterface is NULL or when PAWIN_USE_WDMKS_DEVICE_INFO is undefined.
+                */
+#ifdef PAWIN_USE_WDMKS_DEVICE_INFO
+                if( !pnpInterface )
+#endif
+                {
+                    DWORD spkrcfg;
+                    if( SUCCEEDED(IDirectSound_GetSpeakerConfig( lpDirectSound, &spkrcfg )) )
+                    {
+                        int count = 0;
+                        switch (DSSPEAKER_CONFIG(spkrcfg))
+                        {
+                            case DSSPEAKER_HEADPHONE:        count = 2; break;
+                            case DSSPEAKER_MONO:             count = 1; break;
+                            case DSSPEAKER_QUAD:             count = 4; break;
+                            case DSSPEAKER_STEREO:           count = 2; break;
+                            case DSSPEAKER_SURROUND:         count = 4; break;
+                            case DSSPEAKER_5POINT1:          count = 6; break;
+                            case DSSPEAKER_7POINT1:          count = 8; break;
+                            case DSSPEAKER_7POINT1_SURROUND: count = 8; break;
+#ifndef DSSPEAKER_5POINT1_SURROUND
+#define DSSPEAKER_5POINT1_SURROUND 0x00000009
+#endif
+                            case DSSPEAKER_5POINT1_SURROUND: count = 6; break;
+                        }
+                        if( count )
+                        {
+                            deviceInfo->maxOutputChannels = count;
+                            winDsDeviceInfo->deviceOutputChannelCountIsKnown = 1;
+                        }
+                    }
+                }
+
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
                 if( pnpInterface )
                 {
