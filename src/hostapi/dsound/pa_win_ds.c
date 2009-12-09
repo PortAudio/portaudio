@@ -107,7 +107,11 @@
  provided in newer platform sdks and x64
  */
 #ifndef DWORD_PTR
-#define DWORD_PTR DWORD
+    #if defined(_WIN64)
+        #define DWORD_PTR unsigned __int64
+    #else
+        #define DWORD_PTR unsigned long
+    #endif
 #endif
 
 #define PRINT(x) PA_DEBUG(x);
