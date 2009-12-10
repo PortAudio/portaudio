@@ -51,7 +51,7 @@
 
 #include "pa_util.h"
 
-#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) && !defined(_WIN32_WCE) /* MSC version 6 and above */
 #pragma comment( lib, "winmm.lib" )
 #endif
 
