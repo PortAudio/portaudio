@@ -85,16 +85,18 @@ void PaUtil_SetDebugPrintFunction(PaUtilLogCallback cb)
 
 #define SIZEDUMP 1024
 
-static char strdump[SIZEDUMP];
 
 void PaUtil_DebugPrint( const char *format, ... )
 {
 
     if (userCB)
     {
+        char strdump[SIZEDUMP];
+
         va_list ap;
         va_start( ap, format );
         VSNPRINTF( strdump, SIZEDUMP, format, ap );
+        strdump[SIZEDUMP-1] = 0;
         userCB(strdump);
         va_end( ap ); 
     }
