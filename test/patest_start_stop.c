@@ -143,6 +143,8 @@ int main(void)
 
     for( i=0; i<NUM_LOOPS; i++ )
     {
+        data.left_phase = data.right_phase = 0;
+
         err = Pa_StartStream( stream );
         if( err != paNoError ) goto error;
 
