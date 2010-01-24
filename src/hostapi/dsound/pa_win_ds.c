@@ -1585,6 +1585,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
     PaWinDsHostApiRepresentation *winDsHostApi = (PaWinDsHostApiRepresentation*)hostApi;
     PaWinDsStream *stream = 0;
+    int bufferProcessorIsInitialized = 0;
+    int streamRepresentationIsInitialized = 0;
     PaWinDsDeviceInfo *inputWinDsDeviceInfo, *outputWinDsDeviceInfo;
     PaDeviceInfo *inputDeviceInfo, *outputDeviceInfo;
     int inputChannelCount, outputChannelCount;
@@ -1721,6 +1723,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                                                &winDsHostApi->blockingStreamInterface, streamCallback, userData );
     }
     
+    streamRepresentationIsInitialized = 1;
+
     PaUtil_InitializeCpuLoadMeasurer( &stream->cpuLoadMeasurer, sampleRate );
 
 
@@ -1763,6 +1767,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( result != paNoError )
         goto error;
 
+    bufferProcessorIsInitialized = 1;
 
     stream->streamRepresentation.streamInfo.inputLatency =
             PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor);   /* FIXME: not initialised anywhere else */
@@ -1929,6 +1934,38 @@ error:
     {
         if( stream->processingCompleted != NULL )
             CloseHandle( stream->processingCompleted );
+
+        if( stream->pDirectSoundOutputBuffer )
+        {
+            IDirectSoundBuffer_Stop( stream->pDirectSoundOutputBuffer );
+            IDirectSoundBuffer_Release( stream->pDirectSoundOutputBuffer );
+            stream->pDirectSoundOutputBuffer = NULL;
+        }
+
+        if( stream->pDirectSoundInputBuffer )
+        {
+            IDirectSoundCaptureBuffer_Stop( stream->pDirectSoundInputBuffer );
+            IDirectSoundCaptureBuffer_Release( stream->pDirectSoundInputBuffer );
+            stream->pDirectSoundInputBuffer = NULL;
+        }
+
+        if( stream->pDirectSoundCapture )
+        {
+            IDirectSoundCapture_Release( stream->pDirectSoundCapture );
+            stream->pDirectSoundCapture = NULL;
+        }
+
+        if( stream->pDirectSound )
+        {
+            IDirectSound_Release( stream->pDirectSound );
+            stream->pDirectSound = NULL;
+        }
+
+        if( bufferProcessorIsInitialized )
+            PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
+
+        if( streamRepresentationIsInitialized )
+            PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
 
         PaUtil_FreeMemory( stream );
     }
