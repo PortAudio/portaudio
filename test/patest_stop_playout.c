@@ -307,7 +307,7 @@ int main(void)
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
-    outputParameters.device = 7; //Pa_GetDefaultOutputDevice(); /* default output device */
+    outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
     outputParameters.channelCount = 2;       /* stereo output */
     outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultHighOutputLatency;
