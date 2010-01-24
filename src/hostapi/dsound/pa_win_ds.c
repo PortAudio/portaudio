@@ -2417,11 +2417,14 @@ static PaError StartStream( PaStream *s )
 
     if( stream->bufferProcessor.outputChannelCount > 0 )
     {
-        /* Give user callback a chance to pre-fill buffer. REVIEW - i thought we weren't pre-filling, rb. */
-        TimeSlice( stream );
-        /* we ignore the return value from TimeSlice here and start the stream as usual.
-            The first timer callback will detect if the callback has completed. */
-        
+        if( stream->streamRepresentation.streamCallback )
+        {
+            /* Give user callback a chance to pre-fill buffer. REVIEW - i thought we weren't pre-filling, rb. */
+            TimeSlice( stream );
+            /* we ignore the return value from TimeSlice here and start the stream as usual.
+                The first timer callback will detect if the callback has completed. */
+        }
+
         QueryPerformanceCounter( &stream->previousPlayTime );
         stream->previousPlayCursor = 0;
         stream->finalZeroBytesWritten = 0;
@@ -2449,9 +2452,9 @@ static PaError StartStream( PaStream *s )
         }
     }
 
-
-    /* Create timer that will wake us up so we can fill the DSound buffer. */
+    if( stream->streamRepresentation.streamCallback )
     {
+        /* Create timer that will wake us up so we can fill the DSound buffer. */
         int resolution;
         int framesPerWakeup = stream->framesPerDSBuffer / 4;
         int msecPerWakeup = MSEC_PER_SECOND * framesPerWakeup / (int) stream->streamRepresentation.streamInfo.sampleRate;
@@ -2460,13 +2463,14 @@ static PaError StartStream( PaStream *s )
         resolution = msecPerWakeup/4;
         stream->timerID = timeSetEvent( msecPerWakeup, resolution, (LPTIMECALLBACK) TimerCallback,
                                              (DWORD_PTR) stream, TIME_PERIODIC | TIME_KILL_SYNCHRONOUS );
-    }
-    if( stream->timerID == 0 )
-    {
-        stream->isActive = 0;
-        result = paUnanticipatedHostError;
-        PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr );
-        goto error;
+    
+        if( stream->timerID == 0 )
+        {
+            stream->isActive = 0;
+            result = paUnanticipatedHostError;
+            PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr );
+            goto error;
+        }
     }
 
     stream->isStarted = TRUE;
@@ -2484,12 +2488,15 @@ static PaError StopStream( PaStream *s )
     HRESULT          hr;
     int timeoutMsec;
 
-    stream->stopProcessing = 1;
+    if( stream->streamRepresentation.streamCallback )
+    {
+        stream->stopProcessing = 1;
 
-    /* Set timeout at 4 times maximum time we might wait. */
-    timeoutMsec = (int) (4 * MSEC_PER_SECOND * (stream->framesPerDSBuffer / stream->streamRepresentation.streamInfo.sampleRate));
+        /* Set timeout at 4 times maximum time we might wait. */
+        timeoutMsec = (int) (4 * MSEC_PER_SECOND * (stream->framesPerDSBuffer / stream->streamRepresentation.streamInfo.sampleRate));
 
-    WaitForSingleObject( stream->processingCompleted, timeoutMsec );
+        WaitForSingleObject( stream->processingCompleted, timeoutMsec );
+    }
 
     if( stream->timerID != 0 )
     {
