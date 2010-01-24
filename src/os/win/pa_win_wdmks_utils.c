@@ -45,6 +45,9 @@
 #include "pa_util.h"
 #include "pa_win_wdmks_utils.h"
 
+#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#pragma comment( lib, "ksguid.lib" )
+#endif
 
 static PaError WdmGetPinPropertySimple(
     HANDLE  handle,
