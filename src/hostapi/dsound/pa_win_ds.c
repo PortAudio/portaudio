@@ -238,7 +238,8 @@ typedef struct PaWinDsStream
     BOOL                 outputIsRunning;
     /* use double which lets us can play for several thousand years with enough precision */
     double               dsw_framesWritten;
-    double               framesPlayed;
+    INT                  finalZeroBytesWritten; /* used to determine when we've flushed the whole buffer */
+
 /* Input */
     LPDIRECTSOUNDCAPTURE pDirectSoundCapture;
     LPDIRECTSOUNDCAPTUREBUFFER   pDirectSoundInputBuffer;
@@ -254,6 +255,7 @@ typedef struct PaWinDsStream
 
     PaStreamCallbackFlags callbackFlags;
 
+    int              callbackResult;
     HANDLE           processingCompleted;
     
 /* FIXME - move all below to PaUtilStreamRepresentation */
@@ -1993,9 +1995,11 @@ static HRESULT QueryOutputSpace( PaWinDsStream *stream, long *bytesEmpty )
     {
         return hr;
     }
+
     // Determine size of gap between playIndex and WriteIndex that we cannot write into.
     playWriteGap = writeCursor - playCursor;
     if( playWriteGap < 0 ) playWriteGap += stream->outputBufferSizeBytes; // unwrap
+
     /* DirectSound doesn't have a large enough playCursor so we cannot detect wrap-around. */
     /* Attempt to detect playCursor wrap-around and correct it. */
     if( stream->outputIsRunning && (stream->perfCounterTicksPerBuffer.QuadPart != 0) )
@@ -2024,8 +2028,6 @@ static HRESULT QueryOutputSpace( PaWinDsStream *stream, long *bytesEmpty )
             playCursor += (buffersWrapped * stream->outputBufferSizeBytes);
             bytesPlayed += (buffersWrapped * stream->outputBufferSizeBytes);
         }
-        /* Maintain frame output cursor. */
-        stream->framesPlayed += (bytesPlayed / stream->bytesPerOutputFrame);
     }
     numBytesEmpty = playCursor - stream->outputBufferWriteOffsetBytes;
     if( numBytesEmpty < 0 ) numBytesEmpty += stream->outputBufferSizeBytes; // unwrap offset
@@ -2056,9 +2058,8 @@ static HRESULT QueryOutputSpace( PaWinDsStream *stream, long *bytesEmpty )
 }
 
 /***********************************************************************************/
-static PaError Pa_TimeSlice( PaWinDsStream *stream )
+static int TimeSlice( PaWinDsStream *stream )
 {
-    PaError           result = 0;   /* FIXME: this should be declared int and this function should also return that type (same as stream callback return type)*/
     long              numFrames = 0;
     long              bytesEmpty = 0;
     long              bytesFilled = 0;
@@ -2149,8 +2150,9 @@ static PaError Pa_TimeSlice( PaWinDsStream *stream )
             if (hresult != DS_OK)
             {
                 ERR_RPT(("DirectSound IDirectSoundCaptureBuffer_Lock failed, hresult = 0x%x\n",hresult));
-                result = paUnanticipatedHostError;
-                PA_DS_SET_LAST_DIRECTSOUND_ERROR( hresult );
+                /* PA_DS_SET_LAST_DIRECTSOUND_ERROR( hresult ); */
+                PaUtil_ResetBufferProcessor( &stream->bufferProcessor ); /* flush the buffer processor */
+                stream->callbackResult = paComplete;
                 goto error2;
             }
 
@@ -2177,8 +2179,9 @@ static PaError Pa_TimeSlice( PaWinDsStream *stream )
             if (hresult != DS_OK)
             {
                 ERR_RPT(("DirectSound IDirectSoundBuffer_Lock failed, hresult = 0x%x\n",hresult));
-                result = paUnanticipatedHostError;
-                PA_DS_SET_LAST_DIRECTSOUND_ERROR( hresult );
+                /* PA_DS_SET_LAST_DIRECTSOUND_ERROR( hresult ); */
+                PaUtil_ResetBufferProcessor( &stream->bufferProcessor ); /* flush the buffer processor */
+                stream->callbackResult = paComplete;
                 goto error1;
             }
 
@@ -2195,8 +2198,7 @@ static PaError Pa_TimeSlice( PaWinDsStream *stream )
             }
         }
 
-        result = paContinue;
-        numFrames = PaUtil_EndBufferProcessing( &stream->bufferProcessor, &result );
+        numFrames = PaUtil_EndBufferProcessing( &stream->bufferProcessor, &stream->callbackResult );
         stream->framesWritten += numFrames;
         
         if( stream->bufferProcessor.outputChannelCount > 0 )
@@ -2222,11 +2224,18 @@ error1:
         }
 error2:
 
-        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, numFrames );
-
+        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, numFrames );        
     }
-    
-    return result;
+
+    if( stream->callbackResult == paComplete && !PaUtil_IsBufferProcessorOutputEmpty( &stream->bufferProcessor ) )
+    {
+        /* don't return completed until the buffer processor has been drained */
+        return paContinue;
+    }
+    else
+    {
+        return stream->callbackResult;
+    }
 }
 /*******************************************************************/
 
@@ -2238,7 +2247,7 @@ static HRESULT ZeroAvailableOutputSpace( PaWinDsStream *stream )
     DWORD dwsize1 = 0;
     DWORD dwsize2 = 0;
     long  bytesEmpty;
-    hr = QueryOutputSpace( stream, &bytesEmpty ); // updates framesPlayed
+    hr = QueryOutputSpace( stream, &bytesEmpty );
     if (hr != DS_OK) return hr;
     if( bytesEmpty == 0 ) return DS_OK;
     // Lock free space in the DS
@@ -2257,14 +2266,17 @@ static HRESULT ZeroAvailableOutputSpace( PaWinDsStream *stream )
         stream->outputBufferWriteOffsetBytes = (stream->outputBufferWriteOffsetBytes + dwsize1 + dwsize2) % stream->outputBufferSizeBytes;
         IDirectSoundBuffer_Unlock( stream->pDirectSoundOutputBuffer, lpbuf1, dwsize1, lpbuf2, dwsize2);
         stream->dsw_framesWritten += bytesEmpty / stream->bytesPerOutputFrame;
+
+        stream->finalZeroBytesWritten += dwsize1 + dwsize2;
     }
     return hr;
 }
 
 
-static void CALLBACK Pa_TimerCallback(UINT uID, UINT uMsg, DWORD_PTR dwUser, DWORD dw1, DWORD dw2)
+static void CALLBACK TimerCallback(UINT uID, UINT uMsg, DWORD_PTR dwUser, DWORD dw1, DWORD dw2)
 {
     PaWinDsStream *stream;
+    int isFinished = 0;
 
     /* suppress unused variable warnings */
     (void) uID;
@@ -2279,38 +2291,44 @@ static void CALLBACK Pa_TimerCallback(UINT uID, UINT uMsg, DWORD_PTR dwUser, DWO
     {
         if( stream->abortProcessing )
         {
-            stream->isActive = 0;
+            isFinished = 1;
         }
         else if( stream->stopProcessing )
         {
             if( stream->bufferProcessor.outputChannelCount > 0 )
             {
                 ZeroAvailableOutputSpace( stream );
-                /* clear isActive when all sound played */
-                if( stream->framesPlayed >= stream->framesWritten )
+                if( stream->finalZeroBytesWritten >= stream->outputBufferSizeBytes )
                 {
-                    stream->isActive = 0;
+                    /* once we've flushed the whole output buffer with zeros we know all data has been played */
+                    isFinished = 1;
                 }
             }
             else
             {
-                stream->isActive = 0;
+                isFinished = 1;
             }
         }
         else
         {
-            if( Pa_TimeSlice( stream ) != 0)  /* Call time slice independant of timing method. */
+            int callbackResult = TimeSlice( stream );
+            if( callbackResult != paContinue )
             {
-                /* FIXME implement handling of paComplete and paAbort if possible */
+                /* FIXME implement handling of paComplete and paAbort if possible 
+                   At the moment this should behave as if paComplete was called and 
+                   flush the buffer.
+                */
+
                 stream->stopProcessing = 1;
             }
         }
 
-        if( !stream->isActive )
+        if( isFinished )
         {
             if( stream->streamRepresentation.streamFinishedCallback != 0 )
                 stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
 
+            stream->isActive = 0; /* don't set this until the stream really is inactive */
             SetEvent( stream->processingCompleted );
         }
     }
@@ -2368,13 +2386,14 @@ static PaError StartStream( PaStream *s )
     PaWinDsStream   *stream = (PaWinDsStream*)s;
     HRESULT          hr;
 
+    stream->callbackResult = paContinue;
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
     
     ResetEvent( stream->processingCompleted );
 
     if( stream->bufferProcessor.inputChannelCount > 0 )
     {
-        // Start the buffer playback
+        // Start the buffer capture
         if( stream->pDirectSoundInputBuffer != NULL ) // FIXME: not sure this check is necessary
         {
             hr = IDirectSoundCaptureBuffer_Start( stream->pDirectSoundInputBuffer, DSCBSTART_LOOPING );
@@ -2399,12 +2418,13 @@ static PaError StartStream( PaStream *s )
     if( stream->bufferProcessor.outputChannelCount > 0 )
     {
         /* Give user callback a chance to pre-fill buffer. REVIEW - i thought we weren't pre-filling, rb. */
-        result = Pa_TimeSlice( stream );
-        if( result != paNoError ) return result; // FIXME - what if finished?
-
+        TimeSlice( stream );
+        /* we ignore the return value from TimeSlice here and start the stream as usual.
+            The first timer callback will detect if the callback has completed. */
+        
         QueryPerformanceCounter( &stream->previousPlayTime );
         stream->previousPlayCursor = 0;
-        stream->framesPlayed = 0;
+        stream->finalZeroBytesWritten = 0;
         hr = IDirectSoundBuffer_SetCurrentPosition( stream->pDirectSoundOutputBuffer, 0 );
         DBUG(("PaHost_StartOutput: IDirectSoundBuffer_SetCurrentPosition returned = 0x%X.\n", hr));
         if( hr != DS_OK )
@@ -2438,7 +2458,7 @@ static PaError StartStream( PaStream *s )
         if( msecPerWakeup < 10 ) msecPerWakeup = 10;
         else if( msecPerWakeup > 100 ) msecPerWakeup = 100;
         resolution = msecPerWakeup/4;
-        stream->timerID = timeSetEvent( msecPerWakeup, resolution, (LPTIMECALLBACK) Pa_TimerCallback,
+        stream->timerID = timeSetEvent( msecPerWakeup, resolution, (LPTIMECALLBACK) TimerCallback,
                                              (DWORD_PTR) stream, TIME_PERIODIC | TIME_KILL_SYNCHRONOUS );
     }
     if( stream->timerID == 0 )
