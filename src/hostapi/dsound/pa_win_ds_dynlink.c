@@ -45,6 +45,7 @@
 */
 
 #include "pa_win_ds_dynlink.h"
+#include "pa_debugprint.h"
 
 PaWinDsDSoundEntryPoints paWinDsDSoundEntryPoints = { 0, 0, 0, 0, 0, 0, 0 };
 
@@ -104,7 +105,7 @@ static HRESULT WINAPI DummyDirectSoundCaptureEnumerateA(LPDSENUMCALLBACKA lpDSCE
 
 void PaWinDs_InitializeDSoundEntryPoints(void)
 {
-    paWinDsDSoundEntryPoints.hInstance_ = LoadLibrary("dsound.dll");
+    paWinDsDSoundEntryPoints.hInstance_ = LoadLibraryA("dsound.dll");
     if( paWinDsDSoundEntryPoints.hInstance_ != NULL )
     {
         paWinDsDSoundEntryPoints.DllGetClassObject =
@@ -151,6 +152,9 @@ void PaWinDs_InitializeDSoundEntryPoints(void)
     }
     else
     {
+        DWORD errorCode = GetLastError(); // 126 (0x7E) == ERROR_MOD_NOT_FOUND
+        PA_DEBUG(("Couldn't load dsound.dll error code: %d \n",errorCode));
+
         /* initialize with dummy entry points to make live easy when ds isn't present */
         paWinDsDSoundEntryPoints.DirectSoundCreate = DummyDirectSoundCreate;
         paWinDsDSoundEntryPoints.DirectSoundEnumerateW = DummyDirectSoundEnumerateW;

@@ -1088,9 +1088,9 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     if( result != paNoError )
         goto error;
 
-    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerate( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
 
-    paWinDsDSoundEntryPoints.DirectSoundEnumerate( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundEnumerateA( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
 
     if( deviceNamesAndGUIDs.inputNamesAndGUIDs.enumerationError != paNoError )
     {
