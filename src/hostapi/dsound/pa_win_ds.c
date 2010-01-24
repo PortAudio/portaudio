@@ -253,6 +253,8 @@ typedef struct PaWinDsStream
     double           secondsPerHostByte; /* Used to optimize latency calculation for outTime */
 
     PaStreamCallbackFlags callbackFlags;
+
+    HANDLE           processingCompleted;
     
 /* FIXME - move all below to PaUtilStreamRepresentation */
     volatile int     isStarted;
@@ -1778,6 +1780,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->timerID = 0;
 
+        stream->processingCompleted = CreateEvent( NULL, /* bManualReset = */ TRUE, /* bInitialState = */ FALSE, NULL );
+        if( stream->processingCompleted == NULL )
+        {
+            result = paInsufficientMemory;
+            goto error;
+        }
+
     /* Get system minimum latency. */
         minLatencyFrames = PaWinDs_GetMinLatencyFrames( sampleRate );
 
@@ -1917,7 +1926,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 error:
     if( stream )
+    {
+        if( stream->processingCompleted != NULL )
+            CloseHandle( stream->processingCompleted );
+
         PaUtil_FreeMemory( stream );
+    }
 
     return result;
 }
@@ -2259,6 +2273,8 @@ static void CALLBACK Pa_TimerCallback(UINT uID, UINT uMsg, DWORD_PTR dwUser, DWO
         {
             if( stream->streamRepresentation.streamFinishedCallback != 0 )
                 stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
+
+            SetEvent( stream->processingCompleted );
         }
     }
 }
@@ -2271,6 +2287,8 @@ static PaError CloseStream( PaStream* s )
 {
     PaError result = paNoError;
     PaWinDsStream *stream = (PaWinDsStream*)s;
+
+    CloseHandle( stream->processingCompleted );
 
     // Cleanup the sound buffers
     if( stream->pDirectSoundOutputBuffer )
@@ -2315,6 +2333,8 @@ static PaError StartStream( PaStream *s )
 
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
     
+    ResetEvent( stream->processingCompleted );
+
     if( stream->bufferProcessor.inputChannelCount > 0 )
     {
         // Start the buffer playback
@@ -2382,7 +2402,7 @@ static PaError StartStream( PaStream *s )
         else if( msecPerWakeup > 100 ) msecPerWakeup = 100;
         resolution = msecPerWakeup/4;
         stream->timerID = timeSetEvent( msecPerWakeup, resolution, (LPTIMECALLBACK) Pa_TimerCallback,
-                                             (DWORD_PTR) stream, TIME_PERIODIC );
+                                             (DWORD_PTR) stream, TIME_PERIODIC | TIME_KILL_SYNCHRONOUS );
     }
     if( stream->timerID == 0 )
     {
@@ -2408,13 +2428,12 @@ static PaError StopStream( PaStream *s )
     int timeoutMsec;
 
     stream->stopProcessing = 1;
-    /* Set timeout at 20% beyond maximum time we might wait. */
-    timeoutMsec = (int) (1200.0 * stream->framesPerDSBuffer / stream->streamRepresentation.streamInfo.sampleRate);
-    while( stream->isActive && (timeoutMsec > 0)  )
-    {
-        Sleep(10);
-        timeoutMsec -= 10;
-    }
+
+    /* Set timeout at 4 times maximum time we might wait. */
+    timeoutMsec = (int) (4 * MSEC_PER_SECOND * (stream->framesPerDSBuffer / stream->streamRepresentation.streamInfo.sampleRate));
+
+    WaitForSingleObject( stream->processingCompleted, timeoutMsec );
+
     if( stream->timerID != 0 )
     {
         timeKillEvent(stream->timerID);  /* Stop callback timer. */
