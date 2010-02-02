@@ -102,6 +102,33 @@ static HRESULT WINAPI DummyDirectSoundCaptureEnumerateA(LPDSENUMCALLBACKA lpDSCE
     return E_NOTIMPL;
 }
 
+#ifdef PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE
+static HRESULT WINAPI DummyDirectSoundFullDuplexCreate8(
+         LPCGUID pcGuidCaptureDevice,
+         LPCGUID pcGuidRenderDevice,
+         LPCDSCBUFFERDESC pcDSCBufferDesc,
+         LPCDSBUFFERDESC pcDSBufferDesc,
+         HWND hWnd,
+         DWORD dwLevel,
+         LPDIRECTSOUNDFULLDUPLEX * ppDSFD,
+         LPDIRECTSOUNDCAPTUREBUFFER8 * ppDSCBuffer8,
+         LPDIRECTSOUNDBUFFER8 * ppDSBuffer8,
+         LPUNKNOWN pUnkOuter)
+{
+    (void)pcGuidCaptureDevice; /* unused parameter */
+    (void)pcGuidRenderDevice; /* unused parameter */
+    (void)pcDSCBufferDesc; /* unused parameter */
+    (void)pcDSBufferDesc; /* unused parameter */
+    (void)hWnd; /* unused parameter */
+    (void)dwLevel; /* unused parameter */
+    (void)ppDSFD; /* unused parameter */
+    (void)ppDSCBuffer8; /* unused parameter */
+    (void)ppDSBuffer8; /* unused parameter */
+    (void)pUnkOuter; /* unused parameter */
+
+    return E_NOTIMPL;
+}
+#endif /* PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE */
 
 void PaWinDs_InitializeDSoundEntryPoints(void)
 {
@@ -149,6 +176,16 @@ void PaWinDs_InitializeDSoundEntryPoints(void)
                 GetProcAddress( paWinDsDSoundEntryPoints.hInstance_, "DirectSoundCaptureEnumerateA" );
         if( paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA == NULL )
             paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA = DummyDirectSoundCaptureEnumerateA;
+
+#ifdef PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE
+        paWinDsDSoundEntryPoints.DirectSoundFullDuplexCreate8 =
+                (HRESULT (WINAPI *)(LPCGUID, LPCGUID, LPCDSCBUFFERDESC, LPCDSBUFFERDESC,
+                                    HWND, DWORD, LPDIRECTSOUNDFULLDUPLEX *, LPDIRECTSOUNDCAPTUREBUFFER8 *, 
+                                    LPDIRECTSOUNDBUFFER8 *, LPUNKNOWN))
+                GetProcAddress( paWinDsDSoundEntryPoints.hInstance_, "DirectSoundFullDuplexCreate" );
+        if( paWinDsDSoundEntryPoints.DirectSoundFullDuplexCreate8 == NULL )
+            paWinDsDSoundEntryPoints.DirectSoundFullDuplexCreate8 = DummyDirectSoundFullDuplexCreate8;
+#endif
     }
     else
     {
@@ -162,6 +199,9 @@ void PaWinDs_InitializeDSoundEntryPoints(void)
         paWinDsDSoundEntryPoints.DirectSoundCaptureCreate = DummyDirectSoundCaptureCreate;
         paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateW = DummyDirectSoundCaptureEnumerateW;
         paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA = DummyDirectSoundCaptureEnumerateA;
+#ifdef PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE
+        paWinDsDSoundEntryPoints.DirectSoundFullDuplexCreate8 = DummyDirectSoundFullDuplexCreate8;
+#endif
     }
 }
 
