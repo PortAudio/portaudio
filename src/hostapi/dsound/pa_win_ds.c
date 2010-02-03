@@ -1648,7 +1648,7 @@ static HRESULT InitOutputBuffer( PaWinDsStream *stream, PaWinDsDeviceInfo *devic
     secondaryDesc.dwSize = sizeof(DSBUFFERDESC);
     secondaryDesc.dwFlags = DSBCAPS_GLOBALFOCUS | DSBCAPS_GETCURRENTPOSITION2;
     secondaryDesc.dwBufferBytes = bytesPerBuffer;
-    secondaryDesc.lpwfxFormat = (WAVEFORMATEX*)&waveFormat;
+    secondaryDesc.lpwfxFormat = (WAVEFORMATEX*)&waveFormat; /* waveFormat contains whatever format was negotiated for the primary buffer above */
     // Create the secondary buffer
     if ((result = IDirectSound_CreateSoundBuffer( stream->pDirectSound,
                   &secondaryDesc, &stream->pDirectSoundOutputBuffer, NULL)) != DS_OK)
@@ -2116,12 +2116,13 @@ error:
             stream->pDirectSound = NULL;
         }
 
+#ifdef PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE
         if( stream->pDirectSoundFullDuplex8 )
         {
             IDirectSoundFullDuplex_Release( stream->pDirectSoundFullDuplex8 );
             stream->pDirectSoundFullDuplex8 = NULL;
         }
-
+#endif
         if( bufferProcessorIsInitialized )
             PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
 
@@ -2535,11 +2536,13 @@ static PaError CloseStream( PaStream* s )
         stream->pDirectSound = NULL;
     }
 
+#ifdef PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE
     if( stream->pDirectSoundFullDuplex8 )
     {
         IDirectSoundFullDuplex_Release( stream->pDirectSoundFullDuplex8 );
         stream->pDirectSoundFullDuplex8 = NULL;
     }
+#endif
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
