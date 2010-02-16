@@ -1567,7 +1567,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         inputSampleFormat = inputParameters->sampleFormat;
 		inputStreamInfo   = (PaWasapiStreamInfo *)inputParameters->hostApiSpecificStreamInfo;
         PaWasapiDeviceInfo *info = &paWasapi->devInfo[inputParameters->device];
-		stream->in.flags  = inputStreamInfo->flags;
+		stream->in.flags  = (inputStreamInfo ? inputStreamInfo->flags : 0);
 
 		// Select Exclusive/Shared mode
 		stream->in.shareMode = AUDCLNT_SHAREMODE_SHARED;
@@ -1656,7 +1656,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         outputSampleFormat = outputParameters->sampleFormat;
 		outputStreamInfo   = (PaWasapiStreamInfo *)outputParameters->hostApiSpecificStreamInfo;
 		PaWasapiDeviceInfo *info = &paWasapi->devInfo[outputParameters->device];
-		stream->out.flags  = outputStreamInfo->flags;
+		stream->out.flags  = (outputStreamInfo ? outputStreamInfo->flags : 0);
 
 		// Select Exclusive/Shared mode
 		stream->out.shareMode = AUDCLNT_SHAREMODE_SHARED;
