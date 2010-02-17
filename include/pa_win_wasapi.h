@@ -68,12 +68,17 @@ typedef enum PaWasapiFlags
        Note: WASAPI Event driven core is capable of 2ms latency!!!, but Polling
              method can only provide 15-20ms latency. */
     paWinWasapiPolling                  = (1 << 3),
+
+    /* forces custom thread priority setting. must be used if PaWasapiStreamInfo::threadPriority 
+       is set to custom value. */
+    paWinWasapiThreadPriority           = (1 << 4)
 }
 PaWasapiFlags;
 #define paWinWasapiExclusive             (paWinWasapiExclusive)
 #define paWinWasapiRedirectHostProcessor (paWinWasapiRedirectHostProcessor)
 #define paWinWasapiUseChannelMask        (paWinWasapiUseChannelMask)
 #define paWinWasapiPolling               (paWinWasapiPolling)
+#define paWinWasapiThreadPriority        (paWinWasapiThreadPriority)
 
 
 /* Host processor. Allows to skip internal PA processing completely. 
@@ -85,46 +90,6 @@ PaWasapiFlags;
 typedef void (*PaWasapiHostProcessorCallback) (void *inputBuffer,  long inputFrames,
                                                void *outputBuffer, long outputFrames,
                                                void *userData);
-
-/* Stream descriptor. */
-typedef struct PaWasapiStreamInfo 
-{
-    unsigned long size;             /**< sizeof(PaWasapiStreamInfo) */
-    PaHostApiTypeId hostApiType;    /**< paWASAPI */
-    unsigned long version;          /**< 1 */
-
-    unsigned long flags;            /**< collection of PaWasapiFlags */
-
-    /* Support for WAVEFORMATEXTENSIBLE channel masks. If flags contains
-       paWinWasapiUseChannelMask this allows you to specify which speakers 
-       to address in a multichannel stream. Constants for channelMask
-       are specified in pa_win_waveformat.h
-    */
-    PaWinWaveFormatChannelMask channelMask;
-
-    /* Delivers raw data to callback obtained from GetBuffer() methods skipping 
-       internal PortAudio processing inventory completely. userData parameter will 
-       be the same that was passed to Pa_OpenStream method.
-    */
-    PaWasapiHostProcessorCallback hostProcessorOutput;
-    PaWasapiHostProcessorCallback hostProcessorInput;
-} 
-PaWasapiStreamInfo;
-
-
-/** Returns default sound format for device. Format is represented by PaWinWaveFormat or 
-    WAVEFORMATEXTENSIBLE structure.
-
- @param pFormat pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
- @param nFormatSize pize of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
- @param nDevice device index.
-
- @return A non-negative value indicating the number of bytes copied into format decriptor
-         or, a PaErrorCode (which are always negative) if PortAudio is not initialized
-         or an error is encountered.
-*/
-int PaWasapi_GetDeviceDefaultFormat( void *pFormat, int nFormatSize, PaDeviceIndex nDevice );
-
 
 /* Device role */
 typedef enum PaWasapiDeviceRole
@@ -144,6 +109,72 @@ typedef enum PaWasapiDeviceRole
 PaWasapiDeviceRole;
 
 
+/* Thread priority */
+typedef enum PaWasapiThreadPriority
+{
+    eThreadPriorityNone = 0,
+    eThreadPriorityAudio,            //!< Default for Shared mode.
+    eThreadPriorityCapture,
+    eThreadPriorityDistribution,
+    eThreadPriorityGames,
+    eThreadPriorityPlayback,
+    eThreadPriorityProAudio,        //!< Default for Exclusive mode.
+    eThreadPriorityWindowManager
+}
+PaWasapiThreadPriority;
+
+
+/* Stream descriptor. */
+typedef struct PaWasapiStreamInfo 
+{
+    unsigned long size;             /**< sizeof(PaWasapiStreamInfo) */
+    PaHostApiTypeId hostApiType;    /**< paWASAPI */
+    unsigned long version;          /**< 1 */
+
+    unsigned long flags;            /**< collection of PaWasapiFlags */
+
+    /* Support for WAVEFORMATEXTENSIBLE channel masks. If flags contains
+       paWinWasapiUseChannelMask this allows you to specify which speakers 
+       to address in a multichannel stream. Constants for channelMask
+       are specified in pa_win_waveformat.h. Will be used only if 
+       paWinWasapiUseChannelMask flag is specified.
+    */
+    PaWinWaveFormatChannelMask channelMask;
+
+    /* Delivers raw data to callback obtained from GetBuffer() methods skipping 
+       internal PortAudio processing inventory completely. userData parameter will 
+       be the same that was passed to Pa_OpenStream method. Will be used only if 
+       paWinWasapiRedirectHostProcessor flag is specified.
+    */
+    PaWasapiHostProcessorCallback hostProcessorOutput;
+    PaWasapiHostProcessorCallback hostProcessorInput;
+
+    /* Specifies thread priority explicitly. Will be used only if paWinWasapiThreadPriority flag
+       is specified.
+
+       Please note, if Input/Output streams are opened simultaniously (Full-Duplex mode)
+       you shall specify same value for threadPriority or othervise one of the values will be used
+       to setup thread priority.
+    */
+    PaWasapiThreadPriority threadPriority;
+} 
+PaWasapiStreamInfo;
+
+
+/** Returns default sound format for device. Format is represented by PaWinWaveFormat or 
+    WAVEFORMATEXTENSIBLE structure.
+
+ @param pFormat pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
+ @param nFormatSize pize of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
+ @param nDevice device index.
+
+ @return A non-negative value indicating the number of bytes copied into format decriptor
+         or, a PaErrorCode (which are always negative) if PortAudio is not initialized
+         or an error is encountered.
+*/
+int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice );
+
+
 /** Returns device role (PaWasapiDeviceRole enum).
 
  @param nDevice device index.
@@ -160,18 +191,13 @@ int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex nDevice );
  @param hTask a handle to pointer to priority task. Must be used with PaWasapi_RevertThreadPriority
               method to revert thread priority to initial state.
 
- @param nPriorityClass an Id of thread priority:    1 - Audio
-                                                    2 - Capture
-                                                    3 - Distribution
-                                                    4 - Games
-                                                    5 - Playback
-                                                    6 - Pro Audio
-                                                    7 - Window Manager
+ @param nPriorityClass an Id of thread priority of PaWasapiThreadPriority type. Specifying 
+                       eThreadPriorityNone does nothing.
 
  @return Error code indicating success or failure.
  @see PaWasapi_RevertThreadPriority
 */
-PaError PaWasapi_ThreadPriorityBoost( void **hTask, int nPriorityClass );
+PaError PaWasapi_ThreadPriorityBoost( void **hTask, PaWasapiThreadPriority nPriorityClass );
 
 
 /** Boost thread priority of calling thread (MMCSS). Use it for Blocking Interface only for thread

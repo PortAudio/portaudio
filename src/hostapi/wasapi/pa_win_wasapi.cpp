@@ -97,6 +97,8 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
 
 enum { S_INPUT = 0, S_OUTPUT, S_COUNT };
 
+#define STATIC_ARRAY_SIZE(array) (sizeof(array)/sizeof(array[0]))
+
 #define PRINT(x) PA_DEBUG(x);
 
 #define PA_SKELETON_SET_LAST_HOST_ERROR( errorCode, errorText ) \
@@ -315,6 +317,9 @@ typedef struct PaWasapiStream
 
 	// Av Task (MM thread management)
 	HANDLE hAvTask;
+
+	// Thread priority level
+	PaWasapiThreadPriority nThreadPriority;
 }
 PaWasapiStream;
 
@@ -893,7 +898,7 @@ static inline PaWasapiHostApiRepresentation *GetHostApi(PaError *_error = NULL)
 }
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceDefaultFormat( void *pFormat, int nFormatSize, PaDeviceIndex nDevice )
+int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice )
 {
 	if (pFormat == NULL)
 		return paBadBufferPtr;
@@ -907,10 +912,10 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, int nFormatSize, PaDeviceInd
 	if (paWasapi == NULL)
 		return ret;
 
-	if (nDevice >= (int)paWasapi->deviceCount)
+	if ((UINT32)nDevice >= paWasapi->deviceCount)
 		return paInvalidDevice;
 
-	int size = min(nFormatSize, sizeof(paWasapi->devInfo[ nDevice ].DefaultFormat));
+	UINT32 size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ nDevice ].DefaultFormat));
 	memcpy(pFormat, &paWasapi->devInfo[ nDevice ].DefaultFormat, size);
 
 	return size;
@@ -1560,6 +1565,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         goto error;
     }
 
+	// Default thread priority is Audio: for exclusive mode we will use Pro Audio.
+	stream->nThreadPriority = eThreadPriorityAudio;
+
 	// Try create device: Input
 	if (inputParameters != NULL)
     {
@@ -1572,7 +1580,20 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Select Exclusive/Shared mode
 		stream->in.shareMode = AUDCLNT_SHAREMODE_SHARED;
         if ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiExclusive))
+		{
+			// Boost thread priority
+			stream->nThreadPriority = eThreadPriorityProAudio;
+			// Make Exclusive
 			stream->in.shareMode = AUDCLNT_SHAREMODE_EXCLUSIVE;
+		}
+
+		// If user provided explicit thread priority level, use it
+        if ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiThreadPriority))
+		{
+			if ((inputStreamInfo->threadPriority > eThreadPriorityNone) &&
+				(inputStreamInfo->threadPriority <= eThreadPriorityWindowManager))
+				stream->nThreadPriority = inputStreamInfo->threadPriority;
+		}
 
 		// Choose processing mode
 		stream->in.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -1661,7 +1682,20 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Select Exclusive/Shared mode
 		stream->out.shareMode = AUDCLNT_SHAREMODE_SHARED;
         if ((outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiExclusive))
+		{
+			// Boost thread priority
+			stream->nThreadPriority = eThreadPriorityProAudio;
+			// Make Exclusive
 			stream->out.shareMode = AUDCLNT_SHAREMODE_EXCLUSIVE;
+		}
+
+		// If user provided explicit thread priority level, use it
+        if ((outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiThreadPriority))
+		{
+			if ((outputStreamInfo->threadPriority > eThreadPriorityNone) &&
+				(outputStreamInfo->threadPriority <= eThreadPriorityWindowManager))
+				stream->nThreadPriority = outputStreamInfo->threadPriority;
+		}
 
 		// Choose processing mode
 		stream->out.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -2440,13 +2474,14 @@ void MMCSS_deactivate(HANDLE hTask)
 }
 
 // ------------------------------------------------------------------------------------------
-PaError PaWasapi_ThreadPriorityBoost(void **hTask, int nPriorityClass)
+PaError PaWasapi_ThreadPriorityBoost(void **hTask, PaWasapiThreadPriority nPriorityClass)
 {
 	if (hTask == NULL)
 		return paUnanticipatedHostError;
 
-	static const char *mmcs_name[7] = 
+	static const char *mmcs_name[] = 
 	{
+		NULL,
 		"Audio",
 		"Capture",
 		"Distribution",
@@ -2455,7 +2490,7 @@ PaError PaWasapi_ThreadPriorityBoost(void **hTask, int nPriorityClass)
 		"Pro Audio",
 		"Window Manager"
 	};
-	if ((UINT32)nPriorityClass >= 7)
+	if ((UINT32)nPriorityClass >= STATIC_ARRAY_SIZE(mmcs_name))
 		return paUnanticipatedHostError;
 
 	HANDLE task = MMCSS_activate(mmcs_name[nPriorityClass]);
@@ -2546,7 +2581,7 @@ void _OnStreamStop(PaWasapiStream *stream)
 	// Restore thread priority
 	if (stream->hAvTask != NULL)
 	{
-		MMCSS_deactivate(stream->hAvTask);
+		PaWasapi_ThreadPriorityRevert(stream->hAvTask);
 		stream->hAvTask = NULL;
 	}
 
@@ -2584,7 +2619,8 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	}
 
 	// Boost thread priority
-	stream->hAvTask = MMCSS_activate("Pro Audio");
+	stream->hAvTask = NULL;
+	PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
 	// Initialize event & start INPUT stream
 	if (stream->in.client)
@@ -2693,7 +2729,8 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
     processor[S_OUTPUT] = (stream->hostProcessOverrideOutput.processor != NULL ? stream->hostProcessOverrideOutput : defaultProcessor);
 
 	// Boost thread priority
-	stream->hAvTask = MMCSS_activate("Pro Audio");
+	stream->hAvTask = NULL;
+	PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
 	// Initialize event & start INPUT stream
 	if (stream->in.client)
