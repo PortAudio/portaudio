@@ -504,6 +504,8 @@ static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32
 // ------------------------------------------------------------------------------------------
 static __forceinline UINT32 GetFramesSleepTime(UINT32 nFrames, UINT32 nSamplesPerSec)
 {
+	if (nSamplesPerSec == 0)
+		return 0;
 #define REFTIMES_PER_SEC  10000000
 #define REFTIMES_PER_MILLISEC  10000
 	// Calculate the actual duration of the allocated buffer.
@@ -2833,7 +2835,6 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	}
 
 	// Boost thread priority
-	stream->hAvTask = NULL;
 	PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
 	// Initialize event & start INPUT stream
@@ -2927,12 +2928,19 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 {
     PaWasapiHostProcessor processor[S_COUNT];
 	HRESULT hr;
-	DWORD dwResult = S_OUTPUT;
 	BOOL bInitOutput = FALSE;
     PaWasapiStream *stream = (PaWasapiStream *)param;
 
 	// Calculate the actual duration of the allocated buffer.
-	DWORD sleep_ms = GetFramesSleepTime(stream->out.framesPerHostCallback, stream->out.wavex.Format.nSamplesPerSec);
+	DWORD sleep_ms     = 0;
+	DWORD sleep_ms_in  = GetFramesSleepTime(stream->in.framesPerHostCallback, stream->in.wavex.Format.nSamplesPerSec);
+	DWORD sleep_ms_out = GetFramesSleepTime(stream->out.framesPerHostCallback, stream->out.wavex.Format.nSamplesPerSec);
+	if ((sleep_ms_in != 0) && (sleep_ms_out != 0))
+		sleep_ms = min(sleep_ms_in, sleep_ms_out);
+	else
+	{
+		sleep_ms = (sleep_ms_in ? sleep_ms_in : sleep_ms_out);
+	}
 
     // Setup data processors
     PaWasapiHostProcessor defaultProcessor;
@@ -2942,7 +2950,6 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
     processor[S_OUTPUT] = (stream->hostProcessOverrideOutput.processor != NULL ? stream->hostProcessOverrideOutput : defaultProcessor);
 
 	// Boost thread priority
-	stream->hAvTask = NULL;
 	PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
 	// Initialize event & start INPUT stream
@@ -2977,39 +2984,42 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	// Processing Loop
 	while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
     {
-		// Process S_INPUT/S_OUTPUT
-		switch (dwResult)
+		for (INT32 i = 0; i < S_COUNT; ++i)
 		{
-		// Input stream
-		case S_INPUT: {
-            if (stream->cclient == NULL)
-                break;
-			PollInputBuffer(stream, processor);
-			break; }
-
-		// Output stream
-		case S_OUTPUT: {
-
-            if (stream->rclient == NULL)
-                break;
-
-			UINT32 frames = stream->out.framesPerHostCallback;
-
-			// Get Read position
-			UINT32 padding = 0;
-			hr = stream->out.client->GetCurrentPadding(&padding);
-			if (hr != S_OK)
+			// Process S_INPUT/S_OUTPUT
+			switch (i)
 			{
-				LogHostError(hr);
-				break;
+			// Input stream
+			case S_INPUT: {
+				if (stream->cclient == NULL)
+					break;
+				PollInputBuffer(stream, processor);
+				break; }
+
+			// Output stream
+			case S_OUTPUT: {
+
+				if (stream->rclient == NULL)
+					break;
+
+				UINT32 frames = stream->out.framesPerHostCallback;
+
+				// Get Read position
+				UINT32 padding = 0;
+				hr = stream->out.client->GetCurrentPadding(&padding);
+				if (hr != S_OK)
+				{
+					LogHostError(hr);
+					break;
+				}
+
+				// Fill buffer
+				frames -= padding;
+				if (frames != 0)
+					FillOutputBuffer(stream, processor, frames);
+
+				break; }
 			}
-
-			// Fill buffer
-			frames -= padding;
-			if (frames != 0)
-				FillOutputBuffer(stream, processor, frames);
-
-			break; }
 		}
 	}
 
