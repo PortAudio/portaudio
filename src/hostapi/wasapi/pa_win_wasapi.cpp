@@ -1368,6 +1368,8 @@ static PaError IsStreamParamsValid(struct PaUtilHostApiRepresentation *hostApi,
 {
 	if (hostApi == NULL)
 		return paHostApiNotFound;
+	if ((UINT32)sampleRate == 0)
+		return paInvalidSampleRate;
 	
 	if (inputParameters != NULL)
     {
@@ -1686,6 +1688,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// choosing maximum default size
 		framesPerBuffer = max(framesPerBufferIn, framesPerBufferOut);
 	}
+	if (framesPerBuffer == 0)
+		framesPerBuffer = ((UINT32)sampleRate / 100) * 2;
 
 	// Try create device: Input
 	if (inputParameters != NULL)
