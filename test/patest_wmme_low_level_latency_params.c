@@ -47,11 +47,11 @@
 
 #define NUM_SECONDS         (6)
 #define SAMPLE_RATE         (44100)
-#define FRAMES_PER_BUFFER   (441)
 
-#define WMME_FRAMES_PER_BUFFER  (441)
-#define WMME_BUFFER_COUNT       (5)
+#define WMME_FRAMES_PER_BUFFER  (49) //(441)
+#define WMME_BUFFER_COUNT       (45)    //(5)
 
+#define FRAMES_PER_BUFFER   WMME_FRAMES_PER_BUFFER /* hardwire portaudio callback buffer size to WMME buffer size for this test */
 
 #ifndef M_PI
 #define M_PI  (3.14159265)
@@ -137,13 +137,13 @@ int main(int argc, char* argv[])
     outputParameters.device = deviceIndex;
     outputParameters.channelCount = CHANNEL_COUNT;
     outputParameters.sampleFormat = paFloat32; /* 32 bit floating point processing */
-    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.suggestedLatency = 0; /*Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;*/
     outputParameters.hostApiSpecificStreamInfo = NULL;
 
     wmmeStreamInfo.size = sizeof(PaWinMmeStreamInfo);
     wmmeStreamInfo.hostApiType = paMME; 
     wmmeStreamInfo.version = 1;
-    wmmeStreamInfo.flags = paWinMmeUseLowLevelLatencyParameters;
+    wmmeStreamInfo.flags = paWinMmeUseLowLevelLatencyParameters | paWinMmeDontThrottleOverloadedProcessingThread;
     wmmeStreamInfo.framesPerBuffer = WMME_FRAMES_PER_BUFFER;
     wmmeStreamInfo.bufferCount = WMME_BUFFER_COUNT;
     outputParameters.hostApiSpecificStreamInfo = &wmmeStreamInfo;
