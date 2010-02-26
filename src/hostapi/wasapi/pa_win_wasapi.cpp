@@ -2820,6 +2820,14 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	BOOL bInitOutput = FALSE;
     PaWasapiStream *stream = (PaWasapiStream *)param;
 
+	// Waiting on all events in case of Full-Duplex/Exclusive mode.
+	BOOL bWaitAllEvents = FALSE;
+	if ((stream->in.client != NULL) && (stream->out.client != NULL))
+	{
+		bWaitAllEvents = (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) &&
+			(stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE);
+	}
+
     // Setup data processors
     PaWasapiHostProcessor defaultProcessor;
     defaultProcessor.processor = WaspiHostProcessingLoop;
@@ -2879,7 +2887,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	for (;;)
     {
 	    // 2 sec timeout
-        dwResult = WaitForMultipleObjects(S_COUNT, event, FALSE, 10000);
+        dwResult = WaitForMultipleObjects(S_COUNT, event, bWaitAllEvents, 10000);
 
 		// Check for close event (after wait for buffers to avoid any calls to user
 		// callback when hCloseRequest was set)
