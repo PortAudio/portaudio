@@ -58,6 +58,16 @@
 	#undef INITGUID
 #endif
 
+#ifndef _AVRT_ //<< fix MinGW dummy compile by defining missing type: AVRT_PRIORITY
+typedef enum _AVRT_PRIORITY
+{
+    AVRT_PRIORITY_LOW = -1,
+    AVRT_PRIORITY_NORMAL,
+    AVRT_PRIORITY_HIGH,
+    AVRT_PRIORITY_CRITICAL
+} AVRT_PRIORITY, *PAVRT_PRIORITY;
+#endif
+
 #include "pa_util.h"
 #include "pa_allocation.h"
 #include "pa_hostapi.h"
