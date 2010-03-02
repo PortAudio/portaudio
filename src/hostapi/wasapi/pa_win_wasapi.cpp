@@ -44,11 +44,11 @@
 
 #define WIN32_LEAN_AND_MEAN // exclude rare headers
 #include <windows.h>
+#include <stdio.h>
 #include <process.h>
 #include <mmsystem.h>
 #include <MMReg.h>  // must be before other Wasapi headers
 #if _MSC_VER >= 1400
-	#include <strsafe.h>
 	#include <Avrt.h>
 	#include <audioclient.h>
 	#include <Endpointvolume.h>
@@ -134,16 +134,16 @@ typedef BOOL   (WINAPI *FAvRevertMmThreadCharacteristics)(HANDLE);
 typedef BOOL   (WINAPI *FAvSetMmThreadPriority)          (HANDLE,AVRT_PRIORITY);
 
 static HMODULE hDInputDLL = 0;
-FAvRtCreateThreadOrderingGroup   pAvRtCreateThreadOrderingGroup=0;
-FAvRtDeleteThreadOrderingGroup   pAvRtDeleteThreadOrderingGroup=0;
-FAvRtWaitOnThreadOrderingGroup   pAvRtWaitOnThreadOrderingGroup=0;
-FAvSetMmThreadCharacteristics    pAvSetMmThreadCharacteristics=0;
-FAvRevertMmThreadCharacteristics pAvRevertMmThreadCharacteristics=0;
-FAvSetMmThreadPriority           pAvSetMmThreadPriority=0;
+FAvRtCreateThreadOrderingGroup   pAvRtCreateThreadOrderingGroup = NULL;
+FAvRtDeleteThreadOrderingGroup   pAvRtDeleteThreadOrderingGroup = NULL;
+FAvRtWaitOnThreadOrderingGroup   pAvRtWaitOnThreadOrderingGroup = NULL;
+FAvSetMmThreadCharacteristics    pAvSetMmThreadCharacteristics = NULL;
+FAvRevertMmThreadCharacteristics pAvRevertMmThreadCharacteristics = NULL;
+FAvSetMmThreadPriority           pAvSetMmThreadPriority = NULL;
 
-#define setupPTR(fun, type, name)  {                                                        \
+#define _GetProc(fun, type, name)  {                                                        \
                                         fun = (type) GetProcAddress(hDInputDLL,name);       \
-                                        if(fun == NULL) {                                   \
+                                        if (fun == NULL) {                                  \
                                             PRINT(("GetProcAddr failed for %s" ,name));     \
                                             return false;                                   \
                                         }                                                   \
@@ -527,15 +527,15 @@ static __forceinline UINT32 GetFramesSleepTime(UINT32 nFrames, UINT32 nSamplesPe
 static bool SetupAVRT()
 {
     hDInputDLL = LoadLibraryA("avrt.dll");
-    if(hDInputDLL == NULL)
+    if (hDInputDLL == NULL)
         return false;
 
-    setupPTR(pAvRtCreateThreadOrderingGroup,  FAvRtCreateThreadOrderingGroup,  "AvRtCreateThreadOrderingGroup");
-    setupPTR(pAvRtDeleteThreadOrderingGroup,  FAvRtDeleteThreadOrderingGroup,  "AvRtDeleteThreadOrderingGroup");
-    setupPTR(pAvRtWaitOnThreadOrderingGroup,  FAvRtWaitOnThreadOrderingGroup,  "AvRtWaitOnThreadOrderingGroup");
-    setupPTR(pAvSetMmThreadCharacteristics,   FAvSetMmThreadCharacteristics,   "AvSetMmThreadCharacteristicsA");
-	setupPTR(pAvRevertMmThreadCharacteristics,FAvRevertMmThreadCharacteristics,"AvRevertMmThreadCharacteristics");
-    setupPTR(pAvSetMmThreadPriority,          FAvSetMmThreadPriority,          "AvSetMmThreadPriority");
+    _GetProc(pAvRtCreateThreadOrderingGroup,  FAvRtCreateThreadOrderingGroup,  "AvRtCreateThreadOrderingGroup");
+    _GetProc(pAvRtDeleteThreadOrderingGroup,  FAvRtDeleteThreadOrderingGroup,  "AvRtDeleteThreadOrderingGroup");
+    _GetProc(pAvRtWaitOnThreadOrderingGroup,  FAvRtWaitOnThreadOrderingGroup,  "AvRtWaitOnThreadOrderingGroup");
+    _GetProc(pAvSetMmThreadCharacteristics,   FAvSetMmThreadCharacteristics,   "AvSetMmThreadCharacteristicsA");
+	_GetProc(pAvRevertMmThreadCharacteristics,FAvRevertMmThreadCharacteristics,"AvRevertMmThreadCharacteristics");
+    _GetProc(pAvSetMmThreadPriority,          FAvSetMmThreadPriority,          "AvSetMmThreadPriority");
     
 	return pAvRtCreateThreadOrderingGroup && 
 		pAvRtDeleteThreadOrderingGroup && 
@@ -647,7 +647,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     CoInitialize(NULL);
 
-    PaError result = paNoError;
+    PaError result = paUnanticipatedHostError;
     PaWasapiHostApiRepresentation *paWasapi;
     PaDeviceInfo *deviceInfoArray;
 
@@ -697,7 +697,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 				WCHAR* pszDeviceId = NULL;
 				hResult = defaultRenderer->GetId(&pszDeviceId);
 				IF_FAILED_JUMP(hResult, error);
-				StringCchCopyW(paWasapi->defaultRenderer, MAX_STR_LEN-1, pszDeviceId);
+				wcscpy_s(paWasapi->defaultRenderer, MAX_STR_LEN-1, pszDeviceId);
 				CoTaskMemFree(pszDeviceId);
 				defaultRenderer->Release();
 			}
@@ -716,7 +716,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 				WCHAR* pszDeviceId = NULL;
 				hResult = defaultCapturer->GetId(&pszDeviceId);
 				IF_FAILED_JUMP(hResult, error);
-				StringCchCopyW(paWasapi->defaultCapturer, MAX_STR_LEN-1, pszDeviceId);
+				wcscpy_s(paWasapi->defaultCapturer, MAX_STR_LEN-1, pszDeviceId);
 				CoTaskMemFree(pszDeviceId);
 				defaultCapturer->Release();
 			}
@@ -767,7 +767,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 WCHAR* pszDeviceId = NULL;
                 hResult = paWasapi->devInfo[i].device->GetId(&pszDeviceId);
                 IF_FAILED_JUMP(hResult, error);
-                StringCchCopyW(paWasapi->devInfo[i].szDeviceID, MAX_STR_LEN-1, pszDeviceId);
+                wcscpy_s(paWasapi->devInfo[i].szDeviceID, MAX_STR_LEN-1, pszDeviceId);
                 CoTaskMemFree(pszDeviceId);
 
                 if (lstrcmpW(paWasapi->devInfo[i].szDeviceID, paWasapi->defaultCapturer) == 0)
@@ -938,7 +938,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     SAFE_RELEASE(pEndPoints);
 
-    return result;
+    return (result = paNoError);
 
 error:
 
