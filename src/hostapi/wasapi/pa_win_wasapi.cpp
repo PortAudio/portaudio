@@ -647,7 +647,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     CoInitialize(NULL);
 
-    PaError result = paUnanticipatedHostError;
+    PaError result = paNoError;
     PaWasapiHostApiRepresentation *paWasapi;
     PaDeviceInfo *deviceInfoArray;
 
@@ -674,9 +674,9 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->info.defaultOutputDevice = paNoDevice;
 
     HRESULT hResult = S_OK;
-    IMMDeviceCollection* pEndPoints=0;
-    paWasapi->enumerator = 0;
-
+    IMMDeviceCollection *pEndPoints = NULL;
+    
+	paWasapi->enumerator = NULL;
     hResult = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL,CLSCTX_INPROC_SERVER,
              __uuidof(IMMDeviceEnumerator),
              (void**)&paWasapi->enumerator);
@@ -685,7 +685,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     // getting default device ids in the eMultimedia "role"
     {
         {
-            IMMDevice* defaultRenderer=0;
+            IMMDevice *defaultRenderer = NULL;
             hResult = paWasapi->enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultRenderer);
             if (hResult != S_OK)
 			{
@@ -694,7 +694,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 			}
 			else
 			{
-				WCHAR* pszDeviceId = NULL;
+				WCHAR *pszDeviceId = NULL;
 				hResult = defaultRenderer->GetId(&pszDeviceId);
 				IF_FAILED_JUMP(hResult, error);
 				wcscpy_s(paWasapi->defaultRenderer, MAX_STR_LEN-1, pszDeviceId);
@@ -945,6 +945,7 @@ error:
     SAFE_RELEASE(pEndPoints);
 	
 	Terminate((PaUtilHostApiRepresentation *)paWasapi);
+	(*hostApi) = NULL;
 	
     return result;
 }
