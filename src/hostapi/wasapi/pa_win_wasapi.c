@@ -834,7 +834,7 @@ static BOOL UseWOW64VistaWorkaround()
 // ------------------------------------------------------------------------------------------
 PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
-    PaError result = paUnanticipatedHostError;
+    PaError result = paNoError;
     PaWasapiHostApiRepresentation *paWasapi;
     PaDeviceInfo *deviceInfoArray;
     HRESULT hResult = S_OK;
@@ -843,13 +843,13 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     if (!SetupAVRT())
 	{
-        PRINT(("Windows WASAPI : No AVRT! (not VISTA?)"));
-        return paHostApiNotFound;
+        PRINT(("WASAPI: No AVRT! (not VISTA?)"));
+        return paNoError;
     }
 
     CoInitialize(NULL);
 
-    paWasapi = (PaWasapiHostApiRepresentation*)PaUtil_AllocateMemory( sizeof(PaWasapiHostApiRepresentation) );
+    paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory( sizeof(PaWasapiHostApiRepresentation) );
     if (paWasapi == NULL)
 	{
         result = paInsufficientMemory;
@@ -863,7 +863,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         goto error;
     }
 
-    *hostApi = &paWasapi->inheritedHostApiRep;
+    *hostApi                             = &paWasapi->inheritedHostApiRep;
     (*hostApi)->info.structVersion		 = 1;
     (*hostApi)->info.type				 = paWASAPI;
     (*hostApi)->info.name				 = "Windows WASAPI";
@@ -1101,7 +1101,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 deviceInfo->defaultLowInputLatency  = nano100ToSeconds(paWasapi->devInfo[i].MinimumDevicePeriod);
             break;
             default:
-                PRINT(("WASAPI device:%d bad Data FLow! \n",i));
+                PRINT(("WASAPI: device %d bad Data FLow! \n",i));
                 goto error;
             break;
             }
@@ -1134,7 +1134,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     SAFE_RELEASE(pEndPoints);
 
-    return (result = paNoError);
+    return paNoError;
 
 error:
 
