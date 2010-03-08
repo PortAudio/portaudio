@@ -531,8 +531,8 @@ static void _OnStreamStop(PaWasapiStream *stream);
 static void _FinishStream(PaWasapiStream *stream);
 
 // ------------------------------------------------------------------------------------------
-#define LogHostError(HRES) __LogHostError(HRES, __FILE__, __LINE__)
-static HRESULT __LogHostError(HRESULT res, const char *file, int line)
+#define LogHostError(HRES) __LogHostError(HRES, __FUNCTION__, __FILE__, __LINE__)
+static HRESULT __LogHostError(HRESULT res, const char *func, const char *file, int line)
 {
     const char *text = NULL;
     switch (res)
@@ -574,18 +574,18 @@ static HRESULT __LogHostError(HRESULT res, const char *file, int line)
 	default:
 		text = "UNKNOWN ERROR";
     }
-	PRINT(("WASAPI ERROR HRESULT: 0x%X : %s\n [FILE: %s {LINE: %d}]\n",res, text, file, line));
+	PRINT(("WASAPI ERROR HRESULT: 0x%X : %s\n [FUNCTION: %s FILE: %s {LINE: %d}]\n", res, text, func, file, line));
 	PA_SKELETON_SET_LAST_HOST_ERROR(res, text);
 	return res;
 }
 
 // ------------------------------------------------------------------------------------------
-#define LogPaError(PAERR) __LogPaError(PAERR, __FILE__, __LINE__)
-static PaError __LogPaError(PaError err, const char *file, int line)
+#define LogPaError(PAERR) __LogPaError(PAERR, __FUNCTION__, __FILE__, __LINE__)
+static PaError __LogPaError(PaError err, const char *func, const char *file, int line)
 {
 	if (err == paNoError)
 		return err;
-	PRINT(("WASAPI ERROR PAERROR: %i : %s\n [FILE: %s {LINE: %d}]\n",err,Pa_GetErrorText(err),file,line));
+	PRINT(("WASAPI ERROR PAERROR: %i : %s\n [FUNCTION: %s FILE: %s {LINE: %d}]\n", err, Pa_GetErrorText(err), func, file, line));
 	return err;
 }
 
@@ -1297,51 +1297,37 @@ static PaSampleFormat waveformatToPaFormat(const WAVEFORMATEXTENSIBLE *in)
 
     switch (old->wFormatTag)
 	{
-    case WAVE_FORMAT_EXTENSIBLE:
-    {
+    case WAVE_FORMAT_EXTENSIBLE: {
         if (IsEqualGUID(&in->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
 		{
             if (in->Samples.wValidBitsPerSample == 32)
                 return paFloat32;
-            else
-                return paCustomFormat;
         }
         else
 		if (IsEqualGUID(&in->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_PCM))
 		{
-            switch (old->wBitsPerSample){
-                case 32: return paInt32; break;
-                case 24: return paInt24;break;
-                case  8: return paUInt8;break;
-                case 16: return paInt16;break;
-                default: return paCustomFormat;break;
+            switch (old->wBitsPerSample)
+			{
+                case 32: return paInt32;
+                case 24: return paInt24;
+                case  8: return paUInt8;
+                case 16: return paInt16;
             }
         }
-        else
-            return paCustomFormat;
-    }
-    break;
+		break; }
+    
+    case WAVE_FORMAT_IEEE_FLOAT: 
+		return paFloat32;
 
-    case WAVE_FORMAT_IEEE_FLOAT:
-        return paFloat32;
-    break;
-
-    case WAVE_FORMAT_PCM:
-    {
+    case WAVE_FORMAT_PCM: {
         switch (old->wBitsPerSample)
 		{
-            case 32: return paInt32; break;
-            case 24: return paInt24;break;
-            case  8: return paUInt8;break;
-            case 16: return paInt16;break;
-            default: return paCustomFormat;break;
+            case 32: return paInt32;
+            case 24: return paInt24;
+            case  8: return paUInt8;
+            case 16: return paInt16;
         }
-    }
-    break;
-
-    default:
-        return paCustomFormat;
-    break;
+		break; }
     }
 
     return paCustomFormat;
@@ -1367,7 +1353,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
     memset(wavex, 0, sizeof(*wavex));
 
     old					 = (WAVEFORMATEX *)wavex;
-    old->nChannels       = params->channelCount;
+    old->nChannels       = (WORD)params->channelCount;
     old->nSamplesPerSec  = (DWORD)sampleRate;
 	if ((old->wBitsPerSample = bitsPerSample) > 16)
 	{
@@ -1424,15 +1410,15 @@ static void wasapiFillWFEXT( WAVEFORMATEXTENSIBLE* pwfext, PaSampleFormat sample
     PA_DEBUG(( "chanelCount = %d\n", channelCount ));
 
     pwfext->Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-    pwfext->Format.nChannels = channelCount;
-    pwfext->Format.nSamplesPerSec = (int)sampleRate;
+    pwfext->Format.nChannels = (WORD)channelCount;
+    pwfext->Format.nSamplesPerSec = (DWORD)sampleRate;
     if(channelCount == 1)
         pwfext->dwChannelMask = KSAUDIO_SPEAKER_DIRECTOUT;
     else
         pwfext->dwChannelMask = KSAUDIO_SPEAKER_STEREO;
     if(sampleFormat == paFloat32)
     {
-        pwfext->Format.nBlockAlign = channelCount * 4;
+        pwfext->Format.nBlockAlign = (WORD)(channelCount * 4);
         pwfext->Format.wBitsPerSample = 32;
         pwfext->Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE)-sizeof(WAVEFORMATEX);
         pwfext->Samples.wValidBitsPerSample = 32;
@@ -1440,7 +1426,7 @@ static void wasapiFillWFEXT( WAVEFORMATEXTENSIBLE* pwfext, PaSampleFormat sample
     }
     else if(sampleFormat == paInt32)
     {
-        pwfext->Format.nBlockAlign = channelCount * 4;
+        pwfext->Format.nBlockAlign = (WORD)(channelCount * 4);
         pwfext->Format.wBitsPerSample = 32;
         pwfext->Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE)-sizeof(WAVEFORMATEX);
         pwfext->Samples.wValidBitsPerSample = 32;
@@ -1448,7 +1434,7 @@ static void wasapiFillWFEXT( WAVEFORMATEXTENSIBLE* pwfext, PaSampleFormat sample
     }
     else if(sampleFormat == paInt24)
     {
-        pwfext->Format.nBlockAlign = channelCount * 4;
+        pwfext->Format.nBlockAlign = (WORD)(channelCount * 4);
         pwfext->Format.wBitsPerSample = 32; // 24-bit in 32-bit int container
         pwfext->Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE)-sizeof(WAVEFORMATEX);
         pwfext->Samples.wValidBitsPerSample = 24;
@@ -1456,7 +1442,7 @@ static void wasapiFillWFEXT( WAVEFORMATEXTENSIBLE* pwfext, PaSampleFormat sample
     }
     else if(sampleFormat == paInt16)
     {
-        pwfext->Format.nBlockAlign = channelCount * 2;
+        pwfext->Format.nBlockAlign = (WORD)(channelCount * 2);
         pwfext->Format.wBitsPerSample = 16;
         pwfext->Format.cbSize = sizeof(WAVEFORMATEXTENSIBLE)-sizeof(WAVEFORMATEX);
         pwfext->Samples.wValidBitsPerSample = 16;
@@ -1862,7 +1848,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
 	HRESULT hr;
     PaWasapiHostApiRepresentation *paWasapi = (PaWasapiHostApiRepresentation*)hostApi;
-    PaWasapiStream *stream;
+    PaWasapiStream *stream = NULL;
     int inputChannelCount, outputChannelCount;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
@@ -2240,7 +2226,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 error:
 
-    if (stream)
+    if (stream != NULL)
 	{
 		CloseStream(stream);
         PaUtil_FreeMemory(stream);
@@ -2289,7 +2275,6 @@ static PaError CloseStream( PaStream* s )
 // ------------------------------------------------------------------------------------------
 static PaError StartStream( PaStream *s )
 {
-    PaError result = paNoError;
 	HRESULT hr;
     PaWasapiStream *stream = (PaWasapiStream*)s;
 
@@ -2558,7 +2543,7 @@ static PaError WriteStream( PaStream* s, const void *_buffer, unsigned long _fra
 	UINT32 frames;
 	const BYTE *buffer = (BYTE *)_buffer;
 	BYTE *data;
-	HRESULT hr;
+	HRESULT hr = S_OK;
 	UINT32 next_rev_sleep, blocks, block_sleep_ms;
 	UINT32 i;
 
@@ -2936,8 +2921,7 @@ PaError PaWasapi_ThreadPriorityRevert(void *hTask)
 static HRESULT FillOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor, UINT32 frames)
 {
 	HRESULT hr;
-	BYTE *data    = NULL;
-	DWORD flags   = 0;
+	BYTE *data = NULL;
 
 	// Get buffer
 	if ((hr = IAudioRenderClient_GetBuffer(stream->rclient, frames, &data)) != S_OK)
@@ -3045,7 +3029,6 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
     PaWasapiHostProcessor processor[S_COUNT];
 	HRESULT hr;
 	DWORD dwResult;
-	BOOL bInitOutput = FALSE;
     PaWasapiStream *stream = (PaWasapiStream *)param;
 	PaWasapiHostProcessor defaultProcessor;
 
@@ -3168,7 +3151,6 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 {
     PaWasapiHostProcessor processor[S_COUNT];
 	HRESULT hr;
-	BOOL bInitOutput = FALSE;
     PaWasapiStream *stream = (PaWasapiStream *)param;
 	PaWasapiHostProcessor defaultProcessor;
 	INT32 i;
