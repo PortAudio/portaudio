@@ -47,8 +47,8 @@
 #include <stdio.h>
 #include <process.h>
 #include <mmsystem.h>
-#include <MMReg.h>  // must be before other Wasapi headers
-#if _MSC_VER >= 1400
+#include <mmreg.h>  // must be before other Wasapi headers
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
 	#include <Avrt.h>
 	#define COBJMACROS
 	#include <Audioclient.h>
@@ -239,7 +239,7 @@
     #include <propkeydef.h>
     #define COBJMACROS
     #define INITGUID
-    #include <Audioclient.h>
+    #include <audioclient.h>
     #include <mmdeviceapi.h>
     #include <endpointvolume.h>
     #include <functiondiscoverykeys.h>
