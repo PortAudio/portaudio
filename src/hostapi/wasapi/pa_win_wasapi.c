@@ -51,8 +51,8 @@
 #if _MSC_VER >= 1400
 	#include <Avrt.h>
 	#define COBJMACROS
-	#include <audioclient.h>
-	#include <Endpointvolume.h>
+	#include <Audioclient.h>
+	#include <endpointvolume.h>
 	#define INITGUID //<< avoid additional linkage of static libs, uneeded code will be optimized out
 	#include <mmdeviceapi.h>
 	#include <functiondiscoverykeys.h>
@@ -83,6 +83,11 @@
 	#include <basetyps.h> // << for IID/CLSID
     #include <rpcsal.h>
     #include <sal.h>
+
+	#ifndef __LPCGUID_DEFINED__
+		#define __LPCGUID_DEFINED__
+		typedef const GUID *LPCGUID;
+	#endif
 
     #ifndef PROPERTYKEY_DEFINED
         #define PROPERTYKEY_DEFINED
@@ -234,9 +239,9 @@
     #include <propkeydef.h>
     #define COBJMACROS
     #define INITGUID
-    #include <audioclient.h>
+    #include <Audioclient.h>
     #include <mmdeviceapi.h>
-    #include <Endpointvolume.h>
+    #include <endpointvolume.h>
     #include <functiondiscoverykeys.h>
     #undef INITGUID
 
@@ -1030,9 +1035,12 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                     IF_FAILED_JUMP(hResult, error);
 					// set
 					#if defined(DUMMYUNIONNAME) && defined(NONAMELESSUNION)
-					paWasapi->devInfo[i].formFactor = (EndpointFormFactor)(*((UINT *)(((WORD *)&value.wReserved3)+1)));
+						// avoid breaking strict-aliasing rules in such line: (EndpointFormFactor)(*((UINT *)(((WORD *)&value.wReserved3)+1)));
+						UINT v;
+						memcpy(&v, (((WORD *)&value.wReserved3)+1), sizeof(v));
+						paWasapi->devInfo[i].formFactor = (EndpointFormFactor)v;
 					#else
-					paWasapi->devInfo[i].formFactor = (EndpointFormFactor)value.uintVal;
+						paWasapi->devInfo[i].formFactor = (EndpointFormFactor)value.uintVal;
 					#endif
 					PA_DEBUG(("WASAPI: device[%s] form-factor: %d\n", deviceInfo->name, paWasapi->devInfo[i].formFactor));
                     // cleanup
