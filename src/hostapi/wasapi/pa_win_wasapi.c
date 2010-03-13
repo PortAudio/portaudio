@@ -443,7 +443,7 @@ typedef struct
     IMMDeviceEnumerator *enumerator;
 
     //this is the REAL number of devices, whether they are usefull to PA or not!
-    UINT deviceCount;
+    UINT32 deviceCount;
 
     WCHAR defaultRenderer [MAX_STR_LEN];
     WCHAR defaultCapturer [MAX_STR_LEN];
@@ -934,18 +934,18 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     if (paWasapi->deviceCount > 0)
     {
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
-                paWasapi->allocations, sizeof(PaDeviceInfo*) * paWasapi->deviceCount);
-        if (!(*hostApi)->deviceInfos)
+        (*hostApi)->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateMemory(
+                paWasapi->allocations, sizeof(PaDeviceInfo *) * paWasapi->deviceCount);
+        if ((*hostApi)->deviceInfos == NULL)
 		{
             result = paInsufficientMemory;
             goto error;
         }
 
         /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaDeviceInfo *)PaUtil_GroupAllocateMemory(
                 paWasapi->allocations, sizeof(PaDeviceInfo) * paWasapi->deviceCount);
-        if (!deviceInfoArray)
+        if (deviceInfoArray == NULL)
 		{
             result = paInsufficientMemory;
             goto error;
@@ -1189,7 +1189,7 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
 }
 
 // ------------------------------------------------------------------------------------------
-static PaWasapiHostApiRepresentation *GetHostApi(PaError *_error)
+static PaWasapiHostApiRepresentation *_GetHostApi(PaError *_error)
 {
 	PaError error;
 
@@ -1210,6 +1210,7 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 	PaError ret;
 	PaWasapiHostApiRepresentation *paWasapi;
 	UINT32 size;
+	PaDeviceIndex index;
 
 	if (pFormat == NULL)
 		return paBadBufferPtr;
@@ -1217,15 +1218,21 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 		return paBufferTooSmall;
 
 	// Get API
-	paWasapi = GetHostApi(&ret);
+	paWasapi = _GetHostApi(&ret);
 	if (paWasapi == NULL)
 		return ret;
 
-	if ((UINT32)nDevice >= paWasapi->deviceCount)
+	// Get device index
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+    if (ret != paNoError)
+        return ret;
+
+	// Validate index
+	if ((UINT32)index >= paWasapi->deviceCount)
 		return paInvalidDevice;
 
-	size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ nDevice ].DefaultFormat));
-	memcpy(pFormat, &paWasapi->devInfo[ nDevice ].DefaultFormat, size);
+	size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].DefaultFormat));
+	memcpy(pFormat, &paWasapi->devInfo[ index ].DefaultFormat, size);
 
 	return size;
 }
@@ -1234,16 +1241,23 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 int PaWasapi_GetDeviceRole( PaDeviceIndex nDevice )
 {
 	PaError ret;
+	PaDeviceIndex index;
 
 	// Get API
-	PaWasapiHostApiRepresentation *paWasapi = GetHostApi(&ret);
+	PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
 	if (paWasapi == NULL)
 		return ret;
 
-	if (nDevice >= (int)paWasapi->deviceCount)
+	// Get device index
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+    if (ret != paNoError)
+        return ret;
+
+	// Validate index
+	if ((UINT32)index >= paWasapi->deviceCount)
 		return paInvalidDevice;
 
-	return paWasapi->devInfo[ nDevice ].formFactor;
+	return paWasapi->devInfo[ index ].formFactor;
 }
 
 // ------------------------------------------------------------------------------------------
