@@ -2500,12 +2500,10 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long _frames )
 	UINT32 buffer_size;
 
 	// validate
-	if (s == NULL)
+	if (!stream->running)
+		return paStreamIsStopped;
+	if (stream->cclient == NULL)
 		return paBadStreamPtr;
-	if (_buffer == NULL)
-		return paBadBufferPtr;
-	if (_frames == 0)
-		return paBufferTooSmall;
 
 	// Notify blocking op has begun
 	ResetEvent(stream->hBlockingOpStreamRD);
@@ -2570,16 +2568,8 @@ static PaError WriteStream( PaStream* s, const void *_buffer, unsigned long _fra
 	UINT32 i;
 
 	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
-	if (_buffer == NULL)
-		return paBadBufferPtr;
-	if (_frames == 0)
-		return paBufferTooSmall;
-
 	if (!stream->running)
 		return paStreamIsStopped;
-
 	if (stream->rclient == NULL)
 		return paBadStreamPtr;
 
@@ -2701,12 +2691,8 @@ static signed long GetStreamReadAvailable( PaStream* s )
 	UINT32 pending = 0;
 
 	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
-
 	if (!stream->running)
 		return paStreamIsStopped;
-
 	if (stream->cclient == NULL)
 		return paBadStreamPtr;
 
@@ -2730,12 +2716,8 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 	UINT32 padding = 0;
 
 	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
-
 	if (!stream->running)
 		return paStreamIsStopped;
-
 	if (stream->rclient == NULL)
 		return paBadStreamPtr;
 
