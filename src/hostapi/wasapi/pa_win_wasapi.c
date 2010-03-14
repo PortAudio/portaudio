@@ -2263,10 +2263,6 @@ static PaError CloseStream( PaStream* s )
     PaError result = paNoError;
     PaWasapiStream *stream = (PaWasapiStream*)s;
 
-	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
-
 	// abort active stream
 	if (IsStreamActive(s))
 	{
@@ -2299,10 +2295,6 @@ static PaError StartStream( PaStream *s )
 {
 	HRESULT hr;
     PaWasapiStream *stream = (PaWasapiStream*)s;
-
-	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
 
 	// check if stream is active already
 	if (IsStreamActive(s))
@@ -2418,55 +2410,35 @@ static void _FinishStream(PaWasapiStream *stream)
 // ------------------------------------------------------------------------------------------
 static PaError StopStream( PaStream *s )
 {
-    PaError result = paNoError;
-
-	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
-
 	// Finish stream
 	_FinishStream((PaWasapiStream *)s);
-
-    return result;
+    return paNoError;
 }
 
 // ------------------------------------------------------------------------------------------
 static PaError AbortStream( PaStream *s )
 {
-    PaError result = paNoError;
-
-	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
-
 	// Finish stream
 	_FinishStream((PaWasapiStream *)s);
-
-    return result;
+    return paNoError;
 }
 
 // ------------------------------------------------------------------------------------------
 static PaError IsStreamStopped( PaStream *s )
 {
-    PaWasapiStream *stream = (PaWasapiStream*)s;
-	return (stream ? !stream->running : paBadStreamPtr);
+	return !((PaWasapiStream *)s)->running;
 }
 
 // ------------------------------------------------------------------------------------------
 static PaError IsStreamActive( PaStream *s )
 {
-    PaWasapiStream *stream = (PaWasapiStream*)s;
-    return (stream ? stream->running : paBadStreamPtr);
+    return ((PaWasapiStream *)s)->running;
 }
 
 // ------------------------------------------------------------------------------------------
 static PaTime GetStreamTime( PaStream *s )
 {
     PaWasapiStream *stream = (PaWasapiStream*)s;
-
-	// validate
-	if (s == NULL)
-		return paBadStreamPtr;
 
     /* suppress unused variable warnings */
     (void) stream;
@@ -2482,8 +2454,7 @@ static PaTime GetStreamTime( PaStream *s )
 // ------------------------------------------------------------------------------------------
 static double GetStreamCpuLoad( PaStream* s )
 {
-    PaWasapiStream *stream = (PaWasapiStream *)s;
-	return (stream ? PaUtil_GetCpuLoad( &stream->cpuLoadMeasurer ) : 0.0);
+	return PaUtil_GetCpuLoad(&((PaWasapiStream *)s)->cpuLoadMeasurer);
 }
 
 // ------------------------------------------------------------------------------------------
