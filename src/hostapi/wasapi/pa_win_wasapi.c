@@ -535,6 +535,9 @@ PaWasapiStream;
 static void _OnStreamStop(PaWasapiStream *stream);
 static void _FinishStream(PaWasapiStream *stream);
 
+// Local statics
+static volatile BOOL g_bCOMInitialized = FALSE;
+
 // ------------------------------------------------------------------------------------------
 #define LogHostError(HRES) __LogHostError(HRES, __FUNCTION__, __FILE__, __LINE__)
 static HRESULT __LogHostError(HRESULT res, const char *func, const char *file, int line)
@@ -842,7 +845,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     PaError result = paNoError;
     PaWasapiHostApiRepresentation *paWasapi;
     PaDeviceInfo *deviceInfoArray;
-    HRESULT hResult = S_OK;
+    HRESULT hr = S_OK;
     IMMDeviceCollection* pEndPoints = NULL;
 	UINT i;
 
@@ -852,7 +855,21 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         return paNoError;
     }
 
-    CoInitialize(NULL);
+    /*
+        If COM is already initialized CoInitialize will either return
+        FALSE, or RPC_E_CHANGED_MODE if it was initialised in a different
+        threading mode. In either case we shouldn't consider it an error
+        but we need to be careful to not call CoUninitialize() if 
+        RPC_E_CHANGED_MODE was returned.
+    */
+    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(hr) && (hr != RPC_E_CHANGED_MODE))
+	{
+		PRINT(("WASAPI: failed CoInitialize"));
+        return paUnanticipatedHostError;
+	}
+    if (hr != RPC_E_CHANGED_MODE)
+        g_bCOMInitialized = TRUE;
 
     paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory( sizeof(PaWasapiHostApiRepresentation) );
     if (paWasapi == NULL)
@@ -877,25 +894,25 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->info.defaultOutputDevice = paNoDevice;
 
     paWasapi->enumerator = NULL;
-    hResult = CoCreateInstance(&pa_CLSID_IMMDeviceEnumerator, NULL, CLSCTX_INPROC_SERVER,
+    hr = CoCreateInstance(&pa_CLSID_IMMDeviceEnumerator, NULL, CLSCTX_INPROC_SERVER,
              &pa_IID_IMMDeviceEnumerator, (void **)&paWasapi->enumerator);
-    IF_FAILED_JUMP(hResult, error);
+    IF_FAILED_JUMP(hr, error);
 
     // getting default device ids in the eMultimedia "role"
     {
         {
             IMMDevice *defaultRenderer = NULL;
-            hResult = IMMDeviceEnumerator_GetDefaultAudioEndpoint(paWasapi->enumerator, eRender, eMultimedia, &defaultRenderer);
-            if (hResult != S_OK)
+            hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(paWasapi->enumerator, eRender, eMultimedia, &defaultRenderer);
+            if (hr != S_OK)
 			{
-				if (hResult != E_NOTFOUND)
-					IF_FAILED_JUMP(hResult, error);
+				if (hr != E_NOTFOUND)
+					IF_FAILED_JUMP(hr, error);
 			}
 			else
 			{
 				WCHAR *pszDeviceId = NULL;
-				hResult = IMMDevice_GetId(defaultRenderer, &pszDeviceId);
-				IF_FAILED_JUMP(hResult, error);
+				hr = IMMDevice_GetId(defaultRenderer, &pszDeviceId);
+				IF_FAILED_JUMP(hr, error);
 				wcsncpy(paWasapi->defaultRenderer, pszDeviceId, MAX_STR_LEN-1);
 				CoTaskMemFree(pszDeviceId);
 				IMMDevice_Release(defaultRenderer);
@@ -904,17 +921,17 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
         {
             IMMDevice *defaultCapturer = NULL;
-            hResult = IMMDeviceEnumerator_GetDefaultAudioEndpoint(paWasapi->enumerator, eCapture, eMultimedia, &defaultCapturer);
-            if (hResult != S_OK)
+            hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(paWasapi->enumerator, eCapture, eMultimedia, &defaultCapturer);
+            if (hr != S_OK)
 			{
-				if (hResult != E_NOTFOUND)
-					IF_FAILED_JUMP(hResult, error);
+				if (hr != E_NOTFOUND)
+					IF_FAILED_JUMP(hr, error);
 			}
 			else
 			{
 				WCHAR *pszDeviceId = NULL;
-				hResult = IMMDevice_GetId(defaultCapturer, &pszDeviceId);
-				IF_FAILED_JUMP(hResult, error);
+				hr = IMMDevice_GetId(defaultCapturer, &pszDeviceId);
+				IF_FAILED_JUMP(hr, error);
 				wcsncpy(paWasapi->defaultCapturer, pszDeviceId, MAX_STR_LEN-1);
 				CoTaskMemFree(pszDeviceId);
 				IMMDevice_Release(defaultCapturer);
@@ -922,11 +939,11 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         }
     }
 
-    hResult = IMMDeviceEnumerator_EnumAudioEndpoints(paWasapi->enumerator, eAll, DEVICE_STATE_ACTIVE, &pEndPoints);
-    IF_FAILED_JUMP(hResult, error);
+    hr = IMMDeviceEnumerator_EnumAudioEndpoints(paWasapi->enumerator, eAll, DEVICE_STATE_ACTIVE, &pEndPoints);
+    IF_FAILED_JUMP(hr, error);
 
-    hResult = IMMDeviceCollection_GetCount(pEndPoints, &paWasapi->deviceCount);
-    IF_FAILED_JUMP(hResult, error);
+    hr = IMMDeviceCollection_GetCount(pEndPoints, &paWasapi->deviceCount);
+    IF_FAILED_JUMP(hr, error);
 
     paWasapi->devInfo = (PaWasapiDeviceInfo *)malloc(sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
 	for (i = 0; i < paWasapi->deviceCount; ++i)
@@ -960,14 +977,14 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
 			PA_DEBUG(("WASAPI: device i: %d\n", i));
 
-            hResult = IMMDeviceCollection_Item(pEndPoints, i, &paWasapi->devInfo[i].device);
-            IF_FAILED_JUMP(hResult, error);
+            hr = IMMDeviceCollection_Item(pEndPoints, i, &paWasapi->devInfo[i].device);
+            IF_FAILED_JUMP(hr, error);
 
             // getting ID
             {
                 WCHAR *pszDeviceId = NULL;
-                hResult = IMMDevice_GetId(paWasapi->devInfo[i].device, &pszDeviceId);
-                IF_FAILED_JUMP(hResult, error);
+                hr = IMMDevice_GetId(paWasapi->devInfo[i].device, &pszDeviceId);
+                IF_FAILED_JUMP(hr, error);
                 wcsncpy(paWasapi->devInfo[i].szDeviceID, pszDeviceId, MAX_STR_LEN-1);
                 CoTaskMemFree(pszDeviceId);
 
@@ -981,8 +998,8 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 }
             }
 
-            hResult = IMMDevice_GetState(paWasapi->devInfo[i].device, &paWasapi->devInfo[i].state);
-            IF_FAILED_JUMP(hResult, error);
+            hr = IMMDevice_GetState(paWasapi->devInfo[i].device, &paWasapi->devInfo[i].state);
+            IF_FAILED_JUMP(hr, error);
 
             if (paWasapi->devInfo[i].state != DEVICE_STATE_ACTIVE)
 			{
@@ -991,16 +1008,16 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
             {
                 IPropertyStore *pProperty;
-                hResult = IMMDevice_OpenPropertyStore(paWasapi->devInfo[i].device, STGM_READ, &pProperty);
-                IF_FAILED_JUMP(hResult, error);
+                hr = IMMDevice_OpenPropertyStore(paWasapi->devInfo[i].device, STGM_READ, &pProperty);
+                IF_FAILED_JUMP(hr, error);
 
                 // "Friendly" Name
                 {
 					char *deviceName;
                     PROPVARIANT value;
                     PropVariantInit(&value);
-                    hResult = IPropertyStore_GetValue(pProperty, &PKEY_Device_FriendlyName, &value);
-                    IF_FAILED_JUMP(hResult, error);
+                    hr = IPropertyStore_GetValue(pProperty, &PKEY_Device_FriendlyName, &value);
+                    IF_FAILED_JUMP(hr, error);
                     deviceInfo->name = NULL;
                     deviceName = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1);
                     if (deviceName == NULL)
@@ -1020,8 +1037,8 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 {
                     PROPVARIANT value;
                     PropVariantInit(&value);
-                    hResult = IPropertyStore_GetValue(pProperty, &PKEY_AudioEngine_DeviceFormat, &value);
-                    IF_FAILED_JUMP(hResult, error);
+                    hr = IPropertyStore_GetValue(pProperty, &PKEY_AudioEngine_DeviceFormat, &value);
+                    IF_FAILED_JUMP(hr, error);
 					memcpy(&paWasapi->devInfo[i].DefaultFormat, value.blob.pBlobData, min(sizeof(paWasapi->devInfo[i].DefaultFormat), value.blob.cbSize));
                     // cleanup
                     PropVariantClear(&value);
@@ -1031,8 +1048,8 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 {
                     PROPVARIANT value;
                     PropVariantInit(&value);
-                    hResult = IPropertyStore_GetValue(pProperty, &PKEY_AudioEndpoint_FormFactor, &value);
-                    IF_FAILED_JUMP(hResult, error);
+                    hr = IPropertyStore_GetValue(pProperty, &PKEY_AudioEndpoint_FormFactor, &value);
+                    IF_FAILED_JUMP(hr, error);
 					// set
 					#if defined(DUMMYUNIONNAME) && defined(NONAMELESSUNION)
 						// avoid breaking strict-aliasing rules in such line: (EndpointFormFactor)(*((UINT *)(((WORD *)&value.wReserved3)+1)));
@@ -1054,10 +1071,10 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
             // Endpoint data
             {
                 IMMEndpoint *endpoint = NULL;
-                hResult = IMMDevice_QueryInterface(paWasapi->devInfo[i].device, &pa_IID_IMMEndpoint, (void **)&endpoint);
-                if (SUCCEEDED(hResult))
+                hr = IMMDevice_QueryInterface(paWasapi->devInfo[i].device, &pa_IID_IMMEndpoint, (void **)&endpoint);
+                if (SUCCEEDED(hr))
 				{
-                    hResult = IMMEndpoint_GetDataFlow(endpoint, &paWasapi->devInfo[i].flow);
+                    hr = IMMEndpoint_GetDataFlow(endpoint, &paWasapi->devInfo[i].flow);
                     SAFE_RELEASE(endpoint);
                 }
             }
@@ -1067,26 +1084,26 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
             {
                 IAudioClient *tmpClient = NULL;
 
-                hResult = IMMDevice_Activate(paWasapi->devInfo[i].device, &pa_IID_IAudioClient,
+                hr = IMMDevice_Activate(paWasapi->devInfo[i].device, &pa_IID_IAudioClient,
 					CLSCTX_INPROC_SERVER, NULL, (void **)&tmpClient);
-                IF_FAILED_JUMP(hResult, error);
+                IF_FAILED_JUMP(hr, error);
 
-                hResult = IAudioClient_GetDevicePeriod(tmpClient,
+                hr = IAudioClient_GetDevicePeriod(tmpClient,
                     &paWasapi->devInfo[i].DefaultDevicePeriod,
                     &paWasapi->devInfo[i].MinimumDevicePeriod);
-                IF_FAILED_JUMP(hResult, error);
+                IF_FAILED_JUMP(hr, error);
 
-                //hResult = tmpClient->GetMixFormat(&paWasapi->devInfo[i].MixFormat);
+                //hr = tmpClient->GetMixFormat(&paWasapi->devInfo[i].MixFormat);
 
 				// Release client
 				SAFE_RELEASE(tmpClient);
 
-				if (hResult != S_OK)
+				if (hr != S_OK)
 				{
 					//davidv: this happened with my hardware, previously for that same device in DirectSound:
 					//Digital Output (Realtek AC'97 Audio)'s GUID: {0x38f2cf50,0x7b4c,0x4740,0x86,0xeb,0xd4,0x38,0x66,0xd8,0xc8, 0x9f}
 					//so something must be _really_ wrong with this device, TODO handle this better. We kind of need GetMixFormat
-					LogHostError(hResult);
+					LogHostError(hr);
 					goto error;
 				}
             }
@@ -1142,9 +1159,13 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     SAFE_RELEASE(pEndPoints);
 
+	PRINT(("WASAPI: initialized ok"));
+
     return paNoError;
 
 error:
+
+	PRINT(("WASAPI: failed %s error[%d|%s]", __FUNCTION__, result, Pa_GetErrorText(result)));
 
     SAFE_RELEASE(pEndPoints);
 
@@ -1174,8 +1195,6 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
     }
     free(paWasapi->devInfo);
 
-    CoUninitialize();
-
     if (paWasapi->allocations)
 	{
         PaUtil_FreeAllAllocations(paWasapi->allocations);
@@ -1186,6 +1205,10 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
 
 	// Close AVRT
 	CloseAVRT();
+
+	// Uninit COM
+    if (g_bCOMInitialized)
+        CoUninitialize();
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1479,12 +1502,12 @@ static PaError GetClosestFormat(IAudioClient *myClient, double sampleRate,
 {
 	PaError answer = paInvalidSampleRate;
 	WAVEFORMATEX *sharedClosestMatch = NULL;
-	HRESULT hResult = !S_OK;
+	HRESULT hr = !S_OK;
 
     MakeWaveFormatFromParams(outWavex, params, sampleRate);
 
-	hResult = IAudioClient_IsFormatSupported(myClient, shareMode, &outWavex->Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
-	if (hResult == S_OK)
+	hr = IAudioClient_IsFormatSupported(myClient, shareMode, &outWavex->Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
+	if (hr == S_OK)
 		answer = paFormatIsSupported;
     else
 	if (sharedClosestMatch)
@@ -1546,8 +1569,8 @@ static const int BestToWorst[FORMATTESTS]={ paFloat32, paInt24, paInt16 };
 			WAVEFORMATEXTENSIBLE ext = { 0 };
 			wasapiFillWFEXT(&ext,BestToWorst[i],sampleRate,params->channelCount);
 
-			hResult = IAudioClient_IsFormatSupported(myClient, shareMode, &ext.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
-			if (hResult == S_OK)
+			hr = IAudioClient_IsFormatSupported(myClient, shareMode, &ext.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
+			if (hr == S_OK)
 			{
 				memcpy(outWavex,&ext,sizeof(WAVEFORMATEXTENSIBLE));
 				answer = paFormatIsSupported;
@@ -1568,15 +1591,15 @@ static const int BestToWorst[FORMATTESTS]={ paFloat32, paInt24, paInt16 };
 			pcm16WaveFormat.wBitsPerSample	= 16;
 			pcm16WaveFormat.cbSize			= 0;
 
-			hResult = IAudioClient_IsFormatSupported(myClient, shareMode, &pcm16WaveFormat, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
-			if (hResult == S_OK)
+			hr = IAudioClient_IsFormatSupported(myClient, shareMode, &pcm16WaveFormat, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
+			if (hr == S_OK)
 			{
 				memcpy(outWavex,&pcm16WaveFormat,sizeof(WAVEFORMATEX));
 				answer = paFormatIsSupported;
 			}
 		}
 
-		LogHostError(hResult);
+		LogHostError(hr);
 	}
 
 	return answer;
@@ -1676,7 +1699,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     if (inputParameters != NULL)
     {
 		WAVEFORMATEXTENSIBLE wavex;
-		HRESULT hResult;
+		HRESULT hr;
 		PaError answer;
 		AUDCLNT_SHAREMODE shareMode = AUDCLNT_SHAREMODE_SHARED;
 		inputStreamInfo = (PaWasapiStreamInfo *)inputParameters->hostApiSpecificStreamInfo;
@@ -1684,11 +1707,11 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 		if (inputStreamInfo && (inputStreamInfo->flags & paWinWasapiExclusive))
 			shareMode  = AUDCLNT_SHAREMODE_EXCLUSIVE;
 
-		hResult = IMMDevice_Activate(paWasapi->devInfo[inputParameters->device].device,
+		hr = IMMDevice_Activate(paWasapi->devInfo[inputParameters->device].device,
 			&pa_IID_IAudioClient, CLSCTX_INPROC_SERVER, NULL, (void **)&tmpClient);
-		if (hResult != S_OK)
+		if (hr != S_OK)
 		{
-			LogHostError(hResult);
+			LogHostError(hr);
 			return paInvalidDevice;
 		}
 
@@ -1701,7 +1724,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 
     if (outputParameters != NULL)
     {
-		HRESULT hResult;
+		HRESULT hr;
 		WAVEFORMATEXTENSIBLE wavex;
 		PaError answer;
 		AUDCLNT_SHAREMODE shareMode = AUDCLNT_SHAREMODE_SHARED;
@@ -1710,11 +1733,11 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 		if (outputStreamInfo && (outputStreamInfo->flags & paWinWasapiExclusive))
 			shareMode  = AUDCLNT_SHAREMODE_EXCLUSIVE;
 
-		hResult = IMMDevice_Activate(paWasapi->devInfo[outputParameters->device].device,
+		hr = IMMDevice_Activate(paWasapi->devInfo[outputParameters->device].device,
 			&pa_IID_IAudioClient, CLSCTX_INPROC_SERVER, NULL, (void **)&tmpClient);
-		if (hResult != S_OK)
+		if (hr != S_OK)
 		{
-			LogHostError(hResult);
+			LogHostError(hr);
 			return paInvalidDevice;
 		}
 
@@ -1977,10 +2000,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create volume mgr
 		stream->inVol = NULL;
-        /*hResult = info->device->Activate(
+        /*hr = info->device->Activate(
             __uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL,
             (void**)&stream->inVol);
-        if (hResult != S_OK)
+        if (hr != S_OK)
             return paInvalidDevice;*/
 
         // Set user-side custom host processor
@@ -2086,10 +2109,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Activate volume
 		stream->outVol = NULL;
-        /*hResult = info->device->Activate(
+        /*hr = info->device->Activate(
             __uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL,
             (void**)&stream->outVol);
-        if (hResult != S_OK)
+        if (hr != S_OK)
             return paInvalidDevice;*/
 
        // Set user-side custom host processor
@@ -2715,7 +2738,7 @@ static void WaspiHostProcessingLoop( void *inputBuffer,  long inputFrames,
 	PaStreamCallbackFlags flags = 0;
     int callbackResult;
     unsigned long framesProcessed;
-	HRESULT hResult;
+	HRESULT hr;
 	UINT32 pending;
 
     PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
@@ -2730,7 +2753,7 @@ static void WaspiHostProcessingLoop( void *inputBuffer,  long inputFrames,
 	if (stream->in.client != NULL)
 	{
 		PaTime pending_time;
-		if ((hResult = IAudioClient_GetCurrentPadding(stream->in.client, &pending)) == S_OK)
+		if ((hr = IAudioClient_GetCurrentPadding(stream->in.client, &pending)) == S_OK)
 			pending_time = (PaTime)pending / (PaTime)stream->in.wavex.Format.nSamplesPerSec;
 		else
 			pending_time = (PaTime)stream->in.latency_seconds;
@@ -2741,7 +2764,7 @@ static void WaspiHostProcessingLoop( void *inputBuffer,  long inputFrames,
 	if (stream->out.client != NULL)
 	{
 		PaTime pending_time;
-		if ((hResult = IAudioClient_GetCurrentPadding(stream->out.client, &pending)) == S_OK)
+		if ((hr = IAudioClient_GetCurrentPadding(stream->out.client, &pending)) == S_OK)
 			pending_time = (PaTime)pending / (PaTime)stream->out.wavex.Format.nSamplesPerSec;
 		else
 			pending_time = (PaTime)stream->out.latency_seconds;
