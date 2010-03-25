@@ -850,8 +850,8 @@ static BOOL UseWOW64VistaWorkaround()
 
 // ------------------------------------------------------------------------------------------
 #define _WASAPI_MONO_TO_STEREO_MIXER(TYPE)\
-	TYPE * __restrict to   = __to;\
-	TYPE * __restrict from = __from;\
+	TYPE * __restrict to   = (TYPE *)__to;\
+	TYPE * __restrict from = (TYPE *)__from;\
 	TYPE * __restrict end  = from + count;\
 	while (from != end)\
 	{\
@@ -875,10 +875,7 @@ static void _MixMonoToStereo_16(void *__to, void *__from, UINT32 count)
 // ------------------------------------------------------------------------------------------
 static void _MixMonoToStereo_24(void *__to, void *__from, UINT32 count)
 {
-#pragma pack(push, 1)
-	typedef struct wasapi_int24 { BYTE d[3]; } wasapi_int24; //<< 24 bit value, packed to 1 byte to avoid padding
-#pragma pack(pop)
-	_WASAPI_MONO_TO_STEREO_MIXER(wasapi_int24);
+	_WASAPI_MONO_TO_STEREO_MIXER(int); // !!! int24 data is contained in 32-bit containers
 }
 
 // ------------------------------------------------------------------------------------------
