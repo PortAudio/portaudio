@@ -794,64 +794,72 @@ static BOOL IsWow64()
 // ------------------------------------------------------------------------------------------
 typedef enum EWindowsVersion
 {
-	WINDOWS_UNKNOWN,
-	WINDOWS_VISTA_SERVER2008,
-	WINDOWS_7_SERVER2008R2
+	WINDOWS_UNKNOWN					= 0,
+	WINDOWS_VISTA_SERVER2008		= (1 << 0),
+	WINDOWS_7_SERVER2008R2			= (1 << 1),
+	WINDOWS_7_SERVER2008R2_AND_UP	= (1 << 2)
 }
 EWindowsVersion;
 // The function is limited to Vista/7 mostly as we need just to find out Vista/WOW64 combination
 // in order to use WASAPI WOW64 workarounds.
-static EWindowsVersion GetWindowsVersion()
+static UINT32 GetWindowsVersion()
 {
-    DWORD dwVersion = 0;
-	DWORD dwMajorVersion = 0;
-	DWORD dwMinorVersion = 0;
-	DWORD dwBuild = 0;
+	static UINT32 version = WINDOWS_UNKNOWN;
 
-	typedef DWORD (WINAPI *LPFN_GETVERSION)(VOID);
-	LPFN_GETVERSION fnGetVersion;
-
-    fnGetVersion = (LPFN_GETVERSION) GetProcAddress(
-		GetModuleHandle(TEXT("kernel32")), TEXT("GetVersion"));
-
-	if (fnGetVersion == NULL)
-		return WINDOWS_UNKNOWN;
-
-    dwVersion = fnGetVersion();
-
-    // Get the Windows version
-    dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
-    dwMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
-
-    // Get the build number
-    if (dwVersion < 0x80000000)
-        dwBuild = (DWORD)(HIWORD(dwVersion));
-
-	switch (dwMajorVersion)
+	if (version == WINDOWS_UNKNOWN)
 	{
-	case 6:
-		switch (dwMinorVersion)
+		DWORD dwVersion = 0;
+		DWORD dwMajorVersion = 0;
+		DWORD dwMinorVersion = 0;
+		DWORD dwBuild = 0;
+
+		typedef DWORD (WINAPI *LPFN_GETVERSION)(VOID);
+		LPFN_GETVERSION fnGetVersion;
+
+		fnGetVersion = (LPFN_GETVERSION) GetProcAddress(GetModuleHandle(TEXT("kernel32")), TEXT("GetVersion"));
+		if (fnGetVersion == NULL)
+			return WINDOWS_UNKNOWN;
+
+		dwVersion = fnGetVersion();
+
+		// Get the Windows version
+		dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
+		dwMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
+
+		// Get the build number
+		if (dwVersion < 0x80000000)
+			dwBuild = (DWORD)(HIWORD(dwVersion));
+
+		switch (dwMajorVersion)
 		{
-		case 0:
-			return WINDOWS_VISTA_SERVER2008;
-		case 1:
-			return WINDOWS_7_SERVER2008R2;
+		case 6:
+			switch (dwMinorVersion)
+			{
+			case 0:
+				version |= WINDOWS_VISTA_SERVER2008;
+				break;
+			case 1:
+				version |= WINDOWS_7_SERVER2008R2;
+				break;
+			default:
+				version |= (WINDOWS_7_SERVER2008R2|WINDOWS_7_SERVER2008R2_AND_UP);
+			}
 		}
 	}
 
-	return WINDOWS_UNKNOWN;
+	return version;
 }
 
 // ------------------------------------------------------------------------------------------
 static BOOL UseWOW64VistaWorkaround()
 {
-	return (IsWow64() && (GetWindowsVersion() == WINDOWS_VISTA_SERVER2008));
+	return (IsWow64() && (GetWindowsVersion() & WINDOWS_VISTA_SERVER2008));
 }
 
 // ------------------------------------------------------------------------------------------
 #define _WASAPI_MONO_TO_STEREO_MIXER(TYPE)\
-	TYPE * __restrict to   = (TYPE *)__to;\
-	TYPE * __restrict from = (TYPE *)__from;\
+	TYPE * __restrict to   = __to;\
+	TYPE * __restrict from = __from;\
 	TYPE * __restrict end  = from + count;\
 	while (from != end)\
 	{\
@@ -1878,6 +1886,38 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 			pSubStream->period = info->DefaultDevicePeriod;
 	}
 
+	// Windows 7 does not allow to set latency lower than minimal device period and will
+	// return error: AUDCLNT_E_INVALID_DEVICE_PERIOD. Under Vista though this error is not implemented
+	// allowing to hack WASAPI device with lower period resulting in possibly lower latency.
+	if (GetWindowsVersion() & WINDOWS_7_SERVER2008R2_AND_UP)
+	{
+		if (pSubStream->period < info->MinimumDevicePeriod)
+			pSubStream->period = info->MinimumDevicePeriod;
+
+		/*
+			AUDCLNT_E_BUFFER_SIZE_ERROR: Applies to Windows 7 and later.
+			Indicates that the buffer duration value requested by an exclusive-mode client is 
+			out of range. The requested duration value for pull mode must not be greater than 
+			500 milliseconds; for push mode the duration value must not be greater than 2 seconds.
+		*/
+		if (pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
+		{
+static const REFERENCE_TIME MAX_BUFFER_EVENT_DURATION = 500  * 10000;
+static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
+
+			if (streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) // pull mode, max 500ms
+			{
+				if (pSubStream->period > MAX_BUFFER_EVENT_DURATION)
+					pSubStream->period = MAX_BUFFER_EVENT_DURATION;
+			}
+			else												 // push mode, max 2000ms
+			{
+				if (pSubStream->period > MAX_BUFFER_POLL_DURATION)
+					pSubStream->period = MAX_BUFFER_POLL_DURATION;
+			}
+		}
+	}
+
 	// Open the stream and associate it with an audio session
     hr = IAudioClient_Initialize(pAudioClient,
         pSubStream->shareMode,
@@ -1929,6 +1969,15 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 
 		// Calculate period
 		pSubStream->period = MakeHnsPeriod(nFrames, pSubStream->wavex.Format.nSamplesPerSec);
+
+		// Windows 7 does not allow to set latency lower than minimal device period and will
+		// return error: AUDCLNT_E_INVALID_DEVICE_PERIOD. Under Vista though this error is not implemented
+		// allowing to hack WASAPI device with lower period resulting in possibly lower latency.
+		if (GetWindowsVersion() & WINDOWS_7_SERVER2008R2_AND_UP)
+		{
+			if (pSubStream->period < info->MinimumDevicePeriod)
+				pSubStream->period = info->MinimumDevicePeriod;
+		}
 
         // Open the stream and associate it with an audio session
         hr = IAudioClient_Initialize(pAudioClient,
