@@ -701,7 +701,7 @@ static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32
 {
 #define HDA_PACKET_SIZE 128
 
-	long packets_total = 10000 * (nSamplesPerSec * nBlockAlign / HDA_PACKET_SIZE);
+	//long packets_total = 10000 * (nSamplesPerSec * nBlockAlign / HDA_PACKET_SIZE);
 	long frame_bytes   = nFrames * nBlockAlign;
 	long packets;
 
@@ -711,10 +711,10 @@ static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32
 	packets      = frame_bytes / HDA_PACKET_SIZE;
 
 	// align to packets count
-	while (packets && ((packets_total % packets) != 0))
+	/*while (packets && ((packets_total % packets) != 0))
 	{
 		--packets;
-	}
+	}*/
 
 	frame_bytes = packets * HDA_PACKET_SIZE;
 	nFrames     = frame_bytes / nBlockAlign;
