@@ -1048,7 +1048,8 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
             deviceInfo->structVersion = 2;
             deviceInfo->hostApi       = hostApiIndex;
 
-			PA_DEBUG(("WASAPI: device i: %d\n", i));
+			PA_DEBUG(("WASAPI: device idx: %02d\n", i));
+			PA_DEBUG(("WASAPI: ---------------\n"));
 
             hr = IMMDeviceCollection_Item(pEndPoints, i, &paWasapi->devInfo[i].device);
             IF_FAILED_JUMP(hr, error);
@@ -1104,6 +1105,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 						_snprintf(deviceName, MAX_STR_LEN-1, "baddev%d", i);
                     deviceInfo->name = deviceName;
                     PropVariantClear(&value);
+					PA_DEBUG(("WASAPI:%d| name[%s]\n", i, deviceInfo->name));
                 }
 
                 // Default format
@@ -1132,7 +1134,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 					#else
 						paWasapi->devInfo[i].formFactor = (EndpointFormFactor)value.uintVal;
 					#endif
-					PA_DEBUG(("WASAPI: device[%s] form-factor: %d\n", deviceInfo->name, paWasapi->devInfo[i].formFactor));
+					PA_DEBUG(("WASAPI:%d| form-factor[%d]\n", i, paWasapi->devInfo[i].formFactor));
                     // cleanup
                     PropVariantClear(&value);
                 }
@@ -1182,29 +1184,30 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
             }
 
             // we can now fill in portaudio device data
-            deviceInfo->maxInputChannels  = 0;  //for now
-            deviceInfo->maxOutputChannels = 0;  //for now
+            deviceInfo->maxInputChannels  = 0;
+            deviceInfo->maxOutputChannels = 0;
+			deviceInfo->defaultSampleRate = paWasapi->devInfo[i].DefaultFormat.Format.nSamplesPerSec;
             switch (paWasapi->devInfo[i].flow)
 			{
-            case eRender:
-                // WASAPI accepts exact channels count
+			case eRender: {
                 deviceInfo->maxOutputChannels		 = paWasapi->devInfo[i].DefaultFormat.Format.nChannels;
                 deviceInfo->defaultHighOutputLatency = nano100ToSeconds(paWasapi->devInfo[i].DefaultDevicePeriod);
                 deviceInfo->defaultLowOutputLatency  = nano100ToSeconds(paWasapi->devInfo[i].MinimumDevicePeriod);
-            break;
-            case eCapture:
-                // WASAPI accepts exact channels count
+				PA_DEBUG(("WASAPI:%d| def.SR[%d] max.CH[%d] latency{hi[%f] lo[%f]}\n", i, (UINT32)deviceInfo->defaultSampleRate,
+					deviceInfo->maxOutputChannels, (float)deviceInfo->defaultHighOutputLatency, (float)deviceInfo->defaultLowOutputLatency));
+				break;}
+			case eCapture: {
                 deviceInfo->maxInputChannels		= paWasapi->devInfo[i].DefaultFormat.Format.nChannels;
                 deviceInfo->defaultHighInputLatency = nano100ToSeconds(paWasapi->devInfo[i].DefaultDevicePeriod);
                 deviceInfo->defaultLowInputLatency  = nano100ToSeconds(paWasapi->devInfo[i].MinimumDevicePeriod);
-            break;
+				PA_DEBUG(("WASAPI:%d| def.SR[%d] max.CH[%d] latency{hi[%f] lo[%f]}\n", i, (UINT32)deviceInfo->defaultSampleRate,
+					deviceInfo->maxInputChannels, (float)deviceInfo->defaultHighInputLatency, (float)deviceInfo->defaultLowInputLatency));
+				break; }
             default:
-                PRINT(("WASAPI: device %d bad Data FLow! \n",i));
-                goto error;
+                PRINT(("WASAPI:%d| bad Data Flow!\n", i));
+                //continue; // do not skip from list, allow to initialize
             break;
             }
-
-			deviceInfo->defaultSampleRate = paWasapi->devInfo[i].DefaultFormat.Format.nSamplesPerSec;
 
             (*hostApi)->deviceInfos[i] = deviceInfo;
             ++(*hostApi)->info.deviceCount;
@@ -1827,6 +1830,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
     HRESULT hr					= S_OK;
     UINT32 nFrames				= 0;
     IAudioClient *pAudioClient	= NULL;
+	double suggestedLatency     = 0.0;
 
     if (!pSubStream || !info || !params)
         return E_POINTER;
@@ -1846,23 +1850,34 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 	{
 		if (pa_error)
 			(*pa_error) = error;
-		return AUDCLNT_E_UNSUPPORTED_FORMAT;
+
+		LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
+		goto done; // fail, format not supported
 	}
 
 	// Check for Mono >> Stereo workaround
 	if ((params->channelCount == 1) && (pSubStream->wavex.Format.nChannels == 2))
 	{
 		if (blocking)
-			return AUDCLNT_E_UNSUPPORTED_FORMAT; // fail, blocking mode not supported
+		{
+			LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
+			goto done; // fail, blocking mode not supported
+		}
 
 		// select mixer
 		pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat);
 		if (pSubStream->monoMixer == NULL)
-			return AUDCLNT_E_UNSUPPORTED_FORMAT; // fail, no mixer for format
+		{
+			LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
+			goto done; // fail, no mixer for format
+		}
 	}
 
+	// Correct latency to default device period (in Exclusive mode this is 10ms) if user selected 0
+	suggestedLatency = (params->suggestedLatency < 0.001 ? nano100ToSeconds(info->DefaultDevicePeriod) : params->suggestedLatency);
+
 	// Add latency frames
-	framesPerLatency += MakeFramesFromHns(SecondsTonano100(params->suggestedLatency), pSubStream->wavex.Format.nSamplesPerSec);
+	framesPerLatency += MakeFramesFromHns(SecondsTonano100(suggestedLatency), pSubStream->wavex.Format.nSamplesPerSec);
 
 	// Align frames to HD Audio packet size of 128 bytes for Exclusive mode only.
 	// Not aligning on Windows Vista will cause Event timeout, although Windows 7 will
@@ -1927,10 +1942,39 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		&pSubStream->wavex.Format,
         NULL);
 
+	// This would mean too low latency
+	if (hr == AUDCLNT_E_BUFFER_SIZE_ERROR)
+	{
+		PRINT(("WASAPI: CreateAudioClient: correcting buffer size to device minimum\n"));
+
+		// User was trying to set lowest possible, so set lowest device possible
+		pSubStream->period = info->MinimumDevicePeriod;
+
+        // Release the previous allocations
+        SAFE_RELEASE(pAudioClient);
+
+        // Create a new audio client
+        hr = IMMDevice_Activate(info->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pAudioClient);
+    	if (hr != S_OK)
+		{
+			LogHostError(hr);
+			goto done;
+		}
+
+		// Open the stream and associate it with an audio session
+		hr = IAudioClient_Initialize(pAudioClient,
+			pSubStream->shareMode,
+			streamFlags/*AUDCLNT_STREAMFLAGS_EVENTCALLBACK*/,
+			pSubStream->period,
+			(pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSubStream->period : 0),
+			&pSubStream->wavex.Format,
+			NULL);
+	}
+
     // If the requested buffer size is not aligned...
     if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED)
     {
-		PRINT(("WASAPI: CreateAudioClient: aligning buffer size"));
+		PRINT(("WASAPI: CreateAudioClient: aligning buffer size\n"));
 
         // Get the next aligned frame
         hr = IAudioClient_GetBufferSize(pAudioClient, &nFrames);
@@ -1952,19 +1996,31 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		}
 
 		// Get closest format
-		if (GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex) != paFormatIsSupported)
-			return AUDCLNT_E_UNSUPPORTED_FORMAT;
+		if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex)) != paFormatIsSupported)
+		{
+			if (pa_error)
+				(*pa_error) = error;
+
+			LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT); // fail, format not supported
+			goto done;
+		}
 
 		// Check for Mono >> Stereo workaround
 		if ((params->channelCount == 1) && (pSubStream->wavex.Format.nChannels == 2))
 		{
 			if (blocking)
-				return AUDCLNT_E_UNSUPPORTED_FORMAT; // fail, blocking mode not supported
+			{
+				LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
+				goto done; // fail, blocking mode not supported
+			}
 
 			// select mixer
 			pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat);
 			if (pSubStream->monoMixer == NULL)
-				return AUDCLNT_E_UNSUPPORTED_FORMAT; // fail, no mixer for format
+			{
+				LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
+				goto done; // fail, no mixer for format
+			}
 		}
 
 		// Calculate period
@@ -2404,10 +2460,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 error:
 
     if (stream != NULL)
-	{
 		CloseStream(stream);
-        PaUtil_FreeMemory(stream);
-	}
 
     return result;
 }
