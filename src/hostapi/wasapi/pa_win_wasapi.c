@@ -545,7 +545,8 @@ static void _OnStreamStop(PaWasapiStream *stream);
 static void _FinishStream(PaWasapiStream *stream);
 
 // Local statics
-static volatile BOOL g_bCOMInitialized = FALSE;
+static volatile BOOL  g_WasapiCOMInit    = FALSE;
+static volatile DWORD g_WasapiInitThread = 0;
 
 // ------------------------------------------------------------------------------------------
 #define LogHostError(HRES) __LogHostError(HRES, __FUNCTION__, __FILE__, __LINE__)
@@ -957,7 +958,11 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         return paUnanticipatedHostError;
 	}
     if (hr != RPC_E_CHANGED_MODE)
-        g_bCOMInitialized = TRUE;
+        g_WasapiCOMInit = TRUE;
+
+	// Memorize calling thread id and report warning on Uninitialize if calling thread is different
+	// as CoInitialize must match CoUninitialize in the same thread.
+	g_WasapiInitThread = GetCurrentThreadId();
 
     paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory( sizeof(PaWasapiHostApiRepresentation) );
     if (paWasapi == NULL)
@@ -1297,9 +1302,21 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
 	// Close AVRT
 	CloseAVRT();
 
-	// Uninit COM
-    if (g_bCOMInitialized)
-        CoUninitialize();
+	// Uninit COM (checking calling thread we won't unitialize user's COM if one is calling
+	//             Pa_Unitialize by mistake from not initializing thread)
+    if (g_WasapiCOMInit)
+	{
+		DWORD calling_thread_id = GetCurrentThreadId();
+		if (g_WasapiInitThread != calling_thread_id)
+		{
+			PRINT(("WASAPI: failed CoUninitializes calling thread[%d] does not match initializing thread[%d]\n", 
+				calling_thread_id, g_WasapiInitThread));
+		}
+		else
+		{
+			CoUninitialize();
+		}
+	}
 }
 
 // ------------------------------------------------------------------------------------------
