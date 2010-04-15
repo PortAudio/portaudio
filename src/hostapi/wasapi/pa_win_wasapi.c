@@ -588,6 +588,9 @@ static HRESULT __LogHostError(HRESULT res, const char *func, const char *file, i
 	case AUDCLNT_S_THREAD_ALREADY_REGISTERED    :text ="AUDCLNT_S_THREAD_ALREADY_REGISTERED"; break;
 	case AUDCLNT_S_POSITION_STALLED				:text ="AUDCLNT_S_POSITION_STALLED"; break;
 
+	// other windows common errors:
+	case CO_E_NOTINITIALIZED                    :text ="CO_E_NOTINITIALIZED: you must call CoInitialize() before Pa_OpenStream()"; break;
+
 	default:
 		text = "UNKNOWN ERROR";
     }
@@ -794,12 +797,14 @@ static BOOL IsWow64()
 // ------------------------------------------------------------------------------------------
 typedef enum EWindowsVersion
 {
-	WINDOWS_UNKNOWN					= 0,
-	WINDOWS_VISTA_SERVER2008		= (1 << 0),
-	WINDOWS_7_SERVER2008R2			= (1 << 1),
-	WINDOWS_7_SERVER2008R2_AND_UP	= (1 << 2)
+	WINDOWS_UNKNOWN			 = 0,
+	WINDOWS_VISTA_SERVER2008 = (1 << 0),
+	WINDOWS_7_SERVER2008R2	 = (1 << 1),
+	WINDOWS_FUTURE           = (1 << 2)
 }
 EWindowsVersion;
+// Defines Windows 7/Windows Server 2008 R2 and up (future versions)
+#define WINDOWS_7_SERVER2008R2_AND_UP (WINDOWS_7_SERVER2008R2|WINDOWS_FUTURE)
 // The function is limited to Vista/7 mostly as we need just to find out Vista/WOW64 combination
 // in order to use WASAPI WOW64 workarounds.
 static UINT32 GetWindowsVersion()
@@ -832,6 +837,13 @@ static UINT32 GetWindowsVersion()
 
 		switch (dwMajorVersion)
 		{
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+			break; // skip lower
 		case 6:
 			switch (dwMinorVersion)
 			{
@@ -842,8 +854,11 @@ static UINT32 GetWindowsVersion()
 				version |= WINDOWS_7_SERVER2008R2;
 				break;
 			default:
-				version |= (WINDOWS_7_SERVER2008R2|WINDOWS_7_SERVER2008R2_AND_UP);
+				version |= WINDOWS_FUTURE;
 			}
+			break;
+		default:
+			version |= WINDOWS_FUTURE;
 		}
 	}
 
