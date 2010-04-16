@@ -1392,6 +1392,22 @@ int PaWasapi_GetDeviceRole( PaDeviceIndex nDevice )
 }
 
 // ------------------------------------------------------------------------------------------
+PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *nInput, unsigned int *nOutput )
+{
+    PaWasapiStream *stream = (PaWasapiStream *)pStream;
+	if (stream == NULL)
+		return paBadStreamPtr;
+
+	if (nInput != NULL)
+		(*nInput) = stream->in.framesPerHostCallback;
+
+	if (nOutput != NULL)
+		(*nOutput) = stream->out.framesPerHostCallback;
+
+	return paNoError;
+}
+
+// ------------------------------------------------------------------------------------------
 static void LogWAVEFORMATEXTENSIBLE(const WAVEFORMATEXTENSIBLE *in)
 {
     const WAVEFORMATEX *old = (WAVEFORMATEX *)in;
