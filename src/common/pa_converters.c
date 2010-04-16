@@ -1163,14 +1163,38 @@ static void Int24_To_Int16_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    (void) destinationBuffer; /* unused parameters */
-    (void) destinationStride; /* unused parameters */
-    (void) sourceBuffer; /* unused parameters */
-    (void) sourceStride; /* unused parameters */
-    (void) count; /* unused parameters */
-    (void) ditherGenerator; /* unused parameters */
-    /* IMPLEMENT ME */
+	#define _PA_CNV_RESCALE(__max_from,__max_to,g) ((1.0f/(float)(__max_from/2+1))*((float)((__max_to/2+1)+g)))
+#ifndef PA_BIG_ENDIAN
+	#define _PA_INT24_TO_INT32(v)   ((int)(((int)v[2] << 24)|((int)v[1] << 16)|((int)v[0] << 8)) >> 8)
+#else
+	#define _PA_INT24_TO_INT32(v)   ((int)(((int)v[0] << 24)|((int)v[1] << 16)|((int)v[2] << 8)) >> 8)
+#endif
+	#define _PA_INT24_TO_FLOAT(v,g) ((float)(_PA_INT24_TO_INT32(v)) * _PA_CNV_RESCALE(0xffffff,0xffff,g))
+
+    unsigned char *src = (unsigned char *)sourceBuffer;
+    PaInt16 *dest = (PaInt16 *)destinationBuffer;
+	float dither, dithered;
+
+    while( count-- )
+    {
+        dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+
+		/* upscale 24-bit int to 16-bit float, decrease scaler by 2 to leave space for dither
+		   in order to not overflow
+		*/
+		dithered = _PA_INT24_TO_FLOAT(src, -2.0f) + dither;
+
+#ifdef PA_USE_C99_LRINTF
+        *dest = lrintf(dithered-0.5f);
+#else
+        *dest = (PaInt16) dithered;
+#endif
+
+        src += sourceStride * 3;
+        dest += destinationStride;
+    }
 }
+
 
 /* -------------------------------------------------------------------------- */
 
