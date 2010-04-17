@@ -1179,8 +1179,8 @@ static void Int24_To_Int16_Dither(
     {
         dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
 
-		/* upscale 24-bit int to 16-bit float, decrease scaler by 2 to leave space for dither
-		   in order to not overflow
+		/* downscale 24-bit int to 16-bit int placed into 32-bit float container, 
+		   16-bit scaler is decreased by 2 to leave space for dither in order not to overflow
 		*/
 		dithered = _PA_INT24_TO_FLOAT(src, -2.0f) + dither;
 
