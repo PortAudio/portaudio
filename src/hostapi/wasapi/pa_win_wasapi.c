@@ -519,7 +519,8 @@ typedef struct PaWasapiStream
     PA_THREAD_ID dwThreadId;
     HANDLE hThread;
 	HANDLE hCloseRequest;
-	HANDLE hThreadDone;
+	HANDLE hThreadStart;        //!< signalled by thread on start
+	HANDLE hThreadExit;         //!< signalled by thread on exit
 	HANDLE hBlockingOpStreamRD;
 	HANDLE hBlockingOpStreamWR;
 
@@ -1701,8 +1702,8 @@ static const int BestToWorst[FORMATTESTS] = { paFloat32, paInt24, paInt16 };
 		if (answer != paFormatIsSupported)
 		{
 			// If mono, then driver does not support 1 channel, we use internal workaround
-			// of tiny software mixing functionality, e.g. we provide to user buffer for 1 channel
-			// but then mix into 2 of device buffer
+			// of tiny software mixing functionality, e.g. we provide to user buffer 1 channel
+			// but then mix into 2 for device buffer
 			if (params->channelCount == 1)
 			{
 				WAVEFORMATEXTENSIBLE stereo = { 0 };
@@ -2534,7 +2535,8 @@ static PaError CloseStream( PaStream* s )
 	SAFE_RELEASE(stream->outVol);
 
     SAFE_CLOSE(stream->hThread);
-	SAFE_CLOSE(stream->hThreadDone);
+	SAFE_CLOSE(stream->hThreadStart);
+	SAFE_CLOSE(stream->hThreadExit);
 	SAFE_CLOSE(stream->hCloseRequest);
 	SAFE_CLOSE(stream->hBlockingOpStreamRD);
 	SAFE_CLOSE(stream->hBlockingOpStreamWR);
@@ -2567,8 +2569,9 @@ static PaError StartStream( PaStream *s )
 	// Create thread
 	if (!stream->bBlocking)
 	{
-		// Create thread done event
-		stream->hThreadDone = CreateEvent(NULL, TRUE, FALSE, NULL);
+		// Create thread events
+		stream->hThreadStart = CreateEvent(NULL, TRUE, FALSE, NULL);
+		stream->hThreadExit  = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 		if ((stream->in.client && stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) ||
 			(stream->out.client && stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK))
@@ -2581,6 +2584,10 @@ static PaError StartStream( PaStream *s )
 			if ((stream->hThread = CREATE_THREAD(ProcThreadPoll)) == NULL)
 			   return paUnanticipatedHostError;
 		}
+
+		// Wait for thread to start
+		if (WaitForSingleObject(stream->hThreadStart, 60*1000) == WAIT_TIMEOUT)
+			return paUnanticipatedHostError;
 	}
 	else
 	{
@@ -2641,7 +2648,7 @@ static void _FinishStream(PaWasapiStream *stream)
 	// Issue command to thread to stop processing and wait for thread exit
 	if (!stream->bBlocking)
 	{
-		SignalObjectAndWait(stream->hCloseRequest, stream->hThreadDone, INFINITE, FALSE);
+		SignalObjectAndWait(stream->hCloseRequest, stream->hThreadExit, INFINITE, FALSE);
 	}
 	else
 	// Blocking mode does not own thread
@@ -2658,7 +2665,8 @@ static void _FinishStream(PaWasapiStream *stream)
 
 	// Close thread handles to allow restart
 	SAFE_CLOSE(stream->hThread);
-	SAFE_CLOSE(stream->hThreadDone);
+	SAFE_CLOSE(stream->hThreadStart);
+	SAFE_CLOSE(stream->hThreadExit);
 	SAFE_CLOSE(stream->hCloseRequest);
 	SAFE_CLOSE(stream->hBlockingOpStreamRD);
 	SAFE_CLOSE(stream->hBlockingOpStreamWR);
@@ -3332,6 +3340,10 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	if (!event[S_INPUT] || !event[S_OUTPUT])
 	{
 		PRINT(("WASAPI Thread: failed creating one or two event handles\n"));
+
+		// Prevent deadlocking in Pa_StreamStart
+		SetEvent(stream->hThreadStart);
+		// Exit
 		goto thread_end;
 	}
 
@@ -3371,6 +3383,9 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 
 	// Signal: stream running
 	stream->running = TRUE;
+
+	// Notify: thread started
+	SetEvent(stream->hThreadStart);
 
 	// Processing Loop
 	for (;;)
@@ -3418,8 +3433,11 @@ thread_end:
 	CloseHandle(event[S_INPUT]);
 	CloseHandle(event[S_OUTPUT]);
 
-	// Notify thread is exiting
-	SetEvent(stream->hThreadDone);
+	// Notify: thread exited
+	SetEvent(stream->hThreadExit);
+
+	// Notify: not running
+	stream->running = FALSE;
 
 	return 0;
 }
@@ -3482,6 +3500,9 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	// Signal: stream running
 	stream->running = TRUE;
 
+	// Notify: thread started
+	SetEvent(stream->hThreadStart);
+
 	// Processing Loop
 	while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
     {
@@ -3529,8 +3550,11 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	// Process stop
 	_OnStreamStop(stream);
 
-	// Notify thread is exiting
-	SetEvent(stream->hThreadDone);
+	// Notify: thread exited
+	SetEvent(stream->hThreadExit);
+
+	// Notify: not running
+	stream->running = FALSE;
 
 	return 0;
 }
