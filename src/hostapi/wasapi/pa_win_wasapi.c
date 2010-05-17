@@ -453,8 +453,8 @@ typedef struct
 
     PaWasapiDeviceInfo *devInfo;
 
-	// Is true when WOW64 Vista Workaround is needed
-	BOOL useVistaWOW64Workaround;
+	// Is true when WOW64 Vista/7 Workaround is needed
+	BOOL useWOW64Workaround;
 }
 PaWasapiHostApiRepresentation;
 
@@ -871,9 +871,13 @@ static UINT32 GetWindowsVersion()
 }
 
 // ------------------------------------------------------------------------------------------
-static BOOL UseWOW64VistaWorkaround()
+static BOOL UseWOW64Workaround()
 {
-	return (IsWow64() && (GetWindowsVersion() & WINDOWS_VISTA_SERVER2008));
+	// note: Excluded OS version check as it is reported that event-driven mode 
+	//       fails under Windows 7 as well. Now let's assume any WOW64 process 
+	//       requires a wokaround.
+
+	return (IsWow64()/* && (GetWindowsVersion() & WINDOWS_VISTA_SERVER2008)*/);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1255,7 +1259,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
 
 	// findout if platform workaround is required
-	paWasapi->useVistaWOW64Workaround = UseWOW64VistaWorkaround();
+	paWasapi->useWOW64Workaround = UseWOW64Workaround();
 
     SAFE_RELEASE(pEndPoints);
 
@@ -2214,7 +2218,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Choose processing mode
 		stream->in.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-		if (paWasapi->useVistaWOW64Workaround)
+		if (paWasapi->useWOW64Workaround)
 			stream->in.streamFlags = 0; // polling interface
 		if (streamCallback == NULL)
 			stream->in.streamFlags = 0; // polling interface
@@ -2286,7 +2290,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->in.latency_seconds += buffer_latency;
 
-		PRINT(("PaWASAPIOpenStream(input): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useVistaWOW64Workaround ? "YES" : "NO")));
+		PRINT(("PaWASAPIOpenStream(input): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
 	}
     else
     {
@@ -2323,7 +2327,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Choose processing mode
 		stream->out.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-		if (paWasapi->useVistaWOW64Workaround)
+		if (paWasapi->useWOW64Workaround)
 			stream->out.streamFlags = 0; // polling interface
 		if (streamCallback == NULL)
 			stream->out.streamFlags = 0; // polling interface
@@ -2395,7 +2399,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->out.latency_seconds += buffer_latency;
 
-		PRINT(("PaWASAPIOpenStream(output): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useVistaWOW64Workaround ? "YES" : "NO")));
+		PRINT(("PaWASAPIOpenStream(output): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
 	}
     else
     {
