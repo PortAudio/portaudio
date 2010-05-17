@@ -512,6 +512,9 @@ typedef struct PaWasapiStream
     IAudioRenderClient  *rclient;
 	IAudioEndpointVolume *outVol;
 
+	// event handles for event-driven processing mode
+	HANDLE event[S_COUNT];
+
 	// must be volatile to avoid race condition on user query while
 	// thread is being started
     volatile BOOL running;
@@ -2527,12 +2530,15 @@ static PaError CloseStream( PaStream* s )
 			return result;
 	}
 
-    SAFE_RELEASE(stream->out.client);
-    SAFE_RELEASE(stream->in.client);
     SAFE_RELEASE(stream->cclient);
     SAFE_RELEASE(stream->rclient);
+    SAFE_RELEASE(stream->out.client);
+    SAFE_RELEASE(stream->in.client);
 	SAFE_RELEASE(stream->inVol);
 	SAFE_RELEASE(stream->outVol);
+
+	CloseHandle(stream->event[S_INPUT]);
+	CloseHandle(stream->event[S_OUTPUT]);
 
     SAFE_CLOSE(stream->hThread);
 	SAFE_CLOSE(stream->hThreadStart);
@@ -2573,8 +2579,8 @@ static PaError StartStream( PaStream *s )
 		stream->hThreadStart = CreateEvent(NULL, TRUE, FALSE, NULL);
 		stream->hThreadExit  = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-		if ((stream->in.client && stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) ||
-			(stream->out.client && stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK))
+		if ((stream->in.client && (stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK)) ||
+			(stream->out.client && (stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK)))
 		{
 			if ((stream->hThread = CREATE_THREAD(ProcThreadEvent)) == NULL)
 			   return paUnanticipatedHostError;
@@ -3292,6 +3298,7 @@ void _OnStreamStop(PaWasapiStream *stream)
 	// Stop INPUT client
 	if (stream->in.client != NULL)
 		IAudioClient_Stop(stream->in.client);
+
 	// Stop OUTPUT client
 	if (stream->out.client != NULL)
 		IAudioClient_Stop(stream->out.client);
@@ -3311,7 +3318,6 @@ void _OnStreamStop(PaWasapiStream *stream)
 // ------------------------------------------------------------------------------------------
 PA_THREAD_FUNC ProcThreadEvent(void *param)
 {
-	HANDLE event[S_COUNT];
     PaWasapiHostProcessor processor[S_COUNT];
 	HRESULT hr;
 	DWORD dwResult;
@@ -3332,53 +3338,90 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
     processor[S_INPUT] = (stream->hostProcessOverrideInput.processor != NULL ? stream->hostProcessOverrideInput : defaultProcessor);
     processor[S_OUTPUT] = (stream->hostProcessOverrideOutput.processor != NULL ? stream->hostProcessOverrideOutput : defaultProcessor);
 
-	// Initialize event to NULL first
-	event[S_INPUT]  = CreateEvent(NULL, FALSE, FALSE, NULL);
-	event[S_OUTPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
-
-	// Check on low resources and disallow any processing further
-	if (!event[S_INPUT] || !event[S_OUTPUT])
-	{
-		PRINT(("WASAPI Thread: failed creating one or two event handles\n"));
-
-		// Prevent deadlocking in Pa_StreamStart
-		SetEvent(stream->hThreadStart);
-		// Exit
-		goto thread_end;
-	}
-
 	// Boost thread priority
 	PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
 	// Initialize event & start INPUT stream
 	if (stream->in.client)
 	{
-		if ((hr = IAudioClient_SetEventHandle(stream->in.client, event[S_INPUT])) != S_OK)
-			LogHostError(hr);
+		// Create & set handle
+		if (stream->event[S_INPUT] == NULL)
+		{
+			stream->event[S_INPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
+			if (stream->event[S_INPUT] == NULL)
+			{
+				PRINT(("WASAPI Thread: failed creating Input event handle\n"));
+				goto thread_error;
+			}
+			if ((hr = IAudioClient_SetEventHandle(stream->in.client, stream->event[S_INPUT])) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
+		}
 
-		if ((hr = IAudioClient_GetService(stream->in.client, &pa_IID_IAudioCaptureClient, (void **)&stream->cclient)) != S_OK)
-			LogHostError(hr);
+		// Create Capture client
+		if (stream->cclient == NULL)
+		{
+			if ((hr = IAudioClient_GetService(stream->in.client, &pa_IID_IAudioCaptureClient, (void **)&stream->cclient)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
+		}
 
+		// Start
 		if ((hr = IAudioClient_Start(stream->in.client)) != S_OK)
+		{
 			LogHostError(hr);
+			goto thread_error;
+		}
 	}
 
 	// Initialize event & start OUTPUT stream
 	if (stream->out.client)
 	{
-		if ((hr = IAudioClient_SetEventHandle(stream->out.client, event[S_OUTPUT])) != S_OK)
-			LogHostError(hr);
+		// Create & set handle
+		if (stream->event[S_OUTPUT] == NULL)
+		{
+			stream->event[S_OUTPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
+			if (stream->event[S_OUTPUT] == NULL)
+			{
+				PRINT(("WASAPI Thread: failed creating Output event handle\n"));
+				goto thread_error;
+			}
 
-		if ((hr = IAudioClient_GetService(stream->out.client, &pa_IID_IAudioRenderClient, (void **)&stream->rclient)) != S_OK)
-			LogHostError(hr);
+			if ((hr = IAudioClient_SetEventHandle(stream->out.client, stream->event[S_OUTPUT])) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
+		}
+
+		// Create Render client
+		if (stream->rclient == NULL)
+		{
+			if ((hr = IAudioClient_GetService(stream->out.client, &pa_IID_IAudioRenderClient, (void **)&stream->rclient)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
+		}
 
 		// Preload buffer before start
 		if ((hr = FillOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+		{
 			LogHostError(hr);
+			goto thread_error;
+		}
 
 		// Start
 		if ((hr = IAudioClient_Start(stream->out.client)) != S_OK)
+		{
 			LogHostError(hr);
+			goto thread_error;
+		}
+
 	}
 
 	// Signal: stream running
@@ -3391,7 +3434,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	for (;;)
     {
 	    // 2 sec timeout
-        dwResult = WaitForMultipleObjects(S_COUNT, event, bWaitAllEvents, 10000);
+        dwResult = WaitForMultipleObjects(S_COUNT, stream->event, bWaitAllEvents, 10000);
 
 		// Check for close event (after wait for buffers to avoid any calls to user
 		// callback when hCloseRequest was set)
@@ -3403,7 +3446,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		{
 		case WAIT_TIMEOUT: {
 			PRINT(("WASAPI Thread: WAIT_TIMEOUT - probably bad audio driver or Vista x64 bug: use paWinWasapiPolling instead\n"));
-			goto processing_stop;
+			goto thread_end;
 			break; }
 
 		// Input stream
@@ -3422,16 +3465,10 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		}
 	}
 
-processing_stop:
+thread_end:
 
 	// Process stop
 	_OnStreamStop(stream);
-
-thread_end:
-
-	// Close event
-	CloseHandle(event[S_INPUT]);
-	CloseHandle(event[S_OUTPUT]);
 
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
@@ -3440,6 +3477,14 @@ thread_end:
 	stream->running = FALSE;
 
 	return 0;
+
+thread_error:
+
+	// Prevent deadlocking in Pa_StreamStart
+	SetEvent(stream->hThreadStart);
+
+	// Exit
+	goto thread_end;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3474,27 +3519,48 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	// Initialize event & start INPUT stream
 	if (stream->in.client)
 	{
-		if ((hr = IAudioClient_GetService(stream->in.client, &pa_IID_IAudioCaptureClient, (void **)&stream->cclient)) != S_OK)
-			LogHostError(hr);
+		if (stream->cclient == NULL)
+		{
+			if ((hr = IAudioClient_GetService(stream->in.client, &pa_IID_IAudioCaptureClient, (void **)&stream->cclient)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
+		}
 
 		if ((hr = IAudioClient_Start(stream->in.client)) != S_OK)
+		{
 			LogHostError(hr);
+			goto thread_error;
+		}
 	}
 
 
 	// Initialize event & start OUTPUT stream
 	if (stream->out.client)
 	{
-		if ((hr = IAudioClient_GetService(stream->out.client, &pa_IID_IAudioRenderClient, (void **)&stream->rclient)) != S_OK)
-			LogHostError(hr);
+		if (stream->rclient == NULL)
+		{
+			if ((hr = IAudioClient_GetService(stream->out.client, &pa_IID_IAudioRenderClient, (void **)&stream->rclient)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
+		}
 
 		// Preload buffer (obligatory, othervise ->Start() will fail)
 		if ((hr = FillOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+		{
 			LogHostError(hr);
+			goto thread_error;
+		}
 
 		// Start
 		if ((hr = IAudioClient_Start(stream->out.client)) != S_OK)
+		{
 			LogHostError(hr);
+			goto thread_error;
+		}
 	}
 
 	// Signal: stream running
@@ -3547,6 +3613,8 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 		}
 	}
 
+thread_end:
+
 	// Process stop
 	_OnStreamStop(stream);
 
@@ -3557,6 +3625,14 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	stream->running = FALSE;
 
 	return 0;
+
+thread_error:
+
+	// Prevent deadlocking in Pa_StreamStart
+	SetEvent(stream->hThreadStart);
+
+	// Exit
+	goto thread_end;
 }
 
 //#endif //VC 2005
