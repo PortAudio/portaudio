@@ -873,11 +873,10 @@ static UINT32 GetWindowsVersion()
 // ------------------------------------------------------------------------------------------
 static BOOL UseWOW64Workaround()
 {
-	// note: Excluded OS version check as it is reported that event-driven mode 
-	//       fails under Windows 7 as well. Now let's assume any WOW64 process 
-	//       requires a wokaround.
+	// note: WOW64 bug is common to Windows Vista x64, thus we fall back to safe Poll-driven
+	//       method. Windows 7 x64 seems has WOW64 bug fixed.
 
-	return (IsWow64()/* && (GetWindowsVersion() & WINDOWS_VISTA_SERVER2008)*/);
+	return (IsWow64() && (GetWindowsVersion() & WINDOWS_VISTA_SERVER2008));
 }
 
 // ------------------------------------------------------------------------------------------
