@@ -3327,6 +3327,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	DWORD dwResult;
     PaWasapiStream *stream = (PaWasapiStream *)param;
 	PaWasapiHostProcessor defaultProcessor;
+	BOOL set_event[S_COUNT] = { FALSE, FALSE };
 
 	// Waiting on all events in case of Full-Duplex/Exclusive mode.
 	BOOL bWaitAllEvents = FALSE;
@@ -3345,18 +3346,29 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	// Boost thread priority
 	PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
+	// Create events
+	if (stream->event[S_OUTPUT] == NULL)
+	{
+		stream->event[S_OUTPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
+		set_event[S_OUTPUT] = TRUE;
+	}
+	if (stream->event[S_INPUT] == NULL)
+	{
+		stream->event[S_INPUT]  = CreateEvent(NULL, FALSE, FALSE, NULL);
+		set_event[S_INPUT] = TRUE;
+	}
+	if ((stream->event[S_OUTPUT] == NULL) || (stream->event[S_INPUT] == NULL))
+	{
+		PRINT(("WASAPI Thread: failed creating Input/Output event handle\n"));
+		goto thread_error;
+	}
+
 	// Initialize event & start INPUT stream
 	if (stream->in.client)
 	{
 		// Create & set handle
-		if (stream->event[S_INPUT] == NULL)
+		if (set_event[S_INPUT])
 		{
-			stream->event[S_INPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
-			if (stream->event[S_INPUT] == NULL)
-			{
-				PRINT(("WASAPI Thread: failed creating Input event handle\n"));
-				goto thread_error;
-			}
 			if ((hr = IAudioClient_SetEventHandle(stream->in.client, stream->event[S_INPUT])) != S_OK)
 			{
 				LogHostError(hr);
@@ -3386,15 +3398,8 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	if (stream->out.client)
 	{
 		// Create & set handle
-		if (stream->event[S_OUTPUT] == NULL)
+		if (set_event[S_OUTPUT])
 		{
-			stream->event[S_OUTPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
-			if (stream->event[S_OUTPUT] == NULL)
-			{
-				PRINT(("WASAPI Thread: failed creating Output event handle\n"));
-				goto thread_error;
-			}
-
 			if ((hr = IAudioClient_SetEventHandle(stream->out.client, stream->event[S_OUTPUT])) != S_OK)
 			{
 				LogHostError(hr);
