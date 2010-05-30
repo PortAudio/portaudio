@@ -122,6 +122,7 @@ typedef struct
     int userInterleaved, hostInterleaved;
     int canMmap;
     void *nonMmapBuffer;
+    unsigned int nonMmapBufferSize;
     PaDeviceIndex device;     /* Keep the device index */
 
     snd_pcm_t *pcm;
@@ -1189,6 +1190,7 @@ static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, Pa
     self->streamDir = streamDir;
     self->canMmap = 0;
     self->nonMmapBuffer = NULL;
+    self->nonMmapBufferSize = 0;
 
     if( !callbackMode && !self->userInterleaved )
     {
@@ -1604,13 +1606,8 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
     }
 
     /* non-mmap mode needs a reasonably-sized buffer or it'll stutter */
-    /* 
-       dmitrykos, 30/05/2010: commenting out this hardcoded latency correction, leaving correct (safe) latency 
-       setting to user.
-       
     if( !self->canMmap && framesPerHostBuffer < 2048 )
         framesPerHostBuffer = 2048;
-    */
 
     assert( framesPerHostBuffer > 0 );
     {
@@ -2648,8 +2645,10 @@ static PaError PaAlsaStreamComponent_EndProcessing( PaAlsaStreamComponent *self,
         res = snd_pcm_mmap_commit( self->pcm, self->offset, numFrames );
     else
     {
+        /* using realloc for optimisation
         free( self->nonMmapBuffer );
         self->nonMmapBuffer = NULL;
+        */
     }
 
     if( res == -EPIPE || res == -ESTRPIPE )
@@ -3120,8 +3119,20 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
     }
     else
     {
+        /* using realloc for optimisation
         free( self->nonMmapBuffer );
         self->nonMmapBuffer = calloc( self->numHostChannels, snd_pcm_format_size( self->nativeFormat, self->framesPerBuffer + 1 ) );
+        */
+        unsigned int bufferSize = self->numHostChannels * snd_pcm_format_size( self->nativeFormat, self->framesPerBuffer + 1 );
+        if (bufferSize > self->nonMmapBufferSize)
+        {
+            self->nonMmapBuffer = realloc(self->nonMmapBuffer, (self->nonMmapBufferSize = bufferSize));
+            if (!self->nonMmapBuffer) 
+            {
+                result = paInsufficientMemory;
+                goto error;
+            }
+        }
     }
 
     if( self->hostInterleaved )
@@ -3180,8 +3191,11 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
         {
             *xrun = 1;
             *numFrames = 0;
+
+            /* using realloc for optimisation
             free( self->nonMmapBuffer );
             self->nonMmapBuffer = NULL;
+            */
         }
     }
 
