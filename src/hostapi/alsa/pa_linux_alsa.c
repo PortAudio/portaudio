@@ -1257,10 +1257,6 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
         /* test if MMAP supported */
         self->canMmap = snd_pcm_hw_params_test_access( pcm, hwParams, accessMode ) >= 0 ||
                         snd_pcm_hw_params_test_access( pcm, hwParams, alternateAccessMode ) >= 0;
-
-        PA_DEBUG(("%s: device MMAP SND_PCM_ACCESS_MMAP_INTERLEAVED: %s\n", __FUNCTION__, (snd_pcm_hw_params_test_access( pcm, hwParams, accessMode ) >= 0 ? "YES" : "NO")));
-        PA_DEBUG(("%s: device MMAP SND_PCM_ACCESS_MMAP_NONINTERLEAVED: %s\n", __FUNCTION__, (snd_pcm_hw_params_test_access( pcm, hwParams, alternateAccessMode ) >= 0 ? "YES" : "NO")));
-
         if (!self->canMmap)
         {
             accessMode          = SND_PCM_ACCESS_RW_INTERLEAVED;
@@ -1275,17 +1271,12 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
         /* test if MMAP supported */
         self->canMmap = snd_pcm_hw_params_test_access( pcm, hwParams, accessMode ) >= 0 ||
                         snd_pcm_hw_params_test_access( pcm, hwParams, alternateAccessMode ) >= 0;
-
-        PA_DEBUG(("%s: device MMAP SND_PCM_ACCESS_MMAP_NONINTERLEAVED: %s\n", __FUNCTION__, (snd_pcm_hw_params_test_access( pcm, hwParams, accessMode ) >= 0 ? "YES" : "NO")));
-        PA_DEBUG(("%s: device MMAP SND_PCM_ACCESS_MMAP_INTERLEAVED: %s\n", __FUNCTION__, (snd_pcm_hw_params_test_access( pcm, hwParams, alternateAccessMode ) >= 0 ? "YES" : "NO")));
-
         if (!self->canMmap)
         {
             accessMode          = SND_PCM_ACCESS_RW_NONINTERLEAVED;
             alternateAccessMode = SND_PCM_ACCESS_RW_INTERLEAVED;
         }
     }
-
     PA_DEBUG(("%s: device can MMAP: %s\n", __FUNCTION__, (self->canMmap ? "YES" : "NO"))); 
 
     /* If requested access mode fails, try alternate mode */
@@ -2040,6 +2031,9 @@ static PaError CloseStream( PaStream* s )
 {
     PaError result = paNoError;
     PaAlsaStream *stream = (PaAlsaStream*)s;
+
+	free(stream->playback.nonMmapBuffer);
+	free(stream->capture.nonMmapBuffer);
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
