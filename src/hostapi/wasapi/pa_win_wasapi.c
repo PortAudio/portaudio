@@ -308,7 +308,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
 
 #define MAX_STR_LEN 512
 
-enum { S_INPUT = 0, S_OUTPUT, S_COUNT };
+enum { S_INPUT = 0, S_OUTPUT = 1, S_COUNT = 2, S_FULLDUPLEX = 0 };
 
 #define STATIC_ARRAY_SIZE(array) (sizeof(array)/sizeof(array[0]))
 
@@ -316,6 +316,8 @@ enum { S_INPUT = 0, S_OUTPUT, S_COUNT };
 
 #define PA_SKELETON_SET_LAST_HOST_ERROR( errorCode, errorText ) \
     PaUtil_SetLastHostErrorInfo( paWASAPI, errorCode, errorText )
+
+#define PA_WASAPI__IS_FULLDUPLEX(STREAM) ((STREAM)->in.client && (STREAM)->out.client)
 
 #ifndef IF_FAILED_JUMP
 #define IF_FAILED_JUMP(hr, label) if(FAILED(hr)) goto label;
@@ -884,7 +886,10 @@ static BOOL UseWOW64Workaround()
 }
 
 // ------------------------------------------------------------------------------------------
-#define _WASAPI_MONO_TO_STEREO_MIXER(TYPE)\
+typedef enum EMixerDir { MIX_DIR__1TO2, MIX_DIR__2TO1 } EMixerDir;
+
+// ------------------------------------------------------------------------------------------
+#define _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(TYPE)\
 	TYPE * __restrict to   = __to;\
 	TYPE * __restrict from = __from;\
 	TYPE * __restrict end  = from + count;\
@@ -896,46 +901,58 @@ static BOOL UseWOW64Workaround()
 	}
 
 // ------------------------------------------------------------------------------------------
-static void _MixMonoToStereo_8(void *__to, void *__from, UINT32 count)
-{
-	_WASAPI_MONO_TO_STEREO_MIXER(BYTE);
-}
-
-// ------------------------------------------------------------------------------------------
-static void _MixMonoToStereo_16(void *__to, void *__from, UINT32 count)
-{
-	_WASAPI_MONO_TO_STEREO_MIXER(short);
-}
-
-// ------------------------------------------------------------------------------------------
-static void _MixMonoToStereo_24(void *__to, void *__from, UINT32 count)
-{
-	_WASAPI_MONO_TO_STEREO_MIXER(int); // !!! int24 data is contained in 32-bit containers
-}
-
-// ------------------------------------------------------------------------------------------
-static void _MixMonoToStereo_32(void *__to, void *__from, UINT32 count)
-{
-	_WASAPI_MONO_TO_STEREO_MIXER(int);
-}
-
-// ------------------------------------------------------------------------------------------
-static void _MixMonoToStereo_32f(void *__to, void *__from, UINT32 count)
-{
-	_WASAPI_MONO_TO_STEREO_MIXER(float);
-}
-
-// ------------------------------------------------------------------------------------------
-static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format)
-{
-	switch (format)
-	{
-	case paUInt8:	return _MixMonoToStereo_8;
-	case paInt16:	return _MixMonoToStereo_16;
-	case paInt24:	return _MixMonoToStereo_24;
-	case paInt32:	return _MixMonoToStereo_32;
-	case paFloat32: return _MixMonoToStereo_32f;
+#define _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1(TYPE)\
+	TYPE * __restrict to   = (TYPE *)__to;\
+	TYPE * __restrict from = (TYPE *)__from;\
+	TYPE * __restrict end  = to + count;\
+	while (to != end)\
+	{\
+		*to ++ = (TYPE)((float)(from[0] + from[1]) * 0.5f);\
+		from += 2;\
 	}
+
+// ------------------------------------------------------------------------------------------
+static void _MixMonoToStereo_1TO2_8(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(BYTE); }
+static void _MixMonoToStereo_1TO2_16(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(short); }
+static void _MixMonoToStereo_1TO2_24(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(int); /* !!! int24 data is contained in 32-bit containers*/ }
+static void _MixMonoToStereo_1TO2_32(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(int); }
+static void _MixMonoToStereo_1TO2_32f(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(float); }
+
+// ------------------------------------------------------------------------------------------
+static void _MixMonoToStereo_2TO1_8(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1(BYTE); }
+static void _MixMonoToStereo_2TO1_16(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1(short); }
+static void _MixMonoToStereo_2TO1_24(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1(int); /* !!! int24 data is contained in 32-bit containers*/ }
+static void _MixMonoToStereo_2TO1_32(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1(int); }
+static void _MixMonoToStereo_2TO1_32f(void *__to, void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1(float); }
+
+// ------------------------------------------------------------------------------------------
+static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format, EMixerDir dir)
+{
+	switch (dir)
+	{
+	case MIX_DIR__1TO2:
+		switch (format)
+		{
+		case paUInt8:	return _MixMonoToStereo_1TO2_8;
+		case paInt16:	return _MixMonoToStereo_1TO2_16;
+		case paInt24:	return _MixMonoToStereo_1TO2_24;
+		case paInt32:	return _MixMonoToStereo_1TO2_32;
+		case paFloat32: return _MixMonoToStereo_1TO2_32f;
+		}
+		break;
+
+	case MIX_DIR__2TO1:
+		switch (format)
+		{
+		case paUInt8:	return _MixMonoToStereo_2TO1_8;
+		case paInt16:	return _MixMonoToStereo_2TO1_16;
+		case paInt24:	return _MixMonoToStereo_2TO1_24;
+		case paInt32:	return _MixMonoToStereo_2TO1_32;
+		case paFloat32: return _MixMonoToStereo_2TO1_32f;
+		}
+		break;
+	}
+
 	return NULL;
 }
 
@@ -1670,7 +1687,15 @@ static PaError GetClosestFormat(IAudioClient *myClient, double sampleRate,
 
 		// Validate Channel count
 		if ((WORD)params->channelCount != outWavex->Format.nChannels)
-			return paInvalidChannelCount;
+		{
+			// If mono, then driver does not support 1 channel, we use internal workaround
+			// of tiny software mixing functionality, e.g. we provide to user buffer 1 channel
+			// but then mix into 2 for device buffer
+			if ((params->channelCount == 1) && (outWavex->Format.nChannels == 2))
+				return paFormatIsSupported;
+			else
+				return paInvalidChannelCount;
+		}
 
 		// Validate Sample format
 		if ((bitsPerSample = PaSampleFormatToBitsPerSample(params->sampleFormat)) == 0)
@@ -1924,7 +1949,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 		}
 
 		// select mixer
-		pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat);
+		pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (info->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
 		if (pSubStream->monoMixer == NULL)
 		{
 			LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
@@ -2074,7 +2099,7 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 			}
 
 			// select mixer
-			pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat);
+			pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (info->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
 			if (pSubStream->monoMixer == NULL)
 			{
 				LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
@@ -2223,10 +2248,15 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		stream->in.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
 		if (paWasapi->useWOW64Workaround)
 			stream->in.streamFlags = 0; // polling interface
+		else
 		if (streamCallback == NULL)
 			stream->in.streamFlags = 0; // polling interface
+		else
 		if ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiPolling))
 			stream->in.streamFlags = 0; // polling interface
+		else
+		if (outputParameters != NULL)
+			stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->in, info, inputParameters, 0/*framesPerLatency*/,
@@ -2293,7 +2323,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->in.latency_seconds += buffer_latency;
 
-		PRINT(("PaWASAPIOpenStream(input): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
+		PRINT(("WASAPI::OpenStream(input): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
 	}
     else
     {
@@ -2332,10 +2362,15 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		stream->out.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
 		if (paWasapi->useWOW64Workaround)
 			stream->out.streamFlags = 0; // polling interface
+		else
 		if (streamCallback == NULL)
 			stream->out.streamFlags = 0; // polling interface
+		else
 		if ((outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiPolling))
 			stream->out.streamFlags = 0; // polling interface
+		else
+		if (inputParameters != NULL)
+			stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->out, info, outputParameters, 0/*framesPerLatency*/,
@@ -2402,13 +2437,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->out.latency_seconds += buffer_latency;
 
-		PRINT(("PaWASAPIOpenStream(output): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
+		PRINT(("WASAPI::OpenStream(output): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
 	}
     else
     {
         outputChannelCount = 0;
         outputSampleFormat = hostOutputSampleFormat = paInt16; /* Surpress 'uninitialized var' warnings. */
     }
+
+	// og full-duplex
+	if ((inputParameters != NULL) && (outputParameters != NULL))
+		PRINT(("WASAPI::OpenStream: full-duplex mode\n"));
 
 	// paWinWasapiPolling must be on/or not on both streams
 	if ((inputParameters != NULL) && (outputParameters != NULL))
@@ -3232,7 +3271,7 @@ PaError PaWasapi_ThreadPriorityRevert(void *hTask)
 }
 
 // ------------------------------------------------------------------------------------------
-static HRESULT FillOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor, UINT32 frames)
+static HRESULT ProcessOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor, UINT32 frames)
 {
 	HRESULT hr;
 	BYTE *data = NULL;
@@ -3277,11 +3316,9 @@ static HRESULT FillOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *p
 		// expand buffer (one way only for better performancedue to no calls to realloc)
 		UINT32 mono_frames_size = frames * __DIV_8(stream->out.wavex.Format.wBitsPerSample);
 		if (mono_frames_size > stream->out.monoBufferSize)
-		{
-			stream->out.monoBuffer = realloc(stream->out.monoBuffer, mono_frames_size);
-		}
+			stream->out.monoBuffer = realloc(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
 
-		// feed to user
+		// process
 		processor[S_OUTPUT].processor(NULL, 0, (BYTE *)stream->out.monoBuffer, frames, processor[S_OUTPUT].userData);
 
 		// mix 1 to 2 channels
@@ -3302,7 +3339,7 @@ static HRESULT FillOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *p
 }
 
 // ------------------------------------------------------------------------------------------
-static HRESULT PollInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor)
+static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor)
 {
 	HRESULT hr;
 	UINT32 frames;
@@ -3333,15 +3370,13 @@ static HRESULT PollInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *pr
 			// expand buffer (one way only for better performancedue to no calls to realloc)
 			UINT32 mono_frames_size = frames * __DIV_8(stream->in.wavex.Format.wBitsPerSample);
 			if (mono_frames_size > stream->in.monoBufferSize)
-			{
-				stream->in.monoBuffer = realloc(stream->in.monoBuffer, mono_frames_size);
-			}
-
-			// feed to user
-			processor[S_INPUT].processor((BYTE *)stream->in.monoBuffer, frames, NULL, 0, processor[S_INPUT].userData);
+				stream->in.monoBuffer = realloc(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
 
 			// mix 1 to 2 channels
-			stream->in.monoMixer(data, stream->in.monoBuffer, frames);
+			stream->in.monoMixer(stream->in.monoBuffer, data, frames);
+
+			// process
+			processor[S_INPUT].processor((BYTE *)stream->in.monoBuffer, frames, NULL, 0, processor[S_INPUT].userData);
 
 #undef __DIV_8
 		}
@@ -3480,7 +3515,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		}
 
 		// Preload buffer before start
-		if ((hr = FillOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+		if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
 		{
 			LogHostError(hr);
 			goto thread_error;
@@ -3524,14 +3559,14 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		case WAIT_OBJECT_0 + S_INPUT: {
             if (stream->cclient == NULL)
                 break;
-			PollInputBuffer(stream, processor);
+			ProcessInputBuffer(stream, processor);
 			break; }
 
 		// Output stream
 		case WAIT_OBJECT_0 + S_OUTPUT: {
             if (stream->rclient == NULL)
                 break;
-			FillOutputBuffer(stream, processor, stream->out.framesPerHostCallback);
+			ProcessOutputBuffer(stream, processor, stream->out.framesPerHostCallback);
 			break; }
 		}
 	}
@@ -3556,6 +3591,27 @@ thread_error:
 
 	// Exit
 	goto thread_end;
+}
+
+// ------------------------------------------------------------------------------------------
+static HRESULT PollGetOutputFramesAvailable(PaWasapiStream *stream, UINT32 *available)
+{
+	HRESULT hr;
+	UINT32 frames  = stream->out.framesPerHostCallback, 
+		   padding = 0;
+
+	(*available) = 0;
+
+	// get read position
+	if ((hr = IAudioClient_GetCurrentPadding(stream->out.client, &padding)) != S_OK)
+		return LogHostError(hr);
+
+	// get available
+	frames -= padding;
+	
+	// set
+	(*available) = frames;
+	return hr;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3619,11 +3675,15 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 			}
 		}
 
-		// Preload buffer (obligatory, othervise ->Start() will fail)
-		if ((hr = FillOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+		// Preload buffer (obligatory, othervise ->Start() will fail), avoid processing
+		// when in full-duplex mode as it requires input processing as well
+		if (!PA_WASAPI__IS_FULLDUPLEX(stream))
 		{
-			LogHostError(hr);
-			goto thread_error;
+			if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
 		}
 
 		// Start
@@ -3640,46 +3700,136 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
 
-	// Processing Loop
-	while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
-    {
-		for (i = 0; i < S_COUNT; ++i)
+	if (!PA_WASAPI__IS_FULLDUPLEX(stream))
+	{
+		// Processing Loop
+		while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
 		{
-			// Process S_INPUT/S_OUTPUT
-			switch (i)
+			for (i = 0; i < S_COUNT; ++i)
 			{
-			// Input stream
-			case S_INPUT: {
-				if (stream->cclient == NULL)
-					break;
-				PollInputBuffer(stream, processor);
-				break; }
-
-			// Output stream
-			case S_OUTPUT: {
-
-				UINT32 frames, padding;
-
-				if (stream->rclient == NULL)
-					break;
-
-				frames = stream->out.framesPerHostCallback;
-
-				// Get Read position
-				padding = 0;
-				hr = IAudioClient_GetCurrentPadding(stream->out.client, &padding);
-				if (hr != S_OK)
+				// Process S_INPUT/S_OUTPUT
+				switch (i)
 				{
-					LogHostError(hr);
-					break;
+				// Input stream
+				case S_INPUT: {
+					if (stream->cclient == NULL)
+						break;
+					ProcessInputBuffer(stream, processor);
+					break; }
+
+				// Output stream
+				case S_OUTPUT: {
+
+					UINT32 frames;
+					if (stream->rclient == NULL)
+						break;
+
+					// get available frames
+					if ((hr = PollGetOutputFramesAvailable(stream, &frames)) != S_OK)
+					{
+						LogHostError(hr);
+						break;
+					}
+
+					// output
+					if (frames != 0)
+						ProcessOutputBuffer(stream, processor, frames);
+
+					break; }
 				}
+			}
+		}
+	}
+	else
+	{
+		// Processing Loop
+		while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
+		{
+			UINT32 i_frames = 0, i_processed = 0;
+			BYTE *i_data = NULL, *o_data = NULL;
+			DWORD i_flags = 0;
+			UINT32 o_frames = 0;
 
-				// Fill buffer
-				frames -= padding;
-				if (frames != 0)
-					FillOutputBuffer(stream, processor, frames);
+			// get host input buffer
+			if ((hr = IAudioCaptureClient_GetBuffer(stream->cclient, &i_data, &i_frames, &i_flags, NULL, NULL)) != S_OK)
+			{
+				if (hr == AUDCLNT_S_BUFFER_EMPTY)
+					continue; // no data in capture buffer
 
-				break; }
+				LogHostError(hr);
+				break;
+			}
+
+			// get available frames
+			if ((hr = PollGetOutputFramesAvailable(stream, &o_frames)) != S_OK)
+			{
+				LogHostError(hr);
+				break;
+			}
+
+			// process equal ammount of frames
+			if (o_frames >= i_frames)
+			{
+				// process input ammount of frames
+				UINT32 o_processed = i_frames;
+
+				// get host output buffer
+				if ((hr = IAudioRenderClient_GetBuffer(stream->rclient, o_processed, &o_data)) == S_OK)
+				{
+					// processed amount of i_frames
+					i_processed = i_frames;
+
+					// convert output mono
+					if (stream->out.monoMixer)
+					{
+						#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
+						UINT32 mono_frames_size = o_processed * __DIV_8(stream->out.wavex.Format.wBitsPerSample);
+						#undef __DIV_8
+						// expand buffer (one way only for better performance due to no calls to realloc)
+						if (mono_frames_size > stream->out.monoBufferSize)
+							stream->out.monoBuffer = realloc(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
+					}
+
+					// convert input mono
+					if (stream->in.monoMixer)
+					{
+						#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
+						UINT32 mono_frames_size = i_processed * __DIV_8(stream->in.wavex.Format.wBitsPerSample);
+						#undef __DIV_8
+						// expand buffer (one way only for better performance due to no calls to realloc)
+						if (mono_frames_size > stream->in.monoBufferSize)
+							stream->in.monoBuffer = realloc(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
+
+						// mix 2 to 1 input channels
+						stream->in.monoMixer(stream->in.monoBuffer, i_data, i_processed);
+
+						// replace buffer pointer
+						i_data = (BYTE *)stream->in.monoBuffer;
+					}
+
+					// process
+					processor[S_FULLDUPLEX].processor(i_data, i_processed, o_data, o_processed, processor[S_FULLDUPLEX].userData);
+
+					// mix 1 to 2 output channels
+					if (stream->out.monoBuffer)
+						stream->out.monoMixer(o_data, stream->out.monoBuffer, o_processed);
+
+					// release host output buffer
+					if ((hr = IAudioRenderClient_ReleaseBuffer(stream->rclient, o_processed, 0)) != S_OK)
+						LogHostError(hr);
+				}
+				else
+				{
+					if (stream->out.shareMode != AUDCLNT_SHAREMODE_SHARED)
+						LogHostError(hr); // be silent in shared mode, try again next time
+				}
+			}
+
+			// release host input buffer
+			if ((hr = IAudioCaptureClient_ReleaseBuffer(stream->cclient, i_processed)) != S_OK)
+			{
+				LogHostError(hr);
+				break;
 			}
 		}
 	}
