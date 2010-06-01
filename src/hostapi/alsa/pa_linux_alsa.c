@@ -2987,6 +2987,8 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
             /* not else ! */
             if (timeouts >= 64) /* audio device not working, shall return error to notify waiters */
             {
+				*framesAvail = 0; /* no frames available for processing */
+
                 PA_DEBUG(( "%s: poll timed out, returning error\n", __FUNCTION__, timeouts ));
                 PA_ENSURE( paTimedOut );
             }
