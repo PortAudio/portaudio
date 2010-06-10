@@ -2185,6 +2185,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 	PaTime buffer_latency;
 	ULONG framesPerHostCallback;
 	PaUtilHostBufferSizeMode bufferMode;
+	const BOOL fullDuplex = ((inputParameters != NULL) && (outputParameters != NULL));
 
 	// validate PaStreamParameters
 	if ((result = IsStreamParamsValid(hostApi, inputParameters, outputParameters, sampleRate)) != paNoError)
@@ -2265,7 +2266,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		if ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiPolling))
 			stream->in.streamFlags = 0; // polling interface
 		else
-		if (outputParameters != NULL)
+		if (fullDuplex)
 			stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
@@ -2379,7 +2380,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		if ((outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiPolling))
 			stream->out.streamFlags = 0; // polling interface
 		else
-		if (inputParameters != NULL)
+		if (fullDuplex)
 			stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
@@ -2455,8 +2456,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         outputSampleFormat = hostOutputSampleFormat = paInt16; /* Surpress 'uninitialized var' warnings. */
     }
 
-	// og full-duplex
-	if ((inputParameters != NULL) && (outputParameters != NULL))
+	// log full-duplex
+	if (fullDuplex)
 		PRINT(("WASAPI::OpenStream: full-duplex mode\n"));
 
 	// paWinWasapiPolling must be on/or not on both streams
@@ -2504,12 +2505,14 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 			goto error;
 		}
 
-		// serious problem #2
-		if (stream->out.framesPerHostCallback != stream->in.framesPerHostCallback)
+		// serious problem #2 - No, Not a problem, as framesPerHostCallback take into account
+		// sample size while it is not a problem for PA full-duplex, we must care of
+		// preriod only!
+		/*if (stream->out.framesPerHostCallback != stream->in.framesPerHostCallback)
 		{
 			PRINT(("WASAPI: OpenStream: framesPerHostCallback discrepancy\n"));
 			goto error;
-		}
+		}*/
 	}
 
 	framesPerHostCallback = (outputParameters) ? stream->out.framesPerHostCallback:
