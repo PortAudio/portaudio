@@ -1650,13 +1650,23 @@ static void wasapiFillWFEXT( WAVEFORMATEXTENSIBLE* pwfext, PaSampleFormat sample
 
 // ------------------------------------------------------------------------------------------
 static PaError GetClosestFormat(IAudioClient *myClient, double sampleRate,
-	const PaStreamParameters *params, AUDCLNT_SHAREMODE shareMode, WAVEFORMATEXTENSIBLE *outWavex)
+	const PaStreamParameters *_params, AUDCLNT_SHAREMODE shareMode, WAVEFORMATEXTENSIBLE *outWavex,
+	BOOL output)
 {
-	PaError answer = paInvalidSampleRate;
+	PaError answer                   = paInvalidSampleRate;
 	WAVEFORMATEX *sharedClosestMatch = NULL;
-	HRESULT hr = !S_OK;
+	HRESULT hr                       = !S_OK;
+	PaStreamParameters params       = (*_params);
 
-    MakeWaveFormatFromParams(outWavex, params, sampleRate);
+	/* It was not noticed that 24-bit Input producing no output while device accepts this format.
+	   To fix this issue let's ask for 32-bits and let PA converters convert host 32-bit data
+	   to 24-bit for user-space. The bug concerns Vista, if Windows 7 supports 24-bits for Input
+	   please report to PortAudio developers to exclude Windows 7.
+	*/
+	if ((params.sampleFormat == paInt24) && (output == FALSE))
+		params.sampleFormat = paFloat32;
+
+    MakeWaveFormatFromParams(outWavex, &params, sampleRate);
 
 	hr = IAudioClient_IsFormatSupported(myClient, shareMode, &outWavex->Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
 	if (hr == S_OK)
@@ -1686,19 +1696,19 @@ static PaError GetClosestFormat(IAudioClient *myClient, double sampleRate,
 			return paInvalidSampleRate;
 
 		// Validate Channel count
-		if ((WORD)params->channelCount != outWavex->Format.nChannels)
+		if ((WORD)params.channelCount != outWavex->Format.nChannels)
 		{
 			// If mono, then driver does not support 1 channel, we use internal workaround
 			// of tiny software mixing functionality, e.g. we provide to user buffer 1 channel
 			// but then mix into 2 for device buffer
-			if ((params->channelCount == 1) && (outWavex->Format.nChannels == 2))
+			if ((params.channelCount == 1) && (outWavex->Format.nChannels == 2))
 				return paFormatIsSupported;
 			else
 				return paInvalidChannelCount;
 		}
 
 		// Validate Sample format
-		if ((bitsPerSample = PaSampleFormatToBitsPerSample(params->sampleFormat)) == 0)
+		if ((bitsPerSample = PaSampleFormatToBitsPerSample(params.sampleFormat)) == 0)
 			return paSampleFormatNotSupported;
 
 		// Validate Sample format: bit size (WASAPI does not limit 'bit size')
@@ -1723,7 +1733,7 @@ static const int BestToWorst[FORMATTESTS] = { paFloat32, paInt24, paInt16 };
 		for (i = 0; i < FORMATTESTS; ++i)
 		{
 			WAVEFORMATEXTENSIBLE ext = { 0 };
-			wasapiFillWFEXT(&ext, BestToWorst[i], sampleRate, params->channelCount);
+			wasapiFillWFEXT(&ext, BestToWorst[i], sampleRate, params.channelCount);
 
 			hr = IAudioClient_IsFormatSupported(myClient, shareMode, &ext.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
 			if (hr == S_OK)
@@ -1739,10 +1749,10 @@ static const int BestToWorst[FORMATTESTS] = { paFloat32, paInt24, paInt16 };
 			// If mono, then driver does not support 1 channel, we use internal workaround
 			// of tiny software mixing functionality, e.g. we provide to user buffer 1 channel
 			// but then mix into 2 for device buffer
-			if (params->channelCount == 1)
+			if (params.channelCount == 1)
 			{
 				WAVEFORMATEXTENSIBLE stereo = { 0 };
-				wasapiFillWFEXT(&stereo, params->sampleFormat, sampleRate, 2);
+				wasapiFillWFEXT(&stereo, params.sampleFormat, sampleRate, 2);
 
 				hr = IAudioClient_IsFormatSupported(myClient, shareMode, &stereo.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
 				if (hr == S_OK)
@@ -1869,7 +1879,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 			return paInvalidDevice;
 		}
 
-		answer = GetClosestFormat(tmpClient, sampleRate, inputParameters, shareMode, &wavex);
+		answer = GetClosestFormat(tmpClient, sampleRate, inputParameters, shareMode, &wavex, FALSE);
 		SAFE_RELEASE(tmpClient);
 
 		if (answer != paFormatIsSupported)
@@ -1895,7 +1905,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 			return paInvalidDevice;
 		}
 
-		answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex);
+		answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex, TRUE);
 		SAFE_RELEASE(tmpClient);
 
 		if (answer != paFormatIsSupported)
@@ -1908,7 +1918,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 // ------------------------------------------------------------------------------------------
 static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceInfo *info,
 	const PaStreamParameters *params, UINT32 framesPerLatency, double sampleRate, UINT32 streamFlags,
-	BOOL blocking, PaError *pa_error)
+	BOOL blocking, BOOL output, PaError *pa_error)
 {
 	PaError error;
     HRESULT hr					= S_OK;
@@ -1930,7 +1940,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 	}
 
 	// Get closest format
-	if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex)) != paFormatIsSupported)
+	if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex, output)) != paFormatIsSupported)
 	{
 		if (pa_error)
 			(*pa_error) = error;
@@ -2080,7 +2090,7 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		}
 
 		// Get closest format
-		if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex)) != paFormatIsSupported)
+		if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex, output)) != paFormatIsSupported)
 		{
 			if (pa_error)
 				(*pa_error) = error;
@@ -2260,7 +2270,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->in, info, inputParameters, 0/*framesPerLatency*/,
-			sampleRate, stream->in.streamFlags, (streamCallback == NULL), &result);
+			sampleRate, stream->in.streamFlags, (streamCallback == NULL), FALSE, &result);
         if (hr != S_OK)
 		{
             LogHostError(hr);
@@ -2374,7 +2384,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->out, info, outputParameters, 0/*framesPerLatency*/,
-			sampleRate, stream->out.streamFlags, (streamCallback == NULL), &result);
+			sampleRate, stream->out.streamFlags, (streamCallback == NULL), TRUE, &result);
         if (hr != S_OK)
 		{
             LogHostError(hr);
