@@ -3361,6 +3361,10 @@ static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor 
 
 	for (;;)
 	{
+		// Check if blocking call must be interrupted
+		if (WaitForSingleObject(stream->hCloseRequest, 1) != WAIT_TIMEOUT)
+			break;
+
 		// Get the available data in the shared buffer.
 		if ((hr = IAudioCaptureClient_GetBuffer(stream->cclient, &data, &frames, &flags, NULL, NULL)) != S_OK)
 		{
