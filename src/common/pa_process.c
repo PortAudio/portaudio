@@ -750,6 +750,17 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     destSampleStrideSamples = bp->inputChannelCount;
                     destChannelStrideBytes = bp->bytesPerUserInputSample;
                     userInput = bp->tempInputBuffer;
+
+					/* determine if processing of host buffer can be done directly by callback */
+					if( bp->inputConverter == paConverters.Copy_8_To_8 ||
+						bp->inputConverter == paConverters.Copy_16_To_16 ||
+						bp->inputConverter == paConverters.Copy_24_To_24 ||
+						bp->inputConverter == paConverters.Copy_32_To_32 )
+					{
+						/* process host buffer directly */
+					    userInput = hostInputChannels[0].data;
+						destBytePtr = (unsigned char *)hostInputChannels[0].data;
+					}
                 }
                 else /* user input is not interleaved */
                 {
@@ -778,6 +789,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     }
                 }
                 else
+				if( userInput != hostInputChannels[0].data )
                 {
                     for( i=0; i<bp->inputChannelCount; ++i )
                     {
@@ -805,7 +817,17 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
             {
                 if( bp->userOutputIsInterleaved )
                 {
-                    userOutput = bp->tempOutputBuffer;
+					userOutput = bp->tempOutputBuffer;
+
+					/* determine if processing of host buffer can be done directly by callback */
+					if( bp->outputConverter == paConverters.Copy_8_To_8 ||
+						bp->outputConverter == paConverters.Copy_16_To_16 ||
+						bp->outputConverter == paConverters.Copy_24_To_24 ||
+						bp->outputConverter == paConverters.Copy_32_To_32 )
+					{
+						/* process host buffer directly */
+					    userOutput = hostOutputChannels[0].data;
+					}
                 }
                 else /* user output is not interleaved */
                 {
@@ -834,7 +856,8 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
 
                 /* convert output data (user -> host) */
                 
-                if( bp->outputChannelCount != 0 && bp->hostOutputChannels[0][0].data )
+                if( bp->outputChannelCount != 0 && bp->hostOutputChannels[0][0].data && 
+					userOutput != hostOutputChannels[0].data )
                 {
                     /*
                         could use more elaborate logic here and sometimes process
