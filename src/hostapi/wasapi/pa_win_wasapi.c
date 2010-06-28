@@ -701,10 +701,20 @@ static UINT32 MakeFramesFromHns(REFERENCE_TIME hnsPeriod, UINT32 nSamplesPerSec)
 }
 
 // ------------------------------------------------------------------------------------------
-// Aligns v backwards
+// Aligns 'v' backwards
 static UINT32 ALIGN_BWD(UINT32 v, UINT32 align)
 {
 	return ((v - (align ? v % align : 0)));
+}
+
+// ------------------------------------------------------------------------------------------
+// Aligns 'v' forward
+static UINT32 ALIGN_FWD(UINT32 v, UINT32 align)
+{
+	UINT32 remainder = (align ? (v % align) : 0);
+	if (remainder == 0)
+		return v;
+	return v + (align - remainder);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -713,27 +723,22 @@ static UINT32 ALIGN_BWD(UINT32 v, UINT32 align)
 // is thrown although we must align for Vista anyway.
 static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32 nBlockAlign)
 {
-#define HDA_PACKET_SIZE 128
+#define HDA_PACKET_SIZE (128)
 
-	//long packets_total = 10000 * (nSamplesPerSec * nBlockAlign / HDA_PACKET_SIZE);
-	long frame_bytes   = nFrames * nBlockAlign;
+	long frame_bytes = nFrames * nBlockAlign;
 	long packets;
 
 	// align to packet size
-	frame_bytes  = ALIGN_BWD(frame_bytes, HDA_PACKET_SIZE);
+	frame_bytes  = ALIGN_FWD(frame_bytes, HDA_PACKET_SIZE); // use ALIGN_FWD if bigger but safer period is more desired
 	nFrames      = frame_bytes / nBlockAlign;
 	packets      = frame_bytes / HDA_PACKET_SIZE;
 
-	// align to packets count
-	/*while (packets && ((packets_total % packets) != 0))
-	{
-		--packets;
-	}*/
-
 	frame_bytes = packets * HDA_PACKET_SIZE;
 	nFrames     = frame_bytes / nBlockAlign;
-
+	
 	return nFrames;
+
+#undef HDA_PACKET_SIZE
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1968,10 +1973,15 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 	}
 
 	// Correct latency to default device period (in Exclusive mode this is 10ms) if user selected 0
-	suggestedLatency = (params->suggestedLatency < 0.001 ? nano100ToSeconds(info->DefaultDevicePeriod) : params->suggestedLatency);
+	//suggestedLatency = (params->suggestedLatency < 0.001 ? nano100ToSeconds(info->DefaultDevicePeriod) : params->suggestedLatency);
+	suggestedLatency = params->suggestedLatency;
 
 	// Add latency frames
 	framesPerLatency += MakeFramesFromHns(SecondsTonano100(suggestedLatency), pSubStream->wavex.Format.nSamplesPerSec);
+
+	// Avoid 0 frames
+	if (framesPerLatency == 0)
+		framesPerLatency = MakeFramesFromHns(info->DefaultDevicePeriod, pSubStream->wavex.Format.nSamplesPerSec);
 
 	// Align frames to HD Audio packet size of 128 bytes for Exclusive mode only.
 	// Not aligning on Windows Vista will cause Event timeout, although Windows 7 will
@@ -2270,7 +2280,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 			stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
-		hr = CreateAudioClient(&stream->in, info, inputParameters, 0/*framesPerLatency*/,
+		hr = CreateAudioClient(&stream->in, info, inputParameters, framesPerBuffer/*framesPerLatency*/,
 			sampleRate, stream->in.streamFlags, (streamCallback == NULL), FALSE, &result);
         if (hr != S_OK)
 		{
@@ -2384,7 +2394,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 			stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
-		hr = CreateAudioClient(&stream->out, info, outputParameters, 0/*framesPerLatency*/,
+		hr = CreateAudioClient(&stream->out, info, outputParameters, framesPerBuffer/*framesPerLatency*/,
 			sampleRate, stream->out.streamFlags, (streamCallback == NULL), TRUE, &result);
         if (hr != S_OK)
 		{
@@ -2522,8 +2532,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 	// Exclusive/Shared non paWinWasapiPolling mode: paUtilFixedHostBufferSize - always fixed
 	// Exclusive/Shared paWinWasapiPolling mode: paUtilBoundedHostBufferSize - may vary
 	bufferMode = paUtilFixedHostBufferSize;
-	if (inputParameters &&
-		(!stream->in.streamFlags || ((stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
+	if (inputParameters /*&& // !!! WASAPI IAudioCaptureClient::GetBuffer extracts not number of frames but 1 packet, thus we always must adapt
+		(!stream->in.streamFlags || ((stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0))*/)
 		bufferMode = paUtilBoundedHostBufferSize;
 	else
 	if (outputParameters &&
