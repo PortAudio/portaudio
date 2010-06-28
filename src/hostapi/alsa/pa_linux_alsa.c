@@ -1474,6 +1474,29 @@ static int CalculatePollTimeout( const PaAlsaStream *stream, unsigned long frame
     return (int)ceil( 1000 * frames / stream->streamRepresentation.streamInfo.sampleRate );
 }
 
+/** Align value in backward direction.
+ *
+ * @param v: Value to align.
+ * @param align: Alignment value.
+ */
+static unsigned long ALIGN_BWD(unsigned long v, unsigned long align)
+{
+	return ((v - (align ? v % align : 0)));
+}
+
+/** Align value in forward direction.
+ *
+ * @param v: Value to align.
+ * @param align: Alignment value.
+ */
+static unsigned long ALIGN_FWD(unsigned long v, unsigned long align)
+{
+	unsigned long remainder = (align ? (v % align) : 0);
+	if (remainder == 0)
+		return v;
+	return v + (align - remainder);
+}
+
 /** Determine size per host buffer.
  *
  * During this method call, the component's framesPerBuffer attribute gets computed, and the corresponding period size
@@ -1484,16 +1507,13 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
         unsigned long framesPerUserBuffer, double sampleRate, snd_pcm_hw_params_t* hwParams, int* accurate )
 {
     PaError result = paNoError;
-    unsigned long bufferSize = params->suggestedLatency * sampleRate, framesPerHostBuffer;
+    unsigned long bufferSize = framesPerUserBuffer + params->suggestedLatency * sampleRate, framesPerHostBuffer;
     int dir = 0;
 
     PA_DEBUG(( "%s: frames per user-buffer     = %lu\n", __FUNCTION__, framesPerUserBuffer ));
-    PA_DEBUG(( "%s: suggested latency          = %f\n", __FUNCTION__, params->suggestedLatency ));
+    PA_DEBUG(( "%s: suggested latency          = %f\n",  __FUNCTION__, params->suggestedLatency ));
     PA_DEBUG(( "%s: suggested host buffer size = %lu\n", __FUNCTION__, bufferSize ));
 
-	#define ALIGN_BWD(v,align) (((v) - ((align) ? (v) % (align) : 0)))
-	#define ALIGN_FWD(v,align) (((v) + (align - ((align) ? (v) % (align) : 0))))
-	#define HOST_BUF_ALIGN 16
 	{
         unsigned numPeriods = numPeriods_, maxPeriods = 0;
         /* It may be that the device only supports 2 periods for instance */
@@ -1502,11 +1522,9 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
         assert( maxPeriods > 1 );
         numPeriods = PA_MIN( maxPeriods, numPeriods );
 
-		framesPerHostBuffer = ALIGN_FWD((bufferSize / numPeriods), HOST_BUF_ALIGN);
+		/* Align to 16 bytes for faster copying */
+		framesPerHostBuffer = ALIGN_FWD((bufferSize / numPeriods), 16);
 	}
-	#undef ALIGN_BWD
-	#undef ALIGN_FWD
-	#undef HOST_BUF_ALIGN
 
     {
         snd_pcm_uframes_t min = 0, max = 0;
