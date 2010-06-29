@@ -502,6 +502,7 @@ void PaUtil_SetInterleavedInputChannels( PaUtilBufferProcessor* bp,
         p += bp->bytesPerHostInputSample;
         bp->hostInputChannels[0][channel+i].stride = channelCount;
     }
+    bp->hostInputIsInterleaved[0] = 1;
 }
 
 
@@ -512,6 +513,7 @@ void PaUtil_SetNonInterleavedInputChannel( PaUtilBufferProcessor* bp,
     
     bp->hostInputChannels[0][channel].data = data;
     bp->hostInputChannels[0][channel].stride = 1;
+    bp->hostInputIsInterleaved[0] = 0;
 }
 
 
@@ -551,6 +553,7 @@ void PaUtil_Set2ndInterleavedInputChannels( PaUtilBufferProcessor* bp,
         p += bp->bytesPerHostInputSample;
         bp->hostInputChannels[1][channel+i].stride = channelCount;
     }
+    bp->hostInputIsInterleaved[1] = 1;
 }
 
         
@@ -561,6 +564,7 @@ void PaUtil_Set2ndNonInterleavedInputChannel( PaUtilBufferProcessor* bp,
     
     bp->hostInputChannels[1][channel].data = data;
     bp->hostInputChannels[1][channel].stride = 1;
+    bp->hostInputIsInterleaved[1] = 0;
 }
 
 
@@ -611,6 +615,7 @@ void PaUtil_SetInterleavedOutputChannels( PaUtilBufferProcessor* bp,
         PaUtil_SetOutputChannel( bp, channel + i, p, channelCount );
         p += bp->bytesPerHostOutputSample;
     }
+    bp->hostOutputIsInterleaved[0] = 1;
 }
 
 
@@ -620,6 +625,7 @@ void PaUtil_SetNonInterleavedOutputChannel( PaUtilBufferProcessor* bp,
     assert( channel < bp->outputChannelCount );
 
     PaUtil_SetOutputChannel( bp, channel, data, 1 );
+    bp->hostOutputIsInterleaved[0] = 0;
 }
 
 
@@ -659,6 +665,7 @@ void PaUtil_Set2ndInterleavedOutputChannels( PaUtilBufferProcessor* bp,
         PaUtil_Set2ndOutputChannel( bp, channel + i, p, channelCount );
         p += bp->bytesPerHostOutputSample;
     }
+    bp->hostOutputIsInterleaved[1] = 1;
 }
 
         
@@ -668,6 +675,7 @@ void PaUtil_Set2ndNonInterleavedOutputChannel( PaUtilBufferProcessor* bp,
     assert( channel < bp->outputChannelCount );
     
     PaUtil_Set2ndOutputChannel( bp, channel, data, 1 );
+    bp->hostOutputIsInterleaved[1] = 0;
 }
 
 
@@ -751,16 +759,21 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     destChannelStrideBytes = bp->bytesPerUserInputSample;
                     userInput = bp->tempInputBuffer;
 
-					/* determine if processing of host buffer can be done directly by callback */
-					if( bp->inputConverter == paConverters.Copy_8_To_8 ||
-						bp->inputConverter == paConverters.Copy_16_To_16 ||
-						bp->inputConverter == paConverters.Copy_24_To_24 ||
-						bp->inputConverter == paConverters.Copy_32_To_32 )
-					{
-						/* process host buffer directly */
-					    userInput = hostInputChannels[0].data;
-						destBytePtr = (unsigned char *)hostInputChannels[0].data;
-					}
+                    /* determine if processing of host buffer can be done directly by callback */
+                    if( bp->inputConverter == paConverters.Copy_16_To_16 ||
+                        bp->inputConverter == paConverters.Copy_32_To_32 ||
+                        bp->inputConverter == paConverters.Copy_24_To_24 ||
+                        bp->inputConverter == paConverters.Copy_8_To_8 )
+                    {
+                        /* allow when interlieved buffers both on user and host sides */
+                        if( bp->hostInputFrameCount[0] && !bp->hostInputFrameCount[1] &&
+                            bp->hostInputIsInterleaved[0] )
+                        {
+                            /* process host buffer directly */
+                            userInput = hostInputChannels[0].data;
+                            destBytePtr = (unsigned char *)hostInputChannels[0].data;
+                        }
+                    }
                 }
                 else /* user input is not interleaved */
                 {
@@ -817,17 +830,22 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
             {
                 if( bp->userOutputIsInterleaved )
                 {
-					userOutput = bp->tempOutputBuffer;
+                    userOutput = bp->tempOutputBuffer;
 
-					/* determine if processing of host buffer can be done directly by callback */
-					if( bp->outputConverter == paConverters.Copy_8_To_8 ||
-						bp->outputConverter == paConverters.Copy_16_To_16 ||
-						bp->outputConverter == paConverters.Copy_24_To_24 ||
-						bp->outputConverter == paConverters.Copy_32_To_32 )
-					{
-						/* process host buffer directly */
-					    userOutput = hostOutputChannels[0].data;
-					}
+                    /* determine if processing of host buffer can be done directly by callback */
+                    if( bp->outputConverter == paConverters.Copy_16_To_16 ||
+                        bp->outputConverter == paConverters.Copy_32_To_32 ||
+                        bp->outputConverter == paConverters.Copy_24_To_24 ||
+                        bp->outputConverter == paConverters.Copy_8_To_8 )
+                    {
+                        /* allow when interlieved buffers both on user and host sides */
+                        if( bp->hostOutputFrameCount[0] && !bp->hostOutputFrameCount[1] &&
+                            bp->hostOutputIsInterleaved[0] )
+                        {
+                            /* process host buffer directly */
+                            userOutput = hostOutputChannels[0].data;
+                        }
+                    }
                 }
                 else /* user output is not interleaved */
                 {
