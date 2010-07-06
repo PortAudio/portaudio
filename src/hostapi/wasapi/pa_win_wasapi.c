@@ -479,6 +479,11 @@ typedef struct PaWasapiSubStream
 	UINT32               streamFlags; // AUDCLNT_STREAMFLAGS_EVENTCALLBACK, ...
 	UINT32               flags;
 
+	// Buffers
+	UINT32               buffers;			//!< number of buffers used (from host side)
+	UINT32               framesPerBuffer;	//!< number of frames per 1 buffer
+	BOOL                 userBufferAndHostMatch;
+
 	// Used by blocking interface:
 	UINT32               prevTime;  // time ms between calls of WriteStream
 	UINT32               prevSleep; // time ms to sleep from frames written in previous call
@@ -520,6 +525,9 @@ typedef struct PaWasapiStream
 
 	// event handles for event-driven processing mode
 	HANDLE event[S_COUNT];
+
+	// buffer mode
+	PaUtilHostBufferSizeMode bufferMode;
 
 	// must be volatile to avoid race condition on user query while
 	// thread is being started
@@ -1921,13 +1929,22 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 }
 
 // ------------------------------------------------------------------------------------------
+static PaUint32 PaUtil_GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTime suggestedLatency, double sampleRate, PaUint32 TimerJitterMs)
+{
+	PaUint32 frames = userFramesPerBuffer + max( userFramesPerBuffer, (PaUint32)(suggestedLatency * sampleRate) );
+    frames += (PaUint32)((sampleRate * 0.001) * TimerJitterMs);
+	return frames;
+}
+
+// ------------------------------------------------------------------------------------------
 static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceInfo *info,
 	const PaStreamParameters *params, UINT32 framesPerLatency, double sampleRate, UINT32 streamFlags,
-	BOOL blocking, BOOL output, PaError *pa_error)
+	BOOL blocking, BOOL output, BOOL full_duplex, PaError *pa_error)
 {
 	PaError error;
     HRESULT hr					= S_OK;
     UINT32 nFrames				= 0;
+	UINT32 userFramesPerBuffer  = framesPerLatency;
     IAudioClient *pAudioClient	= NULL;
 	double suggestedLatency     = 0.0;
 
@@ -1972,12 +1989,42 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 		}
 	}
 
+#if 0
 	// Correct latency to default device period (in Exclusive mode this is 10ms) if user selected 0
-	//suggestedLatency = (params->suggestedLatency < 0.001 ? nano100ToSeconds(info->DefaultDevicePeriod) : params->suggestedLatency);
 	suggestedLatency = params->suggestedLatency;
-
-	// Add latency frames
+	// Add suggestd latency
 	framesPerLatency += MakeFramesFromHns(SecondsTonano100(suggestedLatency), pSubStream->wavex.Format.nSamplesPerSec);
+#else
+	// Calculate host buffer size
+	if ((pSubStream->shareMode != AUDCLNT_SHAREMODE_EXCLUSIVE) && 
+		(!streamFlags || ((streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
+	{
+		framesPerLatency = PaUtil_GetFramesPerHostBuffer(framesPerLatency, 
+			params->suggestedLatency, pSubStream->wavex.Format.nSamplesPerSec, 0/*,
+			(streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
+	}
+	else
+	{
+		// do nothing, work 1:1 with buffer (only polling allows to work with >1)
+	}
+#endif
+
+	// Count buffers (must be at least 1)
+	pSubStream->buffers = (userFramesPerBuffer ? framesPerLatency / userFramesPerBuffer : 0);
+	if (pSubStream->buffers == 0)
+		pSubStream->buffers = 1;
+
+	// Determine amount of buffers to be used:
+	// - Exclusive mode does not allow >1 buffers be used, e.g. GetBuffer call must acquire
+	//   max buffer size and it all must be processed.
+	// - Full-duplex mode will lead to period difference, thus only 1.
+	// - Input mode, only 1, as WASAPI allows extraction of only 1 packet.
+	// - For Shared mode we use safe double buffering (2 buffers).
+	if ((pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) || full_duplex/* && output*/)
+	{
+		pSubStream->userBufferAndHostMatch = 1;
+		pSubStream->buffers = 1;
+	}
 
 	// Avoid 0 frames
 	if (framesPerLatency == 0)
@@ -2127,6 +2174,9 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 			}
 		}
 
+		// Reset buffers count to single
+		pSubStream->buffers = 1;
+
 		// Calculate period
 		pSubStream->period = MakeHnsPeriod(nFrames, pSubStream->wavex.Format.nSamplesPerSec);
 
@@ -2266,7 +2316,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		}
 
 		// Choose processing mode
-		stream->in.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+		stream->in.streamFlags = (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? AUDCLNT_STREAMFLAGS_EVENTCALLBACK : 0);
 		if (paWasapi->useWOW64Workaround)
 			stream->in.streamFlags = 0; // polling interface
 		else
@@ -2281,7 +2331,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->in, info, inputParameters, framesPerBuffer/*framesPerLatency*/,
-			sampleRate, stream->in.streamFlags, (streamCallback == NULL), FALSE, &result);
+			sampleRate, stream->in.streamFlags, (streamCallback == NULL), FALSE, fullDuplex, &result);
         if (hr != S_OK)
 		{
             LogHostError(hr);
@@ -2338,13 +2388,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         // Number of frames that are required at each period
 		stream->in.framesPerHostCallback = maxBufferSize;
 
+		// Calculate frames per single buffer, if buffers > 1 then always framesPerBuffer
+		stream->in.framesPerBuffer = 
+			(stream->in.userBufferAndHostMatch ? stream->in.framesPerHostCallback : framesPerBuffer);
+
 		// Calculate buffer latency
 		buffer_latency = (PaTime)maxBufferSize / stream->in.wavex.Format.nSamplesPerSec;
 
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->in.latency_seconds += buffer_latency;
 
-		PRINT(("WASAPI::OpenStream(input): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
+		PRINT(("WASAPI::OpenStream(input): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
 	}
     else
     {
@@ -2380,7 +2434,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		}
 
 		// Choose processing mode
-		stream->out.streamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+		stream->out.streamFlags = (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? AUDCLNT_STREAMFLAGS_EVENTCALLBACK : 0);
 		if (paWasapi->useWOW64Workaround)
 			stream->out.streamFlags = 0; // polling interface
 		else
@@ -2395,7 +2449,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->out, info, outputParameters, framesPerBuffer/*framesPerLatency*/,
-			sampleRate, stream->out.streamFlags, (streamCallback == NULL), TRUE, &result);
+			sampleRate, stream->out.streamFlags, (streamCallback == NULL), TRUE, fullDuplex, &result);
         if (hr != S_OK)
 		{
             LogHostError(hr);
@@ -2452,13 +2506,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         // Number of frames that are required at each period
 		stream->out.framesPerHostCallback = maxBufferSize;
 
+		// Calculate frames per single buffer, if buffers > 1 then always framesPerBuffer
+		stream->out.framesPerBuffer = 
+			(stream->out.userBufferAndHostMatch ? stream->out.framesPerHostCallback : framesPerBuffer);
+
 		// Calculate buffer latency
 		buffer_latency = (PaTime)maxBufferSize / stream->out.wavex.Format.nSamplesPerSec;
 
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->out.latency_seconds += buffer_latency;
 
-		PRINT(("WASAPI::OpenStream(output): framesPerHostCallback[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
+		PRINT(("WASAPI::OpenStream(output): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
 	}
     else
     {
@@ -2525,20 +2583,23 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		}*/
 	}
 
-	framesPerHostCallback = (outputParameters) ? stream->out.framesPerHostCallback:
-		stream->in.framesPerHostCallback;
+	// Calculate frames per host for processor
+	framesPerHostCallback = (outputParameters ? stream->out.framesPerBuffer : stream->in.framesPerBuffer);
 
 	// Choose correct mode of buffer processing:
 	// Exclusive/Shared non paWinWasapiPolling mode: paUtilFixedHostBufferSize - always fixed
-	// Exclusive/Shared paWinWasapiPolling mode: paUtilBoundedHostBufferSize - may vary
+	// Exclusive/Shared paWinWasapiPolling mode: paUtilBoundedHostBufferSize - may vary for Exclusive or Full-duplex
 	bufferMode = paUtilFixedHostBufferSize;
-	if (inputParameters /*&& // !!! WASAPI IAudioCaptureClient::GetBuffer extracts not number of frames but 1 packet, thus we always must adapt
-		(!stream->in.streamFlags || ((stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0))*/)
+	if (inputParameters) // !!! WASAPI IAudioCaptureClient::GetBuffer extracts not number of frames but 1 packet, thus we always must adapt
 		bufferMode = paUtilBoundedHostBufferSize;
 	else
-	if (outputParameters &&
-		(!stream->out.streamFlags || ((stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
-		bufferMode = paUtilBoundedHostBufferSize;
+	if (outputParameters)
+	{
+		if ((stream->out.buffers == 1) && 
+			(!stream->out.streamFlags || ((stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
+			bufferMode = paUtilBoundedHostBufferSize;
+	}
+	stream->bufferMode = bufferMode;
 
     // Initialize buffer processor
     result =  PaUtil_InitializeBufferProcessor(
@@ -2565,12 +2626,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 	// Set Input latency
     stream->streamRepresentation.streamInfo.inputLatency =
             PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor)
-			+ ((inputParameters)?stream->in.latency_seconds :0);
+			+ ((inputParameters)?stream->in.latency_seconds : 0);
 
 	// Set Output latency
     stream->streamRepresentation.streamInfo.outputLatency =
             PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor)
-			+ ((outputParameters)?stream->out.latency_seconds :0);
+			+ ((outputParameters)?stream->out.latency_seconds : 0);
 
 	// Set SR
     stream->streamRepresentation.streamInfo.sampleRate = sampleRate;
@@ -3542,7 +3603,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		}
 
 		// Preload buffer before start
-		if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+		if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
 		{
 			LogHostError(hr);
 			goto thread_error;
@@ -3593,7 +3654,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		case WAIT_OBJECT_0 + S_OUTPUT: {
             if (stream->rclient == NULL)
                 break;
-			ProcessOutputBuffer(stream, processor, stream->out.framesPerHostCallback);
+			ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer);
 			break; }
 		}
 	}
@@ -3652,14 +3713,26 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 
 	// Calculate the actual duration of the allocated buffer.
 	DWORD sleep_ms     = 0;
-	DWORD sleep_ms_in  = GetFramesSleepTime(stream->in.framesPerHostCallback, stream->in.wavex.Format.nSamplesPerSec);
-	DWORD sleep_ms_out = GetFramesSleepTime(stream->out.framesPerHostCallback, stream->out.wavex.Format.nSamplesPerSec);
+	DWORD sleep_ms_in  = GetFramesSleepTime(stream->in.framesPerBuffer, stream->in.wavex.Format.nSamplesPerSec);
+	DWORD sleep_ms_out = GetFramesSleepTime(stream->out.framesPerBuffer, stream->out.wavex.Format.nSamplesPerSec);
+	
+	// Adjust polling time
+	if (stream->bufferMode != paUtilFixedHostBufferSize)
+	{
+		sleep_ms_in  = GetFramesSleepTime(stream->bufferProcessor.framesPerUserBuffer, stream->in.wavex.Format.nSamplesPerSec);
+		sleep_ms_out = GetFramesSleepTime(stream->bufferProcessor.framesPerUserBuffer, stream->out.wavex.Format.nSamplesPerSec);
+	}
+
+	// Choose smallest	
 	if ((sleep_ms_in != 0) && (sleep_ms_out != 0))
 		sleep_ms = min(sleep_ms_in, sleep_ms_out);
 	else
 	{
 		sleep_ms = (sleep_ms_in ? sleep_ms_in : sleep_ms_out);
 	}
+	// Make sure not 0
+	if (sleep_ms == 0)
+		sleep_ms = 1;
 
     // Setup data processors
     defaultProcessor.processor = WaspiHostProcessingLoop;
@@ -3706,7 +3779,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 		// when in full-duplex mode as it requires input processing as well
 		if (!PA_WASAPI__IS_FULLDUPLEX(stream))
 		{
-			if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerHostCallback)) != S_OK)
+			if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
 			{
 				LogHostError(hr);
 				goto thread_error;
@@ -3757,10 +3830,18 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 						LogHostError(hr);
 						break;
 					}
-
+					
 					// output
-					if (frames != 0)
-						ProcessOutputBuffer(stream, processor, frames);
+					if (stream->bufferMode == paUtilFixedHostBufferSize)
+					{
+						if (frames >= stream->out.framesPerBuffer)
+							ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer);
+					}
+					else
+					{
+						if (frames != 0)
+							ProcessOutputBuffer(stream, processor, frames);
+					}
 
 					break; }
 				}
