@@ -708,6 +708,9 @@ static UINT32 MakeFramesFromHns(REFERENCE_TIME hnsPeriod, UINT32 nSamplesPerSec)
 	return nFrames;
 }
 
+// Aligning function type
+typedef UINT32 (*ALIGN_FUNC) (UINT32 v, UINT32 align);
+
 // ------------------------------------------------------------------------------------------
 // Aligns 'v' backwards
 static UINT32 ALIGN_BWD(UINT32 v, UINT32 align)
@@ -729,7 +732,8 @@ static UINT32 ALIGN_FWD(UINT32 v, UINT32 align)
 // Aligns WASAPI buffer to 128 byte packet boundary. HD Audio will fail to play if buffer
 // is misaligned. This problem was solved in Windows 7 were AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED
 // is thrown although we must align for Vista anyway.
-static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32 nBlockAlign)
+static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32 nBlockAlign, 
+								   ALIGN_FUNC pAlignFunc)
 {
 #define HDA_PACKET_SIZE (128)
 
@@ -737,7 +741,7 @@ static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32
 	long packets;
 
 	// align to packet size
-	frame_bytes  = ALIGN_FWD(frame_bytes, HDA_PACKET_SIZE); // use ALIGN_FWD if bigger but safer period is more desired
+	frame_bytes  = pAlignFunc(frame_bytes, HDA_PACKET_SIZE); // use ALIGN_FWD if bigger but safer period is more desired
 	nFrames      = frame_bytes / nBlockAlign;
 	packets      = frame_bytes / HDA_PACKET_SIZE;
 
@@ -1937,24 +1941,66 @@ static PaUint32 PaUtil_GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTi
 }
 
 // ------------------------------------------------------------------------------------------
-static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceInfo *info,
-	const PaStreamParameters *params, UINT32 framesPerLatency, double sampleRate, UINT32 streamFlags,
-	BOOL blocking, BOOL output, BOOL full_duplex, PaError *pa_error)
+static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPerBuffer, UINT32 framesPerLatency, BOOL fullDuplex)
+{
+	// Count buffers (must be at least 1)
+	sub->buffers = (userFramesPerBuffer ? framesPerLatency / userFramesPerBuffer : 0);
+	if (sub->buffers == 0)
+		sub->buffers = 1;
+
+	// Determine amount of buffers used:
+	// - Full-duplex mode will lead to period difference, thus only 1.
+	// - Input mode, only 1, as WASAPI allows extraction of only 1 packet.
+	// - For Shared mode we use double buffering.
+	if ((sub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) || fullDuplex)
+	{
+		// Exclusive mode does not allow >1 buffers be used for Event interface, e.g. GetBuffer 
+		// call must acquire max buffer size and it all must be processed.
+		if (sub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK)
+			sub->userBufferAndHostMatch = 1;
+		
+		// Use paUtilBoundedHostBufferSize because exclusive mode will starve and produce
+		// bad quality of audio
+		sub->buffers = 1;
+	}
+}
+
+// ------------------------------------------------------------------------------------------
+static void _CalculateAlignedPeriod(PaWasapiSubStream *pSub, UINT32 *nFramesPerLatency, 
+									ALIGN_FUNC pAlignFunc)
+{
+	// Align frames to HD Audio packet size of 128 bytes for Exclusive mode only.
+	// Not aligning on Windows Vista will cause Event timeout, although Windows 7 will
+	// return AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED error to realign buffer. Aligning is necessary
+	// for Exclusive mode only! when audio data is feeded directly to hardware.
+	if (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
+	{
+		(*nFramesPerLatency) = AlignFramesPerBuffer((*nFramesPerLatency),
+			pSub->wavex.Format.nSamplesPerSec, pSub->wavex.Format.nBlockAlign, pAlignFunc);
+	}
+
+	// Calculate period
+	pSub->period = MakeHnsPeriod((*nFramesPerLatency), pSub->wavex.Format.nSamplesPerSec);
+}
+
+// ------------------------------------------------------------------------------------------
+static HRESULT CreateAudioClient(PaWasapiSubStream *pSub, PaWasapiDeviceInfo *pInfo,
+	const PaStreamParameters *params, UINT32 framesPerLatency, double sampleRate,
+	BOOL blocking, BOOL output, BOOL fullDuplex, PaError *pa_error)
 {
 	PaError error;
-    HRESULT hr					= S_OK;
-    UINT32 nFrames				= 0;
-	UINT32 userFramesPerBuffer  = framesPerLatency;
-    IAudioClient *pAudioClient	= NULL;
-	double suggestedLatency     = 0.0;
+    HRESULT hr;
+	const UINT32 userFramesPerBuffer = framesPerLatency;
+    IAudioClient *audioClient	     = NULL;
 
-    if (!pSubStream || !info || !params)
+	// Validate parameters
+    if (!pSub || !pInfo || !params)
         return E_POINTER;
 	if ((UINT32)sampleRate == 0)
         return E_INVALIDARG;
 
     // Get the audio client
-    hr = IMMDevice_Activate(info->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void **)&pAudioClient);
+    hr = IMMDevice_Activate(pInfo->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void **)&audioClient);
 	if (hr != S_OK)
 	{
 		LogHostError(hr);
@@ -1962,7 +2008,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 	}
 
 	// Get closest format
-	if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex, output)) != paFormatIsSupported)
+	if ((error = GetClosestFormat(audioClient, sampleRate, params, pSub->shareMode, &pSub->wavex, output)) != paFormatIsSupported)
 	{
 		if (pa_error)
 			(*pa_error) = error;
@@ -1972,7 +2018,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 	}
 
 	// Check for Mono >> Stereo workaround
-	if ((params->channelCount == 1) && (pSubStream->wavex.Format.nChannels == 2))
+	if ((params->channelCount == 1) && (pSub->wavex.Format.nChannels == 2))
 	{
 		if (blocking)
 		{
@@ -1981,8 +2027,8 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 		}
 
 		// select mixer
-		pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (info->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
-		if (pSubStream->monoMixer == NULL)
+		pSub->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
+		if (pSub->monoMixer == NULL)
 		{
 			LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
 			goto done; // fail, no mixer for format
@@ -1990,122 +2036,129 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSubStream, PaWasapiDeviceIn
 	}
 
 #if 0
-	// Correct latency to default device period (in Exclusive mode this is 10ms) if user selected 0
-	suggestedLatency = params->suggestedLatency;
 	// Add suggestd latency
-	framesPerLatency += MakeFramesFromHns(SecondsTonano100(suggestedLatency), pSubStream->wavex.Format.nSamplesPerSec);
+	framesPerLatency += MakeFramesFromHns(SecondsTonano100(params->suggestedLatency), pSub->wavex.Format.nSamplesPerSec);
 #else
 	// Calculate host buffer size
-	if ((pSubStream->shareMode != AUDCLNT_SHAREMODE_EXCLUSIVE) && 
-		(!streamFlags || ((streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
+	if ((pSub->shareMode != AUDCLNT_SHAREMODE_EXCLUSIVE) && 
+		(!pSub->streamFlags || ((pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
 	{
-		framesPerLatency = PaUtil_GetFramesPerHostBuffer(framesPerLatency, 
-			params->suggestedLatency, pSubStream->wavex.Format.nSamplesPerSec, 0/*,
-			(streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
+		framesPerLatency = PaUtil_GetFramesPerHostBuffer(userFramesPerBuffer, 
+			params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
+			(pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
 	}
 	else
 	{
-		// do nothing, work 1:1 with buffer (only polling allows to work with >1)
+		REFERENCE_TIME overall;
+
+		// Work 1:1 with user buffer (only polling allows to use >1)
+		framesPerLatency += MakeFramesFromHns(SecondsTonano100(params->suggestedLatency), pSub->wavex.Format.nSamplesPerSec);
+		
+		// Use Polling if overall latency is > 5ms as it allows to use 100% CPU in a callback,
+		// or user specified latency parameter
+		overall = MakeHnsPeriod(framesPerLatency, pSub->wavex.Format.nSamplesPerSec);
+		if ((overall > 50000) || (params->suggestedLatency > 0))
+		{
+			framesPerLatency = PaUtil_GetFramesPerHostBuffer(userFramesPerBuffer, 
+				params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
+				(streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
+
+			// Use Polling interface
+			pSub->streamFlags &= ~AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+		}
 	}
 #endif
 
-	// Count buffers (must be at least 1)
-	pSubStream->buffers = (userFramesPerBuffer ? framesPerLatency / userFramesPerBuffer : 0);
-	if (pSubStream->buffers == 0)
-		pSubStream->buffers = 1;
-
-	// Determine amount of buffers to be used:
-	// - Exclusive mode does not allow >1 buffers be used, e.g. GetBuffer call must acquire
-	//   max buffer size and it all must be processed.
-	// - Full-duplex mode will lead to period difference, thus only 1.
-	// - Input mode, only 1, as WASAPI allows extraction of only 1 packet.
-	// - For Shared mode we use safe double buffering (2 buffers).
-	if ((pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) || full_duplex/* && output*/)
-	{
-		pSubStream->userBufferAndHostMatch = 1;
-		pSubStream->buffers = 1;
-	}
-
 	// Avoid 0 frames
 	if (framesPerLatency == 0)
-		framesPerLatency = MakeFramesFromHns(info->DefaultDevicePeriod, pSubStream->wavex.Format.nSamplesPerSec);
+		framesPerLatency = MakeFramesFromHns(pInfo->DefaultDevicePeriod, pSub->wavex.Format.nSamplesPerSec);
 
-	// Align frames to HD Audio packet size of 128 bytes for Exclusive mode only.
-	// Not aligning on Windows Vista will cause Event timeout, although Windows 7 will
-	// return AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED error to realign buffer. Aligning is necessary
-	// for Exclusive mode only! when audio data is feeded directly to hardware.
-	if (pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
+	// Calculate aligned period
+	_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_FWD);
+
+	/*! Enforce min/max period for device in Shared mode to avoid bad audio quality.
+        Avoid doing so for Exclusive mode as alignment will suffer.
+	*/
+	if (pSub->shareMode == AUDCLNT_SHAREMODE_SHARED)
 	{
-		framesPerLatency = AlignFramesPerBuffer(framesPerLatency,
-			pSubStream->wavex.Format.nSamplesPerSec, pSubStream->wavex.Format.nBlockAlign);
+		if (pSub->period < pInfo->DefaultDevicePeriod)
+			pSub->period = pInfo->DefaultDevicePeriod;
+	}
+	else
+	{
+		if (pSub->period < pInfo->MinimumDevicePeriod)
+			pSub->period = pInfo->MinimumDevicePeriod;
 	}
 
-    // Calculate period
-	pSubStream->period = MakeHnsPeriod(framesPerLatency, pSubStream->wavex.Format.nSamplesPerSec);
-
-	// Enforce min/max period for device in Shared mode to avoid distorted sound.
-	// Avoid doing so for Exclusive mode as alignment will suffer. Exclusive mode processes
-	// big buffers without problem. Push Exclusive beyond limits if possible.
-	if (pSubStream->shareMode == AUDCLNT_SHAREMODE_SHARED)
+	/*! Windows 7 does not allow to set latency lower than minimal device period and will
+	    return error: AUDCLNT_E_INVALID_DEVICE_PERIOD. Under Vista we enforce the same behavior
+	    manually for unified behavior on all platforms.
+	*/
 	{
-		if (pSubStream->period < info->DefaultDevicePeriod)
-			pSubStream->period = info->DefaultDevicePeriod;
-	}
-
-	// Windows 7 does not allow to set latency lower than minimal device period and will
-	// return error: AUDCLNT_E_INVALID_DEVICE_PERIOD. Under Vista though this error is not implemented
-	// allowing to hack WASAPI device with lower period resulting in possibly lower latency.
-	if (GetWindowsVersion() & WINDOWS_7_SERVER2008R2_AND_UP)
-	{
-		if (pSubStream->period < info->MinimumDevicePeriod)
-			pSubStream->period = info->MinimumDevicePeriod;
-
-		/*
-			AUDCLNT_E_BUFFER_SIZE_ERROR: Applies to Windows 7 and later.
+		/*!	AUDCLNT_E_BUFFER_SIZE_ERROR: Applies to Windows 7 and later.
 			Indicates that the buffer duration value requested by an exclusive-mode client is 
 			out of range. The requested duration value for pull mode must not be greater than 
 			500 milliseconds; for push mode the duration value must not be greater than 2 seconds.
 		*/
-		if (pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
+		if (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
 		{
-static const REFERENCE_TIME MAX_BUFFER_EVENT_DURATION = 500  * 10000;
-static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
+			static const REFERENCE_TIME MAX_BUFFER_EVENT_DURATION = 500  * 10000;
+			static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 
-			if (streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) // pull mode, max 500ms
+			if (pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK)	// pull mode, max 500ms
 			{
-				if (pSubStream->period > MAX_BUFFER_EVENT_DURATION)
-					pSubStream->period = MAX_BUFFER_EVENT_DURATION;
+				if (pSub->period > MAX_BUFFER_EVENT_DURATION)
+				{
+					pSub->period = MAX_BUFFER_EVENT_DURATION;
+
+					// Recalculate aligned period
+					framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
+					_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
+				}
 			}
-			else												 // push mode, max 2000ms
+			else														// push mode, max 2000ms
 			{
-				if (pSubStream->period > MAX_BUFFER_POLL_DURATION)
-					pSubStream->period = MAX_BUFFER_POLL_DURATION;
+				if (pSub->period > MAX_BUFFER_POLL_DURATION)
+				{
+					pSub->period = MAX_BUFFER_POLL_DURATION;
+
+					// Recalculate aligned period
+					framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
+					_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
+				}
 			}
 		}
 	}
 
 	// Open the stream and associate it with an audio session
-    hr = IAudioClient_Initialize(pAudioClient,
-        pSubStream->shareMode,
-        streamFlags/*AUDCLNT_STREAMFLAGS_EVENTCALLBACK*/,
-		pSubStream->period,
-		(pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSubStream->period : 0),
-		&pSubStream->wavex.Format,
+    hr = IAudioClient_Initialize(audioClient,
+        pSub->shareMode,
+        pSub->streamFlags,
+		pSub->period,
+		(pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSub->period : 0),
+		&pSub->wavex.Format,
         NULL);
 
-	// This would mean too low latency
-	if (hr == AUDCLNT_E_BUFFER_SIZE_ERROR)
+	/*! WASAPI is tricky on large device buffer, sometimes 2000ms can be allocated sometimes
+	    less. There is no known guaranteed level thus we make subsequent tries by decreasing 
+		buffer by 100ms per try.
+	*/
+	while ((hr == E_OUTOFMEMORY) && (pSub->period > (100 * 10000)))
 	{
-		PRINT(("WASAPI: CreateAudioClient: correcting buffer size to device minimum\n"));
+		PRINT(("WASAPI: CreateAudioClient: decreasing buffer size to %d milliseconds\n", (pSub->period / 10000)));
 
-		// User was trying to set lowest possible, so set lowest device possible
-		pSubStream->period = info->MinimumDevicePeriod;
+		// Decrease by 100ms and try again
+		pSub->period -= (100 * 10000);
+
+		// Recalculate aligned period
+		framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
+		_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
 
         // Release the previous allocations
-        SAFE_RELEASE(pAudioClient);
+        SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-        hr = IMMDevice_Activate(info->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pAudioClient);
+        hr = IMMDevice_Activate(pInfo->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&audioClient);
     	if (hr != S_OK)
 		{
 			LogHostError(hr);
@@ -2113,33 +2166,67 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		}
 
 		// Open the stream and associate it with an audio session
-		hr = IAudioClient_Initialize(pAudioClient,
-			pSubStream->shareMode,
-			streamFlags/*AUDCLNT_STREAMFLAGS_EVENTCALLBACK*/,
-			pSubStream->period,
-			(pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSubStream->period : 0),
-			&pSubStream->wavex.Format,
+		hr = IAudioClient_Initialize(audioClient,
+			pSub->shareMode,
+			pSub->streamFlags,
+			pSub->period,
+			(pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSub->period : 0),
+			&pSub->wavex.Format,
 			NULL);
 	}
 
-    // If the requested buffer size is not aligned...
+	/*! WASAPI buffer size failure. Fallback to using default size.
+	*/
+	if (hr == AUDCLNT_E_BUFFER_SIZE_ERROR)
+	{
+		// Use default
+		pSub->period = pInfo->DefaultDevicePeriod;
+
+		PRINT(("WASAPI: CreateAudioClient: correcting buffer size to device default\n"));
+
+        // Release the previous allocations
+        SAFE_RELEASE(audioClient);
+
+        // Create a new audio client
+        hr = IMMDevice_Activate(pInfo->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&audioClient);
+    	if (hr != S_OK)
+		{
+			LogHostError(hr);
+			goto done;
+		}
+
+		// Open the stream and associate it with an audio session
+		hr = IAudioClient_Initialize(audioClient,
+			pSub->shareMode,
+			pSub->streamFlags,
+			pSub->period,
+			(pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSub->period : 0),
+			&pSub->wavex.Format,
+			NULL);
+	}
+
+    /*! If the requested buffer size is not aligned. Can be triggered by Windows 7 and up.
+	    Should not be be triggered ever as we do align buffers always with _CalculateAlignedPeriod.
+	*/
     if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED)
     {
-		PRINT(("WASAPI: CreateAudioClient: aligning buffer size\n"));
+		UINT32 frames = 0;
 
         // Get the next aligned frame
-        hr = IAudioClient_GetBufferSize(pAudioClient, &nFrames);
+        hr = IAudioClient_GetBufferSize(audioClient, &frames);
 		if (hr != S_OK)
 		{
 			LogHostError(hr);
 			goto done;
 		}
 
+		PRINT(("WASAPI: CreateAudioClient: aligning buffer size to % frames\n", frames));
+
         // Release the previous allocations
-        SAFE_RELEASE(pAudioClient);
+        SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-        hr = IMMDevice_Activate(info->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pAudioClient);
+        hr = IMMDevice_Activate(pInfo->device, &pa_IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&audioClient);
     	if (hr != S_OK)
 		{
 			LogHostError(hr);
@@ -2147,7 +2234,7 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		}
 
 		// Get closest format
-		if ((error = GetClosestFormat(pAudioClient, sampleRate, params, pSubStream->shareMode, &pSubStream->wavex, output)) != paFormatIsSupported)
+		if ((error = GetClosestFormat(audioClient, sampleRate, params, pSub->shareMode, &pSub->wavex, output)) != paFormatIsSupported)
 		{
 			if (pa_error)
 				(*pa_error) = error;
@@ -2157,7 +2244,7 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		}
 
 		// Check for Mono >> Stereo workaround
-		if ((params->channelCount == 1) && (pSubStream->wavex.Format.nChannels == 2))
+		if ((params->channelCount == 1) && (pSub->wavex.Format.nChannels == 2))
 		{
 			if (blocking)
 			{
@@ -2165,37 +2252,25 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 				goto done; // fail, blocking mode not supported
 			}
 
-			// select mixer
-			pSubStream->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (info->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
-			if (pSubStream->monoMixer == NULL)
+			// Select mixer
+			pSub->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
+			if (pSub->monoMixer == NULL)
 			{
 				LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
 				goto done; // fail, no mixer for format
 			}
 		}
 
-		// Reset buffers count to single
-		pSubStream->buffers = 1;
-
 		// Calculate period
-		pSubStream->period = MakeHnsPeriod(nFrames, pSubStream->wavex.Format.nSamplesPerSec);
-
-		// Windows 7 does not allow to set latency lower than minimal device period and will
-		// return error: AUDCLNT_E_INVALID_DEVICE_PERIOD. Under Vista though this error is not implemented
-		// allowing to hack WASAPI device with lower period resulting in possibly lower latency.
-		if (GetWindowsVersion() & WINDOWS_7_SERVER2008R2_AND_UP)
-		{
-			if (pSubStream->period < info->MinimumDevicePeriod)
-				pSubStream->period = info->MinimumDevicePeriod;
-		}
+		pSub->period = MakeHnsPeriod(frames, pSub->wavex.Format.nSamplesPerSec);
 
         // Open the stream and associate it with an audio session
-        hr = IAudioClient_Initialize(pAudioClient,
-            pSubStream->shareMode,
-            streamFlags/*AUDCLNT_STREAMFLAGS_EVENTCALLBACK*/,
-			pSubStream->period,
-			(pSubStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSubStream->period : 0),
-            &pSubStream->wavex.Format,
+        hr = IAudioClient_Initialize(audioClient,
+            pSub->shareMode,
+            pSub->streamFlags,
+			pSub->period,
+			(pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? pSub->period : 0),
+            &pSub->wavex.Format,
             NULL);
     	if (hr != S_OK)
 		{
@@ -2210,14 +2285,20 @@ static const REFERENCE_TIME MAX_BUFFER_POLL_DURATION  = 2000 * 10000;
 		goto done;
     }
 
-    // Set result
-	pSubStream->client = pAudioClient;
-    IAudioClient_AddRef(pSubStream->client);
+    // Set client
+	pSub->client = audioClient;
+    IAudioClient_AddRef(pSub->client);
+
+	// Recalculate buffers count
+	_RecalculateBuffersCount(pSub, 
+		userFramesPerBuffer, 
+		MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec), 
+		fullDuplex);
 
 done:
 
     // Clean up
-    SAFE_RELEASE(pAudioClient);
+    SAFE_RELEASE(audioClient);
     return hr;
 }
 
@@ -2331,7 +2412,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->in, info, inputParameters, framesPerBuffer/*framesPerLatency*/,
-			sampleRate, stream->in.streamFlags, (streamCallback == NULL), FALSE, fullDuplex, &result);
+			sampleRate, (streamCallback == NULL), FALSE, fullDuplex, &result);
         if (hr != S_OK)
 		{
             LogHostError(hr);
@@ -2449,7 +2530,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 		// Create Audio client
 		hr = CreateAudioClient(&stream->out, info, outputParameters, framesPerBuffer/*framesPerLatency*/,
-			sampleRate, stream->out.streamFlags, (streamCallback == NULL), TRUE, fullDuplex, &result);
+			sampleRate, (streamCallback == NULL), TRUE, fullDuplex, &result);
         if (hr != S_OK)
 		{
             LogHostError(hr);
