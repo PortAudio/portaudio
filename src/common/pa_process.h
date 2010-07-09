@@ -287,14 +287,12 @@ typedef struct {
 
     PaStreamCallbackFlags callbackStatusFlags;
 
-    int hostInputIsInterleaved[2];
     unsigned long hostInputFrameCount[2];
     PaUtilChannelDescriptor *hostInputChannels[2]; /**< pointers to arrays of channel descriptors.
                                                         pointers are NULL for half-duplex output processing.
                                                         hostInputChannels[i].data is NULL when the caller
                                                         calls PaUtil_SetNoInput()
                                                         */
-    int hostOutputIsInterleaved[2];
     unsigned long hostOutputFrameCount[2];
     PaUtilChannelDescriptor *hostOutputChannels[2]; /**< pointers to arrays of channel descriptors.
                                                          pointers are NULL for half-duplex input processing.
