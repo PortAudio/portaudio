@@ -924,7 +924,7 @@ typedef enum EMixerDir { MIX_DIR__1TO2, MIX_DIR__2TO1 } EMixerDir;
 	TYPE * __restrict end  = to + count;\
 	while (to != end)\
 	{\
-		*to ++ = (TYPE)((float)(from[0] + from[1]) * 0.5f);\
+		*to ++ = (TYPE)((float)(from[0] + from[1]) * 0.70710678118654752440084436210485f/*1/sqrt(2)*/);\
 		from += 2;\
 	}
 
@@ -948,7 +948,7 @@ static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format, EMixerDir d
 	switch (dir)
 	{
 	case MIX_DIR__1TO2:
-		switch (format)
+		switch (format & ~paNonInterleaved)
 		{
 		case paUInt8:	return _MixMonoToStereo_1TO2_8;
 		case paInt16:	return _MixMonoToStereo_1TO2_16;
@@ -959,7 +959,7 @@ static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format, EMixerDir d
 		break;
 
 	case MIX_DIR__2TO1:
-		switch (format)
+		switch (format & ~paNonInterleaved)
 		{
 		case paUInt8:	return _MixMonoToStereo_2TO1_8;
 		case paInt16:	return _MixMonoToStereo_2TO1_16;
@@ -1505,7 +1505,7 @@ static void LogWAVEFORMATEXTENSIBLE(const WAVEFORMATEXTENSIBLE *in)
 }
 
 // ------------------------------------------------------------------------------------------
-static PaSampleFormat waveformatToPaFormat(const WAVEFORMATEXTENSIBLE *in)
+static PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *in)
 {
     const WAVEFORMATEX *old = (WAVEFORMATEX *)in;
 
@@ -1742,44 +1742,68 @@ static PaError GetClosestFormat(IAudioClient *myClient, double sampleRate,
 	}
 	else
 	{
-#define FORMATTESTS 3
-static const int BestToWorst[FORMATTESTS] = { paFloat32, paInt24, paInt16 };
-
-		// try selecting suitable sample type
+		static const int BestToWorst[] = { paFloat32, paInt24, paInt16 };
 		int i;
-		for (i = 0; i < FORMATTESTS; ++i)
-		{
-			WAVEFORMATEXTENSIBLE ext = { 0 };
-			wasapiFillWFEXT(&ext, BestToWorst[i], sampleRate, params.channelCount);
 
-			hr = IAudioClient_IsFormatSupported(myClient, shareMode, &ext.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
+		// Try combination stereo and we will use built-in mono-stereo mixer then
+		if (params.channelCount == 1)
+		{
+			WAVEFORMATEXTENSIBLE stereo = { 0 };
+
+			PaStreamParameters stereo_params = params;
+			stereo_params.channelCount = 2;
+
+			MakeWaveFormatFromParams(&stereo, &stereo_params, sampleRate);
+
+			hr = IAudioClient_IsFormatSupported(myClient, shareMode, &stereo.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
 			if (hr == S_OK)
 			{
-				memcpy(outWavex, &ext, sizeof(WAVEFORMATEXTENSIBLE));
+				memcpy(outWavex, &stereo, sizeof(WAVEFORMATEXTENSIBLE));
+				CoTaskMemFree(sharedClosestMatch);
+				return (answer = paFormatIsSupported);
+			}
+
+			// Try selecting suitable sample type
+			for (i = 0; i < STATIC_ARRAY_SIZE(BestToWorst); ++i)
+			{
+				WAVEFORMATEXTENSIBLE sample = { 0 };
+
+				PaStreamParameters sample_params = stereo_params;
+				sample_params.sampleFormat = BestToWorst[i];
+
+				MakeWaveFormatFromParams(&sample, &sample_params, sampleRate);
+
+				hr = IAudioClient_IsFormatSupported(myClient, shareMode, &sample.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
+				if (hr == S_OK)
+				{
+					memcpy(outWavex, &sample, sizeof(WAVEFORMATEXTENSIBLE));
+					CoTaskMemFree(sharedClosestMatch);
+					return (answer = paFormatIsSupported);
+				}
+			}
+		}
+
+		// Try selecting suitable sample type
+		for (i = 0; i < STATIC_ARRAY_SIZE(BestToWorst); ++i)
+		{
+			WAVEFORMATEXTENSIBLE spfmt = { 0 };
+
+			PaStreamParameters spfmt_params = params;
+			spfmt_params.sampleFormat = BestToWorst[i];
+
+			MakeWaveFormatFromParams(&spfmt, &spfmt_params, sampleRate);
+
+			hr = IAudioClient_IsFormatSupported(myClient, shareMode, &spfmt.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
+			if (hr == S_OK)
+			{
+				memcpy(outWavex, &spfmt, sizeof(WAVEFORMATEXTENSIBLE));
+				CoTaskMemFree(sharedClosestMatch);
 				answer = paFormatIsSupported;
 				break;
 			}
 		}
 
-		if (answer != paFormatIsSupported)
-		{
-			// If mono, then driver does not support 1 channel, we use internal workaround
-			// of tiny software mixing functionality, e.g. we provide to user buffer 1 channel
-			// but then mix into 2 for device buffer
-			if (params.channelCount == 1)
-			{
-				WAVEFORMATEXTENSIBLE stereo = { 0 };
-				wasapiFillWFEXT(&stereo, params.sampleFormat, sampleRate, 2);
-
-				hr = IAudioClient_IsFormatSupported(myClient, shareMode, &stereo.Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
-				if (hr == S_OK)
-				{
-					memcpy(outWavex, &stereo, sizeof(WAVEFORMATEXTENSIBLE));
-					answer = paFormatIsSupported;
-				}
-			}
-		}
-
+		// Nothing helped
 		LogHostError(hr);
 	}
 
@@ -1984,9 +2008,9 @@ static void _CalculateAlignedPeriod(PaWasapiSubStream *pSub, UINT32 *nFramesPerL
 }
 
 // ------------------------------------------------------------------------------------------
-static HRESULT CreateAudioClient(PaWasapiSubStream *pSub, PaWasapiDeviceInfo *pInfo,
-	const PaStreamParameters *params, UINT32 framesPerLatency, double sampleRate,
-	BOOL blocking, BOOL output, BOOL fullDuplex, PaError *pa_error)
+static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSub, 
+	PaWasapiDeviceInfo *pInfo, const PaStreamParameters *params, UINT32 framesPerLatency, 
+	double sampleRate, BOOL blocking, BOOL output, BOOL fullDuplex, PaError *pa_error)
 {
 	PaError error;
     HRESULT hr;
@@ -2017,7 +2041,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSub, PaWasapiDeviceInfo *pI
 		goto done; // fail, format not supported
 	}
 
-	// Check for Mono >> Stereo workaround
+	// Check for Mono <<>> Stereo workaround
 	if ((params->channelCount == 1) && (pSub->wavex.Format.nChannels == 2))
 	{
 		if (blocking)
@@ -2027,7 +2051,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSub, PaWasapiDeviceInfo *pI
 		}
 
 		// select mixer
-		pSub->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
+		pSub->monoMixer = _GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
 		if (pSub->monoMixer == NULL)
 		{
 			LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
@@ -2074,7 +2098,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSub, PaWasapiDeviceInfo *pI
 		framesPerLatency = MakeFramesFromHns(pInfo->DefaultDevicePeriod, pSub->wavex.Format.nSamplesPerSec);
 
 	// Calculate aligned period
-	_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_FWD);
+	_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
 
 	/*! Enforce min/max period for device in Shared mode to avoid bad audio quality.
         Avoid doing so for Exclusive mode as alignment will suffer.
@@ -2253,7 +2277,7 @@ static HRESULT CreateAudioClient(PaWasapiSubStream *pSub, PaWasapiDeviceInfo *pI
 			}
 
 			// Select mixer
-			pSub->monoMixer = _GetMonoToStereoMixer(params->sampleFormat, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
+			pSub->monoMixer = _GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1));
 			if (pSub->monoMixer == NULL)
 			{
 				LogHostError(hr = AUDCLNT_E_UNSUPPORTED_FORMAT);
@@ -2411,21 +2435,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 			stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
-		hr = CreateAudioClient(&stream->in, info, inputParameters, framesPerBuffer/*framesPerLatency*/,
+		hr = CreateAudioClient(stream, &stream->in, info, inputParameters, framesPerBuffer/*framesPerLatency*/,
 			sampleRate, (streamCallback == NULL), FALSE, fullDuplex, &result);
         if (hr != S_OK)
 		{
-            LogHostError(hr);
-			if (hr != AUDCLNT_E_UNSUPPORTED_FORMAT)
-				result = paInvalidDevice;
-
-			LogPaError(result);
+			LogPaError(result = paInvalidDevice);
 			goto error;
         }
 		LogWAVEFORMATEXTENSIBLE(&stream->in.wavex);
 
 		// Get closest format
-        hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat( waveformatToPaFormat(&stream->in.wavex), inputSampleFormat );
+        hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat( WaveToPaFormat(&stream->in.wavex), inputSampleFormat );
 
 		// Create volume mgr
 		stream->inVol = NULL;
@@ -2529,21 +2549,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 			stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
 		// Create Audio client
-		hr = CreateAudioClient(&stream->out, info, outputParameters, framesPerBuffer/*framesPerLatency*/,
+		hr = CreateAudioClient(stream, &stream->out, info, outputParameters, framesPerBuffer/*framesPerLatency*/,
 			sampleRate, (streamCallback == NULL), TRUE, fullDuplex, &result);
         if (hr != S_OK)
 		{
-            LogHostError(hr);
-			if (hr != AUDCLNT_E_UNSUPPORTED_FORMAT)
-				result = paInvalidDevice;
-
-			LogPaError(result);
+			LogPaError(result = paInvalidDevice);
 			goto error;
         }
 		LogWAVEFORMATEXTENSIBLE(&stream->out.wavex);
 
         // Get closest format
-        hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat( waveformatToPaFormat(&stream->out.wavex), outputSampleFormat );
+        hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat( WaveToPaFormat(&stream->out.wavex), outputSampleFormat );
 
 		// Activate volume
 		stream->outVol = NULL;
@@ -2651,6 +2667,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		if (stream->in.period != stream->out.period)
 		{
 			PRINT(("WASAPI: OpenStream: period discrepancy\n"));
+			LogPaError(result = paBadIODeviceCombination);
 			goto error;
 		}
 
@@ -3935,7 +3952,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 		while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
 		{
 			UINT32 i_frames = 0, i_processed = 0;
-			BYTE *i_data = NULL, *o_data = NULL;
+			BYTE *i_data = NULL, *o_data = NULL, *o_data_host = NULL;
 			DWORD i_flags = 0;
 			UINT32 o_frames = 0;
 
@@ -3967,6 +3984,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 				{
 					// processed amount of i_frames
 					i_processed = i_frames;
+					o_data_host = o_data;
 
 					// convert output mono
 					if (stream->out.monoMixer)
@@ -3976,7 +3994,17 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 						#undef __DIV_8
 						// expand buffer (one way only for better performance due to no calls to realloc)
 						if (mono_frames_size > stream->out.monoBufferSize)
+						{
 							stream->out.monoBuffer = realloc(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
+							if (stream->out.monoBuffer == NULL)
+							{
+								LogPaError(paInsufficientMemory);
+								break;
+							}
+						}
+
+						// replace buffer pointer
+						o_data = (BYTE *)stream->out.monoBuffer;
 					}
 
 					// convert input mono
@@ -3987,7 +4015,14 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 						#undef __DIV_8
 						// expand buffer (one way only for better performance due to no calls to realloc)
 						if (mono_frames_size > stream->in.monoBufferSize)
+						{
 							stream->in.monoBuffer = realloc(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
+							if (stream->in.monoBuffer == NULL)
+							{
+								LogPaError(paInsufficientMemory);
+								break;
+							}
+						}
 
 						// mix 2 to 1 input channels
 						stream->in.monoMixer(stream->in.monoBuffer, i_data, i_processed);
@@ -4001,7 +4036,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 
 					// mix 1 to 2 output channels
 					if (stream->out.monoBuffer)
-						stream->out.monoMixer(o_data, stream->out.monoBuffer, o_processed);
+						stream->out.monoMixer(o_data_host, stream->out.monoBuffer, o_processed);
 
 					// release host output buffer
 					if ((hr = IAudioRenderClient_ReleaseBuffer(stream->rclient, o_processed, 0)) != S_OK)
