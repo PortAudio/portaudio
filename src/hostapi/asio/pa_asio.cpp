@@ -2528,8 +2528,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else /* Using callback interface... */
     {
         result =  PaUtil_InitializeBufferProcessor( &stream->bufferProcessor,
-                        inputChannelCount, inputSampleFormat, hostInputSampleFormat,
-                        outputChannelCount, outputSampleFormat, hostOutputSampleFormat,
+                        inputChannelCount, inputSampleFormat, (hostInputSampleFormat | paNonInterleaved),
+                        outputChannelCount, outputSampleFormat, (hostOutputSampleFormat | paNonInterleaved),
                         sampleRate, streamFlags, framesPerBuffer,
                         framesPerHostBuffer, paUtilFixedHostBufferSize,
                         streamCallback, userData );
