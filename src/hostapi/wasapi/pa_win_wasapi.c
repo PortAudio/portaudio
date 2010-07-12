@@ -924,7 +924,7 @@ typedef enum EMixerDir { MIX_DIR__1TO2, MIX_DIR__2TO1 } EMixerDir;
 	TYPE * __restrict end  = to + count;\
 	while (to != end)\
 	{\
-		*to ++ = (TYPE)((float)(from[0] + from[1]) * 0.70710678118654752440084436210485f/*1/sqrt(2)*/);\
+		*to ++ = (TYPE)((float)(from[0] + from[1]) * 0.5f);\
 		from += 2;\
 	}
 
@@ -2093,6 +2093,10 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	}
 #endif
 
+	// For full-duplex output resize buffer to be the same as for input
+	if (output && fullDuplex)
+		framesPerLatency = pStream->in.framesPerHostCallback;
+
 	// Avoid 0 frames
 	if (framesPerLatency == 0)
 		framesPerLatency = MakeFramesFromHns(pInfo->DefaultDevicePeriod, pSub->wavex.Format.nSamplesPerSec);
@@ -2663,13 +2667,16 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 	if (outputParameters && inputParameters)
 	{
-		// serious problem #1
-		if (stream->in.period != stream->out.period)
+		// serious problem #1 - No, Not a problem, especially concerning Exclusive mode.
+		// Input device in exclusive mode somehow is getting large buffer always, thus we
+		// adjust Output latency to reflect it, thus period will differ but playback will be 
+		// normal.
+		/*if (stream->in.period != stream->out.period)
 		{
 			PRINT(("WASAPI: OpenStream: period discrepancy\n"));
 			LogPaError(result = paBadIODeviceCombination);
 			goto error;
-		}
+		}*/
 
 		// serious problem #2 - No, Not a problem, as framesPerHostCallback take into account
 		// sample size while it is not a problem for PA full-duplex, we must care of
@@ -2723,12 +2730,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 	// Set Input latency
     stream->streamRepresentation.streamInfo.inputLatency =
-            PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor)
+            ((double)PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor) / sampleRate)
 			+ ((inputParameters)?stream->in.latency_seconds : 0);
 
 	// Set Output latency
     stream->streamRepresentation.streamInfo.outputLatency =
-            PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor)
+            ((double)PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor) / sampleRate)
 			+ ((outputParameters)?stream->out.latency_seconds : 0);
 
 	// Set SR
@@ -3948,8 +3955,9 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	}
 	else
 	{
+#if 0
 		// Processing Loop
-		while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
+		while (WaitForSingleObject(stream->hCloseRequest, 1) == WAIT_TIMEOUT)
 		{
 			UINT32 i_frames = 0, i_processed = 0;
 			BYTE *i_data = NULL, *o_data = NULL, *o_data_host = NULL;
@@ -4056,6 +4064,141 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 				break;
 			}
 		}
+#else
+		// Processing Loop
+		//sleep_ms = 1;
+		while (WaitForSingleObject(stream->hCloseRequest, sleep_ms) == WAIT_TIMEOUT)
+		{
+			UINT32 i_frames = 0, i_processed = 0;
+			BYTE *i_data = NULL, *o_data = NULL, *o_data_host = NULL;
+			DWORD i_flags = 0;
+			UINT32 o_frames = 0;
+			//BOOL repeat = FALSE;
+
+			// going below 1 msec resolution, switching between 1 ms and no waiting
+			//if (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
+			//	sleep_ms = !sleep_ms;
+
+			// get available frames
+			if ((hr = PollGetOutputFramesAvailable(stream, &o_frames)) != S_OK)
+			{
+				LogHostError(hr);
+				break;
+			}
+
+			while (o_frames != 0)
+			{
+				// get host input buffer
+				if ((hr = IAudioCaptureClient_GetBuffer(stream->cclient, &i_data, &i_frames, &i_flags, NULL, NULL)) != S_OK)
+				{
+					if (hr == AUDCLNT_S_BUFFER_EMPTY)
+						break; // no data in capture buffer
+
+					LogHostError(hr);
+					break;
+				}
+
+				//PA_DEBUG(("full-duplex: o_frames[%d] i_frames[%d] repeat[%d]\n", o_frames, i_frames, repeat));
+				//repeat = TRUE;
+
+				// process equal ammount of frames
+				if (o_frames >= i_frames)
+				{
+					// process input ammount of frames
+					UINT32 o_processed = i_frames;
+
+					// get host output buffer
+					if ((hr = IAudioRenderClient_GetBuffer(stream->rclient, o_processed, &o_data)) == S_OK)
+					{
+						// processed amount of i_frames
+						i_processed = i_frames;
+						o_data_host = o_data;
+
+						// convert output mono
+						if (stream->out.monoMixer)
+						{
+							#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
+							UINT32 mono_frames_size = o_processed * __DIV_8(stream->out.wavex.Format.wBitsPerSample);
+							#undef __DIV_8
+							// expand buffer (one way only for better performance due to no calls to realloc)
+							if (mono_frames_size > stream->out.monoBufferSize)
+							{
+								stream->out.monoBuffer = realloc(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
+								if (stream->out.monoBuffer == NULL)
+								{
+									LogPaError(paInsufficientMemory);
+									goto thread_error;
+								}
+							}
+
+							// replace buffer pointer
+							o_data = (BYTE *)stream->out.monoBuffer;
+						}
+
+						// convert input mono
+						if (stream->in.monoMixer)
+						{
+							#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
+							UINT32 mono_frames_size = i_processed * __DIV_8(stream->in.wavex.Format.wBitsPerSample);
+							#undef __DIV_8
+							// expand buffer (one way only for better performance due to no calls to realloc)
+							if (mono_frames_size > stream->in.monoBufferSize)
+							{
+								stream->in.monoBuffer = realloc(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
+								if (stream->in.monoBuffer == NULL)
+								{
+									LogPaError(paInsufficientMemory);
+									goto thread_error;
+								}
+							}
+
+							// mix 2 to 1 input channels
+							stream->in.monoMixer(stream->in.monoBuffer, i_data, i_processed);
+
+							// replace buffer pointer
+							i_data = (BYTE *)stream->in.monoBuffer;
+						}
+
+						// process
+						processor[S_FULLDUPLEX].processor(i_data, i_processed, o_data, o_processed, processor[S_FULLDUPLEX].userData);
+
+						// mix 1 to 2 output channels
+						if (stream->out.monoBuffer)
+							stream->out.monoMixer(o_data_host, stream->out.monoBuffer, o_processed);
+
+						// release host output buffer
+						if ((hr = IAudioRenderClient_ReleaseBuffer(stream->rclient, o_processed, 0)) != S_OK)
+							LogHostError(hr);
+
+						o_frames -= o_processed;
+					}
+					else
+					{
+						if (stream->out.shareMode != AUDCLNT_SHAREMODE_SHARED)
+							LogHostError(hr); // be silent in shared mode, try again next time
+					}
+				}
+				else
+				{
+					i_processed = 0;
+					goto fd_release_buffer_in;
+				}
+
+fd_release_buffer_in:
+
+				// release host input buffer
+				if ((hr = IAudioCaptureClient_ReleaseBuffer(stream->cclient, i_processed)) != S_OK)
+				{
+					LogHostError(hr);
+					break;
+				}
+
+				// break processing, input hasn't been accumulated yet
+				if (i_processed == 0)
+					break;
+			}
+		}
+#endif
 	}
 
 thread_end:
