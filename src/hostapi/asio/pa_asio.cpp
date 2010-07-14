@@ -169,6 +169,12 @@
 */
 
 
+/* winmm.lib is needed for timeGetTime() (this is in winmm.a if you're using gcc) */
+#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#pragma comment(lib, "winmm.lib")
+#endif
+
+
 /* external reference to ASIO SDK's asioDrivers.
 
  This is a bit messy because we want to explicitly manage 
