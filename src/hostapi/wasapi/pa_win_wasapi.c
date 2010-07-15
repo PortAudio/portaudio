@@ -3530,7 +3530,7 @@ static HRESULT ProcessOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor
 // ------------------------------------------------------------------------------------------
 static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor)
 {
-	HRESULT hr;
+	HRESULT hr = S_OK;
 	UINT32 frames;
 	BYTE *data = NULL;
 	DWORD flags = 0;
