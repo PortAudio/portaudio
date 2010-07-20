@@ -2089,6 +2089,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 
 			// Use Polling interface
 			pSub->streamFlags &= ~AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+			PRINT(("WASAPI: CreateAudioClient: forcing POLL mode\n"));
 		}
 	}
 #endif
@@ -2503,7 +2504,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->in.latency_seconds += buffer_latency;
 
-		PRINT(("WASAPI::OpenStream(input): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
+		PRINT(("WASAPI::OpenStream(input): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ] mode[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latency_seconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO"), (stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? "EVENT" : "POLL")));
 	}
     else
     {
@@ -2617,7 +2618,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		// Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
 		stream->out.latency_seconds += buffer_latency;
 
-		PRINT(("WASAPI::OpenStream(output): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO")));
+		PRINT(("WASAPI::OpenStream(output): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ] mode[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latency_seconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (paWasapi->useWOW64Workaround ? "YES" : "NO"), (stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? "EVENT" : "POLL")));
 	}
     else
     {
@@ -3884,11 +3885,21 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 		// when in full-duplex mode as it requires input processing as well
 		if (!PA_WASAPI__IS_FULLDUPLEX(stream))
 		{
-			if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
+			UINT32 frames = 0;
+			if ((hr = PollGetOutputFramesAvailable(stream, &frames)) == S_OK)
+            {
+                if (frames != 0)
+                {
+                    if ((hr = ProcessOutputBuffer(stream, processor, frames)) != S_OK)
+                    {
+                        LogHostError(hr); // not fatal, just log
+                    }
+                }
+            }
+            else
 			{
-				LogHostError(hr);
-				goto thread_error;
-			}
+				LogHostError(hr); // not fatal, just log
+			}            
 		}
 
 		// Start
