@@ -3888,6 +3888,12 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 			UINT32 frames = 0;
 			if ((hr = PollGetOutputFramesAvailable(stream, &frames)) == S_OK)
             {
+				if (stream->bufferMode == paUtilFixedHostBufferSize)
+				{
+					if (frames >= stream->out.framesPerBuffer)
+						frames = stream->out.framesPerBuffer;
+				}
+
                 if (frames != 0)
                 {
                     if ((hr = ProcessOutputBuffer(stream, processor, frames)) != S_OK)
