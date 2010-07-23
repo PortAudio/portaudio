@@ -109,6 +109,70 @@ typedef enum PaWasapiDeviceRole
 PaWasapiDeviceRole;
 
 
+/* Jack connection type */
+typedef enum PaWasapiJackConnectionType
+{
+    eJackConnTypeUnknown,
+    eJackConnType3Point5mm,
+    eJackConnTypeQuarter,
+    eJackConnTypeAtapiInternal,
+    eJackConnTypeRCA,
+    eJackConnTypeOptical,
+    eJackConnTypeOtherDigital,
+    eJackConnTypeOtherAnalog,
+    eJackConnTypeMultichannelAnalogDIN,
+    eJackConnTypeXlrProfessional,
+    eJackConnTypeRJ11Modem,
+    eJackConnTypeCombination
+} 
+PaWasapiJackConnectionType;
+
+
+/* Jack geometric location */
+typedef enum PaWasapiJackGeoLocation
+{
+	eJackGeoLocUnk = 0,
+    eJackGeoLocRear = 0x1, /* matches EPcxGeoLocation::eGeoLocRear */
+    eJackGeoLocFront,
+    eJackGeoLocLeft,
+    eJackGeoLocRight,
+    eJackGeoLocTop,
+    eJackGeoLocBottom,
+    eJackGeoLocRearPanel,
+    eJackGeoLocRiser,
+    eJackGeoLocInsideMobileLid,
+    eJackGeoLocDrivebay,
+    eJackGeoLocHDMI,
+    eJackGeoLocOutsideMobileLid,
+    eJackGeoLocATAPI,
+    eJackGeoLocReserved5,
+    eJackGeoLocReserved6,
+} 
+PaWasapiJackGeoLocation;
+
+
+/* Jack general location */
+typedef enum PaWasapiJackGenLocation
+{
+    eJackGenLocPrimaryBox = 0,
+    eJackGenLocInternal,
+    eJackGenLocSeparate,
+    eJackGenLocOther
+} 
+PaWasapiJackGenLocation;
+
+
+/* Jack's type of port */
+typedef enum PaWasapiJackPortConnection
+{
+    eJackPortConnJack = 0,
+    eJackPortConnIntegratedDevice,
+    eJackPortConnBothIntegratedAndJack,
+    eJackPortConnUnknown
+} 
+PaWasapiJackPortConnection;
+
+
 /* Thread priority */
 typedef enum PaWasapiThreadPriority
 {
@@ -122,6 +186,20 @@ typedef enum PaWasapiThreadPriority
     eThreadPriorityWindowManager
 }
 PaWasapiThreadPriority;
+
+
+/* Stream descriptor. */
+typedef struct PaWasapiJackDescription 
+{
+    unsigned long              channelMapping;
+    unsigned long              color; /* derived from macro: #define RGB(r,g,b) ((COLORREF)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16))) */
+    PaWasapiJackConnectionType connectionType;
+    PaWasapiJackGeoLocation    geoLocation;
+    PaWasapiJackGenLocation    genLocation;
+    PaWasapiJackPortConnection portConnection;
+    unsigned int               isConnected;
+}
+PaWasapiJackDescription;
 
 
 /* Stream descriptor. */
@@ -221,6 +299,31 @@ PaError PaWasapi_ThreadPriorityRevert( void *hTask );
  @see    PaWasapiHostProcessorCallback
 */
 PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *nInput, unsigned int *nOutput );
+
+
+/** Get number of jacks associated with a WASAPI device.  Use this method to determine if
+    there are any jacks associated with the provided WASAPI device.  Not all audio devices
+	will support this capability.  This is valid for both input and output devices.
+ @param  nDevice  device index.
+ @param  jcount   Number of jacks is returned in this variable
+ @return Error code indicating success or failure
+ @see PaWasapi_GetJackDescription
+ */
+PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount);
+
+
+/** Get the jack description associated with a WASAPI device and jack number
+    Before this function is called, use PaWasapi_GetJackCount to determine the
+	number of jacks associated with device.  If jcount is greater than zero, then
+	each jack from 0 to jcount can be queried with this function to get the jack
+	description.
+ @param  nDevice  device index.
+ @param  jindex   Which jack to return information
+ @param  KSJACK_DESCRIPTION This structure filled in on success.
+ @return Error code indicating success or failure
+ @see PaWasapi_GetJackCount
+ */
+PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription);
 
 
 /*

@@ -53,9 +53,10 @@
 	#define COBJMACROS
 	#include <Audioclient.h>
 	#include <endpointvolume.h>
-	#define INITGUID //<< avoid additional linkage of static libs, uneeded code will be optimized out
+	#define INITGUID // Avoid additional linkage of static libs, excessive code will be optimized out by the compiler
 	#include <mmdeviceapi.h>
 	#include <functiondiscoverykeys.h>
+    #include <devicetopology.h>	// Used to get IKsJackDescription interface
 	#undef INITGUID
 #endif
 #ifndef __MWERKS__
@@ -275,6 +276,12 @@ PA_DEFINE_CLSID(IMMDeviceEnumerator,bcde0395, e52f, 467c, 8e, 3d, c4, 57, 92, 91
 PA_DEFINE_IID(IAudioRenderClient,   f294acfc, 3146, 4483, a7, bf, ad, dc, a7, c2, 60, e2);
 // "C8ADBD64-E71E-48a0-A4DE-185C395CD317"
 PA_DEFINE_IID(IAudioCaptureClient,  c8adbd64, e71e, 48a0, a4, de, 18, 5c, 39, 5c, d3, 17);
+// *2A07407E-6497-4A18-9787-32F79BD0D98F*  Or this??
+PA_DEFINE_IID(IDeviceTopology,      2A07407E, 6497, 4A18, 97, 87, 32, f7, 9b, d0, d9, 8f);
+// *AE2DE0E4-5BCA-4F2D-AA46-5D13F8FDB3A9*
+PA_DEFINE_IID(IPart,                AE2DE0E4, 5BCA, 4F2D, aa, 46, 5d, 13, f8, fd, b3, a9);
+// *4509F757-2D46-4637-8E62-CE7DB944F57B*
+PA_DEFINE_IID(IKsJackDescription,   4509F757, 2D46, 4637, 8e, 62, ce, 7d, b9, 44, f5, 7b);
 // Media formats:
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_PCM,        0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_ADPCM,      0x00000002, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
@@ -1422,7 +1429,7 @@ int PaWasapi_GetDeviceRole( PaDeviceIndex nDevice )
 	// Get API
 	PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
 	if (paWasapi == NULL)
-		return ret;
+		return paNotInitialized;
 
 	// Get device index
 	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
@@ -3458,6 +3465,235 @@ PaError PaWasapi_ThreadPriorityRevert(void *hTask)
 	MMCSS_deactivate((HANDLE)hTask);
 
 	return paNoError;
+}
+
+// ------------------------------------------------------------------------------------------
+// Described at:
+// http://msdn.microsoft.com/en-us/library/dd371387(v=VS.85).aspx
+
+PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount)
+{
+	PaError ret;
+	HRESULT hr = S_OK;
+	PaDeviceIndex index;
+    IDeviceTopology *pDeviceTopology = NULL;
+    IConnector *pConnFrom = NULL;
+    IConnector *pConnTo = NULL;
+    IPart *pPart = NULL;
+    IKsJackDescription *pJackDesc = NULL;
+	UINT jackCount = 0;
+
+	PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
+	if (paWasapi == NULL)
+		return paNotInitialized;
+
+	// Get device index.
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+    if (ret != paNoError)
+        return ret;
+
+	// Validate index.
+	if ((UINT32)index >= paWasapi->deviceCount)
+		return paInvalidDevice;
+
+	// Get the endpoint device's IDeviceTopology interface.
+	hr = IMMDevice_Activate(paWasapi->devInfo[index].device, &pa_IID_IDeviceTopology, 
+		CLSCTX_INPROC_SERVER, NULL, (void**)&pDeviceTopology);
+	IF_FAILED_JUMP(hr, error);
+
+    // The device topology for an endpoint device always contains just one connector (connector number 0).
+	hr = IDeviceTopology_GetConnector(pDeviceTopology, 0, &pConnFrom);
+	IF_FAILED_JUMP(hr, error);
+
+    // Step across the connection to the jack on the adapter.
+	hr = IConnector_GetConnectedTo(pConnFrom, &pConnTo);
+    if (HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) == hr)
+    {
+        // The adapter device is not currently active.
+        hr = E_NOINTERFACE;
+    }
+	IF_FAILED_JUMP(hr, error);
+
+	// Get the connector's IPart interface.
+	hr = IConnector_QueryInterface(pConnTo, &pa_IID_IPart, (void**)&pPart);
+	IF_FAILED_JUMP(hr, error);
+
+	// Activate the connector's IKsJackDescription interface.
+	hr = IPart_Activate(pPart, CLSCTX_INPROC_SERVER, &pa_IID_IKsJackDescription, (void**)&pJackDesc);
+	IF_FAILED_JUMP(hr, error);
+
+	// Return jack count for this device.
+	hr = IKsJackDescription_GetJackCount(pJackDesc, &jackCount);
+	IF_FAILED_JUMP(hr, error);
+
+	// Set.
+	(*jcount) = jackCount;
+
+	// Ok.
+	ret = paNoError;
+
+error:
+
+	SAFE_RELEASE(pDeviceTopology);
+	SAFE_RELEASE(pConnFrom);
+	SAFE_RELEASE(pConnTo);
+	SAFE_RELEASE(pPart);
+	SAFE_RELEASE(pJackDesc);
+
+	LogHostError(hr);
+	return paNoError;
+}
+
+// ------------------------------------------------------------------------------------------
+static PaWasapiJackConnectionType ConvertJackConnectionTypeWASAPIToPA(int connType)
+{
+	switch (connType)
+	{
+		case eConnTypeUnknown:			return eJackConnTypeUnknown;
+		case eConnType3Point5mm:		return eJackConnType3Point5mm;
+		case eConnTypeQuarter:			return eJackConnTypeQuarter;
+		case eConnTypeAtapiInternal:	return eJackConnTypeAtapiInternal;
+		case eConnTypeRCA:				return eJackConnTypeRCA;
+		case eConnTypeOptical:			return eJackConnTypeOptical;
+		case eConnTypeOtherDigital:		return eJackConnTypeOtherDigital;
+		case eConnTypeOtherAnalog:		return eJackConnTypeOtherAnalog;
+		case eConnTypeMultichannelAnalogDIN: return eJackConnTypeMultichannelAnalogDIN;
+		case eConnTypeXlrProfessional:	return eJackConnTypeXlrProfessional;
+		case eConnTypeRJ11Modem:		return eJackConnTypeRJ11Modem;
+		case eConnTypeCombination:		return eJackConnTypeCombination;
+	}
+	return eJackConnTypeUnknown;
+}
+
+// ------------------------------------------------------------------------------------------
+static PaWasapiJackGeoLocation ConvertJackGeoLocationWASAPIToPA(int geoLoc)
+{
+	switch (geoLoc)
+	{
+	case eGeoLocRear:				return eJackGeoLocRear;
+	case eGeoLocFront:				return eJackGeoLocFront;
+	case eGeoLocLeft:				return eJackGeoLocLeft;
+	case eGeoLocRight:				return eJackGeoLocRight;
+	case eGeoLocTop:				return eJackGeoLocTop;
+	case eGeoLocBottom:				return eJackGeoLocBottom;
+	case eGeoLocRearPanel:			return eJackGeoLocRearPanel;
+	case eGeoLocRiser:				return eJackGeoLocRiser;
+	case eGeoLocInsideMobileLid:	return eJackGeoLocInsideMobileLid;
+	case eGeoLocDrivebay:			return eJackGeoLocDrivebay;
+	case eGeoLocHDMI:				return eJackGeoLocHDMI;
+	case eGeoLocOutsideMobileLid:	return eJackGeoLocOutsideMobileLid;
+	case eGeoLocATAPI:				return eJackGeoLocATAPI;
+	}
+	return eJackGeoLocUnk;
+}
+
+// ------------------------------------------------------------------------------------------
+static PaWasapiJackGenLocation ConvertJackGenLocationWASAPIToPA(int genLoc)
+{
+	switch (genLoc)
+	{
+	case eGenLocPrimaryBox:	return eJackGenLocPrimaryBox;
+	case eGenLocInternal:	return eJackGenLocInternal;
+	case eGenLocSeparate:	return eJackGenLocSeparate;
+	case eGenLocOther:		return eJackGenLocOther;
+	}
+	return eJackGenLocPrimaryBox;
+}
+
+// ------------------------------------------------------------------------------------------
+static PaWasapiJackPortConnection ConvertJackPortConnectionWASAPIToPA(int portConn)
+{
+	switch (portConn)
+	{
+	case ePortConnJack:					return eJackPortConnJack;
+	case ePortConnIntegratedDevice:		return eJackPortConnIntegratedDevice;
+	case ePortConnBothIntegratedAndJack:return eJackPortConnBothIntegratedAndJack;
+	case ePortConnUnknown:				return eJackPortConnUnknown;
+	}
+	return eJackPortConnJack;
+}
+
+// ------------------------------------------------------------------------------------------
+// Described at:
+// http://msdn.microsoft.com/en-us/library/dd371387(v=VS.85).aspx
+
+PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription)
+{
+	PaError ret;
+	HRESULT hr = S_OK;
+	PaDeviceIndex index;
+    IDeviceTopology *pDeviceTopology = NULL;
+    IConnector *pConnFrom = NULL;
+    IConnector *pConnTo = NULL;
+    IPart *pPart = NULL;
+    IKsJackDescription *pJackDesc = NULL;
+	KSJACK_DESCRIPTION jack = { 0 };
+
+	PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
+	if (paWasapi == NULL)
+		return paNotInitialized;
+
+	// Get device index.
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+    if (ret != paNoError)
+        return ret;
+
+	// Validate index.
+	if ((UINT32)index >= paWasapi->deviceCount)
+		return paInvalidDevice;
+
+	// Get the endpoint device's IDeviceTopology interface.
+	hr = IMMDevice_Activate(paWasapi->devInfo[index].device, &pa_IID_IDeviceTopology, 
+		CLSCTX_INPROC_SERVER, NULL, (void**)&pDeviceTopology);
+	IF_FAILED_JUMP(hr, error);
+
+    // The device topology for an endpoint device always contains just one connector (connector number 0).
+	hr = IDeviceTopology_GetConnector(pDeviceTopology, 0, &pConnFrom);
+	IF_FAILED_JUMP(hr, error);
+
+    // Step across the connection to the jack on the adapter.
+	hr = IConnector_GetConnectedTo(pConnFrom, &pConnTo);
+    if (HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) == hr)
+    {
+        // The adapter device is not currently active.
+        hr = E_NOINTERFACE;
+    }
+	IF_FAILED_JUMP(hr, error);
+
+	// Get the connector's IPart interface.
+	hr = IConnector_QueryInterface(pConnTo, &pa_IID_IPart, (void**)&pPart);
+	IF_FAILED_JUMP(hr, error);
+
+	// Activate the connector's IKsJackDescription interface.
+	hr = IPart_Activate(pPart, CLSCTX_INPROC_SERVER, &pa_IID_IKsJackDescription, (void**)&pJackDesc);
+	IF_FAILED_JUMP(hr, error);
+
+	// Test to return jack description struct for index 0.
+	hr = IKsJackDescription_GetJackDescription(pJackDesc, jindex, &jack);
+	IF_FAILED_JUMP(hr, error);
+
+	// Convert WASAPI values to PA format.
+	pJackDescription->channelMapping = jack.ChannelMapping;
+	pJackDescription->color          = jack.Color;
+	pJackDescription->connectionType = ConvertJackConnectionTypeWASAPIToPA(jack.ConnectionType);
+	pJackDescription->genLocation    = ConvertJackGenLocationWASAPIToPA(jack.GenLocation);
+	pJackDescription->geoLocation    = ConvertJackGeoLocationWASAPIToPA(jack.GeoLocation);
+	pJackDescription->isConnected    = jack.IsConnected;
+	pJackDescription->portConnection = ConvertJackPortConnectionWASAPIToPA(jack.PortConnection);
+
+	// Ok.
+	ret = paNoError;
+
+error:
+
+	SAFE_RELEASE(pDeviceTopology);
+	SAFE_RELEASE(pConnFrom);
+	SAFE_RELEASE(pConnTo);
+	SAFE_RELEASE(pPart);
+	SAFE_RELEASE(pJackDesc);
+
+	LogHostError(hr);
+	return ret;
 }
 
 // ------------------------------------------------------------------------------------------
