@@ -1927,8 +1927,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     PA_ENSURE( PaAlsaStream_Configure( stream, inputParameters, outputParameters, sampleRate, framesPerBuffer,
                 &inputLatency, &outputLatency, &hostBufferSizeMode ) );
-    hostInputSampleFormat = stream->capture.hostSampleFormat;
-    hostOutputSampleFormat = stream->playback.hostSampleFormat;
+    hostInputSampleFormat = stream->capture.hostSampleFormat | (!stream->capture.hostInterleaved ? paNonInterleaved : 0);
+    hostOutputSampleFormat = stream->playback.hostSampleFormat | (!stream->playback.hostInterleaved ? paNonInterleaved : 0);
 
     PA_ENSURE( PaUtil_InitializeBufferProcessor( &stream->bufferProcessor,
                     numInputChannels, inputSampleFormat, hostInputSampleFormat,
