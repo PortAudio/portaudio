@@ -1000,7 +1000,7 @@ static PaError WaitCondition( PaJackHostApiRepresentation *hostApi )
     PaTime pt = PaUtil_GetTime();
     struct timespec ts;
 
-    ts.tv_sec = (time_t) floor( pt + 1 );
+    ts.tv_sec = (time_t) floor( pt + 10 * 60 /* 10 minutes */ );
     ts.tv_nsec = (long) ((pt - floor( pt )) * 1000000000);
     /* XXX: Best enclose in loop, in case of spurious wakeups? */
     err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
@@ -1177,7 +1177,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             minimum_buffer_frames = jackHostApi->jack_buffer_size * 3;
 
         /* setup blocking API data structures (FIXME: can fail) */
-	BlockingBegin( stream, minimum_buffer_frames );
+        BlockingBegin( stream, minimum_buffer_frames );
 
         /* install our own callback for the blocking API */
         streamCallback = BlockingCallback;
@@ -1276,10 +1276,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                   &stream->bufferProcessor,
                   inputChannelCount,
                   inputSampleFormat,
-                  paFloat32,            /* hostInputSampleFormat */
+                  paFloat32 | paNonInterleaved, /* hostInputSampleFormat */
                   outputChannelCount,
                   outputSampleFormat,
-                  paFloat32,            /* hostOutputSampleFormat */
+                  paFloat32 | paNonInterleaved, /* hostOutputSampleFormat */
                   jackSr,
                   streamFlags,
                   framesPerBuffer,
