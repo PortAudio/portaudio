@@ -1477,9 +1477,9 @@ static int CalculatePollTimeout( const PaAlsaStream *stream, unsigned long frame
 /** Align value in backward direction.
  *
  * @param v: Value to align.
- * @param align: Alignment value.
+ * @param align: Alignment.
  */
-static unsigned long ALIGN_BWD(unsigned long v, unsigned long align)
+static unsigned long PaAlsa_AlignBackward(unsigned long v, unsigned long align)
 {
 	return ((v - (align ? v % align : 0)));
 }
@@ -1487,14 +1487,25 @@ static unsigned long ALIGN_BWD(unsigned long v, unsigned long align)
 /** Align value in forward direction.
  *
  * @param v: Value to align.
- * @param align: Alignment value.
+ * @param align: Alignment.
  */
-static unsigned long ALIGN_FWD(unsigned long v, unsigned long align)
+static unsigned long PaAlsa_AlignForward(unsigned long v, unsigned long align)
 {
 	unsigned long remainder = (align ? (v % align) : 0);
-	if (remainder == 0)
-		return v;
-	return v + (align - remainder);
+	return (remainder != 0 ? v + (align - remainder) : v);
+}
+
+/** Get size of host buffer maintained from the number of user frames, sample rate and suggested latency. Minimum double buffering
+ *  is maintained to allow 100% CPU usage inside user callback.
+ *
+ * @param userFramesPerBuffer: User buffer size in number of frames.
+ * @param suggestedLatency: User provided desired latency.
+ * @param sampleRate: Sample rate.
+ */
+static unsigned long PaAlsa_GetFramesPerHostBuffer(unsigned long userFramesPerBuffer, PaTime suggestedLatency, double sampleRate)
+{
+	unsigned long frames = userFramesPerBuffer + PA_MAX( userFramesPerBuffer, (unsigned long)(suggestedLatency * sampleRate) );
+	return frames;
 }
 
 /** Determine size per host buffer.
@@ -1507,51 +1518,208 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
         unsigned long framesPerUserBuffer, double sampleRate, snd_pcm_hw_params_t* hwParams, int* accurate )
 {
     PaError result = paNoError;
-    unsigned long bufferSize = framesPerUserBuffer + params->suggestedLatency * sampleRate, framesPerHostBuffer;
+    unsigned long bufferSize, framesPerHostBuffer;
     int dir = 0;
 
-    PA_DEBUG(( "%s: frames per user-buffer     = %lu\n", __FUNCTION__, framesPerUserBuffer ));
-    PA_DEBUG(( "%s: suggested latency          = %f\n",  __FUNCTION__, params->suggestedLatency ));
-    PA_DEBUG(( "%s: suggested host buffer size = %lu\n", __FUNCTION__, bufferSize ));
+    /* Calculate host buffer size */
+    bufferSize = PaAlsa_GetFramesPerHostBuffer(framesPerUserBuffer, params->suggestedLatency, sampleRate);
+
+    /* Log */
+    PA_DEBUG(( "%s: user-buffer (frames)           = %lu\n", __FUNCTION__, framesPerUserBuffer ));
+    PA_DEBUG(( "%s: user-buffer (sec)              = %f\n",  __FUNCTION__, (double)(framesPerUserBuffer / sampleRate) ));
+    PA_DEBUG(( "%s: suggested latency (sec)        = %f\n",  __FUNCTION__, params->suggestedLatency ));
+    PA_DEBUG(( "%s: suggested host buffer (frames) = %lu\n", __FUNCTION__, bufferSize ));
+    PA_DEBUG(( "%s: suggested host buffer (sec)    = %f\n",  __FUNCTION__, (double)(bufferSize / sampleRate) ));
+
+#ifdef PA_ALSA_USE_OBSOLETE_HOST_BUFFER_CALC
+
+    if( framesPerUserBuffer != paFramesPerBufferUnspecified )
+    {
+        /* Preferably the host buffer size should be a multiple of the user buffer size */
+
+        if( bufferSize > framesPerUserBuffer )
+        {
+            snd_pcm_uframes_t remainder = bufferSize % framesPerUserBuffer;
+            if( remainder > framesPerUserBuffer / 2. )
+                bufferSize += framesPerUserBuffer - remainder;
+            else
+                bufferSize -= remainder;
+
+            assert( bufferSize % framesPerUserBuffer == 0 );
+        }
+        else if( framesPerUserBuffer % bufferSize != 0 )
+        {
+            /*  Find a good compromise between user specified latency and buffer size */
+            if( bufferSize > framesPerUserBuffer * .75 )
+            {
+                bufferSize = framesPerUserBuffer;
+            }
+            else
+            {
+                snd_pcm_uframes_t newSz = framesPerUserBuffer;
+                while( newSz / 2 >= bufferSize )
+                {
+                    if( framesPerUserBuffer % (newSz / 2) != 0 )
+                    {
+                        /* No use dividing any further */
+                        break;
+                    }
+                    newSz /= 2;
+                }
+                bufferSize = newSz;
+            }
+
+            assert( framesPerUserBuffer % bufferSize == 0 );
+        }
+    }
+
+#endif
 
 	{
-        unsigned numPeriods = numPeriods_, maxPeriods = 0;
+        unsigned numPeriods = numPeriods_, maxPeriods = 0, minPeriods = numPeriods_;
+
         /* It may be that the device only supports 2 periods for instance */
         dir = 0;
+        ENSURE_( snd_pcm_hw_params_get_periods_min( hwParams, &minPeriods, &dir ), paUnanticipatedHostError )
         ENSURE_( snd_pcm_hw_params_get_periods_max( hwParams, &maxPeriods, &dir ), paUnanticipatedHostError );
         assert( maxPeriods > 1 );
-        numPeriods = PA_MIN( maxPeriods, numPeriods );
 
-		/* Align to 16 bytes for faster copying */
-		framesPerHostBuffer = ALIGN_FWD((bufferSize / numPeriods), 16);
+        /* Clamp to min/max */
+        numPeriods = PA_MIN(maxPeriods, PA_MAX(minPeriods, numPeriods));
+
+        PA_DEBUG(( "%s: periods min = %lu, max = %lu, req = %lu \n", __FUNCTION__, minPeriods, maxPeriods, numPeriods ));
+
+#ifndef PA_ALSA_USE_OBSOLETE_HOST_BUFFER_CALC
+
+        /* Calculate period size */
+        framesPerHostBuffer = (bufferSize / numPeriods);
+
+        /* Align & test size */
+        if( framesPerUserBuffer != paFramesPerBufferUnspecified )
+        {
+            /* Align to user buffer size */
+            framesPerHostBuffer = PaAlsa_AlignForward(framesPerHostBuffer, framesPerUserBuffer);
+
+            /* Test (borrowed from older implementation) */
+            if( framesPerHostBuffer < framesPerUserBuffer )
+            {
+                assert( framesPerUserBuffer % framesPerHostBuffer == 0 );
+                if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer, 0 ) < 0 )
+                {
+                    if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer * 2, 0 ) == 0 )
+                        framesPerHostBuffer *= 2;
+                    else 
+                    if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer / 2, 0 ) == 0 )
+                        framesPerHostBuffer /= 2;
+                }
+            }
+            else
+            {
+                assert( framesPerHostBuffer % framesPerUserBuffer == 0 );
+                if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer, 0 ) < 0 )
+                {
+                    if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer + framesPerUserBuffer, 0 ) == 0 )
+                        framesPerHostBuffer += framesPerUserBuffer;
+                    else 
+                    if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer - framesPerUserBuffer, 0 ) == 0 )
+                        framesPerHostBuffer -= framesPerUserBuffer;
+                }
+            }
+        }
+#endif
+
+#ifdef PA_ALSA_USE_OBSOLETE_HOST_BUFFER_CALC
+
+        if( framesPerUserBuffer != paFramesPerBufferUnspecified )
+        {
+            /* Try to get a power-of-two of the user buffer size. */
+            framesPerHostBuffer = framesPerUserBuffer;
+            if( framesPerHostBuffer < bufferSize )
+            {
+                while( bufferSize / framesPerHostBuffer > numPeriods )
+                {
+                    framesPerHostBuffer *= 2;
+                }
+                /* One extra period is preferrable to one less (should be more robust) */
+                if( bufferSize / framesPerHostBuffer < numPeriods )
+                {
+                    framesPerHostBuffer /= 2;
+                }
+            }
+            else
+            {
+                while( bufferSize / framesPerHostBuffer < numPeriods )
+                {
+                    if( framesPerUserBuffer % (framesPerHostBuffer / 2) != 0 )
+                    {
+                        /* Can't be divided any further */
+                        break;
+                    }
+                    framesPerHostBuffer /= 2;
+                }
+            }
+
+            if( framesPerHostBuffer < framesPerUserBuffer )
+            {
+                assert( framesPerUserBuffer % framesPerHostBuffer == 0 );
+                if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer, 0 ) < 0 )
+                {
+                    if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer * 2, 0 ) == 0 )
+                        framesPerHostBuffer *= 2;
+                    else if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer / 2, 0 ) == 0 )
+                        framesPerHostBuffer /= 2;
+                }
+            }
+            else
+            {
+                assert( framesPerHostBuffer % framesPerUserBuffer == 0 );
+                if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer, 0 ) < 0 )
+                {
+                    if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer + framesPerUserBuffer, 0 ) == 0 )
+                        framesPerHostBuffer += framesPerUserBuffer;
+                    else if( snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer - framesPerUserBuffer, 0 ) == 0 )
+                        framesPerHostBuffer -= framesPerUserBuffer;
+                }
+            }
+        }
+        else
+        {
+            framesPerHostBuffer = bufferSize / numPeriods;
+        }
+
+        /* non-mmap mode needs a reasonably-sized buffer or it'll stutter */
+        if( !self->canMmap && framesPerHostBuffer < 2048 )
+            framesPerHostBuffer = 2048;
+#endif
+        PA_DEBUG(( "%s: suggested host buffer period   = %lu \n", __FUNCTION__, framesPerHostBuffer ));
 	}
 
     {
+        /* Get min/max period sizes and adjust our chosen */
         snd_pcm_uframes_t min = 0, max = 0;
         ENSURE_( snd_pcm_hw_params_get_period_size_min( hwParams, &min, NULL ), paUnanticipatedHostError );
         ENSURE_( snd_pcm_hw_params_get_period_size_max( hwParams, &max, NULL ), paUnanticipatedHostError );
 
         if( framesPerHostBuffer < min )
         {
-            PA_DEBUG(( "%s: The determined period size (%lu) is less than minimum (%lu)\n", __FUNCTION__,
-                        framesPerHostBuffer, min ));
+            PA_DEBUG(( "%s: The determined period size (%lu) is less than minimum (%lu)\n", __FUNCTION__, framesPerHostBuffer, min ));
             framesPerHostBuffer = min;
         }
-        else if( framesPerHostBuffer > max )
+        else 
+        if( framesPerHostBuffer > max )
         {
-            PA_DEBUG(( "%s: The determined period size (%lu) is greater than maximum (%lu)\n", __FUNCTION__,
-                        framesPerHostBuffer, max ));
+            PA_DEBUG(( "%s: The determined period size (%lu) is greater than maximum (%lu)\n", __FUNCTION__, framesPerHostBuffer, max ));
             framesPerHostBuffer = max;
         }
 
-		PA_DEBUG(( "%s: device period minimum      = %lu\n", __FUNCTION__, min ));
-		PA_DEBUG(( "%s: device period maximum      = %lu\n", __FUNCTION__, max ));
-		PA_DEBUG(( "%s: host buffer period         = %lu\n", __FUNCTION__, framesPerHostBuffer ));
+		PA_DEBUG(( "%s: device period minimum          = %lu\n", __FUNCTION__, min ));
+		PA_DEBUG(( "%s: device period maximum          = %lu\n", __FUNCTION__, max ));
+		PA_DEBUG(( "%s: host buffer period             = %lu\n", __FUNCTION__, framesPerHostBuffer ));
+		PA_DEBUG(( "%s: host buffer period latency     = %f\n", __FUNCTION__, (double)(framesPerHostBuffer / sampleRate) ));
 
-        assert( framesPerHostBuffer >= min && framesPerHostBuffer <= max );
+        /* Try set period size */
         dir = 0;
-        ENSURE_( snd_pcm_hw_params_set_period_size_near( self->pcm, hwParams, &framesPerHostBuffer, &dir ),
-                paUnanticipatedHostError );
+        ENSURE_( snd_pcm_hw_params_set_period_size_near( self->pcm, hwParams, &framesPerHostBuffer, &dir ), paUnanticipatedHostError );
         if( dir != 0 )
         {
             PA_DEBUG(( "%s: The configured period size is non-integer.\n", __FUNCTION__, dir ));
@@ -1944,6 +2112,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->streamRepresentation.streamInfo.outputLatency = outputLatency + (PaTime)(
                 PaUtil_GetBufferProcessorOutputLatency( &stream->bufferProcessor ) / sampleRate);
 
+    PA_DEBUG(( "%s: Stream: framesPerBuffer = %lu, maxFramesPerHostBuffer = %lu, latency = i(%f)/o(%f), \n", __FUNCTION__, framesPerBuffer, stream->maxFramesPerHostBuffer, stream->streamRepresentation.streamInfo.inputLatency, stream->streamRepresentation.streamInfo.outputLatency));
+
     *s = (PaStream*)stream;
 
     return result;
@@ -2273,6 +2443,7 @@ static double GetStreamCpuLoad( PaStream* s )
 
 static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwParams, double sampleRate )
 {
+    PaError result = paNoError;
     unsigned long approx = (unsigned long) sampleRate;
     int dir = 0;
     double fraction = sampleRate - approx;
@@ -2290,7 +2461,22 @@ static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwPara
             dir = 1;
     }
 
-    return snd_pcm_hw_params_set_rate( pcm, hwParams, approx, dir );
+    ENSURE_( snd_pcm_hw_params_set_rate( pcm, hwParams, approx, dir ), paUnanticipatedHostError );
+
+end:
+    return result;
+
+error:
+
+    /* Log */
+    {
+        unsigned int _min = 0, _max = 0; int _dir = 0;
+        ENSURE_( snd_pcm_hw_params_get_rate_min( hwParams, &_min, &_dir ), paUnanticipatedHostError );
+        ENSURE_( snd_pcm_hw_params_get_rate_max( hwParams, &_max, &_dir ), paUnanticipatedHostError );
+        PA_DEBUG(( "%s: SR min = %d, max = %d, req = %lu\n", __FUNCTION__, _min, _max, approx ));
+    }
+
+    goto end;
 }
 
 /* Return exact sample rate in param sampleRate */
