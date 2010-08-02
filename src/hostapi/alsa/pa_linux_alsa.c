@@ -1696,20 +1696,21 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
 
     {
         /* Get min/max period sizes and adjust our chosen */
-        snd_pcm_uframes_t min = 0, max = 0;
+        snd_pcm_uframes_t min = 0, max = 0, minmax_diff;
         ENSURE_( snd_pcm_hw_params_get_period_size_min( hwParams, &min, NULL ), paUnanticipatedHostError );
         ENSURE_( snd_pcm_hw_params_get_period_size_max( hwParams, &max, NULL ), paUnanticipatedHostError );
+        minmax_diff = max - min;
 
         if( framesPerHostBuffer < min )
         {
             PA_DEBUG(( "%s: The determined period size (%lu) is less than minimum (%lu)\n", __FUNCTION__, framesPerHostBuffer, min ));
-            framesPerHostBuffer = min;
+            framesPerHostBuffer = ((minmax_diff == 2) ? min + 1 : min);
         }
         else 
         if( framesPerHostBuffer > max )
         {
             PA_DEBUG(( "%s: The determined period size (%lu) is greater than maximum (%lu)\n", __FUNCTION__, framesPerHostBuffer, max ));
-            framesPerHostBuffer = max;
+            framesPerHostBuffer = ((minmax_diff == 2) ? max - 1 : max);
         }
 
 		PA_DEBUG(( "%s: device period minimum          = %lu\n", __FUNCTION__, min ));
@@ -1717,7 +1718,7 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
 		PA_DEBUG(( "%s: host buffer period             = %lu\n", __FUNCTION__, framesPerHostBuffer ));
 		PA_DEBUG(( "%s: host buffer period latency     = %f\n", __FUNCTION__, (double)(framesPerHostBuffer / sampleRate) ));
 
-        /* Try set period size */
+        /* Try setting period size */
         dir = 0;
         ENSURE_( snd_pcm_hw_params_set_period_size_near( self->pcm, hwParams, &framesPerHostBuffer, &dir ), paUnanticipatedHostError );
         if( dir != 0 )
