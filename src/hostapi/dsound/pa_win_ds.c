@@ -244,7 +244,7 @@ typedef struct PaWinDsStream
     /* Try to detect play buffer underflows. */
     LARGE_INTEGER        perfCounterTicksPerBuffer; /* counter ticks it should take to play a full buffer */
     LARGE_INTEGER        previousPlayTime;
-    UINT                 previousPlayCursor;
+    DWORD                previousPlayCursor;
     UINT                 outputUnderflowCount;
     BOOL                 outputIsRunning;
     INT                  finalZeroBytesWritten; /* used to determine when we've flushed the whole buffer */
@@ -1502,10 +1502,10 @@ static HRESULT InitFullDuplexInputOutputBuffers( PaWinDsStream *stream,
 
         /* retrieve the pre ds 8 buffer interfaces which are used by the rest of the code */
 
-        hr = IUnknown_QueryInterface( pCaptureBuffer8, &IID_IDirectSoundCaptureBuffer, &stream->pDirectSoundInputBuffer );
+        hr = IUnknown_QueryInterface( pCaptureBuffer8, &IID_IDirectSoundCaptureBuffer, (LPVOID *)&stream->pDirectSoundInputBuffer );
         
         if( hr == DS_OK )
-            hr = IUnknown_QueryInterface( pRenderBuffer8, &IID_IDirectSoundBuffer, &stream->pDirectSoundOutputBuffer );
+            hr = IUnknown_QueryInterface( pRenderBuffer8, &IID_IDirectSoundBuffer, (LPVOID *)&stream->pDirectSoundOutputBuffer );
 
         /* release the ds 8 interfaces, we don't need them */
         IUnknown_Release( pCaptureBuffer8 );
