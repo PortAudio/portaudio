@@ -2094,7 +2094,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		// Use Polling if overall latency is > 5ms as it allows to use 100% CPU in a callback,
 		// or user specified latency parameter
 		overall = MakeHnsPeriod(framesPerLatency, pSub->wavex.Format.nSamplesPerSec);
-		if ((overall > 50000) || (params->suggestedLatency > 0))
+		if ((overall >= (106667*2)/*21.33ms*/) || ((INT32)(params->suggestedLatency*100000.0) != 0/*0.01 msec granularity*/))
 		{
 			framesPerLatency = PaUtil_GetFramesPerHostBuffer(userFramesPerBuffer,
 				params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
@@ -2124,12 +2124,22 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	if (pSub->shareMode == AUDCLNT_SHAREMODE_SHARED)
 	{
 		if (pSub->period < pInfo->DefaultDevicePeriod)
+		{
 			pSub->period = pInfo->DefaultDevicePeriod;
+			// Recalculate aligned period
+			framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
+			_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
+		}
 	}
 	else
 	{
 		if (pSub->period < pInfo->MinimumDevicePeriod)
+		{
 			pSub->period = pInfo->MinimumDevicePeriod;
+			// Recalculate aligned period
+			framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
+			_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
+		}
 	}
 
 	/*! Windows 7 does not allow to set latency lower than minimal device period and will
@@ -2152,7 +2162,6 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 				if (pSub->period > MAX_BUFFER_EVENT_DURATION)
 				{
 					pSub->period = MAX_BUFFER_EVENT_DURATION;
-
 					// Recalculate aligned period
 					framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
 					_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
@@ -2163,7 +2172,6 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 				if (pSub->period > MAX_BUFFER_POLL_DURATION)
 				{
 					pSub->period = MAX_BUFFER_POLL_DURATION;
-
 					// Recalculate aligned period
 					framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
 					_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);

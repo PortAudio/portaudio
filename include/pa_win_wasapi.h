@@ -346,8 +346,8 @@ PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJ
         1) Event-Driven:
         This is the most powerful WASAPI implementation which provides glitch-free
         audio at around 3ms latency in Exclusive mode. Lowest possible latency for this mode is 
-        usually - 1.4(Vista only)-3ms(Windows 7+) for HD Audio class audio chips. For the 
-        Shared mode latency can not be lower than 20ms.
+        3 ms for HD Audio class audio chips. For the Shared mode latency can not be 
+		lower than 20 ms.
 
         2) Poll-Driven:
         Polling is another 2-nd method to operate with WASAPI. It is less efficient than Event-Driven
