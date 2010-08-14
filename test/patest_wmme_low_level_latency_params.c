@@ -48,8 +48,8 @@
 #define NUM_SECONDS         (6)
 #define SAMPLE_RATE         (44100)
 
-#define WMME_FRAMES_PER_BUFFER  (49) //(441)
-#define WMME_BUFFER_COUNT       (45)    //(5)
+#define WMME_FRAMES_PER_BUFFER  (440)
+#define WMME_BUFFER_COUNT       (6)
 
 #define FRAMES_PER_BUFFER   WMME_FRAMES_PER_BUFFER /* hardwire portaudio callback buffer size to WMME buffer size for this test */
 
