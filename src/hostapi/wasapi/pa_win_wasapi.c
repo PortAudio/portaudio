@@ -74,17 +74,20 @@
 #include "pa_win_wasapi.h"
 
 #ifndef NTDDI_VERSION
-
-	#define NTDDI_VERSION 0x06000000 // NTDDI_VISTA
+ 
+    #undef WINVER
+    #undef _WIN32_WINNT
+    #define WINVER       0x0600 // VISTA
+	#define _WIN32_WINNT WINVER
 
 	#ifndef _AVRT_ //<< fix MinGW dummy compile by defining missing type: AVRT_PRIORITY
-	typedef enum _AVRT_PRIORITY
-	{
-		AVRT_PRIORITY_LOW = -1,
-		AVRT_PRIORITY_NORMAL,
-		AVRT_PRIORITY_HIGH,
-		AVRT_PRIORITY_CRITICAL
-	} AVRT_PRIORITY, *PAVRT_PRIORITY;
+        typedef enum _AVRT_PRIORITY
+        {
+            AVRT_PRIORITY_LOW = -1,
+            AVRT_PRIORITY_NORMAL,
+            AVRT_PRIORITY_HIGH,
+            AVRT_PRIORITY_CRITICAL
+        } AVRT_PRIORITY, *PAVRT_PRIORITY;
 	#endif
 
 	#include <basetyps.h> // << for IID/CLSID
@@ -111,121 +114,9 @@
         #define __MIDL_CONST const
     #endif
 
-    #ifndef WAVE_FORMAT_IEEE_FLOAT
-        #define WAVE_FORMAT_IEEE_FLOAT      0x0003 // 32-bit floating-point
-    #endif
-
-    // Speaker Positions:
-    #define SPEAKER_FRONT_LEFT              0x1
-    #define SPEAKER_FRONT_RIGHT             0x2
-    #define SPEAKER_FRONT_CENTER            0x4
-    #define SPEAKER_LOW_FREQUENCY           0x8
-    #define SPEAKER_BACK_LEFT               0x10
-    #define SPEAKER_BACK_RIGHT              0x20
-    #define SPEAKER_FRONT_LEFT_OF_CENTER    0x40
-    #define SPEAKER_FRONT_RIGHT_OF_CENTER   0x80
-    #define SPEAKER_BACK_CENTER             0x100
-    #define SPEAKER_SIDE_LEFT               0x200
-    #define SPEAKER_SIDE_RIGHT              0x400
-    #define SPEAKER_TOP_CENTER              0x800
-    #define SPEAKER_TOP_FRONT_LEFT          0x1000
-    #define SPEAKER_TOP_FRONT_CENTER        0x2000
-    #define SPEAKER_TOP_FRONT_RIGHT         0x4000
-    #define SPEAKER_TOP_BACK_LEFT           0x8000
-    #define SPEAKER_TOP_BACK_CENTER         0x10000
-    #define SPEAKER_TOP_BACK_RIGHT          0x20000
-
-    // Bit mask locations reserved for future use
-    #define SPEAKER_RESERVED                0x7FFC0000
-
-    // Used to specify that any possible permutation of speaker configurations
-    #define SPEAKER_ALL                     0x80000000
-
-    // DirectSound Speaker Config
-    #if (NTDDI_VERSION >= NTDDI_WINXP)
-    #define KSAUDIO_SPEAKER_DIRECTOUT       0
-    #endif
-    #define KSAUDIO_SPEAKER_MONO            (SPEAKER_FRONT_CENTER)
-    #define KSAUDIO_SPEAKER_STEREO          (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT)
-    #define KSAUDIO_SPEAKER_QUAD            (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | \
-                                             SPEAKER_BACK_LEFT  | SPEAKER_BACK_RIGHT)
-    #define KSAUDIO_SPEAKER_SURROUND        (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | \
-                                             SPEAKER_FRONT_CENTER | SPEAKER_BACK_CENTER)
-    #define KSAUDIO_SPEAKER_5POINT1         (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | \
-                                             SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY | \
-                                             SPEAKER_BACK_LEFT  | SPEAKER_BACK_RIGHT)
-    #define KSAUDIO_SPEAKER_7POINT1         (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | \
-                                             SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY | \
-                                             SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT | \
-                                             SPEAKER_FRONT_LEFT_OF_CENTER | SPEAKER_FRONT_RIGHT_OF_CENTER)
-
-    #if ( (NTDDI_VERSION >= NTDDI_WINXPSP2) && (NTDDI_VERSION < NTDDI_WS03) ) || (NTDDI_VERSION >= NTDDI_WS03SP1)
-
-    #define KSAUDIO_SPEAKER_5POINT1_SURROUND (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | \
-                                             SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY | \
-                                             SPEAKER_SIDE_LEFT  | SPEAKER_SIDE_RIGHT)
-    #define KSAUDIO_SPEAKER_7POINT1_SURROUND (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | \
-                                             SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY | \
-                                             SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT | \
-                                             SPEAKER_SIDE_LEFT | SPEAKER_SIDE_RIGHT)
-    // The following are obsolete 5.1 and 7.1 settings (they lack side speakers).  Note this means
-    // that the default 5.1 and 7.1 settings (KSAUDIO_SPEAKER_5POINT1 and KSAUDIO_SPEAKER_7POINT1 are
-    // similarly obsolete but are unchanged for compatibility reasons).
-    #define KSAUDIO_SPEAKER_5POINT1_BACK     KSAUDIO_SPEAKER_5POINT1
-    #define KSAUDIO_SPEAKER_7POINT1_WIDE     KSAUDIO_SPEAKER_7POINT1
-
-    #endif // XP SP2 and later (chronologically)
-
-    // DVD Speaker Positions
-    #define KSAUDIO_SPEAKER_GROUND_FRONT_LEFT   SPEAKER_FRONT_LEFT
-    #define KSAUDIO_SPEAKER_GROUND_FRONT_CENTER SPEAKER_FRONT_CENTER
-    #define KSAUDIO_SPEAKER_GROUND_FRONT_RIGHT  SPEAKER_FRONT_RIGHT
-    #define KSAUDIO_SPEAKER_GROUND_REAR_LEFT    SPEAKER_BACK_LEFT
-    #define KSAUDIO_SPEAKER_GROUND_REAR_RIGHT   SPEAKER_BACK_RIGHT
-    #define KSAUDIO_SPEAKER_TOP_MIDDLE          SPEAKER_TOP_CENTER
-    #define KSAUDIO_SPEAKER_SUPER_WOOFER        SPEAKER_LOW_FREQUENCY
-
     #ifdef WIN64
         #include <wtypes.h>
         typedef LONG NTSTATUS;
-        typedef void *PKSEVENT_ENTRY;
-        typedef void *PKSDEVICE;
-        typedef void *PKSFILTERFACTORY;
-        typedef void *PKSFILTER;
-        typedef void *PIRP;
-        typedef void *PCM_RESOURCE_LIST;
-        typedef void *PDEVICE_CAPABILITIES;
-        typedef void *PKSPIN;
-        typedef void *PKSPROCESSPIN_INDEXENTRY;
-        typedef void KSATTRIBUTE_LIST;
-        typedef void *PKSHANDSHAKE;
-        typedef void *PKTIMER;
-        typedef void *PKDPC;
-        typedef void *PKSSTREAM_POINTER;
-        typedef void KSPROPERTY_SET;
-        typedef void KSCLOCK_DISPATCH;
-        typedef void KSMETHOD_SET;
-        typedef void KSEVENT_SET;
-        typedef void KSALLOCATOR_DISPATCH;
-        typedef void KSDEVICE_DISPATCH;
-        typedef void KSFILTER_DISPATCH;
-        typedef void KSFILTER_DESCRIPTOR;
-        typedef void KSPIN_DESCRIPTOR_EX;
-        typedef void KSPIN_DISPATCH;
-        typedef void KSDEVICE_DESCRIPTOR;
-        typedef void *PFNKSDELETEALLOCATOR;
-        typedef void *PFNKSDEFAULTALLOCATE;
-        typedef void *PFNKSDEFAULTFREE;
-        typedef void KSNODE_DESCRIPTOR;
-        typedef char KSPIN_DESCRIPTOR;
-        typedef void *PFNKSINTERSECTHANDLEREX;
-        typedef void *PDEVICE_OBJECT;
-        typedef void *PHYSICAL_ADDRESS;
-        typedef void *PKSSTREAM_POINTER_OFFSET;
-        typedef void *PKSPROCESSPIN;
-        typedef void *PMDL;
-        typedef ULONG KSSTREAM_POINTER_OFFSET;
-        typedef void KSJACK_DESCRIPTION;
         #define FASTCALL
         #include <oleidl.h>
         #include <objidl.h>
@@ -239,16 +130,23 @@
         typedef LONGLONG REFERENCE_TIME;
         #define NONAMELESSUNION
     #endif
+    
+    #ifndef WAVE_FORMAT_IEEE_FLOAT
+        #define WAVE_FORMAT_IEEE_FLOAT 0x0003 // 32-bit floating-point
+    #endif    
+    
+    #ifndef __MINGW_EXTENSION
+        #if defined(__GNUC__) || defined(__GNUG__)
+            #define __MINGW_EXTENSION __extension__
+        #else
+            #define __MINGW_EXTENSION
+        #endif
+    #endif 
 
-	#undef NTDDI_VERSION
-    #undef WINVER
-    #define WINVER 0x0600
-    #undef _WIN32_WINNT
-	#define _WIN32_WINNT 0x0600
     #include <sdkddkver.h>
     #include <propkeydef.h>
     #define COBJMACROS
-    #define INITGUID
+    #define INITGUID // Avoid additional linkage of static libs, excessive code will be optimized out by the compiler
     #include <audioclient.h>
     #include <mmdeviceapi.h>
     #include <endpointvolume.h>
@@ -4015,14 +3913,22 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 		case WAIT_OBJECT_0 + S_INPUT: {
             if (stream->cclient == NULL)
                 break;
-			ProcessInputBuffer(stream, processor);
+			if ((hr = ProcessInputBuffer(stream, processor)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
 			break; }
 
 		// Output stream
 		case WAIT_OBJECT_0 + S_OUTPUT: {
             if (stream->rclient == NULL)
                 break;
-			ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer);
+			if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
+			{
+				LogHostError(hr);
+				goto thread_error;
+			}
 			break; }
 		}
 	}
@@ -4198,7 +4104,11 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 				case S_INPUT: {
 					if (stream->cclient == NULL)
 						break;
-					ProcessInputBuffer(stream, processor);
+					if ((hr = ProcessInputBuffer(stream, processor)) != S_OK)
+					{
+						LogHostError(hr);
+						goto thread_error;
+					}
 					break; }
 
 				// Output stream
@@ -4212,19 +4122,31 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					if ((hr = PollGetOutputFramesAvailable(stream, &frames)) != S_OK)
 					{
 						LogHostError(hr);
-						break;
+						goto thread_error;
 					}
 
 					// output
 					if (stream->bufferMode == paUtilFixedHostBufferSize)
 					{
 						if (frames >= stream->out.framesPerBuffer)
-							ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer);
+						{
+							if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
+							{
+								LogHostError(hr);
+								goto thread_error;
+							}
+						}
 					}
 					else
 					{
 						if (frames != 0)
-							ProcessOutputBuffer(stream, processor, frames);
+						{
+							if ((hr = ProcessOutputBuffer(stream, processor, frames)) != S_OK)
+							{
+								LogHostError(hr);
+								goto thread_error;
+							}
+						}
 					}
 
 					break; }
