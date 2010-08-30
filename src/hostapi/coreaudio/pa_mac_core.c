@@ -817,6 +817,8 @@ static OSStatus AudioDevicePropertyActualSampleRateListenerProc( AudioDeviceID i
 	pthread_mutex_lock( &stream->timingInformationMutex );
 	UpdateReciprocalOfActualOutputSampleRateFromDeviceProperty( stream );
 	pthread_mutex_unlock( &stream->timingInformationMutex );
+
+	return noErr;
 }
 
 static void UpdateOutputLatencySamplesFromDeviceProperty( PaMacCoreStream *stream )
@@ -837,6 +839,8 @@ static OSStatus AudioDevicePropertyOutputLatencySamplesListenerProc( AudioDevice
 	pthread_mutex_lock( &stream->timingInformationMutex );
 	UpdateOutputLatencySamplesFromDeviceProperty( stream );
 	pthread_mutex_unlock( &stream->timingInformationMutex );
+
+	return noErr;
 }
 
 static void UpdateInputLatencySamplesFromDeviceProperty( PaMacCoreStream *stream )
@@ -857,6 +861,8 @@ static OSStatus AudioDevicePropertyInputLatencySamplesListenerProc( AudioDeviceI
 	pthread_mutex_lock( &stream->timingInformationMutex );
 	UpdateInputLatencySamplesFromDeviceProperty( stream );
 	pthread_mutex_unlock( &stream->timingInformationMutex );
+
+	return noErr;
 }
 
 
