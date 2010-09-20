@@ -2462,9 +2462,11 @@ static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwPara
             dir = 1;
     }
 
-    ENSURE_( snd_pcm_hw_params_set_rate( pcm, hwParams, approx, dir ), paUnanticipatedHostError );
-
+    if( snd_pcm_hw_params_set_rate( pcm, hwParams, approx, dir ) < 0)
+        result = paInvalidSampleRate;
+        
 end:
+
     return result;
 
 error:
