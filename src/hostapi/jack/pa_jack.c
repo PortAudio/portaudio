@@ -71,8 +71,6 @@
 #include "pa_ringbuffer.h"
 #include "pa_debugprint.h"
 
-static int aErr_;
-static PaError paErr_;     /* For use with ENSURE_PA */
 static pthread_t mainThread_;
 static char *jackErr_ = NULL;
 static const char* clientName_ = "PortAudio";
@@ -83,15 +81,17 @@ static const char* clientName_ = "PortAudio";
 /* Check PaError */
 #define ENSURE_PA(expr) \
     do { \
-        if( (paErr_ = (expr)) < paNoError ) \
+        PaError paErr; \
+        if( (paErr = (expr)) < paNoError ) \
         { \
-            if( (paErr_) == paUnanticipatedHostError && pthread_self() == mainThread_ ) \
+            if( (paErr) == paUnanticipatedHostError && pthread_self() == mainThread_ ) \
             { \
-                if (! jackErr_ ) jackErr_ = "unknown error";\
-                PaUtil_SetLastHostErrorInfo( paJACK, -1, jackErr_ ); \
+                const char *err = jackErr_; \
+                if (! err ) err = "unknown error"; \
+                PaUtil_SetLastHostErrorInfo( paJACK, -1, err ); \
             } \
             PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
-            result = paErr_; \
+            result = paErr; \
             goto error; \
         } \
     } while( 0 )
@@ -102,8 +102,9 @@ static const char* clientName_ = "PortAudio";
         { \
             if( (code) == paUnanticipatedHostError && pthread_self() == mainThread_ ) \
             { \
-                if (!jackErr_) jackErr_ = "unknown error";\
-                PaUtil_SetLastHostErrorInfo( paJACK, -1, jackErr_ ); \
+                const char *err = jackErr_; \
+                if (!err) err = "unknown error"; \
+                PaUtil_SetLastHostErrorInfo( paJACK, -1, err ); \
             } \
             PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
             result = (code); \
@@ -112,8 +113,10 @@ static const char* clientName_ = "PortAudio";
     } while( 0 )
 
 #define ASSERT_CALL(expr, success) \
-    aErr_ = (expr); \
-    assert( aErr_ == success );
+    do { \
+        int err = (expr); \
+        assert( err == success ); \
+    } while( 0 )
 
 /*
  * Functions that directly map to the PortAudio stream interface
@@ -826,6 +829,7 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     PaUtil_FreeMemory( jackHostApi );
 
     free( jackErr_ );
+    jackErr_ = NULL;
 }
 
 static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
