@@ -632,13 +632,13 @@ static UINT32 ALIGN_BWD(UINT32 v, UINT32 align)
 
 // ------------------------------------------------------------------------------------------
 // Aligns 'v' forward
-/*static UINT32 ALIGN_FWD(UINT32 v, UINT32 align)
+static UINT32 ALIGN_FWD(UINT32 v, UINT32 align)
 {
 	UINT32 remainder = (align ? (v % align) : 0);
 	if (remainder == 0)
 		return v;
 	return v + (align - remainder);
-}*/
+}
 
 // ------------------------------------------------------------------------------------------
 // Aligns WASAPI buffer to 128 byte packet boundary. HD Audio will fail to play if buffer
@@ -2056,7 +2056,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 			pSub->period = pInfo->MinimumDevicePeriod;
 			// Recalculate aligned period
 			framesPerLatency = MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec);
-			_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
+			_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_FWD);
 		}
 	}
 
