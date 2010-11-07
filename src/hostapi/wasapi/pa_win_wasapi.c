@@ -1507,14 +1507,14 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
     old->nBlockAlign     = (old->nChannels * (old->wBitsPerSample/8));
     old->nAvgBytesPerSec = (old->nSamplesPerSec * old->nBlockAlign);
 
-    //WAVEFORMATEX
-    /*if ((params->channelCount <= 2) && ((bitsPerSample == 16) || (bitsPerSample == 8)))
+    // WAVEFORMATEX
+    if ((params->channelCount <= 2) && ((bitsPerSample == 16) || (bitsPerSample == 8)))
 	{
         old->cbSize		= 0;
         old->wFormatTag	= WAVE_FORMAT_PCM;
     }
-    //WAVEFORMATEXTENSIBLE
-    else*/
+    // WAVEFORMATEXTENSIBLE
+    else
 	{
         old->wFormatTag = WAVE_FORMAT_EXTENSIBLE;
         old->cbSize		= sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
@@ -1537,10 +1537,26 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
 			{
 			case 1:  wavex->dwChannelMask = KSAUDIO_SPEAKER_MONO; break;
 			case 2:  wavex->dwChannelMask = KSAUDIO_SPEAKER_STEREO; break;
+			case 3:  wavex->dwChannelMask = KSAUDIO_SPEAKER_STEREO|SPEAKER_LOW_FREQUENCY; break;
 			case 4:  wavex->dwChannelMask = KSAUDIO_SPEAKER_QUAD; break;
+			case 5:  wavex->dwChannelMask = KSAUDIO_SPEAKER_QUAD|SPEAKER_LOW_FREQUENCY; break;
+#ifdef KSAUDIO_SPEAKER_5POINT1_SURROUND
+			case 6:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1_SURROUND; break;
+#else
 			case 6:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1; break;
+#endif
+#ifdef KSAUDIO_SPEAKER_5POINT1_SURROUND
+			case 7:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1_SURROUND|SPEAKER_BACK_CENTER; break;
+#else
+			case 7:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1|SPEAKER_BACK_CENTER; break;
+#endif	
+#ifdef KSAUDIO_SPEAKER_7POINT1_SURROUND
+			case 8:  wavex->dwChannelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND; break;
+#else
 			case 8:  wavex->dwChannelMask = KSAUDIO_SPEAKER_7POINT1; break;
-			default: wavex->dwChannelMask = 0; break;
+#endif
+
+			default: wavex->dwChannelMask = 0;
 			}
 		}
 	}
