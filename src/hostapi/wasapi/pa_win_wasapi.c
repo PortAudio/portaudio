@@ -473,6 +473,7 @@ PaWasapiStream;
 // Local stream methods
 static void _OnStreamStop(PaWasapiStream *stream);
 static void _FinishStream(PaWasapiStream *stream);
+static void _CleanupStream(PaWasapiStream *stream);
 
 // Local statics
 static volatile BOOL  g_WasapiCOMInit    = FALSE;
@@ -1656,8 +1657,8 @@ static PaError GetClosestFormat(IAudioClient *myClient, double sampleRate,
 	   to 24-bit for user-space. The bug concerns Vista, if Windows 7 supports 24-bits for Input
 	   please report to PortAudio developers to exclude Windows 7.
 	*/
-	if ((params.sampleFormat == paInt24) && (output == FALSE))
-		params.sampleFormat = paFloat32;
+	/*if ((params.sampleFormat == paInt24) && (output == FALSE))
+		params.sampleFormat = paFloat32;*/ // <<< The silence was due to missing Int32_To_Int24_Dither implementation
 
     MakeWaveFormatFromParams(outWavex, &params, sampleRate);
 
@@ -2760,12 +2761,7 @@ static PaError CloseStream( PaStream* s )
 	CloseHandle(stream->event[S_INPUT]);
 	CloseHandle(stream->event[S_OUTPUT]);
 
-    SAFE_CLOSE(stream->hThread);
-	SAFE_CLOSE(stream->hThreadStart);
-	SAFE_CLOSE(stream->hThreadExit);
-	SAFE_CLOSE(stream->hCloseRequest);
-	SAFE_CLOSE(stream->hBlockingOpStreamRD);
-	SAFE_CLOSE(stream->hBlockingOpStreamWR);
+	_CleanupStream(stream);
 
 	free(stream->in.monoBuffer);
 	free(stream->out.monoBuffer);
@@ -2788,6 +2784,9 @@ static PaError StartStream( PaStream *s )
 		return paStreamIsNotStopped;
 
     PaUtil_ResetBufferProcessor(&stream->bufferProcessor);
+
+	// Cleanup handles (may be necessary if stream was stopped by itself due to error)
+	_CleanupStream(stream);
 
 	// Create close event
 	stream->hCloseRequest = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -2889,6 +2888,15 @@ static void _FinishStream(PaWasapiStream *stream)
 		_OnStreamStop(stream);
 	}
 
+	// Cleanup handles
+	_CleanupStream(stream);
+
+    stream->running = FALSE;
+}
+
+// ------------------------------------------------------------------------------------------
+static void _CleanupStream(PaWasapiStream *stream)
+{
 	// Close thread handles to allow restart
 	SAFE_CLOSE(stream->hThread);
 	SAFE_CLOSE(stream->hThreadStart);
@@ -2896,8 +2904,6 @@ static void _FinishStream(PaWasapiStream *stream)
 	SAFE_CLOSE(stream->hCloseRequest);
 	SAFE_CLOSE(stream->hBlockingOpStreamRD);
 	SAFE_CLOSE(stream->hBlockingOpStreamWR);
-
-    stream->running = FALSE;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3726,10 +3732,8 @@ static HRESULT ProcessOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor
 	// Process data
 	if (stream->out.monoMixer != NULL)
 	{
-#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
-
 		// expand buffer (one way only for better performancedue to no calls to realloc)
-		UINT32 mono_frames_size = frames * __DIV_8(stream->out.wavex.Format.wBitsPerSample);
+		UINT32 mono_frames_size = frames * (stream->out.wavex.Format.wBitsPerSample / 8);
 		if (mono_frames_size > stream->out.monoBufferSize)
 			stream->out.monoBuffer = realloc(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
 
@@ -3738,8 +3742,6 @@ static HRESULT ProcessOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor
 
 		// mix 1 to 2 channels
 		stream->out.monoMixer(data, stream->out.monoBuffer, frames);
-
-#undef __DIV_8
 	}
 	else
 	{
@@ -3787,10 +3789,8 @@ static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor 
 		// Process data
 		if (stream->in.monoMixer != NULL)
 		{
-#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
-
 			// expand buffer (one way only for better performancedue to no calls to realloc)
-			UINT32 mono_frames_size = frames * __DIV_8(stream->in.wavex.Format.wBitsPerSample);
+			UINT32 mono_frames_size = frames * (stream->in.wavex.Format.wBitsPerSample / 8);
 			if (mono_frames_size > stream->in.monoBufferSize)
 				stream->in.monoBuffer = realloc(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
 
@@ -3799,8 +3799,6 @@ static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor 
 
 			// process
 			processor[S_INPUT].processor((BYTE *)stream->in.monoBuffer, frames, NULL, 0, processor[S_INPUT].userData);
-
-#undef __DIV_8
 		}
 		else
 		{
@@ -3810,6 +3808,8 @@ static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor 
 		// Release buffer
 		if ((hr = IAudioCaptureClient_ReleaseBuffer(stream->cclient, frames)) != S_OK)
 			return LogHostError(hr);
+
+		break;
 	}
 
 	return hr;
@@ -3832,6 +3832,10 @@ void _OnStreamStop(PaWasapiStream *stream)
 		PaWasapi_ThreadPriorityRevert(stream->hAvTask);
 		stream->hAvTask = NULL;
 	}
+
+	// Release Render/Capture clients (if Exclusive mode was used it will release devices to other applications)
+    SAFE_RELEASE(stream->cclient);
+    SAFE_RELEASE(stream->rclient);
 
     // Notify
     if (stream->streamRepresentation.streamFinishedCallback != NULL)
@@ -3961,8 +3965,8 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	// Processing Loop
 	for (;;)
     {
-	    // 2 sec timeout
-        dwResult = WaitForMultipleObjects(S_COUNT, stream->event, bWaitAllEvents, 10000);
+	    // 10 sec timeout (on timeout stream will auto-stop when processed by WAIT_TIMEOUT case)
+        dwResult = WaitForMultipleObjects(S_COUNT, stream->event, bWaitAllEvents, 10*1000);
 
 		// Check for close event (after wait for buffers to avoid any calls to user
 		// callback when hCloseRequest was set)
@@ -3979,24 +3983,30 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 
 		// Input stream
 		case WAIT_OBJECT_0 + S_INPUT: {
+
             if (stream->cclient == NULL)
                 break;
+
 			if ((hr = ProcessInputBuffer(stream, processor)) != S_OK)
 			{
 				LogHostError(hr);
 				goto thread_error;
 			}
+
 			break; }
 
 		// Output stream
 		case WAIT_OBJECT_0 + S_OUTPUT: {
+
             if (stream->rclient == NULL)
                 break;
+
 			if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
 			{
 				LogHostError(hr);
 				goto thread_error;
 			}
+
 			break; }
 		}
 	}
@@ -4233,13 +4243,16 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 				{
 				// Input stream
 				case S_INPUT: {
+
 					if (stream->cclient == NULL)
 						break;
+
 					if ((hr = ProcessInputBuffer(stream, processor)) != S_OK)
 					{
 						LogHostError(hr);
 						goto thread_error;
 					}
+
 					break; }
 
 				// Output stream
@@ -4329,9 +4342,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					// convert output mono
 					if (stream->out.monoMixer)
 					{
-						#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
-						UINT32 mono_frames_size = o_processed * __DIV_8(stream->out.wavex.Format.wBitsPerSample);
-						#undef __DIV_8
+						UINT32 mono_frames_size = o_processed * (stream->out.wavex.Format.wBitsPerSample / 8);
 						// expand buffer (one way only for better performance due to no calls to realloc)
 						if (mono_frames_size > stream->out.monoBufferSize)
 						{
@@ -4350,9 +4361,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					// convert input mono
 					if (stream->in.monoMixer)
 					{
-						#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
-						UINT32 mono_frames_size = i_processed * __DIV_8(stream->in.wavex.Format.wBitsPerSample);
-						#undef __DIV_8
+						UINT32 mono_frames_size = i_processed * (stream->in.wavex.Format.wBitsPerSample / 8);
 						// expand buffer (one way only for better performance due to no calls to realloc)
 						if (mono_frames_size > stream->in.monoBufferSize)
 						{
@@ -4455,9 +4464,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 						// convert output mono
 						if (stream->out.monoMixer)
 						{
-							#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
-							UINT32 mono_frames_size = o_processed * __DIV_8(stream->out.wavex.Format.wBitsPerSample);
-							#undef __DIV_8
+							UINT32 mono_frames_size = o_processed * (stream->out.wavex.Format.wBitsPerSample / 8);
 							// expand buffer (one way only for better performance due to no calls to realloc)
 							if (mono_frames_size > stream->out.monoBufferSize)
 							{
@@ -4476,9 +4483,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 						// convert input mono
 						if (stream->in.monoMixer)
 						{
-							#define __DIV_8(v)  ((v) >> 3) //!< (v / 8)
-							UINT32 mono_frames_size = i_processed * __DIV_8(stream->in.wavex.Format.wBitsPerSample);
-							#undef __DIV_8
+							UINT32 mono_frames_size = i_processed * (stream->in.wavex.Format.wBitsPerSample / 8);
 							// expand buffer (one way only for better performance due to no calls to realloc)
 							if (mono_frames_size > stream->in.monoBufferSize)
 							{
