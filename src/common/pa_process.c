@@ -137,6 +137,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
     PaError result = paNoError;
     PaError bytesPerSample;
     unsigned long tempInputBufferSize, tempOutputBufferSize;
+    PaStreamFlags tempInputStreamFlags;
 
     if( streamFlags & paNeverDropInput )
     {
@@ -257,8 +258,20 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
             goto error;
         }
 
+        /* Under the assumption that no ADC in existence delivers better than 24bits resoultion,
+            we disable dithering when host input format is paInt32 and user format is paInt24, 
+            since the host samples will just be padded with zeros anyway. */
+
+        tempInputStreamFlags = streamFlags;
+        if( !(tempInputStreamFlags & paDitherOff) /* dither is on */
+                && (hostInputSampleFormat & paInt32) /* host input format is int32 */
+                && (userInputSampleFormat & paInt24) /* user requested format is int24 */ ){
+
+            tempInputStreamFlags = tempInputStreamFlags | paDitherOff;
+        }
+
         bp->inputConverter =
-            PaUtil_SelectConverter( hostInputSampleFormat, userInputSampleFormat, streamFlags );
+            PaUtil_SelectConverter( hostInputSampleFormat, userInputSampleFormat, tempInputStreamFlags );
 
         bp->inputZeroer = PaUtil_SelectZeroer( hostInputSampleFormat );
             
