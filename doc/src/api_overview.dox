@@ -32,7 +32,7 @@ The PortAudio API offers the following functionality:
 - Provide Stream timing information to support synchronising audio with other parts of your application
 - Retrieve version and error information.
 
-These functions are described in more detail in the sections that follow.
+These functions are described in more detail below.
 
 
 @section top_level_functions Initialization, termination and utility functions
