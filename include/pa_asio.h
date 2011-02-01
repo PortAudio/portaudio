@@ -65,7 +65,8 @@ extern "C"
 
  @see ASIOGetBufferSize in the ASIO SDK.
 
- @todo This function should have a better name, any suggestions?
+ @todo This function should be renamed to PaAsio_GetAvailableBufferSizes. 
+        No reason to use a wildly different name from the ASIO version.
 */
 PaError PaAsio_GetAvailableLatencyValues( PaDeviceIndex device,
 		long *minLatency, long *maxLatency, long *preferredLatency, long *granularity );
