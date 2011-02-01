@@ -46,7 +46,7 @@
  @todo Dynamically calculate the coefficients used to smooth the CPU Load
  Measurements over time to provide a uniform characterisation of CPU Load
  independent of rate at which PaUtil_BeginCpuLoadMeasurement /
- PaUtil_EndCpuLoadMeasurement are called.
+ PaUtil_EndCpuLoadMeasurement are called. see http://www.portaudio.com/trac/ticket/113
 */
 
 
@@ -89,7 +89,7 @@ void PaUtil_EndCpuLoadMeasurement( PaUtilCpuLoadMeasurer* measurer, unsigned lon
         measuredLoad = (measurementEndTime - measurer->measurementStartTime) / secondsFor100Percent;
 
         /* Low pass filter the calculated CPU load to reduce jitter using a simple IIR low pass filter. */
-        /** FIXME @todo these coefficients shouldn't be hardwired */
+        /** FIXME @todo these coefficients shouldn't be hardwired see: http://www.portaudio.com/trac/ticket/113 */
 #define LOWPASS_COEFFICIENT_0   (0.9)
 #define LOWPASS_COEFFICIENT_1   (0.99999 - LOWPASS_COEFFICIENT_0)
 
