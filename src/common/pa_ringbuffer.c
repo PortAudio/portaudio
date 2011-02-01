@@ -145,7 +145,7 @@ ring_buffer_size_t PaUtil_AdvanceRingBufferWriteIndex( PaUtilRingBuffer *rbuf, r
 ** Get address of region(s) from which we can read data.
 ** If the region is contiguous, size2 will be zero.
 ** If non-contiguous, size2 will be the size of second region.
-** Returns room available to be written or elementCount, whichever is smaller.
+** Returns room available to be read or elementCount, whichever is smaller.
 */
 ring_buffer_size_t PaUtil_GetRingBufferReadRegions( PaUtilRingBuffer *rbuf, ring_buffer_size_t elementCount,
                                 void **dataPtr1, ring_buffer_size_t *sizePtr1,
