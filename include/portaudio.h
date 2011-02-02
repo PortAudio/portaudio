@@ -398,11 +398,13 @@ PaDeviceIndex Pa_GetDefaultInputDevice( void );
 PaDeviceIndex Pa_GetDefaultOutputDevice( void );
 
 
-/** The type used to represent monotonic time in seconds that can be used
- for syncronisation. The type is used for the outTime argument to the
+/** The type used to represent monotonic time in seconds. PaTime is 
+ used for the fields of the PaStreamCallbackTimeInfo argument to the 
  PaStreamCallback and as the result of Pa_GetStreamTime().
+
+ PaTime values have unspecified origin.
      
- @see PaStreamCallback, Pa_GetStreamTime
+ @see PaStreamCallback, PaStreamCallbackTimeInfo, Pa_GetStreamTime
 */
 typedef double PaTime;
 
@@ -1007,13 +1009,20 @@ typedef struct PaStreamInfo
 const PaStreamInfo* Pa_GetStreamInfo( PaStream *stream );
 
 
-/** Determine the current time for the stream according to the same clock used
- to generate buffer timestamps. This time may be used for syncronising other
- events to the audio stream, for example synchronizing audio to MIDI.
+/** Returns the current time in seconds for a stream according to the same clock used
+ to generate callback PaStreamCallbackTimeInfo timestamps. The time values are
+ monotonically increasing and have unspecified origin. 
+ 
+ Pa_GetStreamTime returns valid time values for the entire life of the stream,
+ from when the stream is opened until it is closed. Starting and stopping the stream
+ does not affect the passage of time returned by Pa_GetStreamTime.
+
+ This time may be used for syncronising other events to the audio stream, for 
+ example synchronizing audio to MIDI.
                                         
  @return The stream's current time in seconds, or 0 if an error occurred.
 
- @see PaTime, PaStreamCallback
+ @see PaTime, PaStreamCallback, PaStreamCallbackTimeInfo
 */
 PaTime Pa_GetStreamTime( PaStream *stream );
 
