@@ -40,9 +40,6 @@
  @ingroup win_src
 
     @brief Win32 host API initialization function table.
-
-    @todo Consider using PA_USE_WMME etc instead of PA_NO_WMME. This is what
-    the Unix version does, we should consider being consistent.
 */
 
 

@@ -46,9 +46,6 @@
 
     Some functions declared here are defined in pa_front.c while others
     are implemented separately for each platform.
-
-    @todo Document and adhere to the alignment guarantees provided by
-    PaUtil_AllocateMemory().
 */
 
 

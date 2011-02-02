@@ -39,34 +39,6 @@
 
 /** @file
  @ingroup hostapi_src
-
-    @todo implement paInputOverflow callback status flag
-    
-    @todo implement paNeverDropInput.
-
-    @todo implement host api specific extension to set i/o buffer sizes in frames
-
-    @todo implement initialisation of PaDeviceInfo default*Latency fields (currently set to 0.)
-
-    @todo implement ReadStream, WriteStream, GetStreamReadAvailable, GetStreamWriteAvailable
-
-    @todo audit handling of DirectSound result codes - in many cases we could convert a HRESULT into
-        a native portaudio error code. Standard DirectSound result codes are documented at msdn.
-
-    @todo implement IsFormatSupported
-
-    @todo call PaUtil_SetLastHostErrorInfo with a specific error string (currently just "DSound error").
-
-    @todo make sure all buffers have been played before stopping the stream
-        when the stream callback returns paComplete
-
-    @todo retrieve default devices using the DRVM_MAPPER_PREFERRED_GET functions used in the wmme api
-        these wave device ids can be aligned with the directsound devices either by retrieving
-        the system interface device name using DRV_QUERYDEVICEINTERFACE or by using the wave device
-        id retrieved in KsPropertySetEnumerateCallback.
-
-    old TODOs from phil, need to work out if these have been done:
-        O- fix "patest_stop.c"
 */
 
 
