@@ -1832,21 +1832,21 @@ static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostA
 
         for( j = 0; j < 2; ++j )
         {
-            if( j == 0 )
-            { 
-                /* first, attempt to open the device using WAVEFORMATEXTENSIBLE, 
-                    if this fails we fall back to WAVEFORMATEX */
+            switch(j){
+                case 0:     
+                    /* first, attempt to open the device using WAVEFORMATEXTENSIBLE, 
+                        if this fails we fall back to WAVEFORMATEX */
 
-                PaWin_InitializeWaveFormatExtensible( &waveFormat, devices[i].channelCount, 
-                        sampleFormat, waveFormatTag, sampleRate, channelMask );
+                    PaWin_InitializeWaveFormatExtensible( &waveFormat, devices[i].channelCount, 
+                            sampleFormat, waveFormatTag, sampleRate, channelMask );
+                    break;
+                
+                case 1:
+                    /* retry with WAVEFORMATEX */
 
-            }
-            else
-            {
-                /* retry with WAVEFORMATEX */
-
-                PaWin_InitializeWaveFormatEx( &waveFormat, devices[i].channelCount, 
-                        sampleFormat, waveFormatTag, sampleRate );
+                    PaWin_InitializeWaveFormatEx( &waveFormat, devices[i].channelCount, 
+                            sampleFormat, waveFormatTag, sampleRate );
+                    break;
             }
 
             /* REVIEW: consider not firing an event for input when a full duplex
@@ -3719,7 +3719,9 @@ static PaError ReadStream( PaStream* s,
                 {
                     /** @todo REVIEW: consider what to do if the input overflows.
                         do we requeue all of the buffers? should we be running
-                        a thread to make sure they are always queued? */
+                        a thread to make sure they are always queued? 
+                        see: http://www.portaudio.com/trac/ticket/117
+                        */
 
                     result = paInputOverflowed;
                 }
@@ -3824,7 +3826,9 @@ static PaError WriteStream( PaStream* s,
                     /** @todo REVIEW: consider what to do if the output
                     underflows. do we requeue all the existing buffers with
                     zeros? should we run a separate thread to keep the buffers
-                    enqueued at all times? */
+                    enqueued at all times? 
+                    see: http://www.portaudio.com/trac/ticket/117
+                    */
 
                     result = paOutputUnderflowed;
                 }
