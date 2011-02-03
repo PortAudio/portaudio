@@ -4862,6 +4862,9 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 			// get available frames
 			if ((hr = _PollGetOutputFramesAvailable(stream, &o_frames)) != S_OK)
 			{
+				// release input buffer
+				IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
+
 				LogHostError(hr);
 				break;
 			}
@@ -4889,6 +4892,11 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 							stream->out.monoBuffer = PaWasapi_ReallocateMemory(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
 							if (stream->out.monoBuffer == NULL)
 							{
+								// release input buffer
+								IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
+								// release output buffer
+								IAudioRenderClient_ReleaseBuffer(stream->renderClient, 0, 0);
+
 								LogPaError(paInsufficientMemory);
 								break;
 							}
@@ -4908,6 +4916,11 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 							stream->in.monoBuffer = PaWasapi_ReallocateMemory(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
 							if (stream->in.monoBuffer == NULL)
 							{
+								// release input buffer
+								IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
+								// release output buffer
+								IAudioRenderClient_ReleaseBuffer(stream->renderClient, 0, 0);
+
 								LogPaError(paInsufficientMemory);
 								break;
 							}
@@ -4954,11 +4967,6 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 			BYTE *i_data = NULL, *o_data = NULL, *o_data_host = NULL;
 			DWORD i_flags = 0;
 			UINT32 o_frames = 0;
-			//BOOL repeat = FALSE;
-
-			// going below 1 msec resolution, switching between 1 ms and no waiting
-			//if (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
-			//	sleep_ms = !sleep_ms;
 
 			// Get next sleep time
 			if (sleep_ms == 0)
@@ -4985,9 +4993,6 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					break;
 				}
 
-				//PA_DEBUG(("full-duplex: o_frames[%d] i_frames[%d] repeat[%d]\n", o_frames, i_frames, repeat));
-				//repeat = TRUE;
-
 				// process equal ammount of frames
 				if (o_frames >= i_frames)
 				{
@@ -5011,6 +5016,11 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 								stream->out.monoBuffer = PaWasapi_ReallocateMemory(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
 								if (stream->out.monoBuffer == NULL)
 								{
+									// release input buffer
+									IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
+									// release output buffer
+									IAudioRenderClient_ReleaseBuffer(stream->renderClient, 0, 0);
+
 									LogPaError(paInsufficientMemory);
 									goto thread_error;
 								}
@@ -5030,6 +5040,11 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 								stream->in.monoBuffer = PaWasapi_ReallocateMemory(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
 								if (stream->in.monoBuffer == NULL)
 								{
+									// release input buffer
+									IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
+									// release output buffer
+									IAudioRenderClient_ReleaseBuffer(stream->renderClient, 0, 0);
+
 									LogPaError(paInsufficientMemory);
 									goto thread_error;
 								}
