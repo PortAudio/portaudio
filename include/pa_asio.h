@@ -44,7 +44,6 @@
  @brief ASIO-specific PortAudio API extension header file.
 */
 
-
 #include "portaudio.h"
 
 #ifdef __cplusplus

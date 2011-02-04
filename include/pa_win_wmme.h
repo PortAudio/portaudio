@@ -43,7 +43,6 @@
  @brief WMME-specific PortAudio API extension header file.
 */
 
-
 #include "portaudio.h"
 #include "pa_win_waveformat.h"
 
