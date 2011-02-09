@@ -3098,13 +3098,13 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
         {
 
            /* Suspended, paused or failed device can provide 0 poll results. To avoid deadloop in such situation
-            * we simply run counter 'timeouts' which detects 0 poll result and accumulates. As soon as 64 timouts
+            * we simply run counter 'timeouts' which detects 0 poll result and accumulates. As soon as 2048 timouts (around 2 seconds)
             * are achieved we simply fail function with paTimedOut to notify waiting methods that device is not capable
             * of providing audio data anymore and needs some corresponding recovery action.
             * Note that 'timeouts' is reset to 0 if poll() managed to return non 0 results.
             */
 
-            /*PA_DEBUG(( "%s: poll == 0 results, timed out, %d times left\n", __FUNCTION__, 64 - timeouts ));*/
+            /*PA_DEBUG(( "%s: poll == 0 results, timed out, %d times left\n", __FUNCTION__, 2048 - timeouts ));*/
 
             ++ timeouts;
             if (timeouts > 1) /* sometimes device times out, but normally once, so we do not sleep any time */
@@ -3112,12 +3112,13 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
                 Pa_Sleep( 1 ); /* avoid hot loop */
             }
             /* not else ! */
-            if (timeouts >= 64) /* audio device not working, shall return error to notify waiters */
+            if (timeouts >= 2048) /* audio device not working, shall return error to notify waiters */
             {
 				*framesAvail = 0; /* no frames available for processing */
+				xrun = 1; /* try recovering device */
 
-                PA_DEBUG(( "%s: poll timed out, returning error\n", __FUNCTION__, timeouts ));
-                PA_ENSURE( paTimedOut );
+                PA_DEBUG(( "%s: poll timed out\n", __FUNCTION__, timeouts ));
+                goto end;/*PA_ENSURE( paTimedOut );*/
             }
         }
         else
@@ -3614,13 +3615,15 @@ static void *CallbackThreadFunc( void *userData )
         }
     }
 
+end:	
     /* Match pthread_cleanup_push */
     pthread_cleanup_pop( 1 );
 
-end:
     PA_DEBUG(( "%s: Thread %d exiting\n ", __FUNCTION__, pthread_self() ));
     PaUnixThreading_EXIT( result );
+
 error:
+    PA_DEBUG(( "%s: Thread %d is canceled due to error %d\n ", __FUNCTION__, pthread_self(), result ));
     goto end;
 }
 
