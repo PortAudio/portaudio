@@ -1121,7 +1121,7 @@ static PaError PaOssStream_Configure( PaOssStream *stream, double sampleRate, un
         assert( component->hostChannelCount > 0 );
         assert( component->hostFrames > 0 );
 
-        *inputLatency = component->hostFrames * (component->numBufs - 1) / sampleRate;
+        *inputLatency = (component->hostFrames * (component->numBufs - 1)) / sampleRate;
     }
     if( stream->playback )
     {
@@ -1132,7 +1132,7 @@ static PaError PaOssStream_Configure( PaOssStream *stream, double sampleRate, un
         assert( component->hostChannelCount > 0 );
         assert( component->hostFrames > 0 );
 
-        *outputLatency = component->hostFrames * (component->numBufs - 1) / sampleRate;
+        *outputLatency = (component->hostFrames * (component->numBufs - 1)) / sampleRate;
     }
 
     if( duplex )
