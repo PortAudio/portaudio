@@ -1569,7 +1569,7 @@ typedef struct PaAsioStream
 
     ASIOBufferInfo *asioBufferInfos;
     ASIOChannelInfo *asioChannelInfos;
-    long inputLatency, outputLatency; // actual latencies returned by asio
+    long asioInputLatencyFrames, asioOutputLatencyFrames; // actual latencies returned by asio
 
     long inputChannelCount, outputChannelCount;
     bool postOutput;
@@ -2245,7 +2245,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
 
-    ASIOGetLatencies( &stream->inputLatency, &stream->outputLatency );
+    ASIOGetLatencies( &stream->asioInputLatencyFrames, &stream->asioOutputLatencyFrames );
 
 
     /* Using blocking i/o interface... */
@@ -2357,7 +2357,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                   to samples frames.
                5) Get the next larger (or equal) power-of-two buffer size.
              */
-            lBlockingBufferSize = suggestedInputLatencyFrames - stream->inputLatency;
+            lBlockingBufferSize = suggestedInputLatencyFrames - stream->asioInputLatencyFrames;
             lBlockingBufferSize = (lBlockingBufferSize > 0) ? lBlockingBufferSize : 1;
             lBlockingBufferSize = (lBlockingBufferSize + framesPerBuffer - 1) / framesPerBuffer;
             lBlockingBufferSize = (lBlockingBufferSize + 1) * framesPerBuffer;
@@ -2372,7 +2372,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 (double)( PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor               )
                         + PaUtil_GetBufferProcessorInputLatency(&stream->blockingState->bufferProcessor)
                         + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer
-                        + stream->inputLatency )
+                        + stream->asioInputLatencyFrames )
                 / sampleRate;
 
             /* The code below prints the ASIO latency which doesn't include
@@ -2443,7 +2443,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                   to samples frames.
                5) Get the next larger (or equal) power-of-two buffer size.
              */
-            lBlockingBufferSize = suggestedOutputLatencyFrames - stream->outputLatency;
+            lBlockingBufferSize = suggestedOutputLatencyFrames - stream->asioOutputLatencyFrames;
             lBlockingBufferSize = (lBlockingBufferSize > 0) ? lBlockingBufferSize : 1;
             lBlockingBufferSize = (lBlockingBufferSize + framesPerBuffer - 1) / framesPerBuffer;
             lBlockingBufferSize = (lBlockingBufferSize + 1) * framesPerBuffer;
@@ -2463,7 +2463,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 (double)( PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor               )
                         + PaUtil_GetBufferProcessorOutputLatency(&stream->blockingState->bufferProcessor)
                         + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer
-                        + stream->outputLatency )
+                        + stream->asioOutputLatencyFrames )
                 / sampleRate;
 
             /* The code below prints the ASIO latency which doesn't include
@@ -2518,10 +2518,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->streamRepresentation.streamInfo.inputLatency =
                 (double)( PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor)
-                    + stream->inputLatency) / sampleRate;   // seconds
+                    + stream->asioInputLatencyFrames) / sampleRate;   // seconds
         stream->streamRepresentation.streamInfo.outputLatency =
                 (double)( PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor)
-                    + stream->outputLatency) / sampleRate; // seconds
+                    + stream->asioOutputLatencyFrames) / sampleRate; // seconds
         stream->streamRepresentation.streamInfo.sampleRate = sampleRate;
 
         // the code below prints the ASIO latency which doesn't include the
@@ -2871,10 +2871,10 @@ previousIndex = index;
 
                 /* patch from Paul Boege */
                 paTimeInfo.inputBufferAdcTime = paTimeInfo.currentTime -
-                    ((double)theAsioStream->inputLatency/theAsioStream->streamRepresentation.streamInfo.sampleRate);
+                    ((double)theAsioStream->asioInputLatencyFrames/theAsioStream->streamRepresentation.streamInfo.sampleRate);
 
                 paTimeInfo.outputBufferDacTime = paTimeInfo.currentTime +
-                    ((double)theAsioStream->outputLatency/theAsioStream->streamRepresentation.streamInfo.sampleRate);
+                    ((double)theAsioStream->asioOutputLatencyFrames/theAsioStream->streamRepresentation.streamInfo.sampleRate);
 
                 /* old version is buggy because the buffer processor also adds in its latency to the time parameters
                 paTimeInfo.inputBufferAdcTime = paTimeInfo.currentTime - theAsioStream->streamRepresentation.streamInfo.inputLatency;
