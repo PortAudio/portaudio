@@ -737,7 +737,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_skeleton.c"
+					RelativePath="..\..\src\hostapi\skeleton\pa_hostapi_skeleton.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
