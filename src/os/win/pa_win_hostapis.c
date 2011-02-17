@@ -42,7 +42,6 @@
     @brief Win32 host API initialization function table.
 */
 
-
 #include "pa_hostapi.h"
 
 #ifdef __cplusplus
@@ -65,27 +64,25 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 PaUtilHostApiInitializer *paHostApiInitializers[] =
     {
 
-#ifndef PA_NO_WMME
+#if PA_USE_WMME
         PaWinMme_Initialize,
 #endif
 
-#ifndef PA_NO_DS
+#if PA_USE_DS
         PaWinDs_Initialize,
 #endif
 
-#ifndef PA_NO_ASIO
+#if PA_USE_ASIO
         PaAsio_Initialize,
 #endif
 
-#ifndef PA_NO_WASAPI
+#if PA_USE_WASAPI
 		PaWasapi_Initialize,
 #endif
 
-/*
-#ifndef PA_NO_WDMKS
-       PaWinWdm_Initialize,
+#if PA_USE_WDMKS
+        PaWinWdm_Initialize,
 #endif
-*/
 
         //PaSkeleton_Initialize, /* just for testing */
 

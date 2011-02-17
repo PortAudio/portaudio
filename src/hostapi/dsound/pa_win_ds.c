@@ -41,7 +41,6 @@
  @ingroup hostapi_src
 */
 
-
 #include <assert.h>
 #include <stdio.h>
 #include <string.h> /* strlen() */
@@ -76,6 +75,9 @@
 #include "pa_win_waveformat.h"
 #include "pa_win_wdmks_utils.h"
 
+#ifndef PA_USE_WMME
+#error "Portaudio internal error: PA_USE_WMME=0/1 not defined. pa_hostapi.h should ensure that it is."
+#endif
 
 #if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
 #pragma comment( lib, "dsound.lib" )
@@ -678,7 +680,7 @@ static PaError AddOutputDeviceInfoFromDirectSound(
         else
         {
 
-#ifndef PA_NO_WMME
+#if PA_USE_WMME
             if( caps.dwFlags & DSCAPS_EMULDRIVER )
             {
                 /* If WMME supported, then reject Emulated drivers because they are lousy. */
@@ -894,7 +896,7 @@ static PaError AddInputDeviceInfoFromDirectSoundCapture(
         }
         else
         {
-#ifndef PA_NO_WMME
+#if PA_USE_WMME
             if( caps.dwFlags & DSCAPS_EMULDRIVER )
             {
                 /* If WMME supported, then reject Emulated drivers because they are lousy. */
@@ -2831,6 +2833,4 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 
     return 0;
 }
-
-
 

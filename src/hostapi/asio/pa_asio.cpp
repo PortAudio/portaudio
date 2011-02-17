@@ -2380,8 +2380,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                reports the added latency separately.
             */
             PA_DEBUG(("PaAsio : ASIO InputLatency = %ld (%ld ms),\n         added buffProc:%ld (%ld ms),\n         added blocking:%ld (%ld ms)\n",
-                stream->inputLatency,
-                (long)( stream->inputLatency * (1000.0 / sampleRate) ),
+                stream->asioInputLatencyFrames,
+                (long)( stream->asioInputLatencyFrames * (1000.0 / sampleRate) ),
                 PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor),
                 (long)( PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor) * (1000.0 / sampleRate) ),
                 PaUtil_GetBufferProcessorInputLatency(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer,
@@ -2471,8 +2471,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                reports the added latency separately.
             */
             PA_DEBUG(("PaAsio : ASIO OutputLatency = %ld (%ld ms),\n         added buffProc:%ld (%ld ms),\n         added blocking:%ld (%ld ms)\n",
-                stream->outputLatency,
-                (long)( stream->inputLatency * (1000.0 / sampleRate) ),
+                stream->asioOutputLatencyFrames,
+                (long)( stream->asioOutputLatencyFrames * (1000.0 / sampleRate) ),
                 PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor),
                 (long)( PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor) * (1000.0 / sampleRate) ),
                 PaUtil_GetBufferProcessorOutputLatency(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer,
@@ -2527,15 +2527,15 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         // the code below prints the ASIO latency which doesn't include the
         // buffer processor latency. it reports the added latency separately
         PA_DEBUG(("PaAsio : ASIO InputLatency = %ld (%ld ms), added buffProc:%ld (%ld ms)\n",
-                stream->inputLatency,
-                (long)((stream->inputLatency*1000)/ sampleRate),  
+                stream->asioInputLatencyFrames,
+                (long)((stream->asioInputLatencyFrames*1000)/ sampleRate),  
                 PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor),
                 (long)((PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor)*1000)/ sampleRate)
                 ));
 
         PA_DEBUG(("PaAsio : ASIO OuputLatency = %ld (%ld ms), added buffProc:%ld (%ld ms)\n",
-                stream->outputLatency,
-                (long)((stream->outputLatency*1000)/ sampleRate), 
+                stream->asioOutputLatencyFrames,
+                (long)((stream->asioOutputLatencyFrames*1000)/ sampleRate), 
                 PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor),
                 (long)((PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor)*1000)/ sampleRate)
                 ));

@@ -106,6 +106,10 @@
     #define DYNAMIC_GUID(data) DYNAMIC_GUID_THUNK(data)
 #endif
 
+#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#pragma comment( lib, "setupapi.lib" )
+#endif
+
 /* use CreateThread for CYGWIN, _beginthreadex for all others */
 #ifndef __CYGWIN__
 #define CREATE_THREAD (HANDLE)_beginthreadex( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId )
