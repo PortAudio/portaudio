@@ -2,7 +2,10 @@
 	@ingroup test_src
     @brief Self Testing Quality Assurance app for PortAudio
  	Try to open each device and run through all the
- 	possible configurations.
+ 	possible configurations. This test does not verify
+    that the configuration works well. It just verifies
+    that it does not crash. It requires a human to listen to
+    the outputs.
 
 	@author Phil Burk  http://www.softsynth.com
     

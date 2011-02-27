@@ -56,6 +56,13 @@ int g_testsFailed = 0;
 #define MAX_NUM_RECORDINGS  (8)
 #define LOOPBACK_DETECTION_DURATION_SECONDS  (0.5)
 
+// Use two separate streams instead of one full duplex stream.
+#define PAQA_FLAG_TWO_STREAMS       (1<<0)
+// Use bloching read/write for loopback.
+#define PAQA_FLAG_USE_BLOCKING_IO   (1<<1)
+
+#define DEFAULT_FRAMES_PER_BUFFER   (256)
+
 /** Parameters that describe a single test run. */
 typedef struct TestParameters_s
 {
@@ -67,6 +74,7 @@ typedef struct TestParameters_s
 	int                maxFrames;
 	double             baseFrequency;
 	double             amplitude;
+	int                flags;
 } TestParameters;
 
 typedef struct LoopbackContext_s
@@ -93,6 +101,9 @@ typedef struct UserOptions_s
 	PaDeviceIndex outputDevice;
 } UserOptions;
 
+#define BIG_BUFFER_SIZE  (sizeof(float) * 2 * 2048)
+static unsigned char g_BigBuffer[BIG_BUFFER_SIZE];
+
 /*******************************************************************/
 static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuffer,
 						unsigned long framesPerBuffer,
@@ -102,60 +113,66 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 {
     float *in = (float *)inputBuffer;
     float *out = (float *)outputBuffer;
-    int done = 0;
+    int done = paContinue;
 	
 	LoopbackContext *loopbackContext = (LoopbackContext *) userData;	
 	loopbackContext->callbackCount += 1;
 	
-    /* This may get called with NULL inputBuffer during initial setup. */
-    if( in == NULL) return 0;	
-	
-	for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+    /* This may get called with NULL inputBuffer during initial setup.
+	 * We may also use the same callback with output only streams.
+	 */
+    if( in != NULL)
 	{
-		done |= PaQa_WriteRecording( &loopbackContext->recordings[i], in + i, framesPerBuffer, loopbackContext->test->inputParameters.channelCount );
+		for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+		{
+			done |= PaQa_WriteRecording( &loopbackContext->recordings[i], in + i, framesPerBuffer, loopbackContext->test->inputParameters.channelCount );
+		}
 	}
 	
-	PaQa_EraseBuffer( out, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
-	
-	for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+	if( out != NULL )
 	{
-		PaQa_MixSine( &loopbackContext->generators[i], out + i, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
+		PaQa_EraseBuffer( out, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
+		
+		for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+		{
+			PaQa_MixSine( &loopbackContext->generators[i], out + i, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
+		}
 	}
-	
     return done ? paComplete : paContinue;
 }
 
 /*******************************************************************/
 /** 
- * Open an audio stream.
+ * Open a full duplex audio stream.
  * Generate sine waves on the output channels and record the input channels.
  * Then close the stream.
  * @return 0 if OK or negative error.
  */
-int PaQa_RunLoopback( LoopbackContext *loopbackContext )
+int PaQa_RunLoopbackFullDuplex( LoopbackContext *loopbackContext )
 {
 	PaStream *stream = NULL;
+	PaError err = 0;
 	TestParameters *test = loopbackContext->test;
-	PaError err = Pa_OpenStream(
-						&stream,
-						&test->inputParameters,
-						&test->outputParameters,
-						test->sampleRate,
-						test->framesPerBuffer,
-						paClipOff, /* we won't output out of range samples so don't bother clipping them */
-						RecordAndPlaySinesCallback,
-						loopbackContext );
+	
+	// Use one full duplex stream.
+	err = Pa_OpenStream(
+					&stream,
+					&test->inputParameters,
+					&test->outputParameters,
+					test->sampleRate,
+					test->framesPerBuffer,
+					paClipOff, /* we won't output out of range samples so don't bother clipping them */
+					RecordAndPlaySinesCallback,
+					loopbackContext );
 	if( err != paNoError ) goto error;
 	
 	err = Pa_StartStream( stream );
 	if( err != paNoError ) goto error;
-	
+		
 	// Wait for stream to finish.
 	while( Pa_IsStreamActive( stream ) )
 	{
 		Pa_Sleep(50);
-		//printf("loopback count = %d\n", loopbackContext->callbackCount );
-		//printf("recording position = %d\n", loopbackContext->recordings[0].numFrames );
 	}
 	
 	err = Pa_StopStream( stream );
@@ -163,10 +180,303 @@ int PaQa_RunLoopback( LoopbackContext *loopbackContext )
 
 	err = Pa_CloseStream( stream );
 	if( err != paNoError ) goto error;
+		
+	return 0;
+	
+error:
+	return err;	
+}
+
+/*******************************************************************/
+/** 
+ * Open two audio streams, one for input and one for output.
+ * Generate sine waves on the output channels and record the input channels.
+ * Then close the stream.
+ * @return 0 if OK or negative error.
+ */
+int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
+{
+	PaStream *inStream = NULL;
+	PaStream *outStream = NULL;
+	PaError err = 0;
+	TestParameters *test = loopbackContext->test;
+	
+	// Use two half duplex streams.
+	err = Pa_OpenStream(
+						&inStream,
+						&test->inputParameters,
+						NULL,
+						test->sampleRate,
+						test->framesPerBuffer,
+						paClipOff, /* we won't output out of range samples so don't bother clipping them */
+						RecordAndPlaySinesCallback,
+						loopbackContext );
+	if( err != paNoError ) goto error;
+	err = Pa_OpenStream(
+						&outStream,
+						NULL,
+						&test->outputParameters,
+						test->sampleRate,
+						test->framesPerBuffer,
+						paClipOff, /* we won't output out of range samples so don't bother clipping them */
+						RecordAndPlaySinesCallback,
+						loopbackContext );
+	if( err != paNoError ) goto error;
+			
+	err = Pa_StartStream( inStream );
+	if( err != paNoError ) goto error;
+	
+	// Start output later so we catch the beginning of the waveform.
+	err = Pa_StartStream( outStream );
+	if( err != paNoError ) goto error;
+	
+	// Wait for stream to finish.
+	while( Pa_IsStreamActive( inStream ) )
+	{
+		Pa_Sleep(50);
+	}
+	
+	err = Pa_StopStream( inStream );
+	if( err != paNoError ) goto error;
+		
+	err = Pa_StopStream( outStream );
+	if( err != paNoError ) goto error;
+	
+	err = Pa_CloseStream( inStream );
+	if( err != paNoError ) goto error;
+	
+	err = Pa_CloseStream( outStream );
+	if( err != paNoError ) goto error;
 	
 	return 0;
 	
 error:
+	return err;	
+}
+
+
+
+/*******************************************************************/
+static int RecordAndPlayBlockingIO( PaStream *inStream,
+									  PaStream *outStream,
+									  LoopbackContext *loopbackContext
+									  )
+{	
+    float *in = (float *)g_BigBuffer;
+    float *out = (float *)g_BigBuffer;
+	PaError err;
+	int done = 0;
+	long available;
+	const long maxPerBuffer = 64;
+	TestParameters *test = loopbackContext->test;
+	long framesPerBuffer = test->framesPerBuffer;
+	if( framesPerBuffer <= 0 )
+	{
+		framesPerBuffer = 64; // bigger values might run past end of recording
+	}
+	
+	// Read in audio.
+	err = Pa_ReadStream( inStream, in, framesPerBuffer );
+	// Ignore an overflow on the first read.
+	//if( !((loopbackContext->callbackCount == 0) && (err == paInputOverflowed)) )
+	if( err != paInputOverflowed )
+	{
+		QA_ASSERT_EQUALS( "Pa_ReadStream failed", paNoError, err );
+	}
+	
+	// Save in a recording.
+    for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+	{
+		done |= PaQa_WriteRecording( &loopbackContext->recordings[i], in + i, framesPerBuffer, loopbackContext->test->inputParameters.channelCount );
+	}
+	
+	// Synthesize audio.
+	available = Pa_GetStreamWriteAvailable( outStream );
+	if( available > (2*framesPerBuffer) ) available = (2*framesPerBuffer);
+	PaQa_EraseBuffer( out, available, loopbackContext->test->outputParameters.channelCount );
+	for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+	{
+		PaQa_MixSine( &loopbackContext->generators[i], out + i, available, loopbackContext->test->outputParameters.channelCount );
+	}
+	
+	// Write out audio.
+	err = Pa_WriteStream( outStream, out, available );
+	// Ignore an underflow on the first write.
+	//if( !((loopbackContext->callbackCount == 0) && (err == paOutputUnderflowed)) )
+	if( err != paOutputUnderflowed )
+	{
+		QA_ASSERT_EQUALS( "Pa_WriteStream failed", paNoError, err );
+	}
+		
+	loopbackContext->callbackCount += 1;
+	
+	return done;
+error:
+	return err;
+}
+
+
+/*******************************************************************/
+/** 
+ * Open two audio streams with non-blocking IO.
+ * Generate sine waves on the output channels and record the input channels.
+ * Then close the stream.
+ * @return 0 if OK or negative error.
+ */
+int PaQa_RunLoopbackHalfDuplexBlockingIO( LoopbackContext *loopbackContext )
+{
+	PaStream *inStream = NULL;
+	PaStream *outStream = NULL;
+	PaError err = 0;
+	TestParameters *test = loopbackContext->test;
+	
+	// Use two half duplex streams.
+	err = Pa_OpenStream(
+						&inStream,
+						&test->inputParameters,
+						NULL,
+						test->sampleRate,
+						test->framesPerBuffer,
+						paClipOff, /* we won't output out of range samples so don't bother clipping them */
+						NULL, // causes non-blocking IO
+						NULL );
+	if( err != paNoError ) goto error1;
+	err = Pa_OpenStream(
+						&outStream,
+						NULL,
+						&test->outputParameters,
+						test->sampleRate,
+						test->framesPerBuffer,
+						paClipOff, /* we won't output out of range samples so don't bother clipping them */
+						NULL, // causes non-blocking IO
+						NULL );
+	if( err != paNoError ) goto error2;
+	
+	err = Pa_StartStream( outStream );
+	if( err != paNoError ) goto error3;
+	
+	err = Pa_StartStream( inStream );
+	if( err != paNoError ) goto error3;
+	
+	while( err == 0 )
+	{
+		err = RecordAndPlayBlockingIO( inStream, outStream, loopbackContext );
+		if( err < 0 ) goto error3;
+	}
+	
+	err = Pa_StopStream( inStream );
+	if( err != paNoError ) goto error3;
+	
+	err = Pa_StopStream( outStream );
+	if( err != paNoError ) goto error3;
+	
+	err = Pa_CloseStream( outStream );
+	if( err != paNoError ) goto error2;
+	
+	err = Pa_CloseStream( inStream );
+	if( err != paNoError ) goto error1;
+	
+	
+	return 0;
+	
+error3:
+	Pa_CloseStream( outStream );
+error2:
+	Pa_CloseStream( inStream );
+error1:
+	return err;	
+}
+
+
+/*******************************************************************/
+/** 
+ * Open one audio stream with non-blocking IO.
+ * Generate sine waves on the output channels and record the input channels.
+ * Then close the stream.
+ * @return 0 if OK or negative error.
+ */
+int PaQa_RunLoopbackFullDuplexBlockingIO( LoopbackContext *loopbackContext )
+{
+	PaStream *stream = NULL;
+	PaError err = 0;
+	TestParameters *test = loopbackContext->test;
+	
+	// Use one full duplex stream.
+	err = Pa_OpenStream(
+						&stream,
+						&test->inputParameters,
+						&test->outputParameters,
+						test->sampleRate,
+						test->framesPerBuffer,
+						paClipOff, /* we won't output out of range samples so don't bother clipping them */
+						NULL, // causes non-blocking IO
+						NULL );
+	if( err != paNoError ) goto error1;
+		
+	err = Pa_StartStream( stream );
+	if( err != paNoError ) goto error2;
+	
+	while( err == 0 )
+	{
+		err = RecordAndPlayBlockingIO( stream, stream, loopbackContext );
+		if( err < 0 ) goto error2;
+	}
+	
+	err = Pa_StopStream( stream );
+	if( err != paNoError ) goto error2;
+	
+	
+	err = Pa_CloseStream( stream );
+	if( err != paNoError ) goto error1;
+	
+	
+	return 0;
+	
+error2:
+	Pa_CloseStream( stream );
+error1:
+	return err;	
+}
+
+
+/*******************************************************************/
+/** 
+ * Run some kind of loopback test.
+ * @return 0 if OK or negative error.
+ */
+int PaQa_RunLoopback( LoopbackContext *loopbackContext )
+{
+	PaError err = 0;
+	TestParameters *test = loopbackContext->test;
+	
+	
+	if( test->flags & PAQA_FLAG_TWO_STREAMS )
+	{
+		if( test->flags & PAQA_FLAG_USE_BLOCKING_IO )
+		{
+			err = PaQa_RunLoopbackHalfDuplexBlockingIO( loopbackContext );
+		}
+		else
+		{
+			err = PaQa_RunLoopbackHalfDuplex( loopbackContext );
+		}
+	}
+	else
+	{
+		if( test->flags & PAQA_FLAG_USE_BLOCKING_IO )
+		{
+			err = PaQa_RunLoopbackFullDuplexBlockingIO( loopbackContext );
+		}
+		else
+		{
+			err = PaQa_RunLoopbackFullDuplex( loopbackContext );
+		}
+	}
+	
+	if( err != paNoError )
+	{
+		printf("PortAudio error = %s\n", Pa_GetErrorText( err ) );
+	}
 	return err;	
 }
 
@@ -192,7 +502,7 @@ static int PaQa_SetupLoopbackContext( LoopbackContext *loopbackContextPtr, TestP
 	for( int i=0; i<testParams->samplesPerFrame; i++ )
 	{
 		int err = PaQa_InitializeRecording( &loopbackContextPtr->recordings[i], testParams->maxFrames, testParams->sampleRate );
-		QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, err );
+		QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", paNoError, err );
 	}
 	for( int i=0; i<testParams->samplesPerFrame; i++ )
 	{
@@ -325,7 +635,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	
 error:
 	PaQa_TeardownLoopbackContext( &loopbackContext );
-	return 1;	
+	return err;	
 }
 
 /*******************************************************************/
@@ -342,8 +652,9 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 	testParamsPtr->amplitude = 0.5;
 	testParamsPtr->sampleRate = 44100;
 	testParamsPtr->maxFrames = (int) (1.0 * testParamsPtr->sampleRate);
-	testParamsPtr->framesPerBuffer = 256;
+	testParamsPtr->framesPerBuffer = DEFAULT_FRAMES_PER_BUFFER;
 	testParamsPtr->baseFrequency = 200.0;
+	testParamsPtr->flags = PAQA_FLAG_TWO_STREAMS;
 }
 
 /*******************************************************************/
@@ -363,12 +674,13 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
 	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
+	int flagSettings[] = { 0, 1, 2, 3 };
+	int numFlagSettings = (sizeof(flagSettings)/sizeof(int));
+	
 	double sampleRates[] = { 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 44100.0, 48000.0, 96000.0 };
-//	double sampleRates[] = { 16000.0, 44100.0 };
 	int numRates = (sizeof(sampleRates)/sizeof(double));
 	
 	int framesPerBuffers[] = { 0, 16, 32, 40, 64, 100, 128, 512, 1024 };
-//	int framesPerBuffers[] = { 16, 64, 512 };
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
 		
 	printf("|-sRate-|-buffer-|-latency-|-channel results--------------------|\n");
@@ -388,27 +700,39 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	testParams.maxFrames = (int) (0.5 * testParams.sampleRate);	
 	
 	// Loop though combinations of audio parameters.
-	for( int iRate=0; iRate<numRates; iRate++ )
+	for( int iFlags=0; iFlags<numFlagSettings; iFlags++ )
 	{
-		// SAMPLE RATE
-		testParams.sampleRate = sampleRates[iRate];
-		testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
-		for( int iSize=0; iSize<numBufferSizes; iSize++ )
-		{	
-			// BUFFER SIZE
-			testParams.framesPerBuffer = framesPerBuffers[iSize];
-			printf("| %5d | %6d | ", ((int)(testParams.sampleRate+0.5)), testParams.framesPerBuffer );
-			fflush(stdout);
-			
-			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
-			if( numBadChannels == 0 )
-			{
-				printf( "OK" );
+		testParams.flags = flagSettings[iFlags];
+		printf( "************ FLAGS = 0x%08X ************************\n", testParams.flags );
+
+		// Loop though combinations of audio parameters.
+		for( int iRate=0; iRate<numRates; iRate++ )
+		{
+			// SAMPLE RATE
+			testParams.sampleRate = sampleRates[iRate];
+			testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
+			for( int iSize=0; iSize<numBufferSizes; iSize++ )
+			{	
+				// BUFFER SIZE
+				testParams.framesPerBuffer = framesPerBuffers[iSize];
+				printf("| %5d | %6d | ", ((int)(testParams.sampleRate+0.5)), testParams.framesPerBuffer );
+				fflush(stdout);
+				
+				int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
+				if( numBadChannels == 0 )
+				{
+					printf( "OK" );
+				}
+				//else if( numBadChannels < 0 )
+				//{
+				//	printf( "Aborting because of error.\n" );
+				//	return numBadChannels;
+				//}
+				totalBadChannels += numBadChannels;
+				printf( "\n" );
 			}
-			totalBadChannels += numBadChannels;
 			printf( "\n" );
 		}
-		printf( "\n" );
 	}
 	return totalBadChannels;
 }
@@ -446,6 +770,7 @@ int PaQa_CheckForLoopBack( PaDeviceIndex inputDevice, PaDeviceIndex outputDevice
 	
 	PaQa_SetupLoopbackContext( &loopbackContext, &testParams );
 			
+	testParams.flags = PAQA_FLAG_TWO_STREAMS;
 	err = PaQa_RunLoopback( &loopbackContext );
 	QA_ASSERT_TRUE("loopback detection callback did not run", (loopbackContext.callbackCount > 1) );
 	
@@ -573,6 +898,7 @@ void usage( const char *name )
 	printf("  -w  Save bad recordings in a WAV file.\n");
 	printf("  -dDir  Path for Directory for WAV files. Default is current directory.\n");
 	printf("  -m  Just test the DSP Math code and not the audio devices.\n");
+	printf("  -v  Verbose reports.\n");
 }
 
 /*******************************************************************/
@@ -624,6 +950,10 @@ int main( int argc, char **argv )
 					break;
 				case 'd':
 					userOptions.waveFilePath = &arg[2];
+					break;
+					
+				case 'v':
+					userOptions.verbose = 1;
 					break;
 					
 				case 'h':

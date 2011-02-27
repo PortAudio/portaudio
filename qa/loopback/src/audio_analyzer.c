@@ -391,6 +391,7 @@ int PaQa_MeasureLatency( PaQaRecording *recording, PaQaTestTone *testTone, PaQaA
 	
 	double tolerance = 0.1;
 	analysisResult->latency = PaQa_FindFirstMatch( recording, buffer, cycleSize, tolerance );	
+	QA_ASSERT_TRUE( "Could not find the start of the signal.", (analysisResult->latency >= 0) );
 	analysisResult->amplitudeRatio = PaQa_CompareAmplitudes( recording, analysisResult->latency, buffer, cycleSize );
 	return 0;
 error:

@@ -1,9 +1,11 @@
+TODO - This should be moved into a doxydoc page.
+
 This directory contains various programs to test PortAudio. The files 
 named patest_* are tests, the files named debug_* are just scratch 
 files that may or may not work.
 
 All following tests are up to date with the V19 API. They should all compile
-(without any warnings on GCC 3.3). Note that this does not necissarily mean that 
+(without any warnings on GCC 3.3). Note that this does not necessarily mean that 
 the tests pass, just that they compile.
 
     x- paqa_devs.c 

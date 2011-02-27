@@ -47,11 +47,13 @@
 
 /* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
 #define SAMPLE_RATE  (44100)
-#define FRAMES_PER_BUFFER (1024)
+#define FRAMES_PER_BUFFER (512)
 #define NUM_SECONDS     (5)
 #define NUM_CHANNELS    (2)
 /* #define DITHER_FLAG     (paDitherOff) */
 #define DITHER_FLAG     (0) /**/
+/** Set to 1 if you want to capture the recording to a file. */
+#define WRITE_TO_FILE   (0)
 
 /* Select sample format. */
 #if 1
@@ -246,7 +248,7 @@ int main(void)
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto done;
-    printf("Now recording!!\n"); fflush(stdout);
+    printf("\n=== Now recording!! Please speak into the microphone. ===\n"); fflush(stdout);
 
     while( ( err = Pa_IsStreamActive( stream ) ) == 1 )
     {
@@ -278,7 +280,7 @@ int main(void)
     printf("sample average = %lf\n", average );
 
     /* Write recorded data to a file. */
-#if 0
+#if WRITE_TO_FILE
     {
         FILE  *fid;
         fid = fopen("recorded.raw", "wb");
@@ -308,7 +310,7 @@ int main(void)
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = NULL;
 
-    printf("Begin playback.\n"); fflush(stdout);
+    printf("\n=== Now playing back. ===\n"); fflush(stdout);
     err = Pa_OpenStream(
               &stream,
               NULL, /* no input */

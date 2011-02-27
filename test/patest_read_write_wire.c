@@ -52,8 +52,14 @@
 #define SAMPLE_RATE  (44100)
 #define FRAMES_PER_BUFFER (1024)
 #define NUM_CHANNELS    (2)
+#define NUM_SECONDS     (15)
 /* #define DITHER_FLAG     (paDitherOff)  */
 #define DITHER_FLAG     (0) /**/
+
+/* @todo Underflow and overflow is disabled until we fix priming of blocking write. */
+#define CHECK_OVERFLOW  (0)
+#define CHECK_UNDERFLOW  (0)
+
 
 /* Select sample format. */
 #if 0
@@ -152,20 +158,20 @@ int main(void)
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
-    printf("Wire on. Will run one minute.\n"); fflush(stdout);
+    printf("Wire on. Will run %d seconds.\n", NUM_SECONDS); fflush(stdout);
 
-    for( i=0; i<(60*SAMPLE_RATE)/FRAMES_PER_BUFFER; ++i )
+    for( i=0; i<(NUM_SECONDS*SAMPLE_RATE)/FRAMES_PER_BUFFER; ++i )
     {
        err = Pa_WriteStream( stream, sampleBlock, FRAMES_PER_BUFFER );
-       if( err ) goto xrun;
+       if( err && CHECK_UNDERFLOW ) goto xrun;
        err = Pa_ReadStream( stream, sampleBlock, FRAMES_PER_BUFFER );
-       if( err ) goto xrun;
+       if( err && CHECK_OVERFLOW ) goto xrun;
     }
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
 
     CLEAR( sampleBlock );
-
+/*
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
     printf("Wire on. Interrupt to stop.\n"); fflush(stdout);
@@ -181,7 +187,7 @@ int main(void)
     if( err != paNoError ) goto error;
 
     Pa_CloseStream( stream );
-
+*/
     free( sampleBlock );
 
     Pa_Terminate();

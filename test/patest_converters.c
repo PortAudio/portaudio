@@ -75,6 +75,9 @@ static const char* sampleFormatNames_[SAMPLE_FORMAT_COUNT] =
 static const char* abbreviatedSampleFormatNames_[SAMPLE_FORMAT_COUNT] = 
     { "f32", "i32", "i24", "i16", " i8", "ui8" };
 
+
+PaError My_Pa_GetSampleSize( PaSampleFormat format );
+
 /*
     available flags are paClipOff and paDitherOff
     clipping is usually applied for float -> int conversions
