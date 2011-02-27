@@ -61,6 +61,18 @@ int g_testsFailed = 0;
 // Use bloching read/write for loopback.
 #define PAQA_FLAG_USE_BLOCKING_IO   (1<<1)
 
+const char * s_FlagOnNames[] =
+{
+	"Two Streams (Half Duplex)",
+	"Blocking Read/Write"
+};
+
+const char * s_FlagOffNames[] =
+{
+	"One Stream (Full Duplex)",
+	"Callback"
+};
+
 #define DEFAULT_FRAMES_PER_BUFFER   (256)
 
 /** Parameters that describe a single test run. */
@@ -123,9 +135,13 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	 */
     if( in != NULL)
 	{
+		// Read each channel from the buffer.
 		for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
 		{
-			done |= PaQa_WriteRecording( &loopbackContext->recordings[i], in + i, framesPerBuffer, loopbackContext->test->inputParameters.channelCount );
+			done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
+										in + i, 
+										framesPerBuffer,
+										loopbackContext->test->inputParameters.channelCount );
 		}
 	}
 	
@@ -133,9 +149,13 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	{
 		PaQa_EraseBuffer( out, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
 		
+		
 		for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
 		{
-			PaQa_MixSine( &loopbackContext->generators[i], out + i, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
+			PaQa_MixSine( &loopbackContext->generators[i],
+						 out + i,
+						 framesPerBuffer,
+						 loopbackContext->test->outputParameters.channelCount );
 		}
 	}
     return done ? paComplete : paContinue;
@@ -287,7 +307,10 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	// Save in a recording.
     for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
 	{
-		done |= PaQa_WriteRecording( &loopbackContext->recordings[i], in + i, framesPerBuffer, loopbackContext->test->inputParameters.channelCount );
+		done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
+									in + i,
+									framesPerBuffer,
+									loopbackContext->test->inputParameters.channelCount );
 	}
 	
 	// Synthesize audio.
@@ -296,7 +319,10 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	PaQa_EraseBuffer( out, available, loopbackContext->test->outputParameters.channelCount );
 	for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
 	{
-		PaQa_MixSine( &loopbackContext->generators[i], out + i, available, loopbackContext->test->outputParameters.channelCount );
+		PaQa_MixSine( &loopbackContext->generators[i],
+					 out + i,
+					 available,
+					 loopbackContext->test->outputParameters.channelCount );
 	}
 	
 	// Write out audio.
@@ -574,6 +600,9 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	PaQaAnalysisResult analysisResult;
 	int numBadChannels = 0;
 	
+	printf("| %5d | %6d | ", ((int)(testParams->sampleRate+0.5)), testParams->framesPerBuffer );
+	fflush(stdout);
+	
 	testTone.samplesPerFrame = testParams->samplesPerFrame;
 	testTone.sampleRate = testParams->sampleRate;
 	testTone.amplitude = testParams->amplitude;
@@ -625,6 +654,12 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		}
 
 	}
+	if( numBadChannels == 0 )
+	{
+		printf( "OK" );
+	}
+	printf( "\n" );
+	
 			
 	PaQa_TeardownLoopbackContext( &loopbackContext );
 	if( numBadChannels > 0 )
@@ -635,6 +670,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	
 error:
 	PaQa_TeardownLoopbackContext( &loopbackContext );
+	printf( "\n" );
 	return err;	
 }
 
@@ -674,7 +710,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
 	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
-	int flagSettings[] = { 0, 1, 2, 3 };
+	int flagSettings[] = { 0, 1 };
 	int numFlagSettings = (sizeof(flagSettings)/sizeof(int));
 	
 	double sampleRates[] = { 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 44100.0, 48000.0, 96000.0 };
@@ -683,7 +719,6 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int framesPerBuffers[] = { 0, 16, 32, 40, 64, 100, 128, 512, 1024 };
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
 		
-	printf("|-sRate-|-buffer-|-latency-|-channel results--------------------|\n");
 	// Check to see if a specific value was requested.
 	if( userOptions->sampleRate > 0 )
 	{
@@ -703,36 +738,36 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	for( int iFlags=0; iFlags<numFlagSettings; iFlags++ )
 	{
 		testParams.flags = flagSettings[iFlags];
-		printf( "************ FLAGS = 0x%08X ************************\n", testParams.flags );
+		printf( "************ Mode = %s ************\n",
+			   (( iFlags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
+		printf("|-sRate-|-buffer-|-latency-|-channel results--------------------|\n");
 
 		// Loop though combinations of audio parameters.
+		testParams.framesPerBuffer = 128;
 		for( int iRate=0; iRate<numRates; iRate++ )
 		{
 			// SAMPLE RATE
 			testParams.sampleRate = sampleRates[iRate];
 			testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
-			for( int iSize=0; iSize<numBufferSizes; iSize++ )
-			{	
-				// BUFFER SIZE
-				testParams.framesPerBuffer = framesPerBuffers[iSize];
-				printf("| %5d | %6d | ", ((int)(testParams.sampleRate+0.5)), testParams.framesPerBuffer );
-				fflush(stdout);
-				
-				int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
-				if( numBadChannels == 0 )
-				{
-					printf( "OK" );
-				}
-				//else if( numBadChannels < 0 )
-				//{
-				//	printf( "Aborting because of error.\n" );
-				//	return numBadChannels;
-				//}
-				totalBadChannels += numBadChannels;
-				printf( "\n" );
-			}
-			printf( "\n" );
+			
+			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
+			totalBadChannels += numBadChannels;
 		}
+		printf( "\n" );
+		
+		testParams.sampleRate = 44100;
+		testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
+		for( int iSize=0; iSize<numBufferSizes; iSize++ )
+		{	
+			// BUFFER SIZE
+			testParams.framesPerBuffer = framesPerBuffers[iSize];
+			
+			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
+			totalBadChannels += numBadChannels;			
+		}
+		printf( "\n" );
+		
+		
 	}
 	return totalBadChannels;
 }

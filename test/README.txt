@@ -1,8 +1,11 @@
 TODO - This should be moved into a doxydoc page.
 
+For more information on the TestPlan please visit:
+
+  http://www.portaudio.com/trac/wiki/TestPlan
+  
 This directory contains various programs to test PortAudio. The files 
-named patest_* are tests, the files named debug_* are just scratch 
-files that may or may not work.
+named patest_* are tests.
 
 All following tests are up to date with the V19 API. They should all compile
 (without any warnings on GCC 3.3). Note that this does not necessarily mean that 
@@ -45,18 +48,5 @@ the tests pass, just that they compile.
     x- pa_fuzz.c
     x- pa_minlat.c
 
-The debug_ files are still in V18 format and may need some V19 adaption.
-Feel free to fix them, most simply require adjusting to the new API.
-
-o- pa_tests/debug_convert.c
-o- pa_tests/debug_dither_calc.c
-o- pa_tests/debug_dual.c
-o- pa_tests/debug_multi_in.c
-o- pa_tests/debug_multi_out.c
-o- pa_tests/debug_record.c
-o- pa_tests/debug_record_reuse.c
-o- pa_tests/debug_sine.c
-o- pa_tests/debug_sine_amp.c
-o- pa_tests/debug_sine_formats.c
-o- pa_tests/debug_srate.c
-o- pa_tests/debug_test1.c
+Note that Phil Burk deleted the debug_* tests on 2/26/11. They were just hacked
+versions of old V18 tests. If we need to debug then we can just hack a working V19 test.
