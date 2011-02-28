@@ -95,6 +95,7 @@ TESTS = \
 	bin/patest_underflow \
 	bin/patest_wire \
 	bin/patest_write_sine \
+	bin/patest_write_sine_nonint \
 	bin/pa_devs \
 	bin/pa_fuzz \
 	bin/pa_minlat

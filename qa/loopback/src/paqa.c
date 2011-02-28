@@ -292,7 +292,7 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	long framesPerBuffer = test->framesPerBuffer;
 	if( framesPerBuffer <= 0 )
 	{
-		framesPerBuffer = 64; // bigger values might run past end of recording
+		framesPerBuffer = maxPerBuffer; // bigger values might run past end of recording
 	}
 	
 	// Read in audio.
@@ -553,7 +553,7 @@ static void PaQa_TeardownLoopbackContext( LoopbackContext *loopbackContextPtr )
 /*******************************************************************/
 static void PaQa_PrintShortErrorReport( PaQaAnalysisResult *analysisResultPtr, int channel )
 {
-	printf("#%d ", channel);
+	printf("channel %d ", channel);
 	if( analysisResultPtr->popPosition > 0 )
 	{
 		printf("POP %0.3f at %d, ", (double)analysisResultPtr->popAmplitude, (int)analysisResultPtr->popPosition );	
@@ -1008,7 +1008,7 @@ int main( int argc, char **argv )
 		}
 	}
 		
-	result = PaQa_TestAnalyzer();
+	//result = PaQa_TestAnalyzer();
 	
 	if( (result == 0) && (justMath == 0) )
 	{
