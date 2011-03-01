@@ -290,7 +290,7 @@ void PaQa_FilterRecording( PaQaRecording *input, PaQaRecording *output, BiquadFi
 // peaks then drops to half the peak.
 double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numFrames, double tolerance  )
 {
-	int i;
+	int ic,is;
 	QA_ASSERT_TRUE( "numFrames out of bounds", (numFrames < recording->numFrames) );
 	// How many buffers will fit in the recording?
 	int maxCorrelations = recording->numFrames - numFrames;
@@ -329,7 +329,7 @@ error:
 // Measure the area under the curve by summing absolute value of each value.
 double PaQa_MeasureArea( float *buffer, int numFrames, int stride  )
 {
-	int i;
+	int is;
 	double area = 0.0;
 	for( is=0; is<numFrames; is++ )
 	{
@@ -404,7 +404,7 @@ error:
 // Apply cosine squared window.
 void PaQa_FadeInRecording( PaQaRecording *recording, int startFrame, int count )
 {
-	int i;
+	int is;
 	assert( startFrame >= 0 );
 	assert( count > 0 );
 	double phase = 0.5 * MATH_PI;
