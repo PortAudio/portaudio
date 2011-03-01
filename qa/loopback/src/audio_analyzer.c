@@ -236,6 +236,54 @@ error:
 #undef NUM_SAMPLES
 }
 
+/*==========================================================================================*/
+
+double PaQa_MeasureCrossingSlope( float *buffer, int numFrames )
+{
+	int i;
+	double slopeTotal = 0.0;
+	int slopeCount = 0;
+	float previous;
+	double averageSlope = 0.0;
+	
+	previous = buffer[0];
+	for( i=1; i<numFrames; i++ )
+	{
+		float current = buffer[i];
+		if( (current > 0.0) && (previous < 0.0) )
+		{
+			double delta = current - previous;
+			slopeTotal += delta;
+			slopeCount += 1;
+		}
+		previous = current;
+	}
+	if( slopeCount > 0 )
+	{
+		averageSlope = slopeTotal / slopeCount;
+	}
+	return averageSlope;
+}
+
+/*==========================================================================================*/
+/*
+ * We can't just measure the peaks cuz they may be clipped.
+ * But the zero crossing should be intact.
+ * The measured slope of a sine wave at zero should be:
+ *
+ *   slope = sin( 2PI * frequency / sampleRate )
+ *
+ */
+double PaQa_MeasureSineAmplitudeBySlope( PaQaRecording *recording,
+						  double frequency, double frameRate,
+						int startFrame, int numFrames )
+{
+	float *buffer = &recording->buffer[startFrame];
+	double measuredSlope = PaQa_MeasureCrossingSlope( buffer, numFrames );
+	double unitySlope = sin( MATH_TWO_PI * frequency / frameRate );
+	double estimatedAmplitude = measuredSlope / unitySlope;
+	return estimatedAmplitude;
+}
 
 /*==========================================================================================*/
 double PaQa_CorrelateSine( PaQaRecording *recording, double frequency, double frameRate,
@@ -339,6 +387,22 @@ double PaQa_MeasureArea( float *buffer, int numFrames, int stride  )
 	return area;
 }
 
+/*==========================================================================================*/
+// Measure the area under the curve by summing absolute value of each value.
+double PaQa_MeasureRootMeanSquare( float *buffer, int numFrames )
+{
+	int is;
+	double area = 0.0;
+	double root;
+	for( is=0; is<numFrames; is++ )
+	{
+		float value = *buffer++;
+		area += value * value;
+	}
+	root = sqrt( area );
+	return root / numFrames;
+}
+
 
 /*==========================================================================================*/
 // Compare the amplitudes of these two signals.
@@ -425,7 +489,7 @@ void PaQa_FadeInRecording( PaQaRecording *recording, int startFrame, int count )
 
 
 /*==========================================================================================*/
-/** Notch filter and high pass filter then detect remaining energy.
+/** Apply notch filter and high pass filter then detect remaining energy.
  */
 int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalysisResult *analysisResult )
 {	

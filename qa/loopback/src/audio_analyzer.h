@@ -115,6 +115,12 @@ double PaQa_ComputePhaseDifference( double phase1, double phase2 );
 double PaQa_MeasureArea( float *buffer, int numFrames, int stride  );
 
 /**
+ * Measure slope of the positive zero crossings.
+ */
+double PaQa_MeasureCrossingSlope( float *buffer, int numFrames );
+
+
+/**
  * Prepare an oscillator that can generate a sine tone for testing.
  */
 void PaQa_SetupSineGenerator( PaQaSineGenerator *generator, double frequency, double amplitude, double frameRate );
@@ -155,6 +161,16 @@ double PaQa_CorrelateSine( PaQaRecording *recording, double frequency, double fr
 						  int startFrame, int numSamples, double *phasePtr );
 
 double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numSamples, double tolerance  );
+
+/** 
+ * Estimate the original amplitude of a clipped sine wave by measuring
+ * its average slope at the zero crossings.
+ */
+double PaQa_MeasureSineAmplitudeBySlope( PaQaRecording *recording,
+										double frequency, double frameRate,
+										int startFrame, int numFrames );
+
+double PaQa_MeasureRootMeanSquare( float *buffer, int numFrames );
 
 /**
  * Compare the amplitudes of these two signals.

@@ -54,6 +54,7 @@ int g_testsFailed = 0;
 
 #define MAX_NUM_GENERATORS  (8)
 #define MAX_NUM_RECORDINGS  (8)
+#define MAX_BACKGROUND_NOISE_RMS (0.00001)
 #define LOOPBACK_DETECTION_DURATION_SECONDS  (0.5)
 
 // Use two separate streams instead of one full duplex stream.
@@ -276,6 +277,51 @@ error:
 }
 
 
+/*******************************************************************/
+/** 
+ * Open one audio streams, just for input.
+ * Record background level.
+ * Then close the stream.
+ * @return 0 if OK or negative error.
+ */
+int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
+{
+	PaStream *inStream = NULL;
+	PaError err = 0;
+	TestParameters *test = loopbackContext->test;
+	
+	// Just open an input stream.
+	err = Pa_OpenStream(
+						&inStream,
+						&test->inputParameters,
+						NULL,
+						test->sampleRate,
+						test->framesPerBuffer,
+						paClipOff, /* We won't output out of range samples so don't bother clipping them. */
+						RecordAndPlaySinesCallback,
+						loopbackContext );
+	if( err != paNoError ) goto error;
+	
+	err = Pa_StartStream( inStream );
+	if( err != paNoError ) goto error;
+	
+	// Wait for stream to finish.
+	while( Pa_IsStreamActive( inStream ) )
+	{
+		Pa_Sleep(50);
+	}
+	
+	err = Pa_StopStream( inStream );
+	if( err != paNoError ) goto error;
+	
+	err = Pa_CloseStream( inStream );
+	if( err != paNoError ) goto error;
+	
+	return 0;
+	
+error:
+	return err;	
+}
 
 /*******************************************************************/
 static int RecordAndPlayBlockingIO( PaStream *inStream,
@@ -682,19 +728,23 @@ error:
 static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice )
 {
 	memset( testParamsPtr, 0, sizeof(TestParameters) );
-	testParamsPtr->inputParameters.device = inputDevice;
-	testParamsPtr->outputParameters.device = outputDevice;
-	testParamsPtr->inputParameters.sampleFormat = paFloat32;
-	testParamsPtr->outputParameters.sampleFormat = paFloat32;
+	
+	
 	testParamsPtr->samplesPerFrame = 2;
-	testParamsPtr->inputParameters.channelCount = testParamsPtr->samplesPerFrame;
-	testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
 	testParamsPtr->amplitude = 0.5;
 	testParamsPtr->sampleRate = 44100;
 	testParamsPtr->maxFrames = (int) (1.0 * testParamsPtr->sampleRate);
 	testParamsPtr->framesPerBuffer = DEFAULT_FRAMES_PER_BUFFER;
 	testParamsPtr->baseFrequency = 200.0;
 	testParamsPtr->flags = PAQA_FLAG_TWO_STREAMS;
+	
+	testParamsPtr->inputParameters.device = inputDevice;
+	testParamsPtr->inputParameters.sampleFormat = paFloat32;
+	testParamsPtr->inputParameters.channelCount = testParamsPtr->samplesPerFrame;
+	
+	testParamsPtr->outputParameters.device = outputDevice;
+	testParamsPtr->outputParameters.sampleFormat = paFloat32;
+	testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
 }
 
 /*******************************************************************/
@@ -780,6 +830,56 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 }
 
 /*******************************************************************/
+int PaQa_CheckForClippedLoopback( LoopbackContext *loopbackContextPtr )
+{
+	int clipped = 0;
+	TestParameters *testParamsPtr = loopbackContextPtr->test;
+	
+	// Start in the middle assuming past latency.
+	int startFrame = testParamsPtr->maxFrames/2;
+	int numFrames = testParamsPtr->maxFrames/2;
+	
+	// Check to see if the signal is clipped.
+	double amplitudeLeft = PaQa_MeasureSineAmplitudeBySlope( &loopbackContextPtr->recordings[0],
+															testParamsPtr->baseFrequency, testParamsPtr->sampleRate,
+															startFrame, numFrames );
+	double gainLeft = amplitudeLeft / testParamsPtr->amplitude;
+	double amplitudeRight = PaQa_MeasureSineAmplitudeBySlope( &loopbackContextPtr->recordings[1],
+															 testParamsPtr->baseFrequency, testParamsPtr->sampleRate,
+															 startFrame, numFrames );
+	double gainRight = amplitudeLeft / testParamsPtr->amplitude;
+	printf("   Loop gain: left = %f, right = %f\n", gainLeft, gainRight );
+
+	if( (amplitudeLeft > 1.0 ) || (amplitudeRight > 1.0) )
+	{
+		printf("ERROR - loop gain is too high. Should be around than 1.0. Please lower output level and/or input gain.\n" );
+		clipped = 1;
+	}
+	return clipped;
+}
+
+/*******************************************************************/
+int PaQa_MeasureBackgroundNoise( LoopbackContext *loopbackContextPtr, double *rmsPtr )
+{
+	int result = 0;
+	TestParameters *testParamsPtr = loopbackContextPtr->test;
+	*rmsPtr = 0.0;
+	// Rewind so we can record some input.
+	loopbackContextPtr->recordings[0].numFrames = 0;
+	loopbackContextPtr->recordings[1].numFrames = 0;
+	result = PaQa_RunInputOnly( loopbackContextPtr );
+	if( result == 0 )
+	{
+		double leftRMS = PaQa_MeasureRootMeanSquare( loopbackContextPtr->recordings[0].buffer,
+													loopbackContextPtr->recordings[0].numFrames );
+		double rightRMS = PaQa_MeasureRootMeanSquare( loopbackContextPtr->recordings[1].buffer,
+													 loopbackContextPtr->recordings[1].numFrames );
+		*rmsPtr = (leftRMS + rightRMS) / 2.0;
+	}
+	return result;
+}
+
+/*******************************************************************/
 /** 
  * Output a sine wave then try to detect it on input.
  *
@@ -792,7 +892,7 @@ int PaQa_CheckForLoopBack( PaDeviceIndex inputDevice, PaDeviceIndex outputDevice
     const   PaDeviceInfo *inputDeviceInfo;	
     const   PaDeviceInfo *outputDeviceInfo;		
 	PaError err = paNoError;
-	double minAmplitude = 0.3;
+	double minAmplitude;
 	
 	inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
 	if( inputDeviceInfo->maxInputChannels < 2 )
@@ -809,6 +909,19 @@ int PaQa_CheckForLoopBack( PaDeviceIndex inputDevice, PaDeviceIndex outputDevice
 	
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
 	testParams.maxFrames = (int) (LOOPBACK_DETECTION_DURATION_SECONDS * testParams.sampleRate);	
+	minAmplitude = testParams.amplitude / 2.0;
+	
+	// Check to see if the selected formats are supported.
+	if( Pa_IsFormatSupported( &testParams.inputParameters, NULL, testParams.sampleRate ) != paFormatIsSupported )
+	{
+		printf( "Input not supported for this format!\n" );
+		return 0;
+	}
+	if( Pa_IsFormatSupported( NULL, &testParams.outputParameters, testParams.sampleRate ) != paFormatIsSupported )
+	{
+		printf( "Output not supported for this format!\n" );
+		return 0;
+	}
 	
 	PaQa_SetupLoopbackContext( &loopbackContext, &testParams );
 			
@@ -839,17 +952,39 @@ int PaQa_CheckForLoopBack( PaDeviceIndex inputDevice, PaDeviceIndex outputDevice
 												   testParams.sampleRate,
 												   startFrame, numFrames, NULL );
 		
-		double magRightReverse = PaQa_CorrelateSine( &loopbackContext.recordings[1],
-		          loopbackContext.generators[0].frequency,
-			  testParams.sampleRate,
-			  startFrame, numFrames, NULL );
+		double magRightReverse = PaQa_CorrelateSine( &loopbackContext.recordings[1], 
+													loopbackContext.generators[0].frequency,
+													testParams.sampleRate,
+													startFrame, numFrames, NULL );
 		
-		if ((magLeftReverse > 0.1) && (magRightReverse>minAmplitude))
+		if ((magLeftReverse > minAmplitude) && (magRightReverse>minAmplitude))
 		{
-			printf("WARNING - you seem to have the left and right channels swapped on the loopback cable!\n");
+			printf("ERROR - You seem to have the left and right channels swapped on the loopback cable!\n");
 		}
 	}
-	
+	else
+	{
+		double rms = 0.0;
+		if( PaQa_CheckForClippedLoopback( &loopbackContext ) )
+		{
+			// Clipped so don't use this loopback.
+			loopbackConnected = 0;
+		}
+		
+		err = PaQa_MeasureBackgroundNoise( &loopbackContext, &rms );
+		printf("   Background noise = %f\n", rms );
+		if( err )
+		{
+			printf("ERROR - Could not measure background noise on this input!\n");
+			loopbackConnected = 0;
+		}
+		else if( rms > MAX_BACKGROUND_NOISE_RMS )
+		{			printf("ERROR - There is too much background noise on this input!\n");
+			loopbackConnected = 0;
+		}
+		
+			
+	}
 	
 	PaQa_TeardownLoopbackContext( &loopbackContext );
 	return loopbackConnected;	
@@ -861,13 +996,30 @@ error:
 
 /*******************************************************************/
 /**
+ * If there is a loopback connection then run the analysis.
+ */
+static int CheckLoopbackAndScan( UserOptions *userOptions,
+								PaDeviceIndex iIn, PaDeviceIndex iOut,
+								double expectedAmplitude )
+{
+	int loopbackConnected = PaQa_CheckForLoopBack( iIn, iOut );
+	if( loopbackConnected > 0 )
+	{
+		PaQa_AnalyzeLoopbackConnection( userOptions, iIn, iOut, expectedAmplitude );
+		return 1;
+	}
+	return 0;
+}
+								
+/*******************************************************************/
+/**
  * Scan every combination of output to input device.
  * If a loopback is found the analyse the combination.
  * The scan can be overriden using the -i and -o command line options.
  */
 static int ScanForLoopback(UserOptions *userOptions)
 {
-	PaDeviceIndex i,j;
+	PaDeviceIndex iIn,iOut;
 	int  numLoopbacks = 0;
     int  numDevices;
     numDevices = Pa_GetDeviceCount();    
@@ -883,46 +1035,32 @@ static int ScanForLoopback(UserOptions *userOptions)
 	else if (userOptions->inputDevice >= 0)
 	{
 		// Just scan for output.
-		for( i=0; i<numDevices; i++ )
+		for( iOut=0; iOut<numDevices; iOut++ )
 		{					
-			int loopbackConnected = PaQa_CheckForLoopBack( userOptions->inputDevice, i );
-			if( loopbackConnected > 0 )
-			{
-				PaQa_AnalyzeLoopbackConnection( userOptions, userOptions->inputDevice, i, expectedAmplitude );
-				numLoopbacks += 1;
-			}
+			numLoopbacks += CheckLoopbackAndScan( userOptions, userOptions->inputDevice, iOut, expectedAmplitude );
 		}
 	}
 	else if (userOptions->outputDevice >= 0)
 	{
 		// Just scan for input.
-		for( i=0; i<numDevices; i++ )
+		for( iIn=0; iIn<numDevices; iIn++ )
 		{					
-			int loopbackConnected = PaQa_CheckForLoopBack( i, userOptions->inputDevice );
-			if( loopbackConnected > 0 )
-			{
-				PaQa_AnalyzeLoopbackConnection( userOptions, i, userOptions->inputDevice, expectedAmplitude );
-				numLoopbacks += 1;
-			}
+			numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, userOptions->outputDevice, expectedAmplitude );
 		}
 	}
 	else 
 	{	
 		// Scan both.
-		for( i=0; i<numDevices; i++ )
+		for( iOut=0; iOut<numDevices; iOut++ )
 		{
-			for( j=0; j<numDevices; j++ )
-			{
-				int loopbackConnected = PaQa_CheckForLoopBack( i, j );
-				if( loopbackConnected > 0 )
-				{
-					PaQa_AnalyzeLoopbackConnection( userOptions, i, j, expectedAmplitude );
-					numLoopbacks += 1;
-				}
+			
+			for( iIn=0; iIn<numDevices; iIn++ )
+			{				
+				numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, iOut, expectedAmplitude );
 			}
 		}
 	}
-	QA_ASSERT_TRUE( "No loopback cables found or volumes too low.", (numLoopbacks > 0) );
+	QA_ASSERT_TRUE( "No good loopback cable found.", (numLoopbacks > 0) );
 	return numLoopbacks;
 	
 error:
