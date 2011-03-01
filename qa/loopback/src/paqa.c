@@ -284,8 +284,8 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 									  )
 {	
 	int i;
-    float *in = (float *)g_BigBuffer;
-    float *out = (float *)g_BigBuffer;
+	float *in = (float *)g_BigBuffer;
+	float *out = (float *)g_BigBuffer;
 	PaError err;
 	int done = 0;
 	long available;
@@ -307,12 +307,12 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	}
 	
 	// Save in a recording.
-    for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+	for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
 	{
 		done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
-									in + i,
-									framesPerBuffer,
-									loopbackContext->test->inputParameters.channelCount );
+		         in + i,
+		         framesPerBuffer,
+		         loopbackContext->test->inputParameters.channelCount );
 	}
 	
 	// Synthesize audio.
@@ -322,9 +322,9 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	for( i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
 	{
 		PaQa_MixSine( &loopbackContext->generators[i],
-					 out + i,
-					 available,
-					 loopbackContext->test->outputParameters.channelCount );
+		          out + i,
+		          available,
+		          loopbackContext->test->outputParameters.channelCount );
 	}
 	
 	// Write out audio.
@@ -705,6 +705,8 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice, double expectedAmplitude )
 {
 	int i;
+	int iFlags;
+	int iRate;
 	int iSize;
 	int totalBadChannels = 0;
 	TestParameters testParams;
@@ -719,10 +721,10 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int flagSettings[] = { 0, 1 };
 	int numFlagSettings = (sizeof(flagSettings)/sizeof(int));
 	
-	double sampleRates[] = { 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 44100.0, 48000.0, 96000.0 };
+	double sampleRates[] = { 44100.0, 48000.0, 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 96000.0 };
 	int numRates = (sizeof(sampleRates)/sizeof(double));
 	
-	int framesPerBuffers[] = { 0, 16, 32, 40, 64, 100, 128, 512, 1024 };
+	int framesPerBuffers[] = { 256, 16, 32, 40, 64, 100, 128, 512, 1024 };
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
 		
 	// Check to see if a specific value was requested.
@@ -749,7 +751,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		printf("|-sRate-|-buffer-|-latency-|-channel results--------------------|\n");
 
 		// Loop though combinations of audio parameters.
-		testParams.framesPerBuffer = 128;
+		testParams.framesPerBuffer = framesPerBuffers[0];
 		for( iRate=0; iRate<numRates; iRate++ )
 		{
 			// SAMPLE RATE
@@ -761,7 +763,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		}
 		printf( "\n" );
 		
-		testParams.sampleRate = 44100;
+		testParams.sampleRate = sampleRates[0];
 		testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
 		for( iSize=0; iSize<numBufferSizes; iSize++ )
 		{	
@@ -839,9 +841,9 @@ int PaQa_CheckForLoopBack( PaDeviceIndex inputDevice, PaDeviceIndex outputDevice
 												   startFrame, numFrames, NULL );
 		
 		double magRightReverse = PaQa_CorrelateSine( &loopbackContext.recordings[1],
-													loopbackContext.generators[0].frequency,
-													testParams.sampleRate,
-													startFrame, numFrames, NULL );
+		          loopbackContext.generators[0].frequency,
+			  testParams.sampleRate,
+			  startFrame, numFrames, NULL );
 		
 		if ((magLeftReverse > 0.1) && (magRightReverse>minAmplitude))
 		{
@@ -866,6 +868,7 @@ error:
  */
 static int ScanForLoopback(UserOptions *userOptions)
 {
+	PaDeviceIndex i,j;
 	int  numLoopbacks = 0;
     int  numDevices;
     numDevices = Pa_GetDeviceCount();    
@@ -881,7 +884,7 @@ static int ScanForLoopback(UserOptions *userOptions)
 	else if (userOptions->inputDevice >= 0)
 	{
 		// Just scan for output.
-		for( PaDeviceIndex i=0; i<numDevices; i++ )
+		for( i=0; i<numDevices; i++ )
 		{					
 			int loopbackConnected = PaQa_CheckForLoopBack( userOptions->inputDevice, i );
 			if( loopbackConnected > 0 )
@@ -894,7 +897,7 @@ static int ScanForLoopback(UserOptions *userOptions)
 	else if (userOptions->outputDevice >= 0)
 	{
 		// Just scan for input.
-		for( PaDeviceIndex i=0; i<numDevices; i++ )
+		for( i=0; i<numDevices; i++ )
 		{					
 			int loopbackConnected = PaQa_CheckForLoopBack( i, userOptions->inputDevice );
 			if( loopbackConnected > 0 )
@@ -907,9 +910,9 @@ static int ScanForLoopback(UserOptions *userOptions)
 	else 
 	{	
 		// Scan both.
-		for( PaDeviceIndex i=0; i<numDevices; i++ )
+		for( i=0; i<numDevices; i++ )
 		{
-			for( PaDeviceIndex j=0; j<numDevices; j++ )
+			for( j=0; j<numDevices; j++ )
 			{
 				int loopbackConnected = PaQa_CheckForLoopBack( i, j );
 				if( loopbackConnected > 0 )
