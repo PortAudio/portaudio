@@ -641,7 +641,7 @@ static void PaQa_PrintFullErrorReport( PaQaAnalysisResult *analysisResultPtr, in
  * Test loopback connection using the given parameters.
  * @return number of channels with glitches, or negative error.
  */
-static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *testParams, double expectedAmplitude )
+static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *testParams )
 {
 	int i;
 	LoopbackContext loopbackContext;
@@ -752,7 +752,7 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
  * Run a series of tests on this loopback connection.
  * @return number of bad channel results
  */
-static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice, double expectedAmplitude )
+static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice )
 {
 	int iFlags;
 	int iRate;
@@ -807,7 +807,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 			testParams.sampleRate = sampleRates[iRate];
 			testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
 			
-			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
+			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 			totalBadChannels += numBadChannels;
 		}
 		printf( "\n" );
@@ -819,7 +819,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 			// BUFFER SIZE
 			testParams.framesPerBuffer = framesPerBuffers[iSize];
 			
-			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams, expectedAmplitude );
+			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 			totalBadChannels += numBadChannels;			
 		}
 		printf( "\n" );
@@ -862,7 +862,6 @@ int PaQa_CheckForClippedLoopback( LoopbackContext *loopbackContextPtr )
 int PaQa_MeasureBackgroundNoise( LoopbackContext *loopbackContextPtr, double *rmsPtr )
 {
 	int result = 0;
-	TestParameters *testParamsPtr = loopbackContextPtr->test;
 	*rmsPtr = 0.0;
 	// Rewind so we can record some input.
 	loopbackContextPtr->recordings[0].numFrames = 0;
@@ -999,13 +998,12 @@ error:
  * If there is a loopback connection then run the analysis.
  */
 static int CheckLoopbackAndScan( UserOptions *userOptions,
-								PaDeviceIndex iIn, PaDeviceIndex iOut,
-								double expectedAmplitude )
+								PaDeviceIndex iIn, PaDeviceIndex iOut )
 {
 	int loopbackConnected = PaQa_CheckForLoopBack( iIn, iOut );
 	if( loopbackConnected > 0 )
 	{
-		PaQa_AnalyzeLoopbackConnection( userOptions, iIn, iOut, expectedAmplitude );
+		PaQa_AnalyzeLoopbackConnection( userOptions, iIn, iOut );
 		return 1;
 	}
 	return 0;
@@ -1023,21 +1021,18 @@ static int ScanForLoopback(UserOptions *userOptions)
 	int  numLoopbacks = 0;
     int  numDevices;
     numDevices = Pa_GetDeviceCount();    
-	
-	double expectedAmplitude = 0.4;
-	
+		
 	// If both devices are specified then just use that combination.
 	if ((userOptions->inputDevice >= 0) && (userOptions->outputDevice >= 0))
 	{
-		PaQa_AnalyzeLoopbackConnection( userOptions, userOptions->inputDevice, userOptions->outputDevice, expectedAmplitude );
-		numLoopbacks += 1;
+		numLoopbacks += CheckLoopbackAndScan( userOptions, userOptions->inputDevice, userOptions->outputDevice );
 	}
 	else if (userOptions->inputDevice >= 0)
 	{
 		// Just scan for output.
 		for( iOut=0; iOut<numDevices; iOut++ )
 		{					
-			numLoopbacks += CheckLoopbackAndScan( userOptions, userOptions->inputDevice, iOut, expectedAmplitude );
+			numLoopbacks += CheckLoopbackAndScan( userOptions, userOptions->inputDevice, iOut );
 		}
 	}
 	else if (userOptions->outputDevice >= 0)
@@ -1045,10 +1040,10 @@ static int ScanForLoopback(UserOptions *userOptions)
 		// Just scan for input.
 		for( iIn=0; iIn<numDevices; iIn++ )
 		{					
-			numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, userOptions->outputDevice, expectedAmplitude );
+			numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, userOptions->outputDevice );
 		}
 	}
-	else 
+	else
 	{	
 		// Scan both.
 		for( iOut=0; iOut<numDevices; iOut++ )
@@ -1056,7 +1051,7 @@ static int ScanForLoopback(UserOptions *userOptions)
 			
 			for( iIn=0; iIn<numDevices; iIn++ )
 			{				
-				numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, iOut, expectedAmplitude );
+				numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, iOut );
 			}
 		}
 	}
@@ -1091,12 +1086,12 @@ int main( int argc, char **argv )
 	int justMath = 0;
 	printf("PortAudio LoopBack Test built " __DATE__ " at " __TIME__ "\n");
 	
-	// Process arguments. Skip name of executable.
 	memset(&userOptions, 0, sizeof(userOptions));
 	userOptions.inputDevice = paNoDevice;
 	userOptions.outputDevice = paNoDevice;
 	userOptions.waveFilePath = ".";
 	
+	// Process arguments. Skip name of executable.
 	char *name = argv[0];
 	for( i=1; i<argc; i++ )
 	{
