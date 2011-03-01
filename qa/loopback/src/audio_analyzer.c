@@ -146,9 +146,6 @@ int PaQa_WriteRecording( PaQaRecording *recording, float *buffer, int numFrames,
 	}
 	recording->numFrames += framesToWrite;
 	return (recording->numFrames >= recording->maxFrames);
-	
-error:
-	return -1;
 }
 
 /*==========================================================================================*/
@@ -166,9 +163,6 @@ int PaQa_WriteSilence( PaQaRecording *recording, int numFrames )
 	}
 	recording->numFrames += framesToRecord;
 	return (recording->numFrames >= recording->maxFrames);
-	
-error:
-	return -1;
 }
 
 /*==========================================================================================*/
@@ -187,9 +181,6 @@ int PaQa_RecordFreeze( PaQaRecording *recording, int numFrames )
 	}
 	recording->numFrames += framesToRecord;
 	return (recording->numFrames >= recording->maxFrames);
-	
-error:
-	return -1;
 }
 
 /*==========================================================================================*/
@@ -518,7 +509,7 @@ int PaQa_DetectPhaseError( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 
 		double phase = 666.0;
 		double mag = PaQa_CorrelateSine( recording, testTone->frequency, testTone->sampleRate, i, windowSize, &phase );
-		if( loopCount > 1)
+		if( (loopCount > 1) && (mag > 0.0) )
 		{
 			double phaseDelta = PaQa_ComputePhaseDifference( phase, previousPhase );
 			double phaseError = PaQa_ComputePhaseDifference( phaseDelta, expectedPhaseIncrement );
@@ -573,7 +564,7 @@ int PaQa_AnalyseRecording( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 	
 	if( (analysisResult->latency >= 0) && (analysisResult->amplitudeRatio > 0.1) )
 	{
-		analysisResult->valid = 1;
+		analysisResult->valid = (1);
 		
 		result = PaQa_DetectPop( recording, testTone, analysisResult );
 		QA_ASSERT_EQUALS( "detect pop", 0, result );
@@ -584,4 +575,5 @@ int PaQa_AnalyseRecording( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 	return 0;
 error:
 	return -1;
-}	
+}
+

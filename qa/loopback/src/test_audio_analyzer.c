@@ -48,6 +48,8 @@
 #define FRAMES_PER_BLOCK  (64)
 #define PRINT_REPORTS  0
 
+#define TEST_SAVED_WAVE  (0)
+
 /*==========================================================================================*/
 /**
  * Detect a single tone.
@@ -425,7 +427,7 @@ static int TestDetectPops( void )
 	return 0;
 }
 
-
+#if TEST_SAVED_WAVE
 /*==========================================================================================*/
 /**
  * Simple test that write a sawtooth waveform to a file.
@@ -464,6 +466,7 @@ error:
     printf("ERROR: result = %d\n", result );
     return result;
 }
+#endif /* TEST_SAVED_WAVE */
 
 /*==========================================================================================*/
 /**
@@ -558,26 +561,26 @@ error:
 int PaQa_TestAnalyzer( void )
 {
 	int result;
-		
 	
+#if TEST_SAVED_WAVE
 	// Write a simple wave file.
-	//if (result = TestSavedWave()) return result;
+	if ((result = TestSavedWave()) != 0) return result;
+#endif /* TEST_SAVED_WAVE */
 	
 	// Generate single tone and verify presence.
-	if (result = TestSingleMonoTone()) return result;
+	if ((result = TestSingleMonoTone()) != 0) return result;
 
 	// Generate prime series of tones and verify presence.
-	if (result = TestMixedMonoTones()) return result;
+	if ((result = TestMixedMonoTones()) != 0) return result;
 	
 	// Detect dropped or added samples in a sine wave recording.
-	if (result = TestDetectPhaseErrors()) return result;
+	if ((result = TestDetectPhaseErrors()) != 0) return result;
 	
 	// Test to see if notch filter can knock out the test tone.
-	if (result = TestNotchFilter()) return result;
+	if ((result = TestNotchFilter()) != 0) return result;
 	
 	// Detect pops that get back in phase.
-	if (result = TestDetectPops()) return result;
+	if ((result = TestDetectPops()) != 0) return result;
 	
-
 	return 0;
 }

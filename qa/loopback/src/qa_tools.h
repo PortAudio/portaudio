@@ -53,7 +53,7 @@ extern int g_testsFailed;
 
 
 #define QA_ASSERT_EQUALS( message, expected, actual ) \
-	if( (expected) != (actual) ) \
+	if( ((expected) != (actual)) ) \
 	{ \
 		printf( "%s:%d - ERROR - %s, expected %d, got %d\n", __FILE__, __LINE__, message, expected, actual ); \
 		g_testsFailed++; \
