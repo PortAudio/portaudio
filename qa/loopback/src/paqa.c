@@ -704,7 +704,6 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
  */
 static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice, double expectedAmplitude )
 {
-	int i;
 	int iFlags;
 	int iRate;
 	int iSize;
