@@ -4270,7 +4270,8 @@ static void *CallbackThreadFunc( void *userData )
         }
     }
 
-end:	
+end:
+    ; /* Hack to fix "label at end of compound statement" error caused by pthread_cleanup_pop(1) macro. */
     /* Match pthread_cleanup_push */
     pthread_cleanup_pop( 1 );
 
