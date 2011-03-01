@@ -57,14 +57,6 @@ COMMON_OBJS = \
 	src/common/pa_stream.o \
 	src/common/pa_trace.o \
 	src/hostapi/skeleton/pa_hostapi_skeleton.o
-
-LOOPBACK_OBJS = \
-	qa/loopback/src/audio_analyzer.o \
-	qa/loopback/src/biquad_filter.o \
-	qa/loopback/src/paqa_tools.o \
-	qa/loopback/src/test_audio_analyzer.o \
-	qa/loopback/src/write_wav.o \
-	qa/loopback/src/paqa.o
 	
 TESTS = \
 	bin/paqa_devs \
@@ -161,10 +153,6 @@ $(ALL_TESTS): bin/%: lib/$(PALIB) $(MAKEFILE) $(PAINC) test/%.c
 	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(top_srcdir)/test/$*.c lib/$(PALIB) $(LIBS)
 	@WITH_ASIO_TRUE@  $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS) $(top_srcdir)/test/$*.c lib/$(PALIB) $(LIBS)
 
-bin/paloopback: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(LOOPBACK_OBJS)
-	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(LOOPBACK_OBJS) lib/$(PALIB) $(LIBS)
-	@WITH_ASIO_TRUE@ $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS)  $(LOOPBACK_OBJS) lib/$(PALIB) $(LIBS)
-
 install: lib/$(PALIB) portaudio-2.0.pc
 	$(INSTALL) -d $(DESTDIR)$(libdir)
 	$(LIBTOOL) --mode=install $(INSTALL) lib/$(PALIB) $(DESTDIR)$(libdir)
@@ -190,7 +178,7 @@ uninstall:
 	$(MAKE) uninstall-recursive
 
 clean:
-	$(LIBTOOL) --mode=clean rm -f $(LTOBJS) $(LOOPBACK_OBJS) $(ALL_TESTS) lib/$(PALIB)
+	$(LIBTOOL) --mode=clean rm -f $(LTOBJS) $(ALL_TESTS) lib/$(PALIB)
 	$(RM) bin-stamp lib-stamp
 	-$(RM) -r bin lib
 
