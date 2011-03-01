@@ -123,6 +123,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 						PaStreamCallbackFlags statusFlags,
 						void *userData )
 {
+	int i;
     float *in = (float *)inputBuffer;
     float *out = (float *)outputBuffer;
     int done = paContinue;
@@ -136,7 +137,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
     if( in != NULL)
 	{
 		// Read each channel from the buffer.
-		for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+		for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
 		{
 			done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
 										in + i, 
@@ -150,7 +151,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 		PaQa_EraseBuffer( out, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
 		
 		
-		for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+		for( i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
 		{
 			PaQa_MixSine( &loopbackContext->generators[i],
 						 out + i,
@@ -282,6 +283,7 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 									  LoopbackContext *loopbackContext
 									  )
 {	
+	int i;
     float *in = (float *)g_BigBuffer;
     float *out = (float *)g_BigBuffer;
 	PaError err;
@@ -305,7 +307,7 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	}
 	
 	// Save in a recording.
-    for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+    for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
 	{
 		done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
 									in + i,
@@ -317,7 +319,7 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	available = Pa_GetStreamWriteAvailable( outStream );
 	if( available > (2*framesPerBuffer) ) available = (2*framesPerBuffer);
 	PaQa_EraseBuffer( out, available, loopbackContext->test->outputParameters.channelCount );
-	for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+	for( i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
 	{
 		PaQa_MixSine( &loopbackContext->generators[i],
 					 out + i,
@@ -522,15 +524,16 @@ static int PaQa_SaveTestResultToWaveFile( UserOptions *userOptions, PaQaRecordin
 /*******************************************************************/
 static int PaQa_SetupLoopbackContext( LoopbackContext *loopbackContextPtr, TestParameters *testParams )
 {
+	int i;
 	// Setup loopback context.
 	memset( loopbackContextPtr, 0, sizeof(LoopbackContext) );	
 	loopbackContextPtr->test = testParams;
-	for( int i=0; i<testParams->samplesPerFrame; i++ )
+	for( i=0; i<testParams->samplesPerFrame; i++ )
 	{
 		int err = PaQa_InitializeRecording( &loopbackContextPtr->recordings[i], testParams->maxFrames, testParams->sampleRate );
 		QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", paNoError, err );
 	}
-	for( int i=0; i<testParams->samplesPerFrame; i++ )
+	for( i=0; i<testParams->samplesPerFrame; i++ )
 	{
 		PaQa_SetupSineGenerator( &loopbackContextPtr->generators[i], PaQa_GetNthFrequency( testParams->baseFrequency, i ),
 								testParams->amplitude, testParams->sampleRate );
@@ -543,8 +546,8 @@ error:
 /*******************************************************************/
 static void PaQa_TeardownLoopbackContext( LoopbackContext *loopbackContextPtr )
 {
-
-	for( int i=0; i<loopbackContextPtr->test->samplesPerFrame; i++ )
+	int i;
+	for( i=0; i<loopbackContextPtr->test->samplesPerFrame; i++ )
 	{
 		PaQa_TerminateRecording( &loopbackContextPtr->recordings[i] );
 	}	
@@ -594,6 +597,7 @@ static void PaQa_PrintFullErrorReport( PaQaAnalysisResult *analysisResultPtr, in
  */
 static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *testParams, double expectedAmplitude )
 {
+	int i;
 	LoopbackContext loopbackContext;
 	PaError err = paNoError;
 	PaQaTestTone testTone;
@@ -615,7 +619,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	QA_ASSERT_TRUE("loopback did not run", (loopbackContext.callbackCount > 1) );
 	
 	// Analyse recording to to detect glitches.
-	for( int i=0; i<testParams->samplesPerFrame; i++ )
+	for( i=0; i<testParams->samplesPerFrame; i++ )
 	{
 		double freq = PaQa_GetNthFrequency( testParams->baseFrequency, i );
 		testTone.frequency = freq;
@@ -700,6 +704,8 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
  */
 static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice, double expectedAmplitude )
 {
+	int i;
+	int iSize;
 	int totalBadChannels = 0;
 	TestParameters testParams;
     const   PaDeviceInfo *inputDeviceInfo;	
@@ -735,7 +741,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	testParams.maxFrames = (int) (0.5 * testParams.sampleRate);	
 	
 	// Loop though combinations of audio parameters.
-	for( int iFlags=0; iFlags<numFlagSettings; iFlags++ )
+	for( iFlags=0; iFlags<numFlagSettings; iFlags++ )
 	{
 		testParams.flags = flagSettings[iFlags];
 		printf( "************ Mode = %s ************\n",
@@ -744,7 +750,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 
 		// Loop though combinations of audio parameters.
 		testParams.framesPerBuffer = 128;
-		for( int iRate=0; iRate<numRates; iRate++ )
+		for( iRate=0; iRate<numRates; iRate++ )
 		{
 			// SAMPLE RATE
 			testParams.sampleRate = sampleRates[iRate];
@@ -757,7 +763,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		
 		testParams.sampleRate = 44100;
 		testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
-		for( int iSize=0; iSize<numBufferSizes; iSize++ )
+		for( iSize=0; iSize<numBufferSizes; iSize++ )
 		{	
 			// BUFFER SIZE
 			testParams.framesPerBuffer = framesPerBuffers[iSize];
@@ -940,7 +946,7 @@ void usage( const char *name )
 int main( int argc, char **argv )
 {
 	UserOptions userOptions;
-	
+	int i;
 	int result = 0;
 	int justMath = 0;
 	printf("PortAudio LoopBack Test built " __DATE__ " at " __TIME__ "\n");
@@ -952,7 +958,7 @@ int main( int argc, char **argv )
 	userOptions.waveFilePath = ".";
 	
 	char *name = argv[0];
-	for( int i=1; i<argc; i++ )
+	for( i=1; i<argc; i++ )
 	{
 		char *arg = argv[i];
 		if( arg[0] == '-' )
@@ -1008,7 +1014,7 @@ int main( int argc, char **argv )
 		}
 	}
 		
-	//result = PaQa_TestAnalyzer();
+	result = PaQa_TestAnalyzer();
 	
 	if( (result == 0) && (justMath == 0) )
 	{

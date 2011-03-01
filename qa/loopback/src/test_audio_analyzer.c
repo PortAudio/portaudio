@@ -104,6 +104,7 @@ error:
 
 static int TestMixedMonoTones( void )
 {
+	int i;
 	int result = 0;
 #define NUM_TONES (5)
 	PaQaSineGenerator generators[NUM_TONES];
@@ -117,7 +118,7 @@ static int TestMixedMonoTones( void )
 	double amp = 0.1;
 	
 	// Setup a sine oscillator.
-	for( int i=0; i<NUM_TONES; i++ )
+	for( i=0; i<NUM_TONES; i++ )
 	{
 		PaQa_SetupSineGenerator( &generators[i], PaQa_GetNthFrequency( baseFreq, i ), amp, sampleRate );
 	}
@@ -130,14 +131,14 @@ static int TestMixedMonoTones( void )
 	while (!done)
 	{
 		PaQa_EraseBuffer( buffer, FRAMES_PER_BLOCK, samplesPerFrame );
-		for( int i=0; i<NUM_TONES; i++ )
+		for( i=0; i<NUM_TONES; i++ )
 		{
 			PaQa_MixSine( &generators[i], buffer, FRAMES_PER_BLOCK, stride );
 		}
 		done = PaQa_WriteRecording( &recording, buffer, FRAMES_PER_BLOCK, samplesPerFrame );
 	}
 	
-	for( int i=0; i<NUM_TONES; i++ )
+	for( i=0; i<NUM_TONES; i++ )
 	{
 		double mag = PaQa_CorrelateSine( &recording, PaQa_GetNthFrequency( baseFreq, i), sampleRate, 0, recording.numFrames, NULL );
 		QA_ASSERT_CLOSE( "exact frequency match", amp, mag, 0.01 );
@@ -219,7 +220,7 @@ static void MakeRecordingWithAddedFrames( PaQaRecording *recording, PaQaTestTone
 
 static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTone, int popPosition, int popWidth, double popAmplitude )
 {
-	
+	int i;
 	PaQaSineGenerator generator;
 #define BUFFER_SIZE 512
 	float buffer[BUFFER_SIZE];
@@ -245,7 +246,7 @@ static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTo
 		popWidth = (recording->numFrames - popPosition) - 1;
 	}
 	
-	for( int i=0; i<popWidth; i++ )
+	for( i=0; i<popWidth; i++ )
 	{
 		float good = recording->buffer[i+popPosition];
 		float bad = (good > 0.0) ? (good - popAmplitude) : (good + popAmplitude);
