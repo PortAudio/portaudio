@@ -148,11 +148,9 @@ SRC_DIRS = \
 SUBDIRS =
 @ENABLE_CXX_TRUE@SUBDIRS += bindings/cpp
 
-all: lib/$(PALIB) all-recursive tests loopback
+all: lib/$(PALIB) all-recursive tests
 
 tests: bin-stamp $(TESTS)
-
-loopback: bin-stamp bin/paloopback
 
 # With ASIO enabled we must link libportaudio and all test programs with CXX
 lib/$(PALIB): lib-stamp $(LTOBJS) $(MAKEFILE) $(PAINC)
