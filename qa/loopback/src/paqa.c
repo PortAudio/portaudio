@@ -56,9 +56,10 @@ int g_testsFailed = 0;
 #define MAX_NUM_RECORDINGS                   (8)
 #define MAX_BACKGROUND_NOISE_RMS             (0.0004)
 #define LOOPBACK_DETECTION_DURATION_SECONDS  (0.8)
-#define DEFAULT_FRAMES_PER_BUFFER            (128)
+#define DEFAULT_FRAMES_PER_BUFFER            (0)
 #define DEFAULT_HIGH_LATENCY_MSEC            (100)
 #define PAQA_WAIT_STREAM_MSEC                (100)
+#define PAQA_TEST_DURATION                   (1.2)
 
 // Use two separate streams instead of one full duplex stream.
 #define PAQA_FLAG_TWO_STREAMS       (1<<0)
@@ -737,8 +738,14 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		
 		if( i==0 )
 		{
+			printf( "%4d-%4d | ",
+				   loopbackContext.minFramesPerBuffer,
+				   loopbackContext.maxFramesPerBuffer
+				   );
+			
 			double latencyMSec = 1000.0 * analysisResult.latency / testParams->sampleRate;
 			printf("%7.2f | ", latencyMSec );
+						
 		}
 		
 		if( analysisResult.valid )
@@ -763,7 +770,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		}
 		else
 		{
-			printf( "[%d] NO SIGNAL, ", i );
+			printf( "[%d] No or low signal, ampRatio = %f", i, analysisResult.amplitudeRatio );
 			numBadChannels += 1;
 		}
 
@@ -773,17 +780,15 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		printf( "OK" );
 	}
 	
-	printf( ", %d/%d/%d/%d, ",
+	printf( ", %d/%d/%d/%d ",
 		   loopbackContext.inputOverflowCount,
 		   loopbackContext.inputUnderflowCount,
 		   loopbackContext.outputOverflowCount,
-		   loopbackContext.outputUnderflowCount );
+		   loopbackContext.outputUnderflowCount
+		  );
 	
 	printf( "\n" );
-	
-	// Sleep to see if this lets the audio drivers stabilize.
-	Pa_Sleep( 500 );
-			
+				
 	PaQa_TeardownLoopbackContext( &loopbackContext );
 	if( numBadChannels > 0 )
 	{
@@ -806,7 +811,7 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 	testParamsPtr->samplesPerFrame = 2;
 	testParamsPtr->amplitude = 0.5;
 	testParamsPtr->sampleRate = 44100;
-	testParamsPtr->maxFrames = (int) (1.0 * testParamsPtr->sampleRate);
+	testParamsPtr->maxFrames = (int) (PAQA_TEST_DURATION * testParamsPtr->sampleRate);
 	testParamsPtr->framesPerBuffer = DEFAULT_FRAMES_PER_BUFFER;
 	testParamsPtr->baseFrequency = 200.0;
 	testParamsPtr->flags = PAQA_FLAG_TWO_STREAMS;
@@ -829,6 +834,7 @@ static void PaQa_OverrideTestParameters( TestParameters *testParamsPtr,  UserOpt
 	if( userOptions->sampleRate >= 0 )
 	{
 		testParamsPtr->sampleRate = userOptions->sampleRate;
+		testParamsPtr->maxFrames = (int) (PAQA_TEST_DURATION * testParamsPtr->sampleRate);
 	}
 	if( userOptions->framesPerBuffer >= 0 )
 	{
@@ -887,41 +893,58 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	// Loop though combinations of audio parameters.
 	for( iFlags=0; iFlags<numFlagSettings; iFlags++ )
 	{
+		int numRuns = 0;
+
 		testParams.flags = flagSettings[iFlags];
-		printf( "************ Mode = %s ************\n",
+		printf( "\n************ Mode = %s ************\n",
 			   (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
-		printf("|-sRate-|-buffer-|-latency-|-channel results--------------------|\n");
+		printf("|-   requested  -|- measured ----------------------------------------------->\n");
+		printf("|-sRate-|-fr/buf-|- frm/buf -|-latency-|-channel results--------------------|\n");
 
 		// Loop though various sample rates.
-		savedValue = testParams.sampleRate;
-		for( iRate=0; iRate<numRates; iRate++ )
+		if( userOptions->sampleRate < 0 )
 		{
-			// SAMPLE RATE
-			testParams.sampleRate = sampleRates[iRate];
-			testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
-			
-			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
-			totalBadChannels += numBadChannels;
+			savedValue = testParams.sampleRate;
+			for( iRate=0; iRate<numRates; iRate++ )
+			{
+				// SAMPLE RATE
+				testParams.sampleRate = sampleRates[iRate];
+				testParams.maxFrames = (int) (PAQA_TEST_DURATION * testParams.sampleRate);
+				
+				int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+				totalBadChannels += numBadChannels;
+			}
+			testParams.sampleRate = savedValue;
+			testParams.maxFrames = (int) (PAQA_TEST_DURATION * testParams.sampleRate);
+			printf( "\n" );
+			numRuns += 1;
 		}
-		testParams.sampleRate = savedValue;
-		testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
-		printf( "\n" );
 		
 		// Loop through various buffer sizes.
-		savedValue = testParams.framesPerBuffer;
-		for( iSize=0; iSize<numBufferSizes; iSize++ )
-		{	
-			// BUFFER SIZE
-			testParams.framesPerBuffer = framesPerBuffers[iSize];
-			
-			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
-			totalBadChannels += numBadChannels;			
+		if( userOptions->framesPerBuffer < 0 )
+		{
+			savedValue = testParams.framesPerBuffer;
+			for( iSize=0; iSize<numBufferSizes; iSize++ )
+			{	
+				// BUFFER SIZE
+				testParams.framesPerBuffer = framesPerBuffers[iSize];
+				
+				int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+				totalBadChannels += numBadChannels;			
+			}
+			testParams.framesPerBuffer = savedValue;
+			printf( "\n" );		
+			numRuns += 1;
 		}
-		testParams.framesPerBuffer = savedValue;
-		printf( "\n" );		
+		// Run one with single parameters in case we did not do a series.
+		if( numRuns == 0 )
+		{
+			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+			totalBadChannels += numBadChannels;						
+		}
 	}
-	
-	printf("Test Sample Formats using Half Duplex IO -----\n" );
+			
+	printf("\nTest Sample Formats using Half Duplex IO -----\n" );
 	testParams.flags = PAQA_FLAG_TWO_STREAMS;
 	
 	for( iFormat=0; iFormat<numSampleFormats; iFormat++ )
@@ -996,20 +1019,29 @@ int PaQa_MeasureBackgroundNoise( LoopbackContext *loopbackContextPtr, double *rm
 int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice )
 {
 	TestParameters testParams;
-	LoopbackContext loopbackContext = { 0 };
+	LoopbackContext loopbackContext;
     const   PaDeviceInfo *inputDeviceInfo;	
     const   PaDeviceInfo *outputDeviceInfo;		
 	PaError err = paNoError;
 	double minAmplitude;
 	
 	inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
-	QA_ASSERT_TRUE( "Pa_GetDeviceInfo for input returned NULL.", (inputDeviceInfo != NULL) );
+	if( inputDeviceInfo == NULL )
+	{
+		printf("ERROR - Pa_GetDeviceInfo for input returned NULL.\n");
+		return paInvalidDevice;
+	}
 	if( inputDeviceInfo->maxInputChannels < 2 )
 	{
 		return 0;
 	}
+	
 	outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
-	QA_ASSERT_TRUE( "Pa_GetDeviceInfo for output returned NULL.", (outputDeviceInfo != NULL) );
+	if( outputDeviceInfo == NULL )
+	{
+		printf("ERROR - Pa_GetDeviceInfo for output returned NULL.\n");
+		return paInvalidDevice;
+	}
 	if( outputDeviceInfo->maxOutputChannels < 2 )
 	{
 		return 0;
@@ -1041,7 +1073,7 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 	{
 		printf( "Output not supported for this format!\n" );
 		return 0;
-	}!
+	}
 	
 	PaQa_SetupLoopbackContext( &loopbackContext, &testParams );
 			
@@ -1158,7 +1190,6 @@ static int ScanForLoopback(UserOptions *userOptions)
 	else if (userOptions->outputDevice >= 0)
 	{
 		// Just scan for input.
-	QA_ASSERT_TRUE( "No good loopback cable found.", (numLoopbacks > 0) );
 		for( iIn=0; iIn<numDevices; iIn++ )
 		{					
 			numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, userOptions->outputDevice );
@@ -1169,8 +1200,6 @@ static int ScanForLoopback(UserOptions *userOptions)
 		// Scan both.
 		for( iOut=0; iOut<numDevices; iOut++ )
 		{
-			
-	QA_ASSERT_TRUE( "No good loopback cable found.", (numLoopbacks > 0) );
 			for( iIn=0; iIn<numDevices; iIn++ )
 			{				
 				numLoopbacks += CheckLoopbackAndScan( userOptions, iIn, iOut );
@@ -1309,7 +1338,6 @@ int main( int argc, char **argv )
 					break;
 					
 				case 'm':
-	userOptions.framesPerBuffer = -1;
 					printf("Option -m set so just testing math and not the audio devices.\n");
 					justMath = 1;
 					break;

@@ -447,6 +447,8 @@ int PaQa_MeasureLatency( PaQaRecording *recording, PaQaTestTone *testTone, PaQaA
 	int cycleSize = (int) (period + 0.5);
 	//printf("PaQa_AnalyseRecording: frequency = %8f, frameRate = %8f, period = %8f, cycleSize = %8d\n", 
 	//	   testTone->frequency, testTone->sampleRate, period, cycleSize );
+	analysisResult->latency = -1;
+	analysisResult->valid = (0);
 	
 	// Set up generator to find matching first cycle.
 	QA_ASSERT_TRUE( "cycleSize out of bounds", (cycleSize < MAX_BUFFER_SIZE) );
