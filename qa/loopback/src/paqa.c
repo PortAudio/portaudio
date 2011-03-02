@@ -54,8 +54,10 @@ int g_testsFailed = 0;
 
 #define MAX_NUM_GENERATORS  (8)
 #define MAX_NUM_RECORDINGS  (8)
-#define MAX_BACKGROUND_NOISE_RMS (0.00001)
-#define LOOPBACK_DETECTION_DURATION_SECONDS  (0.5)
+#define MAX_BACKGROUND_NOISE_RMS (0.0004)
+#define LOOPBACK_DETECTION_DURATION_SECONDS  (0.8)
+#define DEFAULT_FRAMES_PER_BUFFER   (64)
+#define PAQA_WAIT_STREAM_MSEC   (100)
 
 // Use two separate streams instead of one full duplex stream.
 #define PAQA_FLAG_TWO_STREAMS       (1<<0)
@@ -74,7 +76,6 @@ const char * s_FlagOffNames[] =
 	"Callback"
 };
 
-#define DEFAULT_FRAMES_PER_BUFFER   (256)
 
 /** Parameters that describe a single test run. */
 typedef struct TestParameters_s
@@ -134,7 +135,6 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	int i;
 	LoopbackContext *loopbackContext = (LoopbackContext *) userData;
 	
-	int channelsPerFrame = loopbackContext->test->inputParameters.channelCount;
 		
 	loopbackContext->callbackCount += 1;
 	if( statusFlags & paInputUnderflow ) loopbackContext->inputUnderflowCount += 1;
@@ -148,6 +148,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	 */
 	if( inputBuffer != NULL)
 	{
+		int channelsPerFrame = loopbackContext->test->inputParameters.channelCount;
 		float *in = (float *)inputBuffer;
 		
 		PaSampleFormat inFormat = loopbackContext->test->inputParameters.sampleFormat;
@@ -169,6 +170,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	
 	if( outputBuffer != NULL )
 	{
+		int channelsPerFrame = loopbackContext->test->outputParameters.channelCount;
 		float *out = (float *)outputBuffer;
 		
 		PaSampleFormat outFormat = loopbackContext->test->outputParameters.sampleFormat;
@@ -193,6 +195,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 		}
 		
 	}
+
 	return loopbackContext->done ? paComplete : paContinue;
 }
 
@@ -227,7 +230,7 @@ int PaQa_RunLoopbackFullDuplex( LoopbackContext *loopbackContext )
 	// Wait for stream to finish.
 	while( loopbackContext->done == 0 )
 	{
-		Pa_Sleep(50);
+		Pa_Sleep(PAQA_WAIT_STREAM_MSEC);
 	}
 	
 	err = Pa_StopStream( stream );
@@ -796,13 +799,13 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 	testParamsPtr->inputParameters.sampleFormat = paFloat32;
 	testParamsPtr->inputParameters.channelCount = testParamsPtr->samplesPerFrame;
 	testParamsPtr->inputParameters.suggestedLatency =
-		Pa_GetDeviceInfo( inputDevice )->defaultHighInputLatency;
+		Pa_GetDeviceInfo( inputDevice )->defaultLowInputLatency;
 	
 	testParamsPtr->outputParameters.device = outputDevice;
 	testParamsPtr->outputParameters.sampleFormat = paFloat32;
 	testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
 	testParamsPtr->outputParameters.suggestedLatency =
-		Pa_GetDeviceInfo( outputDevice )->defaultHighOutputLatency;
+		Pa_GetDeviceInfo( outputDevice )->defaultLowOutputLatency;
 }
 
 /*******************************************************************/
@@ -824,7 +827,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
 	
 	double bestSampleRate = 44100.0;
-	int bestBufferSize = 32;
+	int bestBufferSize = DEFAULT_FRAMES_PER_BUFFER;
 	
 	printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
 	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
@@ -840,6 +843,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
 	
 	PaSampleFormat sampleFormats[] = { paUInt8, paInt16, paInt32 };
+	const char *sampleFormatNames[] = { "paUInt8", "paInt16", "paInt32" };
 	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
 	
 	// Check to see if a specific value was requested.
@@ -903,7 +907,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		PaSampleFormat format = sampleFormats[ iFormat ];
 		testParams.inputParameters.sampleFormat = format;
 		testParams.outputParameters.sampleFormat = format;
-		printf("Sample format = %d\n", (int) format );
+		printf("Sample format = %d = %s\n", (int) format, sampleFormatNames[iFormat] );
 		int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 		totalBadChannels += numBadChannels;			
 	}

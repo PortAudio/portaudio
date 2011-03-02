@@ -45,6 +45,7 @@
 #include "audio_analyzer.h"
 #include "write_wav.h"
 
+#define PAQA_POP_THRESHOLD  (0.04)
 
 /*==========================================================================================*/
 double PaQa_GetNthFrequency( double baseFrequency, int index )
@@ -540,7 +541,7 @@ int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalys
 		}
 	}
 	
-	if( maxAmplitude > 0.01 )
+	if( maxAmplitude > PAQA_POP_THRESHOLD )
 	{
 		analysisResult->popPosition = maxPosition;
 		analysisResult->popAmplitude = maxAmplitude;
