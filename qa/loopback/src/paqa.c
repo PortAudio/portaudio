@@ -104,7 +104,7 @@ typedef struct LoopbackContext_s
 	int                outputOverflowCount;
 	int                primingCount;
 	TestParameters    *test;
-	
+	volatile int       done;
 } LoopbackContext;
 
 typedef struct UserOptions_s
@@ -132,7 +132,6 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 						void *userData )
 {
 	int i;
-    int done = paContinue;
 	LoopbackContext *loopbackContext = (LoopbackContext *) userData;
 	
 	int channelsPerFrame = loopbackContext->test->inputParameters.channelCount;
@@ -147,7 +146,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
     /* This may get called with NULL inputBuffer during initial setup.
 	 * We may also use the same callback with output only streams.
 	 */
-    if( inputBuffer != NULL)
+	if( inputBuffer != NULL)
 	{
 		float *in = (float *)inputBuffer;
 		
@@ -161,7 +160,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 		// Read each channel from the buffer.
 		for( i=0; i<channelsPerFrame; i++ )
 		{			
-			done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
+			loopbackContext->done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
 										in + i, 
 										framesPerBuffer,
 										channelsPerFrame );
@@ -179,7 +178,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 			out = (float *) g_ConversionBuffer;
 		}
 			
-		PaQa_EraseBuffer( out, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
+		PaQa_EraseBuffer( out, framesPerBuffer, channelsPerFrame );
 		for( i=0; i<channelsPerFrame; i++ )
 		{
 			PaQa_MixSine( &loopbackContext->generators[i],
@@ -194,7 +193,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 		}
 		
 	}
-    return done ? paComplete : paContinue;
+	return loopbackContext->done ? paComplete : paContinue;
 }
 
 /*******************************************************************/
@@ -209,7 +208,7 @@ int PaQa_RunLoopbackFullDuplex( LoopbackContext *loopbackContext )
 	PaStream *stream = NULL;
 	PaError err = 0;
 	TestParameters *test = loopbackContext->test;
-	
+	loopbackContext->done = 0;
 	// Use one full duplex stream.
 	err = Pa_OpenStream(
 					&stream,
@@ -226,7 +225,7 @@ int PaQa_RunLoopbackFullDuplex( LoopbackContext *loopbackContext )
 	if( err != paNoError ) goto error;
 		
 	// Wait for stream to finish.
-	while( Pa_IsStreamActive( stream ) )
+	while( loopbackContext->done == 0 )
 	{
 		Pa_Sleep(50);
 	}
@@ -256,6 +255,7 @@ int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
 	PaStream *outStream = NULL;
 	PaError err = 0;
 	TestParameters *test = loopbackContext->test;
+	loopbackContext->done = 0;
 	
 	// Use two half duplex streams.
 	err = Pa_OpenStream(
@@ -287,7 +287,7 @@ int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
 	if( err != paNoError ) goto error;
 	
 	// Wait for stream to finish.
-	while( Pa_IsStreamActive( inStream ) )
+	while( loopbackContext->done == 0  )
 	{
 		Pa_Sleep(50);
 	}
@@ -323,6 +323,7 @@ int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
 	PaStream *inStream = NULL;
 	PaError err = 0;
 	TestParameters *test = loopbackContext->test;
+	loopbackContext->done = 0;
 	
 	// Just open an input stream.
 	err = Pa_OpenStream(
@@ -340,7 +341,7 @@ int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
 	if( err != paNoError ) goto error;
 	
 	// Wait for stream to finish.
-	while( Pa_IsStreamActive( inStream ) )
+	while( loopbackContext->done == 0 )
 	{
 		Pa_Sleep(50);
 	}
@@ -762,6 +763,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	
 	printf( "\n" );
 	
+	Pa_Sleep( 500 );
 			
 	PaQa_TeardownLoopbackContext( &loopbackContext );
 	if( numBadChannels > 0 )
@@ -793,10 +795,14 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 	testParamsPtr->inputParameters.device = inputDevice;
 	testParamsPtr->inputParameters.sampleFormat = paFloat32;
 	testParamsPtr->inputParameters.channelCount = testParamsPtr->samplesPerFrame;
+	testParamsPtr->inputParameters.suggestedLatency =
+		Pa_GetDeviceInfo( inputDevice )->defaultHighInputLatency;
 	
 	testParamsPtr->outputParameters.device = outputDevice;
 	testParamsPtr->outputParameters.sampleFormat = paFloat32;
 	testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
+	testParamsPtr->outputParameters.suggestedLatency =
+		Pa_GetDeviceInfo( outputDevice )->defaultHighOutputLatency;
 }
 
 /*******************************************************************/
@@ -812,14 +818,13 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int iFormat;
 	int totalBadChannels = 0;
 	TestParameters testParams;
-    const   PaDeviceInfo *inputDeviceInfo;	
-    const   PaDeviceInfo *outputDeviceInfo;		
+	const   PaDeviceInfo *inputDeviceInfo;	
+	const   PaDeviceInfo *outputDeviceInfo;		
 	inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
 	outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
 	
 	double bestSampleRate = 44100.0;
 	int bestBufferSize = 32;
-	
 	
 	printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
 	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
