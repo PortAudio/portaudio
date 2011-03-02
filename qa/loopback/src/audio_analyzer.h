@@ -75,6 +75,7 @@ typedef struct PaQaTestTone_s
 typedef struct PaQaAnalysisResult_s
 {
 	int       valid;
+	/** Latency in samples from output to input. */
 	double    latency;
 	double    amplitudeRatio;
 	double    popAmplitude;
@@ -124,7 +125,6 @@ double PaQa_MeasureCrossingSlope( float *buffer, int numFrames );
  * Prepare an oscillator that can generate a sine tone for testing.
  */
 void PaQa_SetupSineGenerator( PaQaSineGenerator *generator, double frequency, double amplitude, double frameRate );
-
 
 /*================================================================*/
 /*================= Recordings ===================================*/

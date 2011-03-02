@@ -96,9 +96,15 @@ typedef struct LoopbackContext_s
 	PaQaSineGenerator  generators[MAX_NUM_GENERATORS];
 	// Record each channel individually.
 	PaQaRecording      recordings[MAX_NUM_RECORDINGS];
+	// Measured at runtime.
 	int                callbackCount;
-	
+	int                inputUnderflowCount;
+	int                outputUnderflowCount;
+	int                inputOverflowCount;
+	int                outputOverflowCount;
+	int                primingCount;
 	TestParameters    *test;
+	
 } LoopbackContext;
 
 typedef struct UserOptions_s
@@ -115,7 +121,8 @@ typedef struct UserOptions_s
 } UserOptions;
 
 #define BIG_BUFFER_SIZE  (sizeof(float) * 2 * 2048)
-static unsigned char g_BigBuffer[BIG_BUFFER_SIZE];
+static unsigned char g_ReadWriteBuffer[BIG_BUFFER_SIZE];
+static unsigned char g_ConversionBuffer[BIG_BUFFER_SIZE];
 
 /*******************************************************************/
 static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuffer,
@@ -125,40 +132,67 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 						void *userData )
 {
 	int i;
-    float *in = (float *)inputBuffer;
-    float *out = (float *)outputBuffer;
     int done = paContinue;
+	LoopbackContext *loopbackContext = (LoopbackContext *) userData;
 	
-	LoopbackContext *loopbackContext = (LoopbackContext *) userData;	
+	int channelsPerFrame = loopbackContext->test->inputParameters.channelCount;
+		
 	loopbackContext->callbackCount += 1;
-	
+	if( statusFlags & paInputUnderflow ) loopbackContext->inputUnderflowCount += 1;
+	if( statusFlags & paInputOverflow ) loopbackContext->inputOverflowCount += 1;
+	if( statusFlags & paOutputUnderflow ) loopbackContext->outputUnderflowCount += 1;
+	if( statusFlags & paOutputOverflow ) loopbackContext->outputOverflowCount += 1;
+	if( statusFlags & paPrimingOutput ) loopbackContext->primingCount += 1;
+
     /* This may get called with NULL inputBuffer during initial setup.
 	 * We may also use the same callback with output only streams.
 	 */
-    if( in != NULL)
+    if( inputBuffer != NULL)
 	{
-		// Read each channel from the buffer.
-		for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+		float *in = (float *)inputBuffer;
+		
+		PaSampleFormat inFormat = loopbackContext->test->inputParameters.sampleFormat;
+		if( inFormat != paFloat32 )
 		{
+			in = (float *) g_ConversionBuffer;
+			PaQa_ConvertToFloat( inputBuffer, framesPerBuffer * channelsPerFrame, inFormat, (float *) g_ConversionBuffer );
+		}
+		
+		// Read each channel from the buffer.
+		for( i=0; i<channelsPerFrame; i++ )
+		{			
 			done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
 										in + i, 
 										framesPerBuffer,
-										loopbackContext->test->inputParameters.channelCount );
+										channelsPerFrame );
 		}
 	}
 	
-	if( out != NULL )
+	if( outputBuffer != NULL )
 	{
+		float *out = (float *)outputBuffer;
+		
+		PaSampleFormat outFormat = loopbackContext->test->outputParameters.sampleFormat;
+		if( outFormat != paFloat32 )
+		{
+			// If we need to convert then mix to the g_ConversionBuffer and then convert into the PA outputBuffer.
+			out = (float *) g_ConversionBuffer;
+		}
+			
 		PaQa_EraseBuffer( out, framesPerBuffer, loopbackContext->test->outputParameters.channelCount );
-		
-		
-		for( i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+		for( i=0; i<channelsPerFrame; i++ )
 		{
 			PaQa_MixSine( &loopbackContext->generators[i],
 						 out + i,
 						 framesPerBuffer,
-						 loopbackContext->test->outputParameters.channelCount );
+						 channelsPerFrame );
 		}
+		
+		if( outFormat != paFloat32 )
+		{
+			PaQa_ConvertFromFloat( out, framesPerBuffer * channelsPerFrame, outFormat, outputBuffer );
+		}
+		
 	}
     return done ? paComplete : paContinue;
 }
@@ -330,8 +364,8 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 									  )
 {	
 	int i;
-	float *in = (float *)g_BigBuffer;
-	float *out = (float *)g_BigBuffer;
+	float *in = (float *)g_ReadWriteBuffer;
+	float *out = (float *)g_ReadWriteBuffer;
 	PaError err;
 	int done = 0;
 	long available;
@@ -351,6 +385,11 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	{
 		QA_ASSERT_EQUALS( "Pa_ReadStream failed", paNoError, err );
 	}
+	else
+	{
+		loopbackContext->inputOverflowCount += 1;
+	}
+
 	
 	// Save in a recording.
 	for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
@@ -381,6 +420,11 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 	{
 		QA_ASSERT_EQUALS( "Pa_WriteStream failed", paNoError, err );
 	}
+	else
+	{
+		loopbackContext->outputUnderflowCount += 1;
+	}
+	
 		
 	loopbackContext->callbackCount += 1;
 	
@@ -664,7 +708,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	err = PaQa_RunLoopback( &loopbackContext );
 	QA_ASSERT_TRUE("loopback did not run", (loopbackContext.callbackCount > 1) );
 	
-	// Analyse recording to to detect glitches.
+	// Analyse recording to detect glitches.
 	for( i=0; i<testParams->samplesPerFrame; i++ )
 	{
 		double freq = PaQa_GetNthFrequency( testParams->baseFrequency, i );
@@ -674,7 +718,8 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		
 		if( i==0 )
 		{
-			printf("%7.1f | ", analysisResult.latency );
+			double latencyMSec = 1000.0 * analysisResult.latency / testParams->sampleRate;
+			printf("%7.2f | ", latencyMSec );
 		}
 		
 		if( analysisResult.valid )
@@ -708,6 +753,13 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	{
 		printf( "OK" );
 	}
+	
+	printf( ", %d/%d/%d/%d, ",
+		   loopbackContext.inputOverflowCount,
+		   loopbackContext.inputUnderflowCount,
+		   loopbackContext.outputOverflowCount,
+		   loopbackContext.outputUnderflowCount );
+	
 	printf( "\n" );
 	
 			
@@ -757,6 +809,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int iFlags;
 	int iRate;
 	int iSize;
+	int iFormat;
 	int totalBadChannels = 0;
 	TestParameters testParams;
     const   PaDeviceInfo *inputDeviceInfo;	
@@ -764,27 +817,37 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
 	outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
 	
+	double bestSampleRate = 44100.0;
+	int bestBufferSize = 32;
+	
+	
 	printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
 	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
-	int flagSettings[] = { 0, 1 };
+	// test half duplex first because it is more likely to work.
+	int flagSettings[] = { PAQA_FLAG_TWO_STREAMS, 0 };
 	int numFlagSettings = (sizeof(flagSettings)/sizeof(int));
 	
-	double sampleRates[] = { 44100.0, 48000.0, 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 96000.0 };
+	double sampleRates[] = { 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 44100.0, 48000.0, 96000.0 };
 	int numRates = (sizeof(sampleRates)/sizeof(double));
 	
-	int framesPerBuffers[] = { 256, 16, 32, 40, 64, 100, 128, 512, 1024 };
+	int framesPerBuffers[] = { 16, 32, 40, 64, 100, 128, 256, 512, 1024 };
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
-		
+	
+	PaSampleFormat sampleFormats[] = { paUInt8, paInt16, paInt32 };
+	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
+	
 	// Check to see if a specific value was requested.
 	if( userOptions->sampleRate > 0 )
 	{
 		sampleRates[0] = userOptions->sampleRate;
+		bestSampleRate = userOptions->sampleRate;
 		numRates = 1;
 	}
 	if( userOptions->framesPerBuffer > 0 )
 	{
 		framesPerBuffers[0] = userOptions->framesPerBuffer;
+		bestBufferSize = userOptions->framesPerBuffer;
 		numBufferSizes = 1;
 	}
 	
@@ -796,11 +859,11 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	{
 		testParams.flags = flagSettings[iFlags];
 		printf( "************ Mode = %s ************\n",
-			   (( iFlags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
+			   (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
 		printf("|-sRate-|-buffer-|-latency-|-channel results--------------------|\n");
 
 		// Loop though combinations of audio parameters.
-		testParams.framesPerBuffer = framesPerBuffers[0];
+		testParams.framesPerBuffer = bestBufferSize;
 		for( iRate=0; iRate<numRates; iRate++ )
 		{
 			// SAMPLE RATE
@@ -812,7 +875,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		}
 		printf( "\n" );
 		
-		testParams.sampleRate = sampleRates[0];
+		testParams.sampleRate = bestSampleRate;
 		testParams.maxFrames = (int) (1.2 * testParams.sampleRate);
 		for( iSize=0; iSize<numBufferSizes; iSize++ )
 		{	
@@ -822,10 +885,25 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 			int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 			totalBadChannels += numBadChannels;			
 		}
-		printf( "\n" );
-		
-		
+		printf( "\n" );		
 	}
+	
+	printf("Test Sample Formats using Half Duplex IO -----\n" );
+	testParams.flags = PAQA_FLAG_TWO_STREAMS;
+	testParams.sampleRate = bestSampleRate;
+	testParams.framesPerBuffer = bestBufferSize;
+	
+	for( iFormat=0; iFormat<numSampleFormats; iFormat++ )
+	{	
+		PaSampleFormat format = sampleFormats[ iFormat ];
+		testParams.inputParameters.sampleFormat = format;
+		testParams.outputParameters.sampleFormat = format;
+		printf("Sample format = %d\n", (int) format );
+		int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+		totalBadChannels += numBadChannels;			
+	}
+	printf( "\n" );
+	
 	return totalBadChannels;
 }
 
@@ -1062,6 +1140,73 @@ error:
 	return -1;
 }
 
+/*==========================================================================================*/
+int TestSampleFormatConversion( void )
+{
+	int i;
+	const float floatInput[] = { 1.0, 0.5, -0.5, -1.0 };
+
+	const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
+	const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
+	const int intInput[] = { 2147483647, 2147483647/2, -2147483648/2, -2147483648 };
+	
+	float floatOutput[4];
+	short shortOutput[4];
+	int intOutput[4];	
+	unsigned char ucharOutput[4];
+	
+	QA_ASSERT_EQUALS("int must be 32-bit", 4, (int) sizeof(int) );
+	QA_ASSERT_EQUALS("short must be 16-bit", 2, (int) sizeof(short) );
+	
+	// from Float ======
+	PaQa_ConvertFromFloat( floatInput, 4, paUInt8, ucharOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paFloat32 -> paUint8 -> error", ucharInput[i], ucharOutput[i], 1 );
+	}
+	
+	PaQa_ConvertFromFloat( floatInput, 4, paInt16, shortOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paFloat32 -> paInt16 error", shortInput[i], shortOutput[i], 1 );
+	}
+		
+	PaQa_ConvertFromFloat( floatInput, 4, paInt32, intOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paFloat32 -> paInt32 error", intInput[i], intOutput[i], 0x00010000 );
+	}
+	
+	
+	// to Float ======
+	memset( floatOutput, 0, sizeof(floatOutput) );
+	PaQa_ConvertToFloat( ucharInput, 4, paUInt8, floatOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paUInt8 -> paFloat32 error", floatInput[i], floatOutput[i], 0.01 );
+	}
+	
+	memset( floatOutput, 0, sizeof(floatOutput) );
+	PaQa_ConvertToFloat( shortInput, 4, paInt16, floatOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paInt16 -> paFloat32 error", floatInput[i], floatOutput[i], 0.001 );
+	}
+	
+	memset( floatOutput, 0, sizeof(floatOutput) );
+	PaQa_ConvertToFloat( intInput, 4, paInt32, floatOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paInt32 -> paFloat32 error", floatInput[i], floatOutput[i], 0.00001 );
+	}
+	
+	return 0;
+	
+error:
+	return -1;
+}
+
+
 /*******************************************************************/
 void usage( const char *name )
 {
@@ -1150,6 +1295,9 @@ int main( int argc, char **argv )
 	}
 		
 	result = PaQa_TestAnalyzer();
+	
+	// Test sample format conversion tool.
+	result = TestSampleFormatConversion();
 	
 	if( (result == 0) && (justMath == 0) )
 	{
