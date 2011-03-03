@@ -57,7 +57,6 @@ int g_testsFailed = 0;
 #define MAX_BACKGROUND_NOISE_RMS             (0.0004)
 #define LOOPBACK_DETECTION_DURATION_SECONDS  (0.8)
 #define DEFAULT_FRAMES_PER_BUFFER            (0)
-#define DEFAULT_HIGH_LATENCY_MSEC            (100)
 #define PAQA_WAIT_STREAM_MSEC                (100)
 #define PAQA_TEST_DURATION                   (1.2)
 
@@ -116,7 +115,8 @@ typedef struct UserOptions_s
 {
 	int           sampleRate;
 	int           framesPerBuffer;
-	int           latency;
+	int           inputLatency;
+	int           outputLatency;
 	int           saveBadWaves;
 	int           verbose;
 	int           waveFileCount;
@@ -262,6 +262,33 @@ error:
  * Open two audio streams, one for input and one for output.
  * Generate sine waves on the output channels and record the input channels.
  * Then close the stream.
+ * @return 0 if OK or paTimedOut.
+ */
+
+int PaQa_WaitForStream( LoopbackContext *loopbackContext )
+{
+	int timeoutMSec = 1000 * PAQA_TEST_DURATION * 2;
+	
+	// Wait for stream to finish or timeout.
+	while( (loopbackContext->done == 0) && (timeoutMSec > 0) )
+	{
+		Pa_Sleep(PAQA_WAIT_STREAM_MSEC);
+		timeoutMSec -= PAQA_WAIT_STREAM_MSEC;
+	}
+	
+	if( loopbackContext->done == 0 )
+	{
+		printf("ERROR - stream completion timed out!");
+		return paTimedOut;
+	}
+	return 0;
+}
+
+/*******************************************************************/
+/** 
+ * Open two audio streams, one for input and one for output.
+ * Generate sine waves on the output channels and record the input channels.
+ * Then close the stream.
  * @return 0 if OK or negative error.
  */
 int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
@@ -269,6 +296,7 @@ int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
 	PaStream *inStream = NULL;
 	PaStream *outStream = NULL;
 	PaError err = 0;
+	int timedOut = 0;
 	TestParameters *test = loopbackContext->test;
 	loopbackContext->done = 0;
 	
@@ -301,11 +329,7 @@ int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
 	err = Pa_StartStream( outStream );
 	if( err != paNoError ) goto error;
 	
-	// Wait for stream to finish.
-	while( loopbackContext->done == 0  )
-	{
-		Pa_Sleep(PAQA_WAIT_STREAM_MSEC);
-	}
+	timedOut = PaQa_WaitForStream( loopbackContext );
 	
 	err = Pa_StopStream( inStream );
 	if( err != paNoError ) goto error;
@@ -319,7 +343,7 @@ int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
 	err = Pa_CloseStream( outStream );
 	if( err != paNoError ) goto error;
 	
-	return 0;
+	return timedOut;
 	
 error:
 	return err;	
@@ -337,6 +361,7 @@ int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
 {
 	PaStream *inStream = NULL;
 	PaError err = 0;
+	int timedOut = 0;
 	TestParameters *test = loopbackContext->test;
 	loopbackContext->done = 0;
 	
@@ -355,11 +380,7 @@ int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
 	err = Pa_StartStream( inStream );
 	if( err != paNoError ) goto error;
 	
-	// Wait for stream to finish.
-	while( loopbackContext->done == 0 )
-	{
-		Pa_Sleep(PAQA_WAIT_STREAM_MSEC);
-	}
+	timedOut = PaQa_WaitForStream( loopbackContext );
 	
 	err = Pa_StopStream( inStream );
 	if( err != paNoError ) goto error;
@@ -367,7 +388,7 @@ int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
 	err = Pa_CloseStream( inStream );
 	if( err != paNoError ) goto error;
 	
-	return 0;
+	return timedOut;
 	
 error:
 	return err;	
@@ -620,7 +641,7 @@ static int PaQa_SaveTestResultToWaveFile( UserOptions *userOptions, PaQaRecordin
 	if( userOptions->saveBadWaves )
 	{
 		char filename[256];
-		snprintf( filename, sizeof(filename), "%s/test_%d.wav", userOptions->waveFilePath, userOptions->waveFileCount++ );
+		snprintf( filename, sizeof(filename), "%s/paloopback_%d.wav", userOptions->waveFilePath, userOptions->waveFileCount++ );
 		printf( "\"%s\", ", filename );
 		return PaQa_SaveRecordingToWaveFile( recording, filename );
 	}
@@ -819,12 +840,12 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 	testParamsPtr->inputParameters.device = inputDevice;
 	testParamsPtr->inputParameters.sampleFormat = paFloat32;
 	testParamsPtr->inputParameters.channelCount = testParamsPtr->samplesPerFrame;
-	testParamsPtr->inputParameters.suggestedLatency = DEFAULT_HIGH_LATENCY_MSEC * 0.001;
+	testParamsPtr->inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputDevice )->defaultHighInputLatency;
 	
 	testParamsPtr->outputParameters.device = outputDevice;
 	testParamsPtr->outputParameters.sampleFormat = paFloat32;
 	testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
-	testParamsPtr->outputParameters.suggestedLatency = DEFAULT_HIGH_LATENCY_MSEC * 0.001;
+	testParamsPtr->outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputDevice )->defaultHighOutputLatency;
 }
 
 /*******************************************************************/
@@ -840,10 +861,13 @@ static void PaQa_OverrideTestParameters( TestParameters *testParamsPtr,  UserOpt
 	{
 		testParamsPtr->framesPerBuffer = userOptions->framesPerBuffer;
 	}
-	if( userOptions->latency >= 0 )
+	if( userOptions->inputLatency >= 0 )
 	{
-		testParamsPtr->inputParameters.suggestedLatency = userOptions->latency * 0.001;
-		testParamsPtr->outputParameters.suggestedLatency = userOptions->latency * 0.001;
+		testParamsPtr->inputParameters.suggestedLatency = userOptions->inputLatency * 0.001;
+	}
+	if( userOptions->outputLatency >= 0 )
+	{
+		testParamsPtr->outputParameters.suggestedLatency = userOptions->outputLatency * 0.001;
 	}
 	printf( "    running with suggested latency (msec): input = %5.2f, out = %5.2f\n",
 		(testParamsPtr->inputParameters.suggestedLatency * 1000.0),
@@ -879,11 +903,12 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	double sampleRates[] = { 8000.0, 11025.0, 16000.0, 22050.0, 32000.0, 44100.0, 48000.0, 96000.0 };
 	int numRates = (sizeof(sampleRates)/sizeof(double));
 	
-	int framesPerBuffers[] = { 16, 32, 40, 64, 100, 128, 256, 512, 1024 };
+	// framesPerBuffer==0 means PA decides on the buffer size.
+	int framesPerBuffers[] = { 0, 16, 32, 40, 64, 100, 128, 256, 512, 1024 };
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
 	
-	PaSampleFormat sampleFormats[] = { paUInt8, paInt16, paInt32 };
-	const char *sampleFormatNames[] = { "paUInt8", "paInt16", "paInt32" };
+	PaSampleFormat sampleFormats[] = { paUInt8, paInt8, paInt16, paInt32 };
+	const char *sampleFormatNames[] = { "paUInt8", "paInt8", "paInt16", "paInt32" };
 	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
 	
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
@@ -899,7 +924,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		printf( "\n************ Mode = %s ************\n",
 			   (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
 		printf("|-   requested  -|- measured ----------------------------------------------->\n");
-		printf("|-sRate-|-fr/buf-|- frm/buf -|-latency-|-channel results--------------------|\n");
+		printf("|-sRate-|-fr/buf-|- frm/buf -|-latency-|-channel results-------------------->\n");
 
 		// Loop though various sample rates.
 		if( userOptions->sampleRate < 0 )
@@ -957,6 +982,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		totalBadChannels += numBadChannels;			
 	}
 	printf( "\n" );
+	printf( "****************************************\n");
 	
 	return totalBadChannels;
 }
@@ -1053,8 +1079,8 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 		(inputDeviceInfo->defaultLowInputLatency * 1000.0),
 		(inputDeviceInfo->defaultHighInputLatency * 1000.0) );
 	printf( "    default suggested output latency (msec): low = %5.2f, high = %5.2f\n",
-		(outputDeviceInfo->defaultLowInputLatency * 1000.0),
-		(outputDeviceInfo->defaultHighInputLatency * 1000.0) );
+		(outputDeviceInfo->defaultLowOutputLatency * 1000.0),
+		(outputDeviceInfo->defaultHighOutputLatency * 1000.0) );
 		
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
 	
@@ -1218,7 +1244,8 @@ int TestSampleFormatConversion( void )
 {
 	int i;
 	const float floatInput[] = { 1.0, 0.5, -0.5, -1.0 };
-
+	
+	const char charInput[] = { 127, 64, -64, -128 };
 	const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
 	const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
 	const int intInput[] = { 2147483647, 2147483647/2, -2147483648/2, -2147483648 };
@@ -1227,6 +1254,7 @@ int TestSampleFormatConversion( void )
 	short shortOutput[4];
 	int intOutput[4];	
 	unsigned char ucharOutput[4];
+	char charOutput[4];
 	
 	QA_ASSERT_EQUALS("int must be 32-bit", 4, (int) sizeof(int) );
 	QA_ASSERT_EQUALS("short must be 16-bit", 2, (int) sizeof(short) );
@@ -1235,7 +1263,13 @@ int TestSampleFormatConversion( void )
 	PaQa_ConvertFromFloat( floatInput, 4, paUInt8, ucharOutput );
 	for( i=0; i<4; i++ )
 	{
-		QA_ASSERT_CLOSE( "paFloat32 -> paUint8 -> error", ucharInput[i], ucharOutput[i], 1 );
+		QA_ASSERT_CLOSE( "paFloat32 -> paUInt8 -> error", ucharInput[i], ucharOutput[i], 1 );
+	}
+	
+	PaQa_ConvertFromFloat( floatInput, 4, paInt8, charOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paFloat32 -> paInt8 -> error", charInput[i], charOutput[i], 1 );
 	}
 	
 	PaQa_ConvertFromFloat( floatInput, 4, paInt16, shortOutput );
@@ -1257,6 +1291,13 @@ int TestSampleFormatConversion( void )
 	for( i=0; i<4; i++ )
 	{
 		QA_ASSERT_CLOSE( "paUInt8 -> paFloat32 error", floatInput[i], floatOutput[i], 0.01 );
+	}
+	
+	memset( floatOutput, 0, sizeof(floatOutput) );
+	PaQa_ConvertToFloat( charInput, 4, paInt8, floatOutput );
+	for( i=0; i<4; i++ )
+	{
+		QA_ASSERT_CLOSE( "paInt8 -> paFloat32 error", floatInput[i], floatOutput[i], 0.01 );
 	}
 	
 	memset( floatOutput, 0, sizeof(floatOutput) );
@@ -1284,15 +1325,17 @@ error:
 void usage( const char *name )
 {
 	printf("%s [-i# -o# -l# -r# -s# -m -w -dDir]\n", name);
-	printf("  -i# Input device ID. Will scan for loopback cable if not specified.\n");
-	printf("  -o# Output device ID. Will scan for loopback if not specified.\n");
-	printf("  -l# Latency in milliseconds.\n");
-	printf("  -r# Sample Rate in Hz.  Will use multiple common rates if not specified.\n");
-	printf("  -s# Size of callback buffer in frames, framesPerBuffer. Will use common values if not specified.\n");
-	printf("  -w  Save bad recordings in a WAV file.\n");
-	printf("  -dDir  Path for Directory for WAV files. Default is current directory.\n");
-	printf("  -m  Just test the DSP Math code and not the audio devices.\n");
-	printf("  -v  Verbose reports.\n");
+	printf("  -i# - Input device ID. Will scan for loopback cable if not specified.\n");
+	printf("  -o# - Output device ID. Will scan for loopback if not specified.\n");
+	printf("  -l# - Latency for both input and output in milliseconds.\n");
+	printf("  --inputLatency # Input latency in milliseconds.\n");	
+	printf("  --outputLatency # Output latency in milliseconds.\n");
+	printf("  -r# - Sample Rate in Hz.  Will use multiple common rates if not specified.\n");
+	printf("  -s# - Size of callback buffer in frames, framesPerBuffer. Will use common values if not specified.\n");
+	printf("  -w  - Save bad recordings in a WAV file.\n");
+	printf("  -dDir - Path for Directory for WAV files. Default is current directory.\n");
+	printf("  -m  - Just test the DSP Math code and not the audio devices.\n");
+	printf("  -v  - Verbose reports.\n");
 }
 
 /*******************************************************************/
@@ -1309,12 +1352,14 @@ int main( int argc, char **argv )
 	userOptions.outputDevice = paNoDevice;
 	userOptions.sampleRate = -1;
 	userOptions.framesPerBuffer = -1;
-	userOptions.latency = -1;
+	userOptions.inputLatency = -1;
+	userOptions.outputLatency = -1;
 	userOptions.waveFilePath = ".";
 	
 	// Process arguments. Skip name of executable.
 	char *name = argv[0];
-	for( i=1; i<argc; i++ )
+	i = 1;
+	while( i<argc )
 	{
 		char *arg = argv[i];
 		if( arg[0] == '-' )
@@ -1328,7 +1373,7 @@ int main( int argc, char **argv )
 					userOptions.outputDevice = atoi(&arg[2]);
 					break;
 				case 'l':
-					userOptions.latency = atoi(&arg[2]);
+					userOptions.inputLatency = userOptions.outputLatency = atoi(&arg[2]);
 					break;
 				case 'r':
 					userOptions.sampleRate = atoi(&arg[2]);
@@ -1355,11 +1400,36 @@ int main( int argc, char **argv )
 					
 				case 'h':
 					usage( name );
-					return(0);
+					exit(0);
 					break;
+					
+				case '-':
+				{
+					if( strcmp( &arg[2], "inputLatency" ) == 0 )
+					{
+						i += 1;
+						userOptions.inputLatency = atoi(argv[i]);
+					}
+					else if( strcmp( &arg[2], "outputLatency" ) == 0 )
+					{
+						i += 1;
+						userOptions.outputLatency = atoi(argv[i]);					
+					}
+					else
+					{
+						printf("Illegal option: %s\n", arg);
+						usage( name );
+						exit(1);
+					}
+
+				}
+					break;
+					
+					
 				default:
 					printf("Illegal option: %s\n", arg);
 					usage( name );
+					exit(1);
 					break;
 			}
 		}
@@ -1367,7 +1437,10 @@ int main( int argc, char **argv )
 		{
 			printf("Illegal argument: %s\n", arg);
 			usage( name );
+			exit(1);
+
 		}
+		i += 1;
 	}
 		
 	result = PaQa_TestAnalyzer();
