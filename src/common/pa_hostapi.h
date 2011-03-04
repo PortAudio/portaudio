@@ -60,6 +60,13 @@ The code below ensures that PA_USE_* macros are always defined and have value
 are defaulted to 1.
 */
 
+#ifndef PA_USE_SKELETON
+#define PA_USE_SKELETON 0
+#elif (PA_USE_SKELETON != 0) && (PA_USE_SKELETON != 1)
+#undef PA_USE_SKELETON
+#define PA_USE_SKELETON 1
+#endif 
+
 #if defined(PA_NO_ASIO) || defined(PA_NO_DS) || defined(PA_NO_WMME) || defined(PA_NO_WASAPI) || defined(PA_NO_WDMKS)
 #error "Portaudio: PA_NO_<APINAME> is no longer supported, please remove definition and use PA_USE_<APINAME> instead"
 #endif
