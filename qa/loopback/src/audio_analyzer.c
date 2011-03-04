@@ -114,7 +114,7 @@ void PaQa_GenerateCrackDISABLED( float *buffer, int numSamples, int stride )
 int PaQa_InitializeRecording( PaQaRecording *recording, int maxFrames, int frameRate )
 {
 	int numBytes = maxFrames * sizeof(float);
-	recording->buffer = malloc(numBytes);
+	recording->buffer = (float*)malloc(numBytes);
 	QA_ASSERT_TRUE( "Allocate recording buffer.", (recording->buffer != NULL) );
 	recording->maxFrames = maxFrames;	recording->sampleRate = frameRate;
 	recording->numFrames = 0;
@@ -138,12 +138,15 @@ void PaQa_TerminateRecording( PaQaRecording *recording )
 int PaQa_WriteRecording( PaQaRecording *recording, float *buffer, int numFrames, int stride )
 {
 	int i;
-	int framesToWrite = numFrames;
+	int framesToWrite;
+    float *data = &recording->buffer[recording->numFrames];
+
+    framesToWrite = numFrames;
 	if ((framesToWrite + recording->numFrames) > recording->maxFrames)
 	{
 		framesToWrite = recording->maxFrames - recording->numFrames;
 	}
-	float *data = &recording->buffer[recording->numFrames];
+	
 	for( i=0; i<framesToWrite; i++ )
 	{
 		*data++ = *buffer;
@@ -157,12 +160,15 @@ int PaQa_WriteRecording( PaQaRecording *recording, float *buffer, int numFrames,
 int PaQa_WriteSilence( PaQaRecording *recording, int numFrames )
 {
 	int i;
-	int framesToRecord = numFrames;
+	int framesToRecord;
+    float *data = &recording->buffer[recording->numFrames];
+
+    framesToRecord = numFrames;
 	if ((framesToRecord + recording->numFrames) > recording->maxFrames)
 	{
 		framesToRecord = recording->maxFrames - recording->numFrames;
 	}
-	float *data = &recording->buffer[recording->numFrames];
+	
 	for( i=0; i<framesToRecord; i++ )
 	{
 		*data++ = 0.0f;
@@ -175,12 +181,15 @@ int PaQa_WriteSilence( PaQaRecording *recording, int numFrames )
 int PaQa_RecordFreeze( PaQaRecording *recording, int numFrames )
 {
 	int i;
-	int framesToRecord = numFrames;
+	int framesToRecord;
+    float *data = &recording->buffer[recording->numFrames];
+
+    framesToRecord = numFrames;
 	if ((framesToRecord + recording->numFrames) > recording->maxFrames)
 	{
 		framesToRecord = recording->maxFrames - recording->numFrames;
 	}
-	float *data = &recording->buffer[recording->numFrames];
+	
 	for( i=0; i<framesToRecord; i++ )
 	{
 		// Copy old value forward as if the signal had frozen.
@@ -201,12 +210,12 @@ int PaQa_SaveRecordingToWaveFile( PaQaRecording *recording, const char *filename
 #define NUM_SAMPLES  (200)
     short data[NUM_SAMPLES];
 	const int samplesPerFrame = 1;
+    int numLeft = recording->numFrames;
+	float *buffer = &recording->buffer[0];
+
     result =  Audio_WAV_OpenWriter( &writer, filename, recording->sampleRate, samplesPerFrame );
     if( result < 0 ) goto error;
 	
-	int numLeft = recording->numFrames;
-	float *buffer = &recording->buffer[0];
-
 	while( numLeft > 0 )
     {
 		int i;
@@ -291,15 +300,16 @@ double PaQa_CorrelateSine( PaQaRecording *recording, double frequency, double fr
 						  int startFrame, int numFrames, double *phasePtr )
 {
 	double magnitude = 0.0;
-	QA_ASSERT_TRUE( "startFrame out of bounds", (startFrame < recording->numFrames) );
-	QA_ASSERT_TRUE( "numFrames out of bounds", ((startFrame+numFrames) <= recording->numFrames) );
-	
-	int numLeft = numFrames;
+    int numLeft = numFrames;
 	double phase = 0.0;
 	double phaseIncrement = 2.0 * MATH_PI * frequency / frameRate;
 	double sinAccumulator = 0.0;
 	double cosAccumulator = 0.0;
 	float *data = &recording->buffer[startFrame];
+
+    QA_ASSERT_TRUE( "startFrame out of bounds", (startFrame < recording->numFrames) );
+	QA_ASSERT_TRUE( "numFrames out of bounds", ((startFrame+numFrames) <= recording->numFrames) );
+
 	while( numLeft > 0 )
 	{			
 		double sample = (double) *data++;
@@ -340,12 +350,14 @@ void PaQa_FilterRecording( PaQaRecording *input, PaQaRecording *output, BiquadFi
 double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numFrames, double tolerance  )
 {
 	int ic,is;
-	QA_ASSERT_TRUE( "numFrames out of bounds", (numFrames < recording->numFrames) );
 	// How many buffers will fit in the recording?
 	int maxCorrelations = recording->numFrames - numFrames;
 	double maxSum = 0.0;
 	int peakIndex = -1;
 	double location = -1.0;
+
+    QA_ASSERT_TRUE( "numFrames out of bounds", (numFrames < recording->numFrames) );
+
 	for( ic=0; ic<maxCorrelations; ic++ )
 	{
 		double sum = 0.0;
@@ -412,11 +424,13 @@ double PaQa_MeasureRootMeanSquare( float *buffer, int numFrames )
 double PaQa_CompareAmplitudes( PaQaRecording *recording, int startAt, float *buffer, int numFrames )
 {
 	QA_ASSERT_TRUE( "startAt+numFrames out of bounds", ((startAt+numFrames) < recording->numFrames) );
-	double recordedArea = PaQa_MeasureArea( &recording->buffer[startAt], numFrames, 1 );
-	double bufferArea = PaQa_MeasureArea( buffer, numFrames, 1 );
-	if( bufferArea == 0.0 ) return 100000000.0;
-	return recordedArea / bufferArea;
 
+    {
+	    double recordedArea = PaQa_MeasureArea( &recording->buffer[startAt], numFrames, 1 );
+	    double bufferArea = PaQa_MeasureArea( buffer, numFrames, 1 );
+	    if( bufferArea == 0.0 ) return 100000000.0;
+	    return recordedArea / bufferArea;
+    }
 error:
 	return -1.0;
 }
@@ -455,9 +469,8 @@ int PaQa_MeasureLatency( PaQaRecording *recording, PaQaTestTone *testTone, PaQaA
 	PaQa_SetupSineGenerator( &generator, testTone->frequency, testTone->amplitude, testTone->sampleRate );
 	PaQa_EraseBuffer( buffer, cycleSize, testTone->samplesPerFrame );
 	PaQa_MixSine( &generator, buffer, cycleSize, testTone->samplesPerFrame );
-	
-	double tolerance = 0.1;
-	analysisResult->latency = PaQa_FindFirstMatch( recording, buffer, cycleSize, tolerance );	
+
+	analysisResult->latency = PaQa_FindFirstMatch( recording, buffer, cycleSize, /* tolerance= */ 0.1 );	
 	QA_ASSERT_TRUE( "Could not find the start of the signal.", (analysisResult->latency >= 0) );
 	analysisResult->amplitudeRatio = PaQa_CompareAmplitudes( recording, analysisResult->latency, buffer, cycleSize );
 	return 0;
@@ -472,21 +485,23 @@ error:
 void PaQa_FadeInRecording( PaQaRecording *recording, int startFrame, int count )
 {
 	int is;
-	assert( startFrame >= 0 );
-	assert( count > 0 );
 	double phase = 0.5 * MATH_PI;
 	// Advance a quarter wave
 	double phaseIncrement = 0.25 * 2.0 * MATH_PI / count;
 	
+    assert( startFrame >= 0 );
+	assert( count > 0 );
+
 	for( is=0; is<count; is++ )
 	{
 		double c = cos( phase );
-		phase += phaseIncrement;
 		double w = c * c;
 		float x = recording->buffer[ is + startFrame ];
 		float y = x * w;
 		//printf("FADE %d : w=%f, x=%f, y=%f\n", is, w, x, y );
 		recording->buffer[ is + startFrame ] = y;
+
+        phase += phaseIncrement;
 	}
 }
 
@@ -496,7 +511,11 @@ void PaQa_FadeInRecording( PaQaRecording *recording, int startFrame, int count )
  */
 int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalysisResult *analysisResult )
 {	
+    int result = 0;
 	int i;
+    double maxAmplitude;
+	int maxPosition;
+
 	PaQaRecording     notchOutput = { 0 };
 	BiquadFilter      notchFilter;
 	
@@ -508,7 +527,7 @@ int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalys
 	analysisResult->popPosition = -1;
 	analysisResult->popAmplitude = 0.0;
 	
-	int result = PaQa_InitializeRecording( &notchOutput, recording->numFrames, frameRate );
+	result = PaQa_InitializeRecording( &notchOutput, recording->numFrames, frameRate );
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
 	
 	result = PaQa_InitializeRecording( &hipassOutput, recording->numFrames, frameRate );
@@ -530,8 +549,8 @@ int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalys
 	//QA_ASSERT_EQUALS( "PaQa_SaveRecordingToWaveFile failed", 0, result );
 	
 	// Scan remaining signal looking for peak.
-	double maxAmplitude = 0.0;
-	int maxPosition = -1;
+	maxAmplitude = 0.0;
+	maxPosition = -1;
 	for( i=0; i<hipassOutput.numFrames; i++ )
 	{
 		float x = hipassOutput.buffer[i];
@@ -566,12 +585,6 @@ int PaQa_DetectPhaseError( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 	double period = testTone->sampleRate / testTone->frequency;
 	int cycleSize = (int) (period + 0.5);
 	
-	// Scan recording starting with first cycle, looking for phase errors.
-	analysisResult->numDroppedFrames = 0.0;
-	analysisResult->numAddedFrames = 0.0;
-	analysisResult->droppedFramesPosition = -1.0;
-	analysisResult->addedFramesPosition = -1.0;
-	
 	double maxAddedFrames = 0.0;
 	double maxDroppedFrames = 0.0;
 	
@@ -580,6 +593,12 @@ int PaQa_DetectPhaseError( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 	int loopCount = 0;
 	int skip = cycleSize;
 	int windowSize = cycleSize;
+
+    // Scan recording starting with first cycle, looking for phase errors.
+	analysisResult->numDroppedFrames = 0.0;
+	analysisResult->numAddedFrames = 0.0;
+	analysisResult->droppedFramesPosition = -1.0;
+	analysisResult->addedFramesPosition = -1.0;
 	
 	for( i=analysisResult->latency; i<(recording->numFrames - windowSize); i += skip )
 	{
@@ -636,10 +655,11 @@ int PaQa_DetectPhaseError( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 /*==========================================================================================*/
 int PaQa_AnalyseRecording( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalysisResult *analysisResult )
 {
+    int result = 0;
+
 	memset( analysisResult, 0, sizeof(PaQaAnalysisResult) );
-	
-	int result = PaQa_MeasureLatency( recording, testTone, analysisResult );
-	QA_ASSERT_EQUALS( "latency measurement", 0, result );
+	result = PaQa_MeasureLatency( recording, testTone, analysisResult );
+    QA_ASSERT_EQUALS( "latency measurement", 0, result );
 	
 	if( (analysisResult->latency >= 0) && (analysisResult->amplitudeRatio > 0.1) )
 	{

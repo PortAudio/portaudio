@@ -63,18 +63,21 @@ static int TestSingleMonoTone( void )
 	double sampleRate = 44100.0;
 	int maxFrames = ((int)sampleRate) * 1;
 	int samplesPerFrame = 1;
-	
+	int stride = 1;
+    int done = 0;
+
 	double freq = 234.5;
 	double amp = 0.5;
 	
+    double mag1, mag2;
+
 	// Setup a sine oscillator.
 	PaQa_SetupSineGenerator( &generator, freq, amp, sampleRate );
 	
 	result = PaQa_InitializeRecording( &recording, maxFrames, (int) sampleRate );
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
-	
-	int stride = 1;
-	int done = 0;
+
+	done = 0;
 	while (!done)
 	{
 		PaQa_EraseBuffer( buffer, FRAMES_PER_BLOCK, samplesPerFrame );
@@ -82,10 +85,10 @@ static int TestSingleMonoTone( void )
 		done = PaQa_WriteRecording( &recording, buffer, FRAMES_PER_BLOCK, samplesPerFrame );
 	}
 	
-	double mag1 = PaQa_CorrelateSine( &recording, freq, sampleRate, 0, recording.numFrames, NULL );
+	mag1 = PaQa_CorrelateSine( &recording, freq, sampleRate, 0, recording.numFrames, NULL );
 	QA_ASSERT_CLOSE( "exact frequency match", amp, mag1, 0.01 );
 	
-	double mag2 = PaQa_CorrelateSine( &recording, freq * 1.23, sampleRate, 0, recording.numFrames, NULL );
+	mag2 = PaQa_CorrelateSine( &recording, freq * 1.23, sampleRate, 0, recording.numFrames, NULL );
 	QA_ASSERT_CLOSE( "wrong frequency", 0.0, mag2, 0.01 );
 	
 	PaQa_TerminateRecording( &recording );
@@ -117,6 +120,11 @@ static int TestMixedMonoTones( void )
 	double baseFreq = 234.5;
 	double amp = 0.1;
 	
+    double mag2;
+
+    int stride = samplesPerFrame;
+	int done = 0;
+
 	// Setup a sine oscillator.
 	for( i=0; i<NUM_TONES; i++ )
 	{
@@ -126,8 +134,7 @@ static int TestMixedMonoTones( void )
 	result = PaQa_InitializeRecording( &recording, maxFrames, (int) sampleRate );
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
 	
-	int stride = samplesPerFrame;
-	int done = 0;
+	done = 0;
 	while (!done)
 	{
 		PaQa_EraseBuffer( buffer, FRAMES_PER_BLOCK, samplesPerFrame );
@@ -144,7 +151,7 @@ static int TestMixedMonoTones( void )
 		QA_ASSERT_CLOSE( "exact frequency match", amp, mag, 0.01 );
 	}
 			
-	double mag2 = PaQa_CorrelateSine( &recording, baseFreq * 0.87, sampleRate, 0, recording.numFrames, NULL );
+	mag2 = PaQa_CorrelateSine( &recording, baseFreq * 0.87, sampleRate, 0, recording.numFrames, NULL );
 	QA_ASSERT_CLOSE( "wrong frequency", 0.0, mag2, 0.01 );
 	
 	PaQa_TerminateRecording( &recording );
@@ -164,19 +171,19 @@ error:
 
 static void MakeRecordingWithAddedFrames( PaQaRecording *recording, PaQaTestTone *testTone, int glitchPosition, int framesToAdd )
 {
-	
 	PaQaSineGenerator generator;
 #define BUFFER_SIZE 512
 	float buffer[BUFFER_SIZE];
 	
-	// Setup a sine oscillator.
-	PaQa_SetupSineGenerator( &generator, testTone->frequency, testTone->amplitude, testTone->sampleRate );
+    int frameCounter = testTone->startDelay;
 	
 	int stride = 1;
 	// Record some initial silence.
 	int done = PaQa_WriteSilence( recording, testTone->startDelay );
 	
-	int frameCounter = testTone->startDelay;
+    // Setup a sine oscillator.
+	PaQa_SetupSineGenerator( &generator, testTone->frequency, testTone->amplitude, testTone->sampleRate );
+	
 	while (!done)
 	{
 		int framesThisLoop = BUFFER_SIZE;
@@ -225,12 +232,12 @@ static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTo
 #define BUFFER_SIZE 512
 	float buffer[BUFFER_SIZE];
 	
-	// Setup a sine oscillator.
-	PaQa_SetupSineGenerator( &generator, testTone->frequency, testTone->amplitude, testTone->sampleRate );
-	
 	int stride = 1;
 	// Record some initial silence.
 	int done = PaQa_WriteSilence( recording, testTone->startDelay );
+	
+	// Setup a sine oscillator.
+	PaQa_SetupSineGenerator( &generator, testTone->frequency, testTone->amplitude, testTone->sampleRate );
 	
 	// Generate recording with good phase.
 	while (!done)
@@ -260,19 +267,18 @@ static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTo
  */
 static int TestDetectSinglePhaseError( double sampleRate, int cycleSize, int latencyFrames, int glitchPosition, int framesAdded )
 {
-		
 	int result = 0;
 	PaQaRecording     recording;	
 	PaQaTestTone testTone;
 	PaQaAnalysisResult analysisResult = { 0.0 };
-	
+	int framesDropped = 0;
+    int maxFrames = ((int)sampleRate) * 2;
+
 	testTone.samplesPerFrame = 1;
 	testTone.sampleRate = sampleRate;
 	testTone.frequency = sampleRate / cycleSize;
 	testTone.amplitude = 0.5;
 	testTone.startDelay = latencyFrames;
-	
-	int maxFrames = ((int)testTone.sampleRate) * 2;
 	
 	result = PaQa_InitializeRecording( &recording, maxFrames, (int) sampleRate );
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
@@ -281,7 +287,6 @@ static int TestDetectSinglePhaseError( double sampleRate, int cycleSize, int lat
 	
 	PaQa_AnalyseRecording( &recording, &testTone, &analysisResult );
 	
-	int framesDropped = 0;
 	if( framesAdded < 0 )
 	{
 		framesDropped = -framesAdded;
@@ -350,19 +355,17 @@ static int TestDetectPhaseErrors( void )
  */
 static int TestDetectSinglePop( double sampleRate, int cycleSize, int latencyFrames, int popPosition, int popWidth, double popAmplitude )
 {
-	
 	int result = 0;
 	PaQaRecording     recording;	
 	PaQaTestTone testTone;
 	PaQaAnalysisResult analysisResult = { 0.0 };
-	
+	int maxFrames = ((int)sampleRate) * 2;
+
 	testTone.samplesPerFrame = 1;
 	testTone.sampleRate = sampleRate;
 	testTone.frequency = sampleRate / cycleSize;
 	testTone.amplitude = 0.5;
 	testTone.startDelay = latencyFrames;
-	
-	int maxFrames = ((int)testTone.sampleRate) * 2;
 	
 	result = PaQa_InitializeRecording( &recording, maxFrames, (int) sampleRate );
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
@@ -478,12 +481,13 @@ void PaQa_FillWithSine( PaQaRecording *recording, double sampleRate, double freq
 	PaQaSineGenerator generator;
 	float buffer[FRAMES_PER_BLOCK];
 	int samplesPerFrame = 1;
-	
+	int stride = 1;
+	int done = 0;
+
 	// Setup a sine oscillator.
 	PaQa_SetupSineGenerator( &generator, freq, amp, sampleRate );
 		
-	int stride = 1;
-	int done = 0;
+	done = 0;
 	while (!done)
 	{
 		PaQa_EraseBuffer( buffer, FRAMES_PER_BLOCK, samplesPerFrame );
@@ -510,6 +514,8 @@ static int TestNotchFilter( void )
 	double freq = 234.5;
 	double amp = 0.5;
 	
+    double mag1, mag2, mag3;
+
 	result = PaQa_InitializeRecording( &original, maxFrames, (int) sampleRate );
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
 	
@@ -518,7 +524,7 @@ static int TestNotchFilter( void )
 	//result = PaQa_SaveRecordingToWaveFile( &original, "original.wav" );
 	//QA_ASSERT_EQUALS( "PaQa_SaveRecordingToWaveFile failed", 0, result );	
 
-	double mag1 = PaQa_CorrelateSine( &original, freq, sampleRate, 0, original.numFrames, NULL );
+    mag1 = PaQa_CorrelateSine( &original, freq, sampleRate, 0, original.numFrames, NULL );
 	QA_ASSERT_CLOSE( "exact frequency match", amp, mag1, 0.01 );
 		
 	// Filter with exact frequency.
@@ -530,7 +536,7 @@ static int TestNotchFilter( void )
 	result = PaQa_SaveRecordingToWaveFile( &filtered, "filtered1.wav" );
 	QA_ASSERT_EQUALS( "PaQa_SaveRecordingToWaveFile failed", 0, result );
 	
-	double mag2 = PaQa_CorrelateSine( &filtered, freq, sampleRate, 0, filtered.numFrames, NULL );
+	mag2 = PaQa_CorrelateSine( &filtered, freq, sampleRate, 0, filtered.numFrames, NULL );
 	QA_ASSERT_CLOSE( "should eliminate tone", 0.0, mag2, 0.01 );
 	
 	// Filter with mismatched frequency.
@@ -540,7 +546,7 @@ static int TestNotchFilter( void )
 	//result = PaQa_SaveRecordingToWaveFile( &filtered, "badfiltered.wav" );
 	//QA_ASSERT_EQUALS( "PaQa_SaveRecordingToWaveFile failed", 0, result );
 	
-	double mag3 = PaQa_CorrelateSine( &filtered, freq, sampleRate, 0, filtered.numFrames, NULL );
+	mag3 = PaQa_CorrelateSine( &filtered, freq, sampleRate, 0, filtered.numFrames, NULL );
 	QA_ASSERT_CLOSE( "should eliminate tone", amp*0.26, mag3, 0.01 );
 
 	

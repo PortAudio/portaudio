@@ -40,6 +40,8 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
+#include <string.h>
+
 #include "portaudio.h"
 
 #include "qa_tools.h"
@@ -641,7 +643,11 @@ static int PaQa_SaveTestResultToWaveFile( UserOptions *userOptions, PaQaRecordin
 	if( userOptions->saveBadWaves )
 	{
 		char filename[256];
+#ifdef WIN32
+        _snprintf( filename, sizeof(filename), "%s\\paloopback_%d.wav", userOptions->waveFilePath, userOptions->waveFileCount++ );
+#else
 		snprintf( filename, sizeof(filename), "%s/paloopback_%d.wav", userOptions->waveFilePath, userOptions->waveFileCount++ );
+#endif   
 		printf( "\"%s\", ", filename );
 		return PaQa_SaveRecordingToWaveFile( recording, filename );
 	}
@@ -759,12 +765,14 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		
 		if( i==0 )
 		{
+            double latencyMSec;
+
 			printf( "%4d-%4d | ",
 				   loopbackContext.minFramesPerBuffer,
 				   loopbackContext.maxFramesPerBuffer
 				   );
 			
-			double latencyMSec = 1000.0 * analysisResult.latency / testParams->sampleRate;
+			latencyMSec = 1000.0 * analysisResult.latency / testParams->sampleRate;
 			printf("%7.2f | ", latencyMSec );
 						
 		}
@@ -885,17 +893,12 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int iRate;
 	int iSize;
 	int iFormat;
-	int totalBadChannels = 0;
 	int savedValue;
 	TestParameters testParams;
-	const   PaDeviceInfo *inputDeviceInfo;	
-	const   PaDeviceInfo *outputDeviceInfo;		
-	inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
-	outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
-	
-	printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
-	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
-	
+	const PaDeviceInfo *inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );	
+	const PaDeviceInfo *outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );		
+    int totalBadChannels = 0;
+
 	// test half duplex first because it is more likely to work.
 	int flagSettings[] = { PAQA_FLAG_TWO_STREAMS, 0 };
 	int numFlagSettings = (sizeof(flagSettings)/sizeof(int));
@@ -910,6 +913,9 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	PaSampleFormat sampleFormats[] = { paUInt8, paInt8, paInt16, paInt32 };
 	const char *sampleFormatNames[] = { "paUInt8", "paInt8", "paInt16", "paInt32" };
 	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
+	
+    printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
+	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
 	
@@ -932,11 +938,13 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 			savedValue = testParams.sampleRate;
 			for( iRate=0; iRate<numRates; iRate++ )
 			{
+                int numBadChannels;
+
 				// SAMPLE RATE
 				testParams.sampleRate = sampleRates[iRate];
 				testParams.maxFrames = (int) (PAQA_TEST_DURATION * testParams.sampleRate);
 				
-				int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+				numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 				totalBadChannels += numBadChannels;
 			}
 			testParams.sampleRate = savedValue;
@@ -951,10 +959,12 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 			savedValue = testParams.framesPerBuffer;
 			for( iSize=0; iSize<numBufferSizes; iSize++ )
 			{	
+                int numBadChannels;
+
 				// BUFFER SIZE
 				testParams.framesPerBuffer = framesPerBuffers[iSize];
 				
-				int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+				numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 				totalBadChannels += numBadChannels;			
 			}
 			testParams.framesPerBuffer = savedValue;
@@ -974,11 +984,12 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	
 	for( iFormat=0; iFormat<numSampleFormats; iFormat++ )
 	{	
+        int numBadChannels;
 		PaSampleFormat format = sampleFormats[ iFormat ];
 		testParams.inputParameters.sampleFormat = format;
 		testParams.outputParameters.sampleFormat = format;
 		printf("Sample format = %d = %s\n", (int) format, sampleFormatNames[iFormat] );
-		int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+		numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
 		totalBadChannels += numBadChannels;			
 	}
 	printf( "\n" );
@@ -1046,11 +1057,14 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 {
 	TestParameters testParams;
 	LoopbackContext loopbackContext;
-    const   PaDeviceInfo *inputDeviceInfo;	
-    const   PaDeviceInfo *outputDeviceInfo;		
+    const PaDeviceInfo *inputDeviceInfo;	
+    const PaDeviceInfo *outputDeviceInfo;		
 	PaError err = paNoError;
 	double minAmplitude;
-	
+	int loopbackIsConnected;
+    int startFrame, numFrames;
+    double magLeft, magRight;
+
 	inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
 	if( inputDeviceInfo == NULL )
 	{
@@ -1109,21 +1123,22 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 	
 	// Analyse recording to see if we captured the output.
 	// Start in the middle assuming past latency.
-	int startFrame = testParams.maxFrames/2;
-	int numFrames = testParams.maxFrames/2;
-	double magLeft = PaQa_CorrelateSine( &loopbackContext.recordings[0],
-										loopbackContext.generators[0].frequency,
-										testParams.sampleRate,
-										startFrame, numFrames, NULL );
-	double magRight = PaQa_CorrelateSine( &loopbackContext.recordings[1],
-										 loopbackContext.generators[1].frequency,
-										 testParams.sampleRate,
-										 startFrame, numFrames, NULL );
+	startFrame = testParams.maxFrames/2;
+	numFrames = testParams.maxFrames/2;
+	magLeft = PaQa_CorrelateSine( &loopbackContext.recordings[0],
+									loopbackContext.generators[0].frequency,
+									testParams.sampleRate,
+									startFrame, numFrames, NULL );
+	magRight = PaQa_CorrelateSine( &loopbackContext.recordings[1],
+									loopbackContext.generators[1].frequency,
+									testParams.sampleRate,
+									startFrame, numFrames, NULL );
 	printf("   Amplitudes: left = %f, right = %f\n", magLeft, magRight );
-	int loopbackConnected = ((magLeft > minAmplitude) && (magRight > minAmplitude));
 	
 	// Check for backwards cable.
-	if( !loopbackConnected )
+    loopbackIsConnected = ((magLeft > minAmplitude) && (magRight > minAmplitude));
+
+	if( !loopbackIsConnected )
 	{
 		double magLeftReverse = PaQa_CorrelateSine( &loopbackContext.recordings[0],
 												   loopbackContext.generators[1].frequency,
@@ -1146,7 +1161,7 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 		if( PaQa_CheckForClippedLoopback( &loopbackContext ) )
 		{
 			// Clipped so don't use this loopback.
-			loopbackConnected = 0;
+			loopbackIsConnected = 0;
 		}
 		
 		err = PaQa_MeasureBackgroundNoise( &loopbackContext, &rms );
@@ -1154,17 +1169,17 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 		if( err )
 		{
 			printf("ERROR - Could not measure background noise on this input!\n");
-			loopbackConnected = 0;
+			loopbackIsConnected = 0;
 		}
 		else if( rms > MAX_BACKGROUND_NOISE_RMS )
 		{			
 			printf("ERROR - There is too much background noise on this input!\n");
-			loopbackConnected = 0;
+			loopbackIsConnected = 0;
 		}
 	}
 	
 	PaQa_TeardownLoopbackContext( &loopbackContext );
-	return loopbackConnected;	
+	return loopbackIsConnected;	
 	
 error:
 	PaQa_TeardownLoopbackContext( &loopbackContext );
@@ -1248,7 +1263,7 @@ int TestSampleFormatConversion( void )
 	const char charInput[] = { 127, 64, -64, -128 };
 	const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
 	const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
-	const int intInput[] = { 2147483647, 2147483647/2, -2147483648/2, -2147483648 };
+	const int intInput[] = { 2147483647, 2147483647/2, -1073741824 /*-2147483648/2 doesn't work in msvc*/, -2147483648 };
 	
 	float floatOutput[4];
 	short shortOutput[4];
@@ -1341,10 +1356,12 @@ void usage( const char *name )
 /*******************************************************************/
 int main( int argc, char **argv )
 {
+    int i;
 	UserOptions userOptions;
-	int i;
 	int result = 0;
 	int justMath = 0;
+    char *executableName = argv[0];
+
 	printf("PortAudio LoopBack Test built " __DATE__ " at " __TIME__ "\n");
 	
 	memset(&userOptions, 0, sizeof(userOptions));
@@ -1357,7 +1374,6 @@ int main( int argc, char **argv )
 	userOptions.waveFilePath = ".";
 	
 	// Process arguments. Skip name of executable.
-	char *name = argv[0];
 	i = 1;
 	while( i<argc )
 	{
@@ -1399,7 +1415,7 @@ int main( int argc, char **argv )
 					break;
 					
 				case 'h':
-					usage( name );
+					usage( executableName );
 					exit(0);
 					break;
 					
@@ -1418,7 +1434,7 @@ int main( int argc, char **argv )
 					else
 					{
 						printf("Illegal option: %s\n", arg);
-						usage( name );
+						usage( executableName );
 						exit(1);
 					}
 
@@ -1428,7 +1444,7 @@ int main( int argc, char **argv )
 					
 				default:
 					printf("Illegal option: %s\n", arg);
-					usage( name );
+					usage( executableName );
 					exit(1);
 					break;
 			}
@@ -1436,7 +1452,7 @@ int main( int argc, char **argv )
 		else
 		{
 			printf("Illegal argument: %s\n", arg);
-			usage( name );
+			usage( executableName );
 			exit(1);
 
 		}
@@ -1455,8 +1471,12 @@ int main( int argc, char **argv )
 			   Pa_GetVersion(), Pa_GetVersionText() );
 		printf( "=============== PortAudio Devices ========================\n" );
 		PaQa_ListAudioDevices();
+        if( Pa_GetDeviceCount() == 0 )
+            printf( "no devices found.\n" );
+        
 		printf( "=============== Detect Loopback ==========================\n" );
 		ScanForLoopback(&userOptions);
+ 
 		Pa_Terminate();
 	}
 

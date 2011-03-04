@@ -100,8 +100,7 @@ void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFo
 			int *data = (int *)input;
 			for( i=0; i<numSamples; i++ )
 			{
-				int value = *data++;
-				value = value >> 8;
+				int value = (*data++) >> 8;
 				float fval = (float) (value / ((double) 0x00800000));
 				*output++ = fval;
 			}
