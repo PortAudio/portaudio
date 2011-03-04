@@ -1,5 +1,4 @@
 #include <math.h>
-#include <strings.h>
 
 #include "biquad_filter.h"
 
@@ -11,7 +10,7 @@
  * @author (C) 2002 Phil Burk, SoftSynth.com, All Rights Reserved
  */
 
-#define FILTER_PI  (3.14159265)
+#define FILTER_PI  (3.141592653589793238462643)
 /***********************************************************
 ** Calculate coefficients common to many parametric biquad filters.
 */
@@ -118,6 +117,5 @@ void BiquadFilter_Filter( BiquadFilter *filter, float *inputs, float *outputs, i
 	filter->xn1 = xn1;
 	filter->xn2 = xn2;
 	filter->yn1 = yn1;
-	filter->yn2 = yn2;
-		
+	filter->yn2 = yn2;		
 }

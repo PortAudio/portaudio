@@ -41,7 +41,7 @@
 
 #include "biquad_filter.h"
 
-#define MATH_PI  (3.14159265)
+#define MATH_PI  (3.141592653589793238462643)
 #define MATH_TWO_PI  (2.0 * MATH_PI)
 
 typedef struct PaQaSineGenerator_s
