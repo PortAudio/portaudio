@@ -1133,7 +1133,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
             goto error;
         }
 
-        IsDebuggerPresent_ = (IsDebuggerPresentPtr)GetProcAddress( LoadLibrary( "Kernel32.dll" ), "IsDebuggerPresent" );
+        IsDebuggerPresent_ = (IsDebuggerPresentPtr)GetProcAddress( LoadLibraryA( "Kernel32.dll" ), "IsDebuggerPresent" );
 
         for( i=0; i < driverCount; ++i )
         {
