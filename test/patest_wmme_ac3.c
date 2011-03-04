@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     data.buffer = NULL;
 
     printf("usage: patest_wmme_ac3 fileName [paDeviceIndex]\n");
-    printf("**IMPORTANT*** The provided file must include the spdif preamble at the start of every AC-3 frame. Using a normal ac3 file won't work."
+    printf("**IMPORTANT*** The provided file must include the spdif preamble at the start of every AC-3 frame. Using a normal ac3 file won't work.\n");
     printf("PortAudio Test: output a raw spdif ac3 stream. SR = %d, BufSize = %d, Chans = %d\n", 
             SAMPLE_RATE, FRAMES_PER_BUFFER, CHANNEL_COUNT);
 
