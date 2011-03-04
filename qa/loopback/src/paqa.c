@@ -1363,6 +1363,15 @@ int main( int argc, char **argv )
     char *executableName = argv[0];
 
 	printf("PortAudio LoopBack Test built " __DATE__ " at " __TIME__ "\n");
+
+	if( argc > 1 ){
+		printf("running with arguments:");
+		for(i=1; i < argc; ++i )
+			printf(" %s", argv[i] );
+		printf("\n");
+	}else{
+		printf("running with no arguments");
+	}
 	
 	memset(&userOptions, 0, sizeof(userOptions));
 	userOptions.inputDevice = paNoDevice;
