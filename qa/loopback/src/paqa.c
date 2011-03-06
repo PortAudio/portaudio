@@ -127,9 +127,12 @@ typedef struct UserOptions_s
 	PaDeviceIndex outputDevice;
 } UserOptions;
 
-#define BIG_BUFFER_SIZE  (sizeof(float) * 2 * 2048)
+#define BIG_BUFFER_SIZE  (sizeof(float) * 2 * 2 * 1024)
 static unsigned char g_ReadWriteBuffer[BIG_BUFFER_SIZE];
-static unsigned char g_ConversionBuffer[BIG_BUFFER_SIZE];
+
+#define MAX_CONVERSION_SAMPLES   (2 * 32 * 1024)
+#define CONVERSION_BUFFER_SIZE  (sizeof(float) * 2 * MAX_CONVERSION_SAMPLES)
+static unsigned char g_ConversionBuffer[CONVERSION_BUFFER_SIZE];
 
 /*******************************************************************/
 static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuffer,
@@ -164,12 +167,20 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	{
 		int channelsPerFrame = loopbackContext->test->inputParameters.channelCount;
 		float *in = (float *)inputBuffer;
-		
+
 		PaSampleFormat inFormat = loopbackContext->test->inputParameters.sampleFormat;
 		if( inFormat != paFloat32 )
 		{
+			int samplesToConvert = framesPerBuffer * channelsPerFrame;
 			in = (float *) g_ConversionBuffer;
-			PaQa_ConvertToFloat( inputBuffer, framesPerBuffer * channelsPerFrame, inFormat, (float *) g_ConversionBuffer );
+			if( samplesToConvert > MAX_CONVERSION_SAMPLES )
+			{
+				// Hack to prevent buffer overflow.
+				// @todo Loop with small buffer instead of failing.
+				printf("Format conversion buffer too small!\n");
+				return paComplete;
+			}
+			PaQa_ConvertToFloat( inputBuffer, samplesToConvert, inFormat, (float *) g_ConversionBuffer );
 		}
 		
 		// Read each channel from the buffer.
@@ -205,6 +216,12 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 		
 		if( outFormat != paFloat32 )
 		{
+			int samplesToConvert = framesPerBuffer * channelsPerFrame;
+			if( samplesToConvert > MAX_CONVERSION_SAMPLES )
+			{
+				printf("Format conversion buffer too small!\n");
+				return paComplete;
+			}			
 			PaQa_ConvertFromFloat( out, framesPerBuffer * channelsPerFrame, outFormat, outputBuffer );
 		}
 		
@@ -809,7 +826,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		printf( "OK" );
 	}
 	
-	printf( ", %d/%d/%d/%d ",
+	printf( ", %d/%d,%d/%d ",
 		   loopbackContext.inputOverflowCount,
 		   loopbackContext.inputUnderflowCount,
 		   loopbackContext.outputOverflowCount,
@@ -914,7 +931,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	const char *sampleFormatNames[] = { "paUInt8", "paInt8", "paInt16", "paInt32" };
 	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
 	
-    printf( "=============== Analysing Loopback %d to %d ====================\n", outputDevice, inputDevice  );
+    printf( "=============== Analysing Loopback %d to %d =====================\n", outputDevice, inputDevice  );
 	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
@@ -929,8 +946,8 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		testParams.flags = flagSettings[iFlags];
 		printf( "\n************ Mode = %s ************\n",
 			   (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
-		printf("|-   requested  -|- measured ----------------------------------------------->\n");
-		printf("|-sRate-|-fr/buf-|- frm/buf -|-latency-|-channel results-------------------->\n");
+		printf("|-   requested  -|- measured ------------------------------\n");
+		printf("|-sRate-|-fr/buf-|- frm/buf -|-latency-|- channel results -\n");
 
 		// Loop though various sample rates.
 		if( userOptions->sampleRate < 0 )
@@ -1117,7 +1134,16 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 	
 	PaQa_SetupLoopbackContext( &loopbackContext, &testParams );
 			
-	testParams.flags = PAQA_FLAG_TWO_STREAMS;
+	if( inputDevice == outputDevice )
+	{
+		// Use full duplex if checking for loopback on one device.
+		testParams.flags &= ~PAQA_FLAG_TWO_STREAMS;
+	}
+	else
+	{
+		// Use half duplex if checking for loopback on two different device.
+		testParams.flags = PAQA_FLAG_TWO_STREAMS;
+	}
 	err = PaQa_RunLoopback( &loopbackContext );
 	QA_ASSERT_TRUE("loopback detection callback did not run", (loopbackContext.callbackCount > 1) );
 	
