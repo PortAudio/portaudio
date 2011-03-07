@@ -100,12 +100,17 @@ typedef struct LoopbackContext_s
 	PaQaSineGenerator  generators[MAX_NUM_GENERATORS];
 	// Record each channel individually.
 	PaQaRecording      recordings[MAX_NUM_RECORDINGS];
+	
 	// Measured at runtime.
-	int                callbackCount;
+	int                callbackCount; // incremented for each callback
+	int                inputBufferCount; // incremented if input buffer not NULL
 	int                inputUnderflowCount;
-	int                outputUnderflowCount;
 	int                inputOverflowCount;
+	
+	int                outputBufferCount; // incremented if output buffer not NULL
 	int                outputOverflowCount;
+	int                outputUnderflowCount;
+	
 	int                minFramesPerBuffer;
 	int                maxFramesPerBuffer;
 	int                primingCount;
@@ -144,7 +149,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	int i;
 	LoopbackContext *loopbackContext = (LoopbackContext *) userData;
 	
-		
+	
 	loopbackContext->callbackCount += 1;
 	if( statusFlags & paInputUnderflow ) loopbackContext->inputUnderflowCount += 1;
 	if( statusFlags & paInputOverflow ) loopbackContext->inputOverflowCount += 1;
@@ -167,8 +172,10 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	{
 		int channelsPerFrame = loopbackContext->test->inputParameters.channelCount;
 		float *in = (float *)inputBuffer;
-
 		PaSampleFormat inFormat = loopbackContext->test->inputParameters.sampleFormat;
+		
+		loopbackContext->inputBufferCount += 1;
+		
 		if( inFormat != paFloat32 )
 		{
 			int samplesToConvert = framesPerBuffer * channelsPerFrame;
@@ -197,8 +204,10 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	{
 		int channelsPerFrame = loopbackContext->test->outputParameters.channelCount;
 		float *out = (float *)outputBuffer;
-		
 		PaSampleFormat outFormat = loopbackContext->test->outputParameters.sampleFormat;
+		
+		loopbackContext->outputBufferCount += 1;
+		
 		if( outFormat != paFloat32 )
 		{
 			// If we need to convert then mix to the g_ConversionBuffer and then convert into the PA outputBuffer.
@@ -772,6 +781,15 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	err = PaQa_RunLoopback( &loopbackContext );
 	QA_ASSERT_TRUE("loopback did not run", (loopbackContext.callbackCount > 1) );
 	
+	printf( "%4d/%4d/%4d, %4d/%4d/%4d | ",
+		   loopbackContext.inputOverflowCount,
+		   loopbackContext.inputUnderflowCount,
+		   loopbackContext.inputBufferCount,
+		   loopbackContext.outputOverflowCount,
+		   loopbackContext.outputUnderflowCount,
+		   loopbackContext.outputBufferCount
+		   );
+	
 	// Analyse recording to detect glitches.
 	for( i=0; i<testParams->samplesPerFrame; i++ )
 	{
@@ -825,14 +843,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	{
 		printf( "OK" );
 	}
-	
-	printf( ", %d/%d,%d/%d ",
-		   loopbackContext.inputOverflowCount,
-		   loopbackContext.inputUnderflowCount,
-		   loopbackContext.outputOverflowCount,
-		   loopbackContext.outputUnderflowCount
-		  );
-	
+		
 	printf( "\n" );
 				
 	PaQa_TeardownLoopbackContext( &loopbackContext );
@@ -894,7 +905,7 @@ static void PaQa_OverrideTestParameters( TestParameters *testParamsPtr,  UserOpt
 	{
 		testParamsPtr->outputParameters.suggestedLatency = userOptions->outputLatency * 0.001;
 	}
-	printf( "    running with suggested latency (msec): input = %5.2f, out = %5.2f\n",
+	printf( "   Running with suggested latency (msec): input = %5.2f, out = %5.2f\n",
 		(testParamsPtr->inputParameters.suggestedLatency * 1000.0),
 		(testParamsPtr->outputParameters.suggestedLatency * 1000.0) );
 }
@@ -932,7 +943,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
 	
     printf( "=============== Analysing Loopback %d to %d =====================\n", outputDevice, inputDevice  );
-	printf( "    Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
+	printf( "   Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
 	
@@ -947,7 +958,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		printf( "\n************ Mode = %s ************\n",
 			   (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
 		printf("|-   requested  -|- measured ------------------------------\n");
-		printf("|-sRate-|-fr/buf-|- frm/buf -|-latency-|- channel results -\n");
+		printf("|-sRate-|-fr/buf-|- over/under/calls for in, out -|- frm/buf -|-latency-|- channel results -\n");
 
 		// Loop though various sample rates.
 		if( userOptions->sampleRate < 0 )
@@ -1106,10 +1117,10 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
 	
 	printf( "Look for loopback cable between \"%s\" => \"%s\"\n", outputDeviceInfo->name, inputDeviceInfo->name);
 	
-	printf( "    default suggested input latency (msec): low = %5.2f, high = %5.2f\n",
+	printf( "   Default suggested input latency (msec): low = %5.2f, high = %5.2f\n",
 		(inputDeviceInfo->defaultLowInputLatency * 1000.0),
 		(inputDeviceInfo->defaultHighInputLatency * 1000.0) );
-	printf( "    default suggested output latency (msec): low = %5.2f, high = %5.2f\n",
+	printf( "   Default suggested output latency (msec): low = %5.2f, high = %5.2f\n",
 		(outputDeviceInfo->defaultLowOutputLatency * 1000.0),
 		(outputDeviceInfo->defaultHighOutputLatency * 1000.0) );
 		
