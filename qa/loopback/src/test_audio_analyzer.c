@@ -222,12 +222,11 @@ static void MakeRecordingWithAddedFrames( PaQaRecording *recording, PaQaTestTone
 
 /*==========================================================================================*/
 /**
- * Generate a recording with pop.
+ * Generate a clean recording.
  */
 
-static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTone, int popPosition, int popWidth, double popAmplitude )
+static void MakeCleanRecording( PaQaRecording *recording, PaQaTestTone *testTone )
 {
-	int i;
 	PaQaSineGenerator generator;
 #define BUFFER_SIZE 512
 	float buffer[BUFFER_SIZE];
@@ -246,6 +245,18 @@ static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTo
 		PaQa_MixSine( &generator, buffer, BUFFER_SIZE, stride );
 		done = PaQa_WriteRecording( recording, buffer, BUFFER_SIZE, testTone->samplesPerFrame );
 	}
+}
+
+/*==========================================================================================*/
+/**
+ * Generate a recording with pop.
+ */
+
+static void MakeRecordingWithPop( PaQaRecording *recording, PaQaTestTone *testTone, int popPosition, int popWidth, double popAmplitude )
+{
+	int i;
+	
+	MakeCleanRecording( recording, testTone );
 	
 	// Apply glitch to good recording.
 	if( (popPosition + popWidth) >= recording->numFrames )
@@ -324,6 +335,9 @@ static int TestDetectPhaseErrors( void )
 {
 	int result;
 	
+	result = TestDetectSinglePhaseError( 44100, 200, 477, -1, 0 );
+	if( result < 0 ) return result;
+/*
 	result = TestDetectSinglePhaseError( 44100, 200, 77, -1, 0 );
 	if( result < 0 ) return result;
 	
@@ -345,7 +359,7 @@ static int TestDetectPhaseErrors( void )
 	// Note that if the frequency is too high then it is hard to detect single dropped frames.
 	result = TestDetectSinglePhaseError( 44100, 200, 500, 4251, -1 );
 	if( result < 0 ) return result;
-		
+*/
 	return 0;
 }
 
@@ -371,7 +385,7 @@ static int TestDetectSinglePop( double sampleRate, int cycleSize, int latencyFra
 	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
 	
 	MakeRecordingWithPop( &recording, &testTone, popPosition, popWidth, popAmplitude );
-	
+		
 	PaQa_AnalyseRecording( &recording, &testTone, &analysisResult );
 	
 #if PRINT_REPORTS
@@ -379,7 +393,7 @@ static int TestDetectSinglePop( double sampleRate, int cycleSize, int latencyFra
 	printf("                        expected      actual\n");
 	printf("             latency: %10.3f  %10.3f\n", (double)latencyFrames, analysisResult.latency );
 	printf("         popPosition: %10.3f  %10.3f\n", (double)popPosition, analysisResult.popPosition );	
-	printf("        popAmplitude: %10.3f  %10.3f\n", (double)popAmplitude, analysisResult.popAmplitude );	
+	printf("        popAmplitude: %10.3f  %10.3f\n", popAmplitude, analysisResult.popAmplitude );	
 	printf("           cycleSize: %6d\n", cycleSize );	
 	printf("    num added frames: %10.3f\n", analysisResult.numAddedFrames );
 	printf("     added frames at: %10.3f\n", analysisResult.addedFramesPosition );
@@ -400,6 +414,80 @@ static int TestDetectSinglePop( double sampleRate, int cycleSize, int latencyFra
 error:
 	PaQa_SaveRecordingToWaveFile( &recording, "bad_recording.wav" );
 	PaQa_TerminateRecording( &recording);	
+	return 1;
+}	
+
+/*==========================================================================================*/
+/**
+ * Analyse recording with a DC offset.
+ */
+static int TestSingleInitialSpike( double sampleRate, int stepPosition, int cycleSize, int latencyFrames, double stepAmplitude )
+{
+	int i;
+	int result = 0;
+	// Account for highpass filter offset.
+	int expectedLatency = latencyFrames + 1;
+	PaQaRecording     recording;	
+	
+	PaQaRecording     hipassOutput = { 0 };
+	BiquadFilter      hipassFilter;
+	
+	PaQaTestTone testTone;
+	PaQaAnalysisResult analysisResult = { 0.0 };
+	int maxFrames = ((int)sampleRate) * 2;
+	
+	testTone.samplesPerFrame = 1;
+	testTone.sampleRate = sampleRate;
+	testTone.frequency = sampleRate / cycleSize;
+	testTone.amplitude = -0.5;
+	testTone.startDelay = latencyFrames;
+	
+	result = PaQa_InitializeRecording( &recording, maxFrames, (int) sampleRate );
+	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
+	
+	result = PaQa_InitializeRecording( &hipassOutput, maxFrames, (int) sampleRate );
+	QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", 0, result );
+	
+	MakeCleanRecording( &recording, &testTone );
+	
+	// Apply DC step.
+	for( i=stepPosition; i<recording.numFrames; i++ )
+	{
+		recording.buffer[i] += stepAmplitude;
+	}
+	
+	// Use high pass as a DC blocker!
+	BiquadFilter_SetupHighPass( &hipassFilter, 10.0 / sampleRate, 0.5 );
+	PaQa_FilterRecording( &recording, &hipassOutput, &hipassFilter );
+	
+	testTone.amplitude = 0.5;
+	PaQa_AnalyseRecording( &hipassOutput, &testTone, &analysisResult );
+	
+#if PRINT_REPORTS
+	printf("\n=== InitialSpike Analysis ===================\n");
+	printf("                        expected      actual\n");
+	printf("             latency: %10.3f  %10.3f\n", (double)expectedLatency, analysisResult.latency );
+	printf("         popPosition: %10.3f\n", analysisResult.popPosition );	
+	printf("        popAmplitude: %10.3f\n", analysisResult.popAmplitude );	
+	printf("      amplitudeRatio: %10.3f\n", analysisResult.amplitudeRatio );	
+	printf("           cycleSize: %6d\n", cycleSize );	
+	printf("    num added frames: %10.3f\n", analysisResult.numAddedFrames );
+	printf("     added frames at: %10.3f\n", analysisResult.addedFramesPosition );
+	printf("  num dropped frames: %10.3f\n", analysisResult.numDroppedFrames );
+	printf("   dropped frames at: %10.3f\n", analysisResult.droppedFramesPosition );
+#endif
+	
+	QA_ASSERT_CLOSE( "PaQa_AnalyseRecording latency", expectedLatency, analysisResult.latency, 4.0 );
+	QA_ASSERT_EQUALS( "PaQa_AnalyseRecording no pop from step", -1, (int) analysisResult.popPosition );	
+	PaQa_TerminateRecording( &recording );
+	PaQa_TerminateRecording( &hipassOutput );
+	return 0;
+	
+error:
+	PaQa_SaveRecordingToWaveFile( &recording, "bad_step_original.wav" );
+	PaQa_SaveRecordingToWaveFile( &hipassOutput, "bad_step_hipass.wav" );
+	PaQa_TerminateRecording( &recording);	
+	PaQa_TerminateRecording( &hipassOutput );
 	return 1;
 }	
 
@@ -430,6 +518,39 @@ static int TestDetectPops( void )
 	
 	return 0;
 }
+
+/*==========================================================================================*/
+/**
+ * Test analysis when there is a DC offset step before the sine signal.
+ */
+static int TestInitialSpike( void )
+{
+	int result;
+	
+	// No spike.
+	result = TestSingleInitialSpike( 44100, 32, 100, 537, 0.0 );
+	if( result < 0 ) return result;
+	
+	// Small spike.
+	result = TestSingleInitialSpike( 44100, 32, 100, 537, 0.1 );
+	if( result < 0 ) return result;
+	
+	// short pop like Ross's error.
+	result = TestSingleInitialSpike( 8000, 32, 42, 2000, 0.1 );
+	if( result < 0 ) return result;
+	
+	// Medium spike.
+	result = TestSingleInitialSpike( 44100, 40, 190, 3000, 0.5 );
+	if( result < 0 ) return result;
+	
+	// Spike near sine.
+	//result = TestSingleInitialSpike( 44100, 2900, 140, 3000, 0.1 );
+	if( result < 0 ) return result;
+	
+	
+	return 0;
+}
+
 
 #if TEST_SAVED_WAVE
 /*==========================================================================================*/
@@ -588,5 +709,9 @@ int PaQa_TestAnalyzer( void )
 	// Detect pops that get back in phase.
 	if ((result = TestDetectPops()) != 0) return result;
 	
+	// Test to see if the latency detector can be tricked like it was on Ross' Windows machine.
+	if ((result = TestInitialSpike()) != 0) return result;
+	
+
 	return 0;
 }

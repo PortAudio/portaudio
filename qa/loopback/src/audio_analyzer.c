@@ -345,21 +345,28 @@ void PaQa_FilterRecording( PaQaRecording *input, PaQaRecording *output, BiquadFi
 }
 
 /*==========================================================================================*/
-// Scan until we get a correlation that goes over the tolerance level,
-// peaks then drops to half the peak.
-double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numFrames, double tolerance  )
+/** Scan until we get a correlation of a single that goes over the tolerance level,
+ * peaks then drops to half the peak.
+ * Look for inverse correlation as well.
+ */
+double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numFrames, double threshold  )
 {
 	int ic,is;
 	// How many buffers will fit in the recording?
 	int maxCorrelations = recording->numFrames - numFrames;
 	double maxSum = 0.0;
 	int peakIndex = -1;
+	double inverseMaxSum = 0.0;
+	int inversePeakIndex = -1;
 	double location = -1.0;
 
     QA_ASSERT_TRUE( "numFrames out of bounds", (numFrames < recording->numFrames) );
 
 	for( ic=0; ic<maxCorrelations; ic++ )
 	{
+		int pastPeak;
+		int inversePastPeak;
+		
 		double sum = 0.0;
 		// Correlate buffer against the recording.
 		float *recorded = &recording->buffer[ ic ];
@@ -374,13 +381,29 @@ double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numFram
 			maxSum = sum;
 			peakIndex = ic;
 		}
-		if( (maxSum > tolerance) && (sum < 0.5*maxSum) )
+		if( ((-sum) > inverseMaxSum) )
 		{
-			location = peakIndex;
+			inverseMaxSum = -sum;
+			inversePeakIndex = ic;
+		}
+		pastPeak = (maxSum > threshold) && (sum < 0.5*maxSum);
+		inversePastPeak = (inverseMaxSum > threshold) && ((-sum) < 0.5*inverseMaxSum);
+		//printf("PaQa_FindFirstMatch: ic = %4d, sum = %8f, maxSum = %8f, inverseMaxSum = %8f\n", ic, sum, maxSum, inverseMaxSum );														  
+		if( pastPeak && inversePastPeak )
+		{
+			if( maxSum > inverseMaxSum )
+			{
+				location = peakIndex;
+			}
+			else
+			{
+				location = inversePeakIndex;
+			}
 			break;
 		}
 		
 	}
+	//printf("PaQa_FindFirstMatch: location = %4d\n", (int)location );
 	return location;
 error:
 	return -1.0;
@@ -454,6 +477,7 @@ double PaQa_ComputePhaseDifference( double phase1, double phase2 )
 /*==========================================================================================*/
 int PaQa_MeasureLatency( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalysisResult *analysisResult )
 {
+	double threshold;
 	PaQaSineGenerator generator;
 #define MAX_BUFFER_SIZE 2048
 	float buffer[MAX_BUFFER_SIZE];
@@ -470,15 +494,14 @@ int PaQa_MeasureLatency( PaQaRecording *recording, PaQaTestTone *testTone, PaQaA
 	PaQa_EraseBuffer( buffer, cycleSize, testTone->samplesPerFrame );
 	PaQa_MixSine( &generator, buffer, cycleSize, testTone->samplesPerFrame );
 
-	analysisResult->latency = PaQa_FindFirstMatch( recording, buffer, cycleSize, /* tolerance= */ 0.1 );	
+	threshold = cycleSize * 0.01;
+	analysisResult->latency = PaQa_FindFirstMatch( recording, buffer, cycleSize, threshold );	
 	QA_ASSERT_TRUE( "Could not find the start of the signal.", (analysisResult->latency >= 0) );
 	analysisResult->amplitudeRatio = PaQa_CompareAmplitudes( recording, analysisResult->latency, buffer, cycleSize );
 	return 0;
 error:
 	return -1;
 }
-
-
 
 /*==========================================================================================*/
 // Apply cosine squared window.
@@ -551,7 +574,7 @@ int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalys
 	// Scan remaining signal looking for peak.
 	maxAmplitude = 0.0;
 	maxPosition = -1;
-	for( i=0; i<hipassOutput.numFrames; i++ )
+	for( i=(int) analysisResult->latency; i<hipassOutput.numFrames; i++ )
 	{
 		float x = hipassOutput.buffer[i];
 		float mag = fabs( x );
