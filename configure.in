@@ -267,7 +267,7 @@ case "${host_os}" in
         if [[ "x$with_wasapi" = "xyes" ]]; then
             add_objects src/hostapi/wasapi/pa_win_wasapi.o src/common/pa_ringbuffer.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_waveformat.o
             LIBS="-lwinmm -lm -lole32 -luuid"
-            DLL_LIBS="${DLL_LIBS} -lwinmm"
+            DLL_LIBS="${DLL_LIBS} -lwinmm -lole32"
             CFLAGS="$CFLAGS -I\$(top_srcdir)/src/common -I\$(top_srcdir)/src/hostapi/wasapi/mingw-include -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
         fi
         ;;

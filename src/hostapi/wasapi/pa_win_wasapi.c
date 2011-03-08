@@ -3481,7 +3481,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
 	// Findout if there are tail frames, flush them all before reading hardware
 	if ((available = PaUtil_GetRingBufferReadAvailable(stream->in.tailBuffer)) != 0)
 	{
-		UINT32 buf1_size = 0, buf2_size = 0, read, desired;
+		ring_buffer_size_t buf1_size = 0, buf2_size = 0, read, desired;
 		void *buf1 = NULL, *buf2 = NULL;
 
 		// Limit desired to amount of requested frames
