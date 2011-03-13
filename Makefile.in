@@ -82,6 +82,7 @@ TESTS = \
 	bin/patest_longsine \
 	bin/patest_many \
 	bin/patest_maxsines \
+	bin/patest_mono \
 	bin/patest_multi_sine \
 	bin/patest_out_underflow \
 	bin/patest_pink \
@@ -101,6 +102,7 @@ TESTS = \
 	bin/patest_stop \
 	bin/patest_stop_playout \
 	bin/patest_toomanysines \
+	bin/patest_two_rates \
 	bin/patest_underflow \
 	bin/patest_wire \
 	bin/patest_write_sine \

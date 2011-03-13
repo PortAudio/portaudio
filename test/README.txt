@@ -24,7 +24,7 @@ the tests pass, just that they compile.
     x- patest_longsine.c
     x- patest_many.c
     x- patest_maxsines.c
-	o- patest_mono.c
+	x- patest_mono.c
     x- patest_multi_sine.c
     x- patest_pink.c
     x- patest_prime.c
@@ -40,7 +40,7 @@ the tests pass, just that they compile.
     x- patest_stop.c
     x- patest_sync.c
     x- patest_toomanysines.c
-	o- patest_two_rates.c
+	x- patest_two_rates.c
     x- patest_underflow.c
     x- patest_wire.c
     x- patest_write_sine.c
