@@ -338,7 +338,6 @@ case "${host_os}" in
                    DLL_LIBS="$DLL_LIBS -lossaudio"
                    LIBS="$LIBS -lossaudio"
            fi
-           INCLUDES="$INCLUDES pa_unix_oss.h"
            AC_DEFINE(PA_USE_OSS)
         fi
 
