@@ -75,10 +75,6 @@
 #include "pa_win_waveformat.h"
 #include "pa_win_wdmks_utils.h"
 
-#ifndef PA_USE_DS
-#error "Portaudio internal error: PA_USE_DS=0/1 not defined. pa_hostapi.h should ensure that it is."
-#endif
-
 #if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
 #pragma comment( lib, "dsound.lib" )
 #pragma comment( lib, "winmm.lib" )
