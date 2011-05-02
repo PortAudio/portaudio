@@ -1241,13 +1241,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         inputHostFormat = stream->capture->hostFormat;
         stream->streamRepresentation.streamInfo.inputLatency = inLatency +
-            PaUtil_GetBufferProcessorInputLatency( &stream->bufferProcessor ) / sampleRate;
+            PaUtil_GetBufferProcessorInputLatencyFrames( &stream->bufferProcessor ) / sampleRate;
     }
     if( outputParameters )
     {
         outputHostFormat = stream->playback->hostFormat;
         stream->streamRepresentation.streamInfo.outputLatency = outLatency +
-            PaUtil_GetBufferProcessorOutputLatency( &stream->bufferProcessor ) / sampleRate;
+            PaUtil_GetBufferProcessorOutputLatencyFrames( &stream->bufferProcessor ) / sampleRate;
     }
 
     /* Initialize buffer processor with fixed host buffer size.

@@ -1843,9 +1843,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     bufferProcessorIsInitialized = 1;
 
     stream->streamRepresentation.streamInfo.inputLatency =
-            (PaTime)PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor) / sampleRate;   /* FIXME: only includes buffer processor latency */
+            (PaTime)PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor) / sampleRate;   /* FIXME: only includes buffer processor latency */
     stream->streamRepresentation.streamInfo.outputLatency =
-            (PaTime)PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor) / sampleRate;    /* FIXME: only includes buffer processor latency */
+            (PaTime)PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor) / sampleRate;    /* FIXME: only includes buffer processor latency */
     stream->streamRepresentation.streamInfo.sampleRate = sampleRate;
 
     

@@ -406,25 +406,25 @@ void PaUtil_TerminateBufferProcessor( PaUtilBufferProcessor* bufferProcessor );
 void PaUtil_ResetBufferProcessor( PaUtilBufferProcessor* bufferProcessor );
 
 
-/** Retrieve the input latency of a buffer processor.
+/** Retrieve the input latency of a buffer processor, in frames.
 
  @param bufferProcessor The buffer processor examine.
 
  @return The input latency introduced by the buffer processor, in frames.
 
- @see PaUtil_GetBufferProcessorOutputLatency
+ @see PaUtil_GetBufferProcessorOutputLatencyFrames
 */
-unsigned long PaUtil_GetBufferProcessorInputLatency( PaUtilBufferProcessor* bufferProcessor );
+unsigned long PaUtil_GetBufferProcessorInputLatencyFrames( PaUtilBufferProcessor* bufferProcessor );
 
-/** Retrieve the output latency of a buffer processor.
+/** Retrieve the output latency of a buffer processor, in frames.
 
  @param bufferProcessor The buffer processor examine.
 
  @return The output latency introduced by the buffer processor, in frames.
 
- @see PaUtil_GetBufferProcessorInputLatency
+ @see PaUtil_GetBufferProcessorInputLatencyFrames
 */
-unsigned long PaUtil_GetBufferProcessorOutputLatency( PaUtilBufferProcessor* bufferProcessor );
+unsigned long PaUtil_GetBufferProcessorOutputLatencyFrames( PaUtilBufferProcessor* bufferProcessor );
 
 /*@}*/
 

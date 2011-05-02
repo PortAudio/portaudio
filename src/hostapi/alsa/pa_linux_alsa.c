@@ -2768,10 +2768,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     /* Ok, buffer processor is initialized, now we can deduce it's latency */
     if( numInputChannels > 0 )
         stream->streamRepresentation.streamInfo.inputLatency = inputLatency + (PaTime)(
-                PaUtil_GetBufferProcessorInputLatency( &stream->bufferProcessor ) / sampleRate);
+                PaUtil_GetBufferProcessorInputLatencyFrames( &stream->bufferProcessor ) / sampleRate);
     if( numOutputChannels > 0 )
         stream->streamRepresentation.streamInfo.outputLatency = outputLatency + (PaTime)(
-                PaUtil_GetBufferProcessorOutputLatency( &stream->bufferProcessor ) / sampleRate);
+                PaUtil_GetBufferProcessorOutputLatencyFrames( &stream->bufferProcessor ) / sampleRate);
 
     PA_DEBUG(( "%s: Stream: framesPerBuffer = %lu, maxFramesPerHostBuffer = %lu, latency = i(%f)/o(%f), \n", __FUNCTION__, framesPerBuffer, stream->maxFramesPerHostBuffer, stream->streamRepresentation.streamInfo.inputLatency, stream->streamRepresentation.streamInfo.outputLatency));
 

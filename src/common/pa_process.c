@@ -428,13 +428,13 @@ void PaUtil_ResetBufferProcessor( PaUtilBufferProcessor* bp )
 }
 
 
-unsigned long PaUtil_GetBufferProcessorInputLatency( PaUtilBufferProcessor* bp )
+unsigned long PaUtil_GetBufferProcessorInputLatencyFrames( PaUtilBufferProcessor* bp )
 {
     return bp->initialFramesInTempInputBuffer;
 }
 
 
-unsigned long PaUtil_GetBufferProcessorOutputLatency( PaUtilBufferProcessor* bp )
+unsigned long PaUtil_GetBufferProcessorOutputLatencyFrames( PaUtilBufferProcessor* bp )
 {
     return bp->initialFramesInTempOutputBuffer;
 }

@@ -2369,8 +2369,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
             /* Compute total intput latency in seconds */
             stream->streamRepresentation.streamInfo.inputLatency =
-                (double)( PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor               )
-                        + PaUtil_GetBufferProcessorInputLatency(&stream->blockingState->bufferProcessor)
+                (double)( PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor               )
+                        + PaUtil_GetBufferProcessorInputLatencyFrames(&stream->blockingState->bufferProcessor)
                         + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer
                         + stream->asioInputLatencyFrames )
                 / sampleRate;
@@ -2382,10 +2382,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             PA_DEBUG(("PaAsio : ASIO InputLatency = %ld (%ld ms),\n         added buffProc:%ld (%ld ms),\n         added blocking:%ld (%ld ms)\n",
                 stream->asioInputLatencyFrames,
                 (long)( stream->asioInputLatencyFrames * (1000.0 / sampleRate) ),
-                PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor),
-                (long)( PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor) * (1000.0 / sampleRate) ),
-                PaUtil_GetBufferProcessorInputLatency(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer,
-                (long)( (PaUtil_GetBufferProcessorInputLatency(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer) * (1000.0 / sampleRate) )
+                PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor),
+                (long)( PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor) * (1000.0 / sampleRate) ),
+                PaUtil_GetBufferProcessorInputLatencyFrames(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer,
+                (long)( (PaUtil_GetBufferProcessorInputLatencyFrames(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer) * (1000.0 / sampleRate) )
                 ));
 
             /* Determine the size of ring buffer in bytes. */
@@ -2460,8 +2460,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
             /* Compute total output latency in seconds */
             stream->streamRepresentation.streamInfo.outputLatency =
-                (double)( PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor               )
-                        + PaUtil_GetBufferProcessorOutputLatency(&stream->blockingState->bufferProcessor)
+                (double)( PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor)
+                        + PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->blockingState->bufferProcessor)
                         + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer
                         + stream->asioOutputLatencyFrames )
                 / sampleRate;
@@ -2473,10 +2473,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             PA_DEBUG(("PaAsio : ASIO OutputLatency = %ld (%ld ms),\n         added buffProc:%ld (%ld ms),\n         added blocking:%ld (%ld ms)\n",
                 stream->asioOutputLatencyFrames,
                 (long)( stream->asioOutputLatencyFrames * (1000.0 / sampleRate) ),
-                PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor),
-                (long)( PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor) * (1000.0 / sampleRate) ),
-                PaUtil_GetBufferProcessorOutputLatency(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer,
-                (long)( (PaUtil_GetBufferProcessorOutputLatency(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer) * (1000.0 / sampleRate) )
+                PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor),
+                (long)( PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor) * (1000.0 / sampleRate) ),
+                PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer,
+                (long)( (PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->blockingState->bufferProcessor) + (lBlockingBufferSize / framesPerBuffer - 1) * framesPerBuffer) * (1000.0 / sampleRate) )
                 ));
 
             /* Determine the size of ring buffer in bytes. */
@@ -2517,10 +2517,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         callbackBufferProcessorInited = TRUE;
 
         stream->streamRepresentation.streamInfo.inputLatency =
-                (double)( PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor)
+                (double)( PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor)
                     + stream->asioInputLatencyFrames) / sampleRate;   // seconds
         stream->streamRepresentation.streamInfo.outputLatency =
-                (double)( PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor)
+                (double)( PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor)
                     + stream->asioOutputLatencyFrames) / sampleRate; // seconds
         stream->streamRepresentation.streamInfo.sampleRate = sampleRate;
 
@@ -2529,15 +2529,15 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         PA_DEBUG(("PaAsio : ASIO InputLatency = %ld (%ld ms), added buffProc:%ld (%ld ms)\n",
                 stream->asioInputLatencyFrames,
                 (long)((stream->asioInputLatencyFrames*1000)/ sampleRate),  
-                PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor),
-                (long)((PaUtil_GetBufferProcessorInputLatency(&stream->bufferProcessor)*1000)/ sampleRate)
+                PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor),
+                (long)((PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor)*1000)/ sampleRate)
                 ));
 
         PA_DEBUG(("PaAsio : ASIO OuputLatency = %ld (%ld ms), added buffProc:%ld (%ld ms)\n",
                 stream->asioOutputLatencyFrames,
                 (long)((stream->asioOutputLatencyFrames*1000)/ sampleRate), 
-                PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor),
-                (long)((PaUtil_GetBufferProcessorOutputLatency(&stream->bufferProcessor)*1000)/ sampleRate)
+                PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor),
+                (long)((PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor)*1000)/ sampleRate)
                 ));
     }
 
