@@ -906,8 +906,8 @@ typedef struct PaAsioDeviceInfo
 PaAsioDeviceInfo;
 
 
-PaError PaAsio_GetAvailableLatencyValues( PaDeviceIndex device,
-        long *minLatency, long *maxLatency, long *preferredLatency, long *granularity )
+PaError PaAsio_GetAvailableBufferSizes( PaDeviceIndex device,
+        long *minBufferSizeFrames, long *maxBufferSizeFrames, long *preferredBufferSizeFrames, long *granularity )
 {
     PaError result;
     PaUtilHostApiRepresentation *hostApi;
@@ -924,9 +924,9 @@ PaError PaAsio_GetAvailableLatencyValues( PaDeviceIndex device,
             PaAsioDeviceInfo *asioDeviceInfo =
                     (PaAsioDeviceInfo*)hostApi->deviceInfos[hostApiDevice];
 
-            *minLatency = asioDeviceInfo->minBufferSize;
-            *maxLatency = asioDeviceInfo->maxBufferSize;
-            *preferredLatency = asioDeviceInfo->preferredBufferSize;
+            *minBufferSizeFrames = asioDeviceInfo->minBufferSize;
+            *maxBufferSizeFrames = asioDeviceInfo->maxBufferSize;
+            *preferredBufferSizeFrames = asioDeviceInfo->preferredBufferSize;
             *granularity = asioDeviceInfo->bufferGranularity;
         }
     }
