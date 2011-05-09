@@ -101,6 +101,8 @@
 #include "pa_debugprint.h"
 #include "pa_ringbuffer.h"
 
+#include "pa_win_coinitialize.h"
+
 /* This version of pa_asio.cpp is currently only targetted at Win32,
    It would require a few tweaks to work with pre-OS X Macintosh.
    To make configuration easier, we define WIN32 here to make sure
@@ -288,6 +290,8 @@ typedef struct
     PaUtilStreamInterface blockingStreamInterface;
 
     PaUtilAllocationGroup *allocations;
+
+    PaWinUtilComInitializationResult comInitializationResult;
 
     AsioDrivers *asioDrivers;
     void *systemSpecific;
@@ -935,12 +939,10 @@ PaError PaAsio_GetAvailableBufferSizes( PaDeviceIndex device,
 }
 
 /* Unload whatever we loaded in LoadAsioDriver().
-   Also balance the call to CoInitialize(0).
 */
 static void UnloadAsioDriver( void )
 {
 	ASIOExit();
-	CoUninitialize();
 }
 
 /*
@@ -956,23 +958,8 @@ static PaError LoadAsioDriver( PaAsioHostApiRepresentation *asioHostApi, const c
     ASIOError asioError;
     int asioIsInitialized = 0;
 
-    /* 
-	ASIO uses CoCreateInstance() to load a driver. That requires that
-	CoInitialize(0) be called for every thread that loads a driver.
-	It is OK to call CoInitialize(0) multiple times form one thread as long
-	as it is balanced by a call to CoUninitialize(). See UnloadAsioDriver().
-
-	The V18 version called CoInitialize() starting on 2/19/02.
-	That was removed from PA V19 for unknown reasons.
-	Phil Burk added it back on 6/27/08 so that JSyn would work.
-    */
-	CoInitialize( 0 );
-
     if( !asioHostApi->asioDrivers->loadDriver( const_cast<char*>(driverName) ) )
     {
-		/* If this returns an error then it might be because CoInitialize(0) was removed.
-		  It should be called right before this.
-	    */
         result = paUnanticipatedHostError;
         PA_ASIO_SET_LAST_HOST_ERROR( 0, "Failed to load ASIO driver" );
         goto error;
@@ -1021,7 +1008,7 @@ error:
 	{
 		ASIOExit();
 	}
-	CoUninitialize();
+
     return result;
 }
 
@@ -1053,6 +1040,24 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
         goto error;
     }
 
+    /*
+        We initialize COM ourselves here and uninitialize it in Terminate().
+        This should be the only COM initialization needed in this module.
+
+        The ASIO SDK may also initialize COM but since we want to reduce dependency
+        on the ASIO SDK we manage COM initialization ourselves.
+
+        There used to be code that initialized COM in other situations
+        such as when creating a Stream. This made PA work when calling Pa_CreateStream
+        from a non-main thread. However we currently consider initialization 
+        of COM in non-main threads to be the caller's responsibility.
+    */
+    result = PaWinUtil_CoInitialize( paASIO, &asioHostApi->comInitializationResult );
+    if( result != paNoError )
+    {
+        goto error;
+    }
+
     asioHostApi->asioDrivers = 0; /* avoid surprises in our error handler below */
 
     asioHostApi->allocations = PaUtil_CreateAllocationGroup();
@@ -1065,7 +1070,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     /* Allocate the AsioDrivers() driver list (class from ASIO SDK) */
     try
     {
-        asioHostApi->asioDrivers = new AsioDrivers(); /* calls CoInitialize(0) */
+        asioHostApi->asioDrivers = new AsioDrivers(); /* invokes CoInitialize(0) in AsioDriverList::AsioDriverList */
     } 
     catch (std::bad_alloc)
     {
@@ -1347,8 +1352,11 @@ error:
         delete asioHostApi->asioDrivers;
         asioDrivers = 0; /* keep SDK global in sync until we stop depending on it */
 
+        PaWinUtil_CoUninitialize( paASIO, &asioHostApi->comInitializationResult );
+
         PaUtil_FreeMemory( asioHostApi );
     }
+
     return result;
 }
 
@@ -1368,8 +1376,10 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
         PaUtil_DestroyAllocationGroup( asioHostApi->allocations );
     }
 
-    delete asioHostApi->asioDrivers; /* calls CoUninitialize() */
+    delete asioHostApi->asioDrivers;
     asioDrivers = 0; /* keep SDK global in sync until we stop depending on it */
+
+    PaWinUtil_CoUninitialize( paASIO, &asioHostApi->comInitializationResult );
 
     PaUtil_FreeMemory( asioHostApi );
 }
@@ -3836,7 +3846,12 @@ PaError PaAsio_ShowControlPanel( PaDeviceIndex device, void* systemSpecific )
     int asioIsInitialized = 0;
     PaAsioHostApiRepresentation *asioHostApi;
     PaAsioDeviceInfo *asioDeviceInfo;
+    PaWinUtilComInitializationResult comInitializationResult;
 
+    /* initialize COM again here, we might be in another thread */
+    result = PaWinUtil_CoInitialize( paASIO, &comInitializationResult );
+    if( result != paNoError )
+        return result;
 
     result = PaUtil_GetHostApiRepresentation( &hostApi, paASIO );
     if( result != paNoError )
@@ -3862,9 +3877,6 @@ PaError PaAsio_ShowControlPanel( PaDeviceIndex device, void* systemSpecific )
     }
 
     asioDeviceInfo = (PaAsioDeviceInfo*)hostApi->deviceInfos[hostApiDevice];
-
-    /* See notes about CoInitialize(0) in LoadAsioDriver(). */
-	CoInitialize(0);
 
     if( !asioHostApi->asioDrivers->loadDriver( const_cast<char*>(asioDeviceInfo->commonDeviceInfo.name) ) )
     {
@@ -3914,7 +3926,6 @@ PA_DEBUG(("PaAsio_ShowControlPanel: ASIOControlPanel(): %s\n", PaAsio_GetAsioErr
         goto error;
     }
 
-	CoUninitialize();
 PA_DEBUG(("PaAsio_ShowControlPanel: ASIOExit(): %s\n", PaAsio_GetAsioErrorText(asioError) ));
 
     return result;
@@ -3924,7 +3935,8 @@ error:
 	{
 		ASIOExit();
 	}
-	CoUninitialize();
+
+    PaWinUtil_CoUninitialize( paASIO, &comInitializationResult );
 
     return result;
 }

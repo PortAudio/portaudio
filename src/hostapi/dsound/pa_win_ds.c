@@ -74,6 +74,7 @@
 #include "pa_win_ds_dynlink.h"
 #include "pa_win_waveformat.h"
 #include "pa_win_wdmks_utils.h"
+#include "pa_win_coinitialize.h"
 
 #if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
 #pragma comment( lib, "dsound.lib" )
@@ -186,7 +187,7 @@ typedef struct
 
     /* implementation specific data goes here */
 
-    char                    comWasInitialized;
+    PaWinUtilComInitializationResult comInitializationResult;
 
 } PaWinDsHostApiRepresentation;
 
@@ -1011,31 +1012,14 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     int i, deviceCount;
     PaWinDsHostApiRepresentation *winDsHostApi;
     DSDeviceNamesAndGUIDs deviceNamesAndGUIDs;
-
     PaWinDsDeviceInfo *deviceInfoArray;
-    char comWasInitialized = 0;
 
-    /*
-        If COM is already initialized CoInitialize will either return
-        FALSE, or RPC_E_CHANGED_MODE if it was initialised in a different
-        threading mode. In either case we shouldn't consider it an error
-        but we need to be careful to not call CoUninitialize() if 
-        RPC_E_CHANGED_MODE was returned.
-    */
-
-    HRESULT hr = CoInitialize(NULL);
-    if( FAILED(hr) && hr != RPC_E_CHANGED_MODE )
-        return paUnanticipatedHostError;
-
-    if( hr != RPC_E_CHANGED_MODE )
-        comWasInitialized = 1;
+    PaWinDs_InitializeDSoundEntryPoints();
 
     /* initialise guid vectors so they can be safely deleted on error */
     deviceNamesAndGUIDs.winDsHostApi = NULL;
     deviceNamesAndGUIDs.inputNamesAndGUIDs.items = NULL;
     deviceNamesAndGUIDs.outputNamesAndGUIDs.items = NULL;
-
-    PaWinDs_InitializeDSoundEntryPoints();
 
     winDsHostApi = (PaWinDsHostApiRepresentation*)PaUtil_AllocateMemory( sizeof(PaWinDsHostApiRepresentation) );
     if( !winDsHostApi )
@@ -1044,7 +1028,11 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
         goto error;
     }
 
-    winDsHostApi->comWasInitialized = comWasInitialized;
+    result = PaWinUtil_CoInitialize( paDirectSound, &winDsHostApi->comInitializationResult );
+    if( result != paNoError )
+    {
+        goto error;
+    }
 
     winDsHostApi->allocations = PaUtil_CreateAllocationGroup();
     if( !winDsHostApi->allocations )
@@ -1183,15 +1171,16 @@ error:
             PaUtil_FreeAllAllocations( winDsHostApi->allocations );
             PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
         }
-                
+        
+        PaWinUtil_CoUninitialize( paDirectSound, &winDsHostApi->comInitializationResult );
+
         PaUtil_FreeMemory( winDsHostApi );
     }
 
     TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.inputNamesAndGUIDs );
     TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.outputNamesAndGUIDs );
 
-    if( comWasInitialized )
-        CoUninitialize();
+    PaWinDs_TerminateDSoundEntryPoints();
 
     return result;
 }
@@ -1201,7 +1190,6 @@ error:
 static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 {
     PaWinDsHostApiRepresentation *winDsHostApi = (PaWinDsHostApiRepresentation*)hostApi;
-    char comWasInitialized = winDsHostApi->comWasInitialized;
 
     /*
         IMPLEMENT ME:
@@ -1214,12 +1202,11 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
         PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
     }
 
+    PaWinUtil_CoUninitialize( paDirectSound, &winDsHostApi->comInitializationResult );
+
     PaUtil_FreeMemory( winDsHostApi );
 
     PaWinDs_TerminateDSoundEntryPoints();
-
-    if( comWasInitialized )
-        CoUninitialize();
 }
 
 
