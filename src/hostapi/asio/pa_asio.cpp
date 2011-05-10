@@ -1629,7 +1629,7 @@ static void ZeroOutputBuffers( PaAsioStream *stream, long index )
 }
 
 
-static unsigned long SelectHostBufferSize( unsigned long suggestedLatencyFrames,
+static unsigned long SelectHostBufferSize( unsigned long suggestedLatencyFrames, unsigned long userFramesPerBuffer,
         PaAsioDriverInfo *driverInfo )
 {
     unsigned long result;
@@ -2095,15 +2095,15 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( usingBlockingIo )
     {
 /** @todo REVIEW selection of host buffer size for blocking i/o */
-        /* Use default host latency for blocking i/o. */
-        framesPerHostBuffer = SelectHostBufferSize( 0, driverInfo );
+
+        framesPerHostBuffer = SelectHostBufferSize( 0, framesPerBuffer, driverInfo );
 
     }
     else /* Using callback interface... */
     {
         framesPerHostBuffer = SelectHostBufferSize(
                 (( suggestedInputLatencyFrames > suggestedOutputLatencyFrames )
-                        ? suggestedInputLatencyFrames : suggestedOutputLatencyFrames),
+                        ? suggestedInputLatencyFrames : suggestedOutputLatencyFrames), framesPerBuffer,
                 driverInfo );
     }
 
