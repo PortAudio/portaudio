@@ -1700,6 +1700,10 @@
 					Name="win"
 					>
 					<File
+						RelativePath="..\..\src\os\win\pa_win_coinitialize.c"
+						>
+					</File>
+					<File
 						RelativePath="..\..\src\os\win\pa_win_hostapis.c"
 						>
 						<FileConfiguration

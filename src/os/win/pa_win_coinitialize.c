@@ -79,7 +79,7 @@ PaError PaWinUtil_CoInitialize( PaHostApiTypeId hostApiType, PaWinUtilComInitial
     hr = CoInitialize(0); /* use legacy-safe equivalent to CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) */
     if( FAILED(hr) && hr != RPC_E_CHANGED_MODE )
     {
-        PA_DEBUG(("CoInitializeEx failed. hr=%d\n", hr));
+        PA_DEBUG(("CoInitialize(0) failed. hr=%d\n", hr));
 
         if( hr == E_OUTOFMEMORY )
             return paInsufficientMemory;
