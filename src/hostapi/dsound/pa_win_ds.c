@@ -287,7 +287,7 @@ typedef struct PaWinDsStream
     volatile int     stopProcessing; /* stop thread once existing buffers have been returned */
     volatile int     abortProcessing; /* stop thread immediately */
 
-    UINT             timerPeriod; /* set to 0 if we were unable to set the timer period */ 
+    UINT             systemTimerResolutionPeriodMs; /* set to 0 if we were unable to set the timer period */ 
 
 #ifdef PA_WIN_DS_USE_WMME_TIMER
     MMRESULT         timerID;
@@ -2094,17 +2094,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 goto error;
             }
         }
-
-        {
-            /* set the windows scheduler granularity using timeBeginPeriod */
-            TIMECAPS timecaps;
-            /* set windows scheduler granularity to as fine as possible */
-            if( timeGetDevCaps( &timecaps, sizeof(TIMECAPS) == MMSYSERR_NOERROR && timecaps.wPeriodMin > 0 ) )
-            {
-                if( timeBeginPeriod( timecaps.wPeriodMin ) == MMSYSERR_NOERROR )
-                    stream->timerPeriod = timecaps.wPeriodMin; /* save the period so we can reset it later */
-            }
-        }
     }
 
     *s = (PaStream*)stream;
@@ -2114,9 +2103,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 error:
     if( stream )
     {
-        if( stream->timerPeriod > 0 )
-            timeEndPeriod( stream->timerPeriod );
-
         if( stream->processingCompleted != NULL )
             CloseHandle( stream->processingCompleted );
 
@@ -2788,16 +2774,31 @@ static PaError StartStream( PaStream *s )
 
     if( stream->streamRepresentation.streamCallback )
     {
-#ifdef PA_WIN_DS_USE_WMME_TIMER
-        /* Create timer that will wake us up so we can fill the DSound buffer. */
+        TIMECAPS timecaps;
 
-        int resolution;
+        int timerResolution;
         int framesPerWakeup = stream->framesPerDSBuffer / 4;
         int msecPerWakeup = MSEC_PER_SECOND * framesPerWakeup / (int) stream->streamRepresentation.streamInfo.sampleRate;
         if( msecPerWakeup < 10 ) msecPerWakeup = 10;
         else if( msecPerWakeup > 100 ) msecPerWakeup = 100;
-        resolution = msecPerWakeup/4;
-        stream->timerID = timeSetEvent( msecPerWakeup, resolution, (LPTIMECALLBACK) TimerCallback,
+        timerResolution = msecPerWakeup/4;
+
+        /* set windows scheduler granularity only as fine as needed, no finer */
+        assert( stream->systemTimerResolutionPeriodMs == 0 );
+        if( timeGetDevCaps( &timecaps, sizeof(TIMECAPS) == MMSYSERR_NOERROR && timecaps.wPeriodMin > 0 ) )
+        {
+            stream->systemTimerResolutionPeriodMs = timerResolution;
+            if( stream->systemTimerResolutionPeriodMs < timecaps.wPeriodMin )
+                stream->systemTimerResolutionPeriodMs = timecaps.wPeriodMin;
+
+            if( timeBeginPeriod( stream->systemTimerResolutionPeriodMs ) != MMSYSERR_NOERROR )
+                stream->systemTimerResolutionPeriodMs = 0; /* timeBeginPeriod failed, so we don't need to call timeEndPeriod() later */
+        }
+
+
+#ifdef PA_WIN_DS_USE_WMME_TIMER
+        /* Create timer that will wake us up so we can fill the DSound buffer. */
+        stream->timerID = timeSetEvent( msecPerWakeup, timerResolution, (LPTIMECALLBACK) TimerCallback,
                                              (DWORD_PTR) stream, TIME_PERIODIC | TIME_KILL_SYNCHRONOUS );
     
         if( stream->timerID == 0 )
@@ -2890,6 +2891,11 @@ static PaError StopStream( PaStream *s )
 
     }
 #endif
+
+    if( stream->systemTimerResolutionPeriodMs > 0 ){
+        timeEndPeriod( stream->systemTimerResolutionPeriodMs );
+        stream->systemTimerResolutionPeriodMs = 0;
+    }  
 
     if( stream->bufferProcessor.outputChannelCount > 0 )
     {
