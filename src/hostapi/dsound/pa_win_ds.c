@@ -2784,6 +2784,11 @@ static PaError StartStream( PaStream *s )
         timerResolution = msecPerWakeup/4;
 
         /* set windows scheduler granularity only as fine as needed, no finer */
+        /* Although this is not fully documented by MS, it appears that
+           timeBeginPeriod() affects the scheduling granulatity of all timers
+           including Waitable Timer Objects. So we always call timeBeginPeriod, whether
+           we're using an MM timer callback via timeSetEvent or not.
+        */
         assert( stream->systemTimerResolutionPeriodMs == 0 );
         if( timeGetDevCaps( &timecaps, sizeof(TIMECAPS) == MMSYSERR_NOERROR && timecaps.wPeriodMin > 0 ) )
         {
@@ -2798,6 +2803,10 @@ static PaError StartStream( PaStream *s )
 
 #ifdef PA_WIN_DS_USE_WMME_TIMER
         /* Create timer that will wake us up so we can fill the DSound buffer. */
+        /* We have deprecated timeSetEvent because all MM timer callbacks
+           are serialised onto a single thread. Which creates problems with multiple
+           PA streams, or when also using timers for other time critical tasks
+        */
         stream->timerID = timeSetEvent( msecPerWakeup, timerResolution, (LPTIMECALLBACK) TimerCallback,
                                              (DWORD_PTR) stream, TIME_PERIODIC | TIME_KILL_SYNCHRONOUS );
     
