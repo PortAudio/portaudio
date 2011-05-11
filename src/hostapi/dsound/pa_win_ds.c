@@ -41,10 +41,17 @@
  @ingroup hostapi_src
 */
 
+/* Until May 2011 PA/DS has used a multimedia timer to perform the callback.
+   We're replacing this with a new implementation using a thread and a different timer mechanim.
+   Defining PA_WIN_DS_USE_WMME_TIMER uses the old (pre-May 2011) behavior.
+*/
+//#define PA_WIN_DS_USE_WMME_TIMER 
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h> /* strlen() */
 
+#define _WIN32_WINNT 0x0400 /* required to get waitable timer APIs */
 #include <initguid.h> /* make sure ds guids get defined */
 #include <windows.h>
 #include <objbase.h>
@@ -61,6 +68,11 @@
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
 #include <dsconf.h>
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+#ifndef UNDER_CE
+#include <process.h>
+#endif
+#endif
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -79,7 +91,38 @@
 #if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
 #pragma comment( lib, "dsound.lib" )
 #pragma comment( lib, "winmm.lib" )
+#pragma comment( lib, "kernel32.lib" )
 #endif
+
+/* use CreateThread for CYGWIN, _beginthreadex for all others */
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+
+#if !defined(__CYGWIN__) && !defined(UNDER_CE)
+#define CREATE_THREAD (HANDLE)_beginthreadex
+#undef CLOSE_THREAD_HANDLE /* as per documentation we don't call CloseHandle on a thread created with _beginthreadex */
+#define PA_THREAD_FUNC static unsigned WINAPI
+#define PA_THREAD_ID unsigned
+#else
+#define CREATE_THREAD CreateThread
+#define CLOSE_THREAD_HANDLE CloseHandle
+#define PA_THREAD_FUNC static DWORD WINAPI
+#define PA_THREAD_ID DWORD
+#endif
+
+#if (defined(UNDER_CE))
+#pragma comment(lib, "Coredll.lib")
+#elif (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#pragma comment(lib, "winmm.lib")
+#endif
+
+PA_THREAD_FUNC ProcessingThreadProc( void *pArg );
+
+#if !defined(UNDER_CE)
+#define PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT /* use waitable timer where possible, otherwise we use a WaitForSingleObject timeout */
+#endif
+
+#endif /* !PA_WIN_DS_USE_WMME_TIMER */
+
 
 /*
  provided in newer platform sdks and x64
@@ -228,7 +271,6 @@ typedef struct PaWinDsStream
     UINT                 inputSize;
 
     
-    MMRESULT         timerID;
     int              framesPerDSBuffer;
     double           framesWritten;
     double           secondsPerHostByte; /* Used to optimize latency calculation for outTime */
@@ -244,6 +286,21 @@ typedef struct PaWinDsStream
     volatile int     isActive;
     volatile int     stopProcessing; /* stop thread once existing buffers have been returned */
     volatile int     abortProcessing; /* stop thread immediately */
+
+    UINT             timerPeriod; /* set to 0 if we were unable to set the timer period */ 
+
+#ifdef PA_WIN_DS_USE_WMME_TIMER
+    MMRESULT         timerID;
+#else
+
+#ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
+    HANDLE           waitableTimer;
+#endif
+    HANDLE           processingThread;
+    PA_THREAD_ID     processingThreadId;
+    HANDLE           processingThreadCompleted;
+#endif
+
 } PaWinDsStream;
 
 
@@ -1164,23 +1221,10 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     return result;
 
 error:
-    if( winDsHostApi )
-    {
-        if( winDsHostApi->allocations )
-        {
-            PaUtil_FreeAllAllocations( winDsHostApi->allocations );
-            PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
-        }
-        
-        PaWinUtil_CoUninitialize( paDirectSound, &winDsHostApi->comInitializationResult );
-
-        PaUtil_FreeMemory( winDsHostApi );
-    }
-
     TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.inputNamesAndGUIDs );
     TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.outputNamesAndGUIDs );
 
-    PaWinDs_TerminateDSoundEntryPoints();
+    Terminate( winDsHostApi );
 
     return result;
 }
@@ -1191,20 +1235,17 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 {
     PaWinDsHostApiRepresentation *winDsHostApi = (PaWinDsHostApiRepresentation*)hostApi;
 
-    /*
-        IMPLEMENT ME:
-            - clean up any resources not handled by the allocation group
-    */
+    if( winDsHostApi ){
+        if( winDsHostApi->allocations )
+        {
+            PaUtil_FreeAllAllocations( winDsHostApi->allocations );
+            PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
+        }
 
-    if( winDsHostApi->allocations )
-    {
-        PaUtil_FreeAllAllocations( winDsHostApi->allocations );
-        PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
+        PaWinUtil_CoUninitialize( paDirectSound, &winDsHostApi->comInitializationResult );
+
+        PaUtil_FreeMemory( winDsHostApi );
     }
-
-    PaWinUtil_CoUninitialize( paDirectSound, &winDsHostApi->comInitializationResult );
-
-    PaUtil_FreeMemory( winDsHostApi );
 
     PaWinDs_TerminateDSoundEntryPoints();
 }
@@ -1844,14 +1885,35 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int              minLatencyFrames;
         unsigned long    integerSampleRate = (unsigned long) (sampleRate + 0.5);
     
+#ifdef PA_WIN_DS_USE_WMME_TIMER
         stream->timerID = 0;
-
+#endif
         stream->processingCompleted = CreateEvent( NULL, /* bManualReset = */ TRUE, /* bInitialState = */ FALSE, NULL );
         if( stream->processingCompleted == NULL )
         {
             result = paInsufficientMemory;
             goto error;
         }
+
+#ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
+        stream->waitableTimer = (HANDLE)CreateWaitableTimer( 0, FALSE, NULL );
+        if( stream->waitableTimer == NULL )
+        {
+            result = paUnanticipatedHostError;
+            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
+            goto error;
+        }
+#endif
+
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+		stream->processingThreadCompleted = CreateEvent( NULL, /* bManualReset = */ TRUE, /* bInitialState = */ FALSE, NULL );
+        if( stream->processingThreadCompleted == NULL )
+        {
+            result = paUnanticipatedHostError;
+            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
+            goto error;
+        }
+#endif
 
     /* Get system minimum latency. */
         minLatencyFrames = PaWinDs_GetMinLatencyFrames( sampleRate );
@@ -2032,6 +2094,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 goto error;
             }
         }
+
+        {
+            /* set the windows scheduler granularity using timeBeginPeriod */
+            TIMECAPS timecaps;
+            /* set windows scheduler granularity to as fine as possible */
+            if( timeGetDevCaps( &timecaps, sizeof(TIMECAPS) == MMSYSERR_NOERROR && timecaps.wPeriodMin > 0 ) )
+            {
+                if( timeBeginPeriod( timecaps.wPeriodMin ) == MMSYSERR_NOERROR )
+                    stream->timerPeriod = timecaps.wPeriodMin; /* save the period so we can reset it later */
+            }
+        }
     }
 
     *s = (PaStream*)stream;
@@ -2041,8 +2114,21 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 error:
     if( stream )
     {
+        if( stream->timerPeriod > 0 )
+            timeEndPeriod( stream->timerPeriod );
+
         if( stream->processingCompleted != NULL )
             CloseHandle( stream->processingCompleted );
+
+#ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
+        if( stream->waitableTimer != NULL )
+            CloseHandle( stream->waitableTimer );
+#endif
+
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+        if( stream->processingThreadCompleted != NULL )
+            CloseHandle( stream->processingThreadCompleted );
+#endif
 
         if( stream->pDirectSoundOutputBuffer )
         {
@@ -2247,7 +2333,6 @@ static int TimeSlice( PaWinDsStream *stream )
 
     if( framesToXfer > 0 )
     {
-
         PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 
     /* The outputBufferDacTime parameter should indicates the time at which
@@ -2452,6 +2537,75 @@ static void CALLBACK TimerCallback(UINT uID, UINT uMsg, DWORD_PTR dwUser, DWORD 
     }
 }
 
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+
+#ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
+
+static void CALLBACK WaitableTimerAPCProc(
+   LPVOID lpArg,               // Data value
+   DWORD dwTimerLowValue,      // Timer low value
+   DWORD dwTimerHighValue )    // Timer high value
+
+{
+    (void)dwTimerLowValue;
+    (void)dwTimerHighValue;
+
+    TimerCallback( 0, 0, (DWORD_PTR)lpArg, 0, 0 );
+}
+
+#endif /* PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT */
+
+
+PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
+{
+    PaWinDsStream *stream = (PaWinDsStream *)pArg;
+    MMRESULT mmResult;
+    HANDLE hWaitableTimer;
+    LARGE_INTEGER dueTime;
+    int framesPerWakeup, msecPerWakeup;
+
+    framesPerWakeup = stream->framesPerDSBuffer / 4; /* always poll using quadruple buffering, probably not the best strategy */
+    msecPerWakeup = MSEC_PER_SECOND * framesPerWakeup / (int) stream->streamRepresentation.streamInfo.sampleRate;
+    if( msecPerWakeup < 1 ) msecPerWakeup = 1;
+    else if( msecPerWakeup > 100 ) msecPerWakeup = 100;
+
+#ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
+    assert( stream->waitableTimer != NULL );
+
+    /* invoke first timeout immediately */
+    dueTime.LowPart = msecPerWakeup * 1000 * 10;
+    dueTime.HighPart = 0;
+
+    /* tick using waitable timer */
+    if( SetWaitableTimer( stream->waitableTimer, &dueTime, msecPerWakeup, WaitableTimerAPCProc, pArg, FALSE ) != 0 )
+    {
+        DWORD wfsoResult = 0;
+        do
+        {
+            /* wait for processingCompleted to be signaled or our timer APC to be called */
+            wfsoResult = WaitForSingleObjectEx( stream->processingCompleted, msecPerWakeup * 10, /* alertable = */ TRUE );
+
+        }while( wfsoResult == WAIT_TIMEOUT || wfsoResult == WAIT_IO_COMPLETION );
+    }
+
+    CancelWaitableTimer( stream->waitableTimer );
+
+#else
+
+    /* tick using WaitForSingleObject timout */
+    while ( WaitForSingleObject( stream->processingCompleted, msecPerWakeup ) == WAIT_TIMEOUT )
+    {
+        TimerCallback( 0, 0, (DWORD_PTR)pArg, 0, 0 );
+    }
+#endif /* PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT */
+
+    SetEvent( stream->processingThreadCompleted );
+
+    return 0;
+}
+
+#endif /* !PA_WIN_DS_USE_WMME_TIMER */
+
 /***********************************************************************************
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
@@ -2462,6 +2616,15 @@ static PaError CloseStream( PaStream* s )
     PaWinDsStream *stream = (PaWinDsStream*)s;
 
     CloseHandle( stream->processingCompleted );
+
+#ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
+    if( stream->waitableTimer != NULL )
+        CloseHandle( stream->waitableTimer );
+#endif
+
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+	CloseHandle( stream->processingThreadCompleted );
+#endif
 
     // Cleanup the sound buffers
     if( stream->pDirectSoundOutputBuffer )
@@ -2557,6 +2720,10 @@ static PaError StartStream( PaStream *s )
     
     ResetEvent( stream->processingCompleted );
 
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+	ResetEvent( stream->processingThreadCompleted );
+#endif
+
     if( stream->bufferProcessor.inputChannelCount > 0 )
     {
         // Start the buffer capture
@@ -2579,7 +2746,6 @@ static PaError StartStream( PaStream *s )
 
     stream->abortProcessing = 0;
     stream->stopProcessing = 0;
-    stream->isActive = 1;
 
     if( stream->bufferProcessor.outputChannelCount > 0 )
     {
@@ -2622,7 +2788,9 @@ static PaError StartStream( PaStream *s )
 
     if( stream->streamRepresentation.streamCallback )
     {
+#ifdef PA_WIN_DS_USE_WMME_TIMER
         /* Create timer that will wake us up so we can fill the DSound buffer. */
+
         int resolution;
         int framesPerWakeup = stream->framesPerDSBuffer / 4;
         int msecPerWakeup = MSEC_PER_SECOND * framesPerWakeup / (int) stream->streamRepresentation.streamInfo.sampleRate;
@@ -2636,14 +2804,51 @@ static PaError StartStream( PaStream *s )
         {
             stream->isActive = 0;
             result = paUnanticipatedHostError;
-            PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr );
+            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
             goto error;
         }
+#else
+		/* Create processing thread which calls TimerCallback */
+
+		stream->processingThread = CREATE_THREAD( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId );
+        if( !stream->processingThread )
+        {
+            result = paUnanticipatedHostError;
+            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
+            goto error;
+        }
+
+        if( !SetThreadPriority( stream->processingThread, THREAD_PRIORITY_TIME_CRITICAL ) )
+        {
+            result = paUnanticipatedHostError;
+            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
+            goto error;
+        }
+#endif
     }
 
-    stream->isStarted = TRUE;
+    stream->isActive = 1;
+    stream->isStarted = 1;
+
+    assert( result == paNoError );
+    return result;
 
 error:
+
+    if( stream->pDirectSoundOutputBuffer != NULL && stream->outputIsRunning )
+        IDirectSoundBuffer_Stop( stream->pDirectSoundOutputBuffer );
+    stream->outputIsRunning = FALSE;
+
+#ifndef PA_WIN_DS_USE_WMME_TIMER
+    if( stream->processingThread )
+    {
+#ifdef CLOSE_THREAD_HANDLE
+        CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
+#endif
+        stream->processingThread = NULL;
+    }
+#endif
+
     return result;
 }
 
@@ -2666,12 +2871,25 @@ static PaError StopStream( PaStream *s )
         WaitForSingleObject( stream->processingCompleted, timeoutMsec );
     }
 
+#ifdef PA_WIN_DS_USE_WMME_TIMER
     if( stream->timerID != 0 )
     {
         timeKillEvent(stream->timerID);  /* Stop callback timer. */
         stream->timerID = 0;
     }
+#else
+    if( stream->processingThread )
+    {
+		if( WaitForSingleObject( stream->processingThreadCompleted, 30*100 ) == WAIT_TIMEOUT )
+			return paUnanticipatedHostError;
 
+#ifdef CLOSE_THREAD_HANDLE
+        CloseHandle( stream->processingThread ); /* Delete thread. */
+        stream->processingThread = NULL;
+#endif
+
+    }
+#endif
 
     if( stream->bufferProcessor.outputChannelCount > 0 )
     {
@@ -2697,7 +2915,7 @@ static PaError StopStream( PaStream *s )
         }
     }
 
-    stream->isStarted = FALSE;
+    stream->isStarted = 0;
 
     return result;
 }
