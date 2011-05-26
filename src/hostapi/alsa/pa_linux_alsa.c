@@ -79,6 +79,10 @@
 
 #include "pa_linux_alsa.h"
 
+#ifndef SND_PCM_TSTAMP_ENABLE
+#define SND_PCM_TSTAMP_ENABLE SND_PCM_TSTAMP_MMAP
+#endif
+
 /* Defines Alsa function types and pointers to these functions. */
 #define _PA_DEFINE_FUNC(x)  typedef typeof(x) x##_ft; static x##_ft *alsa_##x = 0
 
