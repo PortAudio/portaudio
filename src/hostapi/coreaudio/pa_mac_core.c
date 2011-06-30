@@ -1348,7 +1348,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         inputSampleFormat = inputParameters->sampleFormat;
 
 		/* @todo Blocking read/write on Mac is not yet supported. */
-		if( inputSampleFormat & paNonInterleaved )
+		if( !streamCallback && inputSampleFormat & paNonInterleaved )
 		{
 			return paSampleFormatNotSupported;
 		}
@@ -1378,7 +1378,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         outputSampleFormat = outputParameters->sampleFormat;
         
 		/* @todo Blocking read/write on Mac is not yet supported. */
-		if( outputSampleFormat & paNonInterleaved )
+		if( !streamCallback && outputSampleFormat & paNonInterleaved )
 		{
 			return paSampleFormatNotSupported;
 		}
