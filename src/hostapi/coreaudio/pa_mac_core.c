@@ -411,8 +411,6 @@ static PaError ClipToDeviceBufferSize( AudioDeviceID macCoreDeviceId,
 	AudioValueRange audioRange;
 	UInt32 propSize = sizeof( audioRange );
 	PaError err = WARNING(AudioDeviceGetProperty( macCoreDeviceId, 0, isInput, kAudioDevicePropertyBufferFrameSizeRange, &propSize, &audioRange ) );
-	//printf("kAudioDevicePropertyBufferFrameSizeRange: err = %d, propSize = %d, minimum = %g\n", err, propSize, audioRange.mMinimum);
-	//printf("kAudioDevicePropertyBufferFrameSizeRange: err = %d, propSize = %d, meximum = %g\n", err, propSize, audioRange.mMaximum );
 	resultSize = MAX( resultSize, audioRange.mMinimum );
 	resultSize = MIN( resultSize, audioRange.mMaximum );
 	*allowedSize = resultSize;
@@ -421,7 +419,7 @@ static PaError ClipToDeviceBufferSize( AudioDeviceID macCoreDeviceId,
 
 /* =================================================================================================== */
 #if 0
-void DumpDeviceProperties( AudioDeviceID macCoreDeviceId,
+static void DumpDeviceProperties( AudioDeviceID macCoreDeviceId,
                           int isInput )
 {
     UInt32 propSize;
@@ -1439,7 +1437,7 @@ static PaError OpenAndSetupOneAudioUnit(
 
 /* =================================================================================================== */
 
-UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
+static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
                                   const PaStreamParameters *inputParameters,
                                   const PaStreamParameters *outputParameters,
                                   UInt32 fixedInputLatency,
@@ -1482,7 +1480,6 @@ UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
     }
     VDBUG(("After querying hardware, setting block size to %ld.\n", requested));
 
-error:
     return requested;
 }
 
