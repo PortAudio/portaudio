@@ -223,7 +223,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
             goto error;
         }
 
-        /* Under the assumption that no ADC in existence delivers better than 24bits resoultion,
+        /* Under the assumption that no ADC in existence delivers better than 24bits resolution,
             we disable dithering when host input format is paInt32 and user format is paInt24, 
             since the host samples will just be padded with zeros anyway. */
 
