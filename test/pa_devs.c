@@ -94,6 +94,7 @@ static void PrintSupportedStandardSampleRates(
     else
         printf( "\n" );
 }
+
 /*******************************************************************/
 int main(void);
 int main(void)
@@ -161,10 +162,10 @@ int main(void)
         printf( "Max inputs = %d", deviceInfo->maxInputChannels  );
         printf( ", Max outputs = %d\n", deviceInfo->maxOutputChannels  );
 
-        printf( "Default low input latency   = %8.3f\n", deviceInfo->defaultLowInputLatency  );
-        printf( "Default low output latency  = %8.3f\n", deviceInfo->defaultLowOutputLatency  );
-        printf( "Default high input latency  = %8.3f\n", deviceInfo->defaultHighInputLatency  );
-        printf( "Default high output latency = %8.3f\n", deviceInfo->defaultHighOutputLatency  );
+        printf( "Default low input latency   = %8.4f\n", deviceInfo->defaultLowInputLatency  );
+        printf( "Default low output latency  = %8.4f\n", deviceInfo->defaultLowOutputLatency  );
+        printf( "Default high input latency  = %8.4f\n", deviceInfo->defaultHighInputLatency  );
+        printf( "Default high output latency = %8.4f\n", deviceInfo->defaultHighOutputLatency  );
 
 #ifdef WIN32
 #if PA_USE_ASIO

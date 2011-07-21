@@ -122,7 +122,7 @@ static int QaCallback( const void *inputBuffer, void *outputBuffer,
     PaQaData *data = (PaQaData *) userData;
     (void) inputBuffer;
 
-    /* Play simle sawtooth wave. */
+    /* Play simple sawtooth wave. */
     if( data->mode == MODE_OUTPUT )
     {
         phase = data->sawPhase;
