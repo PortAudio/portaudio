@@ -528,9 +528,6 @@ PaError setBestFramesPerBuffer( const AudioDeviceID device,
     const bool isInput = !isOutput;
     UInt32 propsize = sizeof(UInt32);
     OSErr err;
-    Float64 min  = -1; /*the min blocksize*/
-    Float64 best = -1; /*the best blocksize*/
-    int i=0;
     AudioValueRange range;
 
     if( actualFramesPerBuffer == NULL )
