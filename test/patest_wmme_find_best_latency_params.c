@@ -141,11 +141,13 @@ static void printWindowsVersionInfo( FILE *fp )
                                 osName = "Windows Vista";
                             else
                                 osName = "Windows Server 2008";
+                            break;
                         case 1: 
                             if( osVersionInfoEx.wProductType == VER_NT_WORKSTATION )
                                 osName = "Windows 7";
                             else
                                 osName = "Windows Server 2008 R2";
+                            break;
                     }break;
         }
     }
