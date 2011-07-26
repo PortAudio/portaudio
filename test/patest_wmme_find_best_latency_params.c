@@ -364,8 +364,8 @@ static void usage( int wmmeHostApiIndex )
     fprintf( stderr, "Invalid device index. Use one of these:\n" );
     for( i=0; i < Pa_GetDeviceCount(); ++i ){
 
-        if( Pa_GetDeviceInfo(i)->hostApi == wmmeHostApiIndex )
-            fprintf( stderr, "%d (%s)\n", i, Pa_GetDeviceInfo(i)->name);
+        if( Pa_GetDeviceInfo(i)->hostApi == wmmeHostApiIndex && Pa_GetDeviceInfo(i)->maxOutputChannels > 0 )
+            fprintf( stderr, "%d (%s)\n", i, Pa_GetDeviceInfo(i)->name );
     }
     Pa_Terminate();
     exit(-1);
