@@ -195,9 +195,9 @@ int main(void)
     outputParameters.channelCount = 2;       /* stereo output */
     outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
     deviceInfo = Pa_GetDeviceInfo( outputParameters.device );
-    printf("using device #%d: '%s' (%s)\n", outputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name);
-    printf("defaultLowOutputLatency  = %f seconds\n", deviceInfo->defaultLowOutputLatency);
-    printf("defaultHighOutputLatency = %f seconds\n", deviceInfo->defaultHighOutputLatency);
+    printf("Using device #%d: '%s' (%s)\n", outputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name);
+    printf("Device info: defaultLowOutputLatency  = %f seconds\n", deviceInfo->defaultLowOutputLatency);
+    printf("Device info: defaultHighOutputLatency = %f seconds\n", deviceInfo->defaultHighOutputLatency);
     outputParameters.hostApiSpecificStreamInfo = NULL;
     
     // Try to use a small buffer that is smaller than we think the device can handle.
