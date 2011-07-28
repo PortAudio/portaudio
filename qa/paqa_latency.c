@@ -111,6 +111,8 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
 {
     PaError err;
     PaStream *stream;
+    const PaStreamInfo* streamInfo;
+
     dataPtr->minFramesPerBuffer = 9999999;
     dataPtr->maxFramesPerBuffer = 0;
     printf("-------------------------------------\n");
@@ -132,7 +134,7 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
     printf("Play for %d seconds.\n", NUM_SECONDS );
     Pa_Sleep( NUM_SECONDS * 1000 );
     
-    const PaStreamInfo* streamInfo = Pa_GetStreamInfo( stream );
+    streamInfo = Pa_GetStreamInfo( stream );
     printf("Stream inputLatency  = %g\n", streamInfo->inputLatency );
     printf("Stream outputLatency = %g\n", streamInfo->outputLatency );
     printf("  minFramesPerBuffer = %4d\n", dataPtr->minFramesPerBuffer );
@@ -184,9 +186,11 @@ int main(void)
       fprintf(stderr,"Error: No default output device.\n");
       goto error;
     }
+
     outputParameters.channelCount = 2;       /* stereo output */
     outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
     deviceInfo = Pa_GetDeviceInfo( outputParameters.device );
+    printf("using device #%d: '%s' (%s)\n", outputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name);
     printf("defaultLowOutputLatency  = %f seconds\n", deviceInfo->defaultLowOutputLatency);
     printf("defaultHighOutputLatency = %f seconds\n", deviceInfo->defaultHighOutputLatency);
     outputParameters.hostApiSpecificStreamInfo = NULL;
