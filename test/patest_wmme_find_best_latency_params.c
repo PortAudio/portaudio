@@ -111,7 +111,8 @@ static void printWindowsVersionInfo( FILE *fp )
     if( osVersionInfoEx.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS ){
         switch( osVersionInfoEx.dwMinorVersion ){
             case 0: osName = "Windows 95"; break;
-            case 10: osName = "Windows 98"; break; // could also be SE (code I saw discriminated on osInfo.Version.Revision.ToString() == "2222A")
+            case 10: osName = "Windows 98"; break;  // could also be 98SE (I've seen code discriminate based 
+                                                    // on osInfo.Version.Revision.ToString() == "2222A")
             case 90: osName = "Windows Me"; break;
         }
     }else if( osVersionInfoEx.dwPlatformId == VER_PLATFORM_WIN32_NT ){
@@ -205,7 +206,9 @@ static void printWindowsVersionInfo( FILE *fp )
 
 
     fprintf( fp, "OS name and edition: %s %s\n", osName, osProductType );
-    fprintf( fp, "OS version: %d.%d.%d %S\n", osVersionInfoEx.dwMajorVersion, osVersionInfoEx.dwMinorVersion, osVersionInfoEx.dwBuildNumber, osVersionInfoEx.szCSDVersion );
+    fprintf( fp, "OS version: %d.%d.%d %S\n", 
+                osVersionInfoEx.dwMajorVersion, osVersionInfoEx.dwMinorVersion, 
+                osVersionInfoEx.dwBuildNumber, osVersionInfoEx.szCSDVersion );
     fprintf( fp, "Processor architecture: %s\n", processorArchitecture );
     fprintf( fp, "WoW64 process: %s\n", IsWow64() ? "Yes" : "No" );
 }
@@ -228,6 +231,7 @@ typedef struct
 {
     float sine[TABLE_SIZE];
 	double phase;
+    double phaseIncrement;
     volatile int fadeIn;
     volatile int fadeOut;
     double amp;
@@ -257,7 +261,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
     for( i=0; i<framesPerBuffer; i++ )
     {
         float x = data->sine[(int)data->phase];
-        data->phase += 20;
+        data->phase += data->phaseIncrement;
         if( data->phase >= TABLE_SIZE ){
 			data->phase -= TABLE_SIZE;
 		}
@@ -288,7 +292,8 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 #define NO      0
 
 
-static int playUntilKeyPress( int deviceIndex, float sampleRate, int framesPerUserBuffer, int framesPerWmmeBuffer, int wmmeBufferCount )
+static int playUntilKeyPress( int deviceIndex, float sampleRate, 
+                             int framesPerUserBuffer, int framesPerWmmeBuffer, int wmmeBufferCount )
 {
     PaStreamParameters outputParameters;
     PaWinMmeStreamInfo wmmeStreamInfo;
@@ -324,13 +329,15 @@ static int playUntilKeyPress( int deviceIndex, float sampleRate, int framesPerUs
     data.amp = 0;
     data.fadeIn = 1;
     data.fadeOut = 0;
+    data.phase = 0;
+    data.phaseIncrement = 15 + ((rand()%100) / 10); // randomise pitch
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
 
 
     do{
-        printf( "Trying buffer size %d.\nIf it sounds smooth press 'y', if it sounds bad press 'n' ('q' to quit)\n", framesPerWmmeBuffer );
+        printf( "Trying buffer size %d.\nIf it sounds smooth (without clicks or glitches) press 'y', if it sounds bad press 'n' ('q' to quit)\n", framesPerWmmeBuffer );
         c = tolower(_getch());
         if( c == 'q' ){
             Pa_Terminate();
@@ -364,7 +371,7 @@ static void usage( int wmmeHostApiIndex )
     fprintf( stderr, "Invalid device index. Use one of these:\n" );
     for( i=0; i < Pa_GetDeviceCount(); ++i ){
 
-        if( Pa_GetDeviceInfo(i)->hostApi == wmmeHostApiIndex && Pa_GetDeviceInfo(i)->maxOutputChannels > 0 )
+        if( Pa_GetDeviceInfo(i)->hostApi == wmmeHostApiIndex && Pa_GetDeviceInfo(i)->maxOutputChannels > 0  )
             fprintf( stderr, "%d (%s)\n", i, Pa_GetDeviceInfo(i)->name );
     }
     Pa_Terminate();
@@ -372,11 +379,9 @@ static void usage( int wmmeHostApiIndex )
 }
 
 /*
-    TODO: test at 22050 44100, 48000, 96000, mono and stereo and surround
-
-    TODO: could be testing with 80% CPU load
-
-    another thing to try would be setting the timeBeginPeriod granularity to 1ms and see if it changes the behavior
+    ideas: 
+        o- could be testing with 80% CPU load
+        o- could test with different channel counts
 */
 
 int main(int argc, char* argv[])
@@ -459,7 +464,7 @@ int main(int argc, char* argv[])
     fprintf( resultsFp, "Sample rate: %f\n", (float)sampleRate );
     fprintf( resultsFp, "Buffer count, Smallest working buffer size (frames), Smallest working buffering latency (frames), Smallest working buffering latency (Seconds)\n" );
 
-    for( wmmeBufferCount = wmmeMinBufferCount; wmmeBufferCount <= wmmeMaxBufferCount; ++wmmeBufferCount ){ // TODO print out range we're going to try before starting
+    for( wmmeBufferCount = wmmeMinBufferCount; wmmeBufferCount <= wmmeMaxBufferCount; ++wmmeBufferCount ){
  
         printf( "Test %d of %d\n", (wmmeBufferCount - wmmeMinBufferCount) + 1, (wmmeMaxBufferCount-wmmeMinBufferCount) + 1 );
         printf( "Testing with %d buffers...\n", wmmeBufferCount );
