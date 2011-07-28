@@ -62,6 +62,10 @@ typedef struct
     char message[20];
     int minFramesPerBuffer;
     int maxFramesPerBuffer;
+    int callbackCount;
+    PaTime minDeltaDacTime;
+    PaTime maxDeltaDacTime;
+    PaStreamCallbackTimeInfo previousTimeInfo;
 }
 paTestData;
 
@@ -87,11 +91,25 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
     {
         data->minFramesPerBuffer = framesPerBuffer;
     }
-    
     if( data->maxFramesPerBuffer < framesPerBuffer )
     {
         data->maxFramesPerBuffer = framesPerBuffer;
     }
+    
+    // Measure min and max output time stamp delta.
+    if( data->callbackCount > 0 )
+    {
+        PaTime delta = timeInfo->outputBufferDacTime - data->previousTimeInfo.outputBufferDacTime;
+        if( data->minDeltaDacTime > delta )
+        {
+            data->minDeltaDacTime = delta;
+        }
+        if( data->maxDeltaDacTime < delta )
+        {
+            data->maxDeltaDacTime = delta;
+        }
+    }
+    data->previousTimeInfo = *timeInfo;
     
     for( i=0; i<framesPerBuffer; i++ )
     {
@@ -103,6 +121,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
         if( data->right_phase >= TABLE_SIZE ) data->right_phase -= TABLE_SIZE;
     }
     
+    data->callbackCount += 1;
     return paContinue;
 }
 
@@ -115,12 +134,16 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
 
     dataPtr->minFramesPerBuffer = 9999999;
     dataPtr->maxFramesPerBuffer = 0;
+    dataPtr->minDeltaDacTime = 9999999.0;
+    dataPtr->maxDeltaDacTime = 0.0;
+    dataPtr->callbackCount = 0;
+    
     printf("-------------------------------------\n");
     printf("Stream parameter: suggestedOutputLatency = %g\n", outputParamsPtr->suggestedLatency );
     if( framesPerBuffer == paFramesPerBufferUnspecified ){
         printf("Stream parameter: user framesPerBuffer = paFramesPerBufferUnspecified\n" );
     }else{
-        printf("Stream parameter: user framesPerBuffer = %d\n", framesPerBuffer );
+        printf("Stream parameter: user framesPerBuffer = %lu\n", framesPerBuffer );
     }
     err = Pa_OpenStream(
                         &stream,
@@ -142,9 +165,11 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
 
     printf("Play for %d seconds.\n", NUM_SECONDS );
     Pa_Sleep( NUM_SECONDS * 1000 );
-
+    
     printf("  minFramesPerBuffer = %4d\n", dataPtr->minFramesPerBuffer );
     printf("  maxFramesPerBuffer = %4d\n", dataPtr->maxFramesPerBuffer );
+    printf("  minDeltaDacTime = %f\n", dataPtr->minDeltaDacTime );
+    printf("  maxDeltaDacTime = %f\n", dataPtr->maxDeltaDacTime );
 
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error2;
