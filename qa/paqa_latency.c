@@ -116,7 +116,12 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
     dataPtr->minFramesPerBuffer = 9999999;
     dataPtr->maxFramesPerBuffer = 0;
     printf("-------------------------------------\n");
-    printf("Stream suggestedOutputLatency = %g\n", outputParamsPtr->suggestedLatency );
+    printf("Stream parameter: suggestedOutputLatency = %g\n", outputParamsPtr->suggestedLatency );
+    if( framesPerBuffer == paFramesPerBufferUnspecified ){
+        printf("Stream parameter: user framesPerBuffer = paFramesPerBufferUnspecified\n" );
+    }else{
+        printf("Stream parameter: user framesPerBuffer = %d\n", framesPerBuffer );
+    }
     err = Pa_OpenStream(
                         &stream,
                         NULL, /* no input */
@@ -128,18 +133,18 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
                         dataPtr );
     if( err != paNoError ) goto error1;
     
+    streamInfo = Pa_GetStreamInfo( stream );
+    printf("Stream info: inputLatency  = %g\n", streamInfo->inputLatency );
+    printf("Stream info: outputLatency = %g\n", streamInfo->outputLatency );
+
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error2;
 
     printf("Play for %d seconds.\n", NUM_SECONDS );
     Pa_Sleep( NUM_SECONDS * 1000 );
-    
-    streamInfo = Pa_GetStreamInfo( stream );
-    printf("Stream inputLatency  = %g\n", streamInfo->inputLatency );
-    printf("Stream outputLatency = %g\n", streamInfo->outputLatency );
+
     printf("  minFramesPerBuffer = %4d\n", dataPtr->minFramesPerBuffer );
     printf("  maxFramesPerBuffer = %4d\n", dataPtr->maxFramesPerBuffer );
-
 
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error2;
