@@ -422,17 +422,16 @@ static PaError ClipToDeviceBufferSize( AudioDeviceID macCoreDeviceId,
 static void DumpDeviceProperties( AudioDeviceID macCoreDeviceId,
                           int isInput )
 {
+    PaError err;
+    int i;
     UInt32 propSize;
     UInt32 deviceLatency;
     UInt32 streamLatency;
     UInt32 bufferFrames;
     UInt32 safetyOffset;
+    AudioStreamID streamIDs[128];
     
-    printf(" ---- latency query : macCoreDeviceId = %d, isInput %d ----\n", macCoreDeviceId, isInput );
-    
-    propSize = sizeof(UInt32);
-    PaError err  = WARNING(AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioStreamPropertyLatency, &propSize, &streamLatency));
-    printf("kAudioStreamPropertyLatency: err = %d, propSize = %d, value = %d\n", err, propSize, streamLatency );
+    printf("\n======= latency query : macCoreDeviceId = %d, isInput %d =======\n", (int)macCoreDeviceId, isInput );    
     
     propSize = sizeof(UInt32);
     err = WARNING(AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioDevicePropertyBufferFrameSize, &propSize, &bufferFrames));
@@ -449,8 +448,21 @@ static void DumpDeviceProperties( AudioDeviceID macCoreDeviceId,
     AudioValueRange audioRange;
     propSize = sizeof( audioRange );
     err = WARNING(AudioDeviceGetProperty( macCoreDeviceId, 0, isInput, kAudioDevicePropertyBufferFrameSizeRange, &propSize, &audioRange ) );
-    printf("kAudioDevicePropertyBufferFrameSizeRange: err = %d, propSize = %d, minimum = %g\n", err, propSize, audioRange.mMinimum);
-    printf("kAudioDevicePropertyBufferFrameSizeRange: err = %d, propSize = %d, maximum = %g\n", err, propSize, audioRange.mMaximum );
+    printf("kAudioDevicePropertyBufferFrameSizeRange: err = %d, propSize = %u, minimum = %g\n", err, propSize, audioRange.mMinimum);
+    printf("kAudioDevicePropertyBufferFrameSizeRange: err = %d, propSize = %u, maximum = %g\n", err, propSize, audioRange.mMaximum );
+    
+    /* Get the streams from the device and query their latency. */
+    propSize = sizeof(streamIDs);
+    err  = WARNING(AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioDevicePropertyStreams, &propSize, &streamIDs[0]));
+    int numStreams = propSize / sizeof(AudioStreamID);
+    for( i=0; i<numStreams; i++ )
+    {
+        printf("Stream #%d = %d---------------------- \n", i, streamIDs[i] );
+        
+        propSize = sizeof(UInt32);
+        err  = WARNING(AudioStreamGetProperty(streamIDs[i], 0, kAudioStreamPropertyLatency, &propSize, &streamLatency));
+        printf("  kAudioStreamPropertyLatency: err = %d, propSize = %d, value = %d\n", err, propSize, streamLatency );
+    }
 }
 #endif
 
@@ -468,14 +480,23 @@ static void DumpDeviceProperties( AudioDeviceID macCoreDeviceId,
  */
 static PaError CalculateFixedDeviceLatency( AudioDeviceID macCoreDeviceId, int isInput, UInt32 *fixedLatencyPtr )
 {
+    PaError err;
     UInt32 propSize;
     UInt32 deviceLatency;
     UInt32 streamLatency;
     UInt32 safetyOffset;
+    AudioStreamID streamIDs[1];
     
-    propSize = sizeof(UInt32);
-    PaError err = WARNING(AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioStreamPropertyLatency, &propSize, &streamLatency));
+    // To get stream latency we have to get a streamID from the device.
+    // We are only going to look at the first stream so only fetch one stream.
+    propSize = sizeof(streamIDs);
+    err  = WARNING(AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioDevicePropertyStreams, &propSize, &streamIDs[0]));
     if( err != paNoError ) goto error;
+    if( propSize == sizeof(AudioStreamID) )
+    {        
+        propSize = sizeof(UInt32);
+        err  = WARNING(AudioStreamGetProperty(streamIDs[0], 0, kAudioStreamPropertyLatency, &propSize, &streamLatency));
+    }
     
     propSize = sizeof(UInt32);
     err = WARNING(AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioDevicePropertySafetyOffset, &propSize, &safetyOffset));
@@ -500,6 +521,8 @@ static PaError CalculateDefaultDeviceLatencies( AudioDeviceID macCoreDeviceId,
     UInt32 bufferFrames = 0;
     UInt32 fixedLatency = 0;
     UInt32 clippedMinBufferSize = 0;
+    
+    //DumpDeviceProperties( macCoreDeviceId, isInput );
     
     PaError err = CalculateFixedDeviceLatency( macCoreDeviceId, isInput, &fixedLatency );
     if( err != paNoError ) goto error;
@@ -560,12 +583,12 @@ static PaError GetChannelInfo( PaMacAUHAL *auhalHostApi,
       
     if (numChannels > 0) /* do not try to retrieve the latency if there are no channels. */
     {
-       /* Get the latency.  Don't fail if we can't get this. */
-       /* default to something reasonable */
-       deviceInfo->defaultLowInputLatency = .01;
-       deviceInfo->defaultHighInputLatency = .10;
-       deviceInfo->defaultLowOutputLatency = .01;
-       deviceInfo->defaultHighOutputLatency = .10;        
+        /* Get the latency.  Don't fail if we can't get this. */
+        /* default to something reasonable */
+        deviceInfo->defaultLowInputLatency = .01;
+        deviceInfo->defaultHighInputLatency = .10;
+        deviceInfo->defaultLowOutputLatency = .01;
+        deviceInfo->defaultHighOutputLatency = .10;        
         UInt32 lowLatencyFrames = 0;
         UInt32 highLatencyFrames = 0;
         err = CalculateDefaultDeviceLatencies( macCoreDeviceId, isInput, &lowLatencyFrames, &highLatencyFrames );
@@ -917,75 +940,172 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     return paFormatIsSupported;
 }
 
-
-static void UpdateReciprocalOfActualOutputSampleRateFromDeviceProperty( PaMacCoreStream *stream )
+/* ================================================================================= */
+static void InitializeDeviceProperties( PaMacCoreDeviceProperties *deviceProperties )
 {
+    memset( deviceProperties, 0, sizeof(PaMacCoreDeviceProperties) );
+    deviceProperties->sampleRate = 1.0; // Better than random. Overwritten by actual values later on.
+    deviceProperties->samplePeriod = 1.0 / deviceProperties->sampleRate;
+}
+
+static Float64 CalculateSoftwareLatencyFromProperties( PaMacCoreStream *stream, PaMacCoreDeviceProperties *deviceProperties )
+{
+    UInt32 latencyFrames = deviceProperties->bufferFrameSize + deviceProperties->deviceLatency + deviceProperties->safetyOffset;
+    return latencyFrames * deviceProperties->samplePeriod; // same as dividing by sampleRate but faster
+}
+
+static Float64 CalculateHardwareLatencyFromProperties( PaMacCoreStream *stream, PaMacCoreDeviceProperties *deviceProperties )
+{
+    return deviceProperties->deviceLatency * deviceProperties->samplePeriod; // same as dividing by sampleRate but faster
+}
+
+/* Calculate values used to convert Apple timestamps into PA timestamps
+ * from the device properties. The final results of this calculation
+ * will be used in the audio callback function.
+ */
+static void UpdateTimeStampOffsets( PaMacCoreStream *stream )
+{
+    Float64 inputSoftwareLatency = 0.0;
+    Float64 inputHardwareLatency = 0.0;
+    Float64 outputSoftwareLatency = 0.0;
+    Float64 outputHardwareLatency = 0.0;
+    
+    if( stream->inputUnit != NULL )
+    {
+        inputSoftwareLatency = CalculateSoftwareLatencyFromProperties( stream, &stream->inputProperties );
+        inputHardwareLatency = CalculateHardwareLatencyFromProperties( stream, &stream->inputProperties );
+    }    
+    if( stream->outputUnit != NULL )
+    {
+        outputSoftwareLatency = CalculateSoftwareLatencyFromProperties( stream, &stream->outputProperties );
+        outputHardwareLatency = CalculateHardwareLatencyFromProperties( stream, &stream->outputProperties );
+    }    
+    
+    /* We only need a mutex around setting these variables as a group. */
+	pthread_mutex_lock( &stream->timingInformationMutex );
+    stream->timestampOffsetCombined = inputSoftwareLatency + outputSoftwareLatency;
+    stream->timestampOffsetInputDevice = inputHardwareLatency;
+    stream->timestampOffsetOutputDevice = outputHardwareLatency;
+	pthread_mutex_unlock( &stream->timingInformationMutex );
+}
+
+/* ================================================================================= */
+/* Query sample rate property. */
+static OSStatus UpdateSampleRateFromDeviceProperty( PaMacCoreStream *stream, AudioDeviceID deviceID, Boolean isInput )
+{
+    PaMacCoreDeviceProperties * deviceProperties = isInput ? &stream->inputProperties : &stream->outputProperties;
 	/* FIXME: not sure if this should be the sample rate of the output device or the output unit */
-	Float64 actualOutputSampleRate = stream->outDeviceSampleRate;
+	Float64 actualSampleRate = deviceProperties->sampleRate;
 	UInt32 propSize = sizeof(Float64);
-	OSStatus osErr = AudioDeviceGetProperty( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyActualSampleRate, &propSize, &actualOutputSampleRate);
-	if( osErr != noErr || actualOutputSampleRate < .01 ) // avoid divide by zero if there's an error
-		actualOutputSampleRate = stream->outDeviceSampleRate;
-	
-	stream->recipricalOfActualOutputSampleRate = 1. / actualOutputSampleRate;
+    OSStatus osErr = AudioDeviceGetProperty( deviceID, 0, isInput, kAudioDevicePropertyActualSampleRate, &propSize, &actualSampleRate);
+	if( (osErr == noErr) && (actualSampleRate > 1000.0) ) // avoid divide by zero if there's an error
+	{
+        deviceProperties->sampleRate = actualSampleRate;
+        deviceProperties->samplePeriod = 1.0 / actualSampleRate;
+    }
+    return osErr;
 }
 
 static OSStatus AudioDevicePropertyActualSampleRateListenerProc( AudioDeviceID inDevice, UInt32 inChannel, Boolean isInput, AudioDevicePropertyID inPropertyID, void *inClientData )
 {
 	PaMacCoreStream *stream = (PaMacCoreStream*)inClientData;
-	
-	pthread_mutex_lock( &stream->timingInformationMutex );
-	UpdateReciprocalOfActualOutputSampleRateFromDeviceProperty( stream );
-	pthread_mutex_unlock( &stream->timingInformationMutex );
-
-	return noErr;
+	OSStatus osErr = UpdateSampleRateFromDeviceProperty( stream, inDevice, isInput );
+    if( osErr == noErr )
+    {
+        UpdateTimeStampOffsets( stream );
+    }
+    return osErr;
 }
 
-static void UpdateOutputLatencySamplesFromDeviceProperty( PaMacCoreStream *stream )
+/* ================================================================================= */
+static OSStatus QueryUInt32DeviceProperty( AudioDeviceID deviceID, Boolean isInput, AudioDevicePropertyID propertyID, UInt32 *outValue )
 {
-	UInt32 deviceOutputLatencySamples = 0;
-	UInt32 propSize = sizeof(UInt32);
-	OSStatus osErr = AudioDeviceGetProperty( stream->outputDevice, 0, /* isInput= */ FALSE, kAudioDevicePropertyLatency, &propSize, &deviceOutputLatencySamples);
-	if( osErr != noErr )
-		deviceOutputLatencySamples = 0;
-	
-	stream->deviceOutputLatencySamples = deviceOutputLatencySamples;
+	UInt32 propertyValue = 0;
+	UInt32 propertySize = sizeof(UInt32);
+	OSStatus osErr = AudioDeviceGetProperty( deviceID, 0, isInput, propertyID, &propertySize, &propertyValue);
+	if( osErr == noErr )
+	{
+        *outValue = propertyValue;
+	}
+    return osErr;
 }
 
-static OSStatus AudioDevicePropertyOutputLatencySamplesListenerProc( AudioDeviceID inDevice, UInt32 inChannel, Boolean isInput, AudioDevicePropertyID inPropertyID, void *inClientData )
+static OSStatus AudioDevicePropertyGenericListenerProc( AudioDeviceID inDevice, UInt32 inChannel, Boolean isInput, AudioDevicePropertyID inPropertyID, void *inClientData )
 {
+    OSStatus osErr = noErr;
 	PaMacCoreStream *stream = (PaMacCoreStream*)inClientData;
-	
-	pthread_mutex_lock( &stream->timingInformationMutex );
-	UpdateOutputLatencySamplesFromDeviceProperty( stream );
-	pthread_mutex_unlock( &stream->timingInformationMutex );
-
-	return noErr;
+    PaMacCoreDeviceProperties *deviceProperties = isInput ? &stream->inputProperties : &stream->outputProperties;
+    UInt32 *valuePtr = NULL;
+    switch( inPropertyID )
+    {
+        case kAudioDevicePropertySafetyOffset:
+            valuePtr = &deviceProperties->safetyOffset;
+            break;
+                        
+        case kAudioDevicePropertyLatency:
+            valuePtr = &deviceProperties->deviceLatency;
+            break;
+            
+        case kAudioDevicePropertyBufferFrameSize:
+            valuePtr = &deviceProperties->bufferFrameSize;
+            break;            
+    }
+    if( valuePtr != NULL )
+    {
+        osErr = QueryUInt32DeviceProperty( inDevice, isInput, inPropertyID, valuePtr );
+        if( osErr == noErr )
+        {
+            UpdateTimeStampOffsets( stream );
+        }
+    }
+    return osErr;
 }
 
-static void UpdateInputLatencySamplesFromDeviceProperty( PaMacCoreStream *stream )
+/* ================================================================================= */
+/*
+ * Setup listeners in case device properties change during the run. */
+static OSStatus SetupDevicePropertyListeners( PaMacCoreStream *stream, AudioDeviceID deviceID, Boolean isInput )
 {
-	UInt32 deviceInputLatencySamples = 0;
-	UInt32 propSize = sizeof(UInt32);
-	OSStatus osErr = AudioDeviceGetProperty( stream->inputDevice, 0, /* isInput= */ TRUE, kAudioDevicePropertyLatency, &propSize, &deviceInputLatencySamples);
-	if( osErr != noErr )
-		deviceInputLatencySamples = 0;
-	
-	stream->deviceInputLatencySamples = deviceInputLatencySamples;
+    OSStatus osErr = noErr;
+    PaMacCoreDeviceProperties *deviceProperties = isInput ? &stream->inputProperties : &stream->outputProperties;
+    
+    // Start with the current values for the device properties.
+    UpdateSampleRateFromDeviceProperty( stream, deviceID, isInput );
+    
+    if( (osErr = QueryUInt32DeviceProperty( deviceID, isInput,
+                                           kAudioDevicePropertyLatency, &deviceProperties->deviceLatency )) != noErr ) return osErr;
+    if( (osErr = QueryUInt32DeviceProperty( deviceID, isInput,
+                                           kAudioDevicePropertyBufferFrameSize, &deviceProperties->bufferFrameSize )) != noErr ) return osErr;
+    if( (osErr = QueryUInt32DeviceProperty( deviceID, isInput,
+                                           kAudioDevicePropertySafetyOffset, &deviceProperties->safetyOffset )) != noErr ) return osErr;
+    
+    AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioDevicePropertyActualSampleRate, 
+                                   AudioDevicePropertyActualSampleRateListenerProc, stream );
+    
+    AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioStreamPropertyLatency, 
+                                   AudioDevicePropertyGenericListenerProc, stream );
+    AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioDevicePropertyBufferFrameSize, 
+                                   AudioDevicePropertyGenericListenerProc, stream );
+    AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioDevicePropertySafetyOffset, 
+                                   AudioDevicePropertyGenericListenerProc, stream );
+    
+    return osErr;
 }
 
-static OSStatus AudioDevicePropertyInputLatencySamplesListenerProc( AudioDeviceID inDevice, UInt32 inChannel, Boolean isInput, AudioDevicePropertyID inPropertyID, void *inClientData )
-{
-	PaMacCoreStream *stream = (PaMacCoreStream*)inClientData;
-	
-	pthread_mutex_lock( &stream->timingInformationMutex );
-	UpdateInputLatencySamplesFromDeviceProperty( stream );
-	pthread_mutex_unlock( &stream->timingInformationMutex );
-
-	return noErr;
+static void CleanupDevicePropertyListeners( PaMacCoreStream *stream, AudioDeviceID deviceID, Boolean isInput )
+{    
+    AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertyActualSampleRate, 
+                                   AudioDevicePropertyActualSampleRateListenerProc );
+    
+    AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertyLatency, 
+                                   AudioDevicePropertyGenericListenerProc );	
+    AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertyBufferFrameSize, 
+                                   AudioDevicePropertyGenericListenerProc );
+    AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertySafetyOffset, 
+                                   AudioDevicePropertyGenericListenerProc );
 }
 
-
+/* ================================================================================= */
 static PaError OpenAndSetupOneAudioUnit(
                                    const PaMacCoreStream *stream,
                                    const PaStreamParameters *inStreamParams,
@@ -1419,11 +1539,17 @@ static PaError OpenAndSetupOneAudioUnit(
     ERR_WRAP( AudioUnitInitialize(*audioUnit) );
 
     if( inStreamParams && outStreamParams )
-       VDBUG( ("Opened device %ld for input and output.\n", *audioDevice ) );
+    {
+        VDBUG( ("Opened device %ld for input and output.\n", *audioDevice ) );
+    }
     else if( inStreamParams )
-       VDBUG( ("Opened device %ld for input.\n", *audioDevice ) );
+    {
+        VDBUG( ("Opened device %ld for input.\n", *audioDevice ) );
+    }
     else if( outStreamParams )
-       VDBUG( ("Opened device %ld for output.\n", *audioDevice ) );
+    {
+        VDBUG( ("Opened device %ld for output.\n", *audioDevice ) );
+    }
     return paNoError;
 #undef ERR_WRAP
 
@@ -1442,9 +1568,10 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
                                   const PaStreamParameters *outputParameters,
                                   UInt32 fixedInputLatency,
                                   UInt32 fixedOutputLatency,
-                                  double sampleRate )
+                                  double sampleRate,
+                                  UInt32 requestedFramesPerBuffer )
 {
-    UInt32 requested = 0;  
+    UInt32 suggested = 0;  
     // Use maximum of suggested input and output latencies.
     if( inputParameters )
     {
@@ -1453,34 +1580,45 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
         SInt32 variableLatencyFrames = suggestedLatencyFrames - fixedInputLatency;
         // Prevent negative latency.
         variableLatencyFrames = MAX( variableLatencyFrames, 0 );       
-        requested = MAX( requested, (UInt32) variableLatencyFrames );
+        suggested = MAX( suggested, (UInt32) variableLatencyFrames );
     }
     if( outputParameters )
     {        
         UInt32 suggestedLatencyFrames = outputParameters->suggestedLatency * sampleRate;
         SInt32 variableLatencyFrames = suggestedLatencyFrames - fixedOutputLatency;
         variableLatencyFrames = MAX( variableLatencyFrames, 0 );
-        requested = MAX( requested, (UInt32) variableLatencyFrames );
+        suggested = MAX( suggested, (UInt32) variableLatencyFrames );
     }
     
     VDBUG( ("Block Size unspecified. Based on Latency, the user wants a Block Size near: %ld.\n",
-            requested ) );
+            suggested ) );
+    
+    if( requestedFramesPerBuffer != paFramesPerBufferUnspecified )
+    {
+        if( suggested > (requestedFramesPerBuffer + 1) )
+        {
+            // If the user asks for higher latency than the requested buffer size would provide
+            // then put multiple user buffers in one host buffer.
+            UInt32 userBuffersPerHostBuffer = (suggested + (requestedFramesPerBuffer - 1)) / requestedFramesPerBuffer;
+            suggested = userBuffersPerHostBuffer * requestedFramesPerBuffer;
+        }
+    }
     
     // Clip to the capabilities of the device.
     if( inputParameters )
     {
         ClipToDeviceBufferSize( auhalHostApi->devIds[inputParameters->device],
                                true, // In the old code isInput was false!
-                               requested, &requested );
+                               suggested, &suggested );
     }
     if( outputParameters )
     {
         ClipToDeviceBufferSize( auhalHostApi->devIds[outputParameters->device],
-                               false, requested, &requested );
+                               false, suggested, &suggested );
     }
-    VDBUG(("After querying hardware, setting block size to %ld.\n", requested));
+    VDBUG(("After querying hardware, setting block size to %ld.\n", suggested));
 
-    return requested;
+    return suggested;
 }
 
 /* =================================================================================================== */
@@ -1490,7 +1628,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                            const PaStreamParameters *inputParameters,
                            const PaStreamParameters *outputParameters,
                            double sampleRate,
-                           unsigned long framesPerBuffer,
+                           unsigned long requestedFramesPerBuffer,
                            PaStreamFlags streamFlags,
                            PaStreamCallback *streamCallback,
                            void *userData )
@@ -1506,6 +1644,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     // Accumulate contributions to latency in these variables.
     UInt32 inputLatencyFrames = 0;
     UInt32 outputLatencyFrames = 0;
+    UInt32 suggestedLatencyFramesPerBuffer = requestedFramesPerBuffer;
     
     VVDBUG(("OpenStream(): in chan=%d, in fmt=%ld, out chan=%d, out fmt=%ld SR=%g, FPB=%ld\n",
                 inputParameters  ? inputParameters->channelCount  : -1,
@@ -1513,10 +1652,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 outputParameters ? outputParameters->channelCount : -1,
                 outputParameters ? outputParameters->sampleFormat : -1,
                 (float) sampleRate,
-                framesPerBuffer ));
+                requestedFramesPerBuffer ));
     VDBUG( ("Opening Stream.\n") );
 	
-    /*These first few bits of code are from paSkeleton with few modifications.*/
+    /* These first few bits of code are from paSkeleton with few modifications. */
     if( inputParameters )
     {
         inputChannelCount = inputParameters->channelCount;
@@ -1642,15 +1781,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     }
     
-    if( framesPerBuffer == paFramesPerBufferUnspecified )
+    suggestedLatencyFramesPerBuffer = CalculateOptimalBufferSize( auhalHostApi, inputParameters, outputParameters,
+                                                                 fixedInputLatency, fixedOutputLatency,
+                                                                 sampleRate, requestedFramesPerBuffer );
+    if( requestedFramesPerBuffer == paFramesPerBufferUnspecified )
 	{
-        framesPerBuffer = CalculateOptimalBufferSize( auhalHostApi, inputParameters, outputParameters,
-                                                     fixedInputLatency, fixedOutputLatency,
-                                                     sampleRate );
+        requestedFramesPerBuffer = suggestedLatencyFramesPerBuffer;
     }
-    
-    inputLatencyFrames += framesPerBuffer;
-    outputLatencyFrames += framesPerBuffer;
 
     /* -- Now we actually open and setup streams. -- */
     if( inputParameters && outputParameters && outputParameters->device == inputParameters->device )
@@ -1660,7 +1797,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
        result = OpenAndSetupOneAudioUnit( stream,
                                           inputParameters,
                                           outputParameters,
-                                          framesPerBuffer,
+                                          suggestedLatencyFramesPerBuffer,
                                           &inputFramesPerBuffer,
                                           &outputFramesPerBuffer,
                                           auhalHostApi,
@@ -1683,7 +1820,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
        result = OpenAndSetupOneAudioUnit( stream,
                                           NULL,
                                           outputParameters,
-                                          framesPerBuffer,
+                                          suggestedLatencyFramesPerBuffer,
                                           NULL,
                                           &outputFramesPerBuffer,
                                           auhalHostApi,
@@ -1697,7 +1834,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
        result = OpenAndSetupOneAudioUnit( stream,
                                           inputParameters,
                                           NULL,
-                                          framesPerBuffer,
+                                          suggestedLatencyFramesPerBuffer,
                                           &inputFramesPerBuffer,
                                           NULL,
                                           auhalHostApi,
@@ -1711,7 +1848,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
        stream->inputFramesPerBuffer = inputFramesPerBuffer;
        stream->outputFramesPerBuffer = outputFramesPerBuffer;
     }
-
+    
+    inputLatencyFrames += stream->inputFramesPerBuffer;
+    outputLatencyFrames += stream->outputFramesPerBuffer;
+    
     if( stream->inputUnit ) {
        const size_t szfl = sizeof(float);
        /* setup the AudioBufferList used for input */
@@ -1811,7 +1951,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                  hostOutputSampleFormat,
                  sampleRate,
                  streamFlags,
-                 framesPerBuffer,
+                 requestedFramesPerBuffer,
                  /* If sample rate conversion takes place, the buffer size
                     will not be known. */
                  maxHostFrames,
@@ -1878,39 +2018,27 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->userInChan  = inputChannelCount;
     stream->userOutChan = outputChannelCount;
 
+    // Setup property listeners for timestamp and latency calculations.
 	pthread_mutex_init( &stream->timingInformationMutex, NULL );
 	stream->timingInformationMutexIsInitialized = 1;
-	
-	if( stream->outputUnit ) {
-		UpdateReciprocalOfActualOutputSampleRateFromDeviceProperty( stream );
-		stream->recipricalOfActualOutputSampleRate_ioProcCopy = stream->recipricalOfActualOutputSampleRate;
-		
-		AudioDeviceAddPropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyActualSampleRate, 
-									   AudioDevicePropertyActualSampleRateListenerProc, stream );
-									   		
-		UpdateOutputLatencySamplesFromDeviceProperty( stream );
-		stream->deviceOutputLatencySamples_ioProcCopy = stream->deviceOutputLatencySamples;
-		
-		AudioDeviceAddPropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyLatency, 
-									   AudioDevicePropertyOutputLatencySamplesListenerProc, stream );
-		
-	}else{
-		stream->recipricalOfActualOutputSampleRate = 1.;
-		stream->recipricalOfActualOutputSampleRate_ioProcCopy = 0.;
-		stream->deviceOutputLatencySamples_ioProcCopy = 0;
+    InitializeDeviceProperties( &stream->inputProperties );
+    InitializeDeviceProperties( &stream->outputProperties );
+	if( stream->outputUnit )
+    {
+        Boolean isInput = FALSE;
+        SetupDevicePropertyListeners( stream, stream->outputDevice, isInput );
+    }
+	if( stream->inputUnit )
+    {
+        Boolean isInput = TRUE;
+        SetupDevicePropertyListeners( stream, stream->inputDevice, isInput );
 	}
-	
-	if( stream->inputUnit ) {
-		UpdateInputLatencySamplesFromDeviceProperty( stream );
-		stream->deviceInputLatencySamples_ioProcCopy = stream->deviceInputLatencySamples;
-		
-		AudioDeviceAddPropertyListener( stream->inputDevice, 0, /* isInput = */ TRUE, kAudioDevicePropertyLatency, 
-									   AudioDevicePropertyInputLatencySamplesListenerProc, stream );
-	}else{
-		stream->deviceInputLatencySamples = 0;
-		stream->deviceInputLatencySamples_ioProcCopy = 0;
-	}
-	
+    UpdateTimeStampOffsets( stream );
+    // Setup copies to be used by audio callback.
+    stream->timestampOffsetCombined_ioProcCopy = stream->timestampOffsetCombined;
+    stream->timestampOffsetInputDevice_ioProcCopy = stream->timestampOffsetInputDevice;
+    stream->timestampOffsetOutputDevice_ioProcCopy = stream->timestampOffsetOutputDevice;
+
     stream->state = STOPPED;
     stream->xrunFlags = 0;
 
@@ -1979,6 +2107,7 @@ static OSStatus AudioIOProc( void *inRefCon,
    PaMacCoreStream *stream           = (PaMacCoreStream*)inRefCon;
    const bool isRender               = inBusNumber == OUTPUT_ELEMENT;
    int callbackResult                = paContinue ;
+    double hostTimeStampInPaTime     = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime);
 
    VVDBUG(("AudioIOProc()\n"));
 
@@ -2015,9 +2144,9 @@ static OSStatus AudioIOProc( void *inRefCon,
 	
 	if( pthread_mutex_trylock( &stream->timingInformationMutex ) == 0 ){
 		/* snapshot the ioproc copy of timing information */
-		stream->deviceOutputLatencySamples_ioProcCopy = stream->deviceOutputLatencySamples;
-		stream->recipricalOfActualOutputSampleRate_ioProcCopy = stream->recipricalOfActualOutputSampleRate;
-		stream->deviceInputLatencySamples_ioProcCopy = stream->deviceInputLatencySamples;
+		stream->timestampOffsetCombined_ioProcCopy = stream->timestampOffsetCombined;
+		stream->timestampOffsetInputDevice_ioProcCopy = stream->timestampOffsetInputDevice;
+		stream->timestampOffsetOutputDevice_ioProcCopy = stream->timestampOffsetOutputDevice;
 		pthread_mutex_unlock( &stream->timingInformationMutex );
 	}
 	
@@ -2044,32 +2173,30 @@ static OSStatus AudioIOProc( void *inRefCon,
 		{
 			if( stream->inputUnit == stream->outputUnit ) /* full duplex AUHAL IOProc */
 			{
-				/* FIXME: review. i'm not sure this computation of inputBufferAdcTime is correct for a full-duplex AUHAL */
-				timeInfo.inputBufferAdcTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime) 
-						- stream->deviceInputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy; // FIXME should be using input sample rate here?
-				timeInfo.outputBufferDacTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime) 
-						+ stream->deviceOutputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy;
+                // Ross and Phil agreed that the following calculation is correct based on an email from Jeff Moore:
+                // http://osdir.com/ml/coreaudio-api/2009-07/msg00140.html
+                // Basically the difference between the Apple output timestamp and the PA timestamp is kAudioDevicePropertyLatency.
+				timeInfo.inputBufferAdcTime = hostTimeStampInPaTime - 
+                    (stream->timestampOffsetCombined_ioProcCopy + stream->timestampOffsetInputDevice_ioProcCopy);
+ 				timeInfo.outputBufferDacTime = hostTimeStampInPaTime + stream->timestampOffsetOutputDevice_ioProcCopy;
 			}
 			else /* full duplex with ring-buffer from a separate input AUHAL ioproc */
 			{
-				/* FIXME: review. this computation of inputBufferAdcTime is definitely wrong since it doesn't take the ring buffer latency into account */
-				timeInfo.inputBufferAdcTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime) 
-						- stream->deviceInputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy; // FIXME should be using input sample rate here?
-				timeInfo.outputBufferDacTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime)
-						+ stream->deviceOutputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy;
+				/* FIXME: take the ring buffer latency into account */
+				timeInfo.inputBufferAdcTime = hostTimeStampInPaTime - 
+                    (stream->timestampOffsetCombined_ioProcCopy + stream->timestampOffsetInputDevice_ioProcCopy);
+				timeInfo.outputBufferDacTime = hostTimeStampInPaTime + stream->timestampOffsetOutputDevice_ioProcCopy;
 			}
 		}
 		else /* output only */
 		{
 			timeInfo.inputBufferAdcTime = 0;
-			timeInfo.outputBufferDacTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime)
-					+ stream->deviceOutputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy;
+			timeInfo.outputBufferDacTime = hostTimeStampInPaTime + stream->timestampOffsetOutputDevice_ioProcCopy;
 		}
 	}
 	else /* input only */
 	{
-		timeInfo.inputBufferAdcTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime) 
-				- stream->deviceInputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy; // FIXME should be using input sample rate here?
+		timeInfo.inputBufferAdcTime = hostTimeStampInPaTime - stream->timestampOffsetInputDevice_ioProcCopy; 
 		timeInfo.outputBufferDacTime = 0;
 	}
 	
@@ -2411,16 +2538,16 @@ static PaError CloseStream( PaStream* s )
 
     if( stream ) {
 		
-		if( stream->outputUnit ) {
-			AudioDeviceRemovePropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyActualSampleRate, 
-											  AudioDevicePropertyActualSampleRateListenerProc );
-			AudioDeviceRemovePropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyLatency, 
-											  AudioDevicePropertyOutputLatencySamplesListenerProc );
+		if( stream->outputUnit )
+        {
+            Boolean isInput = FALSE;
+            CleanupDevicePropertyListeners( stream, stream->outputDevice, isInput );
 		}
 		
-		if( stream->inputUnit ) {
-			AudioDeviceRemovePropertyListener( stream->inputDevice, 0, /* isInput = */ TRUE, kAudioDevicePropertyLatency, 
-											  AudioDevicePropertyInputLatencySamplesListenerProc );
+		if( stream->inputUnit )
+        {
+            Boolean isInput = FALSE;
+            CleanupDevicePropertyListeners( stream, stream->inputDevice, isInput );
 		}
 		
        if( stream->outputUnit ) {

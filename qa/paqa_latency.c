@@ -227,8 +227,13 @@ int main(void)
     
     // Try to use a small buffer that is smaller than we think the device can handle.
     // Try to force combining multiple user buffers into a host buffer.
-    framesPerBuffer = 8;
+    framesPerBuffer = 9;
     outputParameters.suggestedLatency = deviceInfo->defaultLowOutputLatency;
+    err = paqaCheckLatency( &outputParameters, &data, sampleRate, framesPerBuffer );
+    if( err != paNoError ) goto error;
+    
+    framesPerBuffer = 64;
+    outputParameters.suggestedLatency = deviceInfo->defaultLowOutputLatency * 1.1;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, framesPerBuffer );
     if( err != paNoError ) goto error;
 
