@@ -13,6 +13,9 @@ import numpy
 testExeName = "PATest.exe" # rename to whatever the compiled patest_suggested_vs_streaminfo_latency.c binary is
 dataFileName = 'patest_suggested_vs_streaminfo_latency.csv' # code below calls the exe to generate this file
 
+inputDeviceIndex = -1 # -1 means default
+inputDeviceIndex = -1 # -1 means default
+
 
 def loadCsvData( dataFileName ):
     params= ""
@@ -39,16 +42,28 @@ def loadCsvData( dataFileName ):
     result.fullDuplexInputLatency = data[4]
     return result;
 
+# run the test with different frames per buffer values:
 
-os.system(testExeName + ' > ' + dataFileName)
+framesPerBufferValues = [0]
+# powers of two
+#for i in range (1,11):
+#    framesPerBufferValues.append( 2 ^ i )
 
-d = loadCsvData(dataFileName)
+# could also test: multiples of 10, random numbers, powers of primes, etc
 
-plot( d.suggestedLatency, d.suggestedLatency )
-plot( d.suggestedLatency, d.halfDuplexOutputLatency )
-plot( d.suggestedLatency, d.halfDuplexInputLatency )
-plot( d.suggestedLatency, d.fullDuplexOutputLatency )
-plot( d.suggestedLatency, d.fullDuplexInputLatency )
+    
+
+for framesPerBuffer in framesPerBufferValues:
+
+    os.system(testExeName + " -1 -1 " + str(framesPerBuffer) + ' > ' + dataFileName)
+
+    d = loadCsvData(dataFileName)
+
+    plot( d.suggestedLatency, d.suggestedLatency )
+    plot( d.suggestedLatency, d.halfDuplexOutputLatency )
+    plot( d.suggestedLatency, d.halfDuplexInputLatency )
+    plot( d.suggestedLatency, d.fullDuplexOutputLatency )
+    plot( d.suggestedLatency, d.fullDuplexInputLatency )
 
 title('PortAudio suggested (requested) vs. resulting (reported) stream latency\n%s'%d.titleInfo)
 ylabel('PaStreamInfo::{input,output}Latency (s)')

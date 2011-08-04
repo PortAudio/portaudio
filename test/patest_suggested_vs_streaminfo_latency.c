@@ -81,11 +81,37 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 
 
 
+
+
 */
 
 /*******************************************************************/
-int main(void);
-int main(void)
+static void usage()
+{
+    int i;
+    const PaDeviceInfo *deviceInfo;
+    const char *channelString;
+
+    fprintf( stderr, "PortAudio suggested (requested) vs. resulting (reported) stream latency test\n" );
+    fprintf( stderr, "Usage: x.exe input-device-index output-device-index frames-per-buffer\n" );
+    fprintf( stderr, "Use -1 for default device index, or use one of these:\n" );
+    for( i=0; i < Pa_GetDeviceCount(); ++i ){
+        deviceInfo = Pa_GetDeviceInfo(i);
+        if( deviceInfo->maxInputChannels > 0 && deviceInfo->maxOutputChannels > 0 )
+            channelString = "full-duplex";
+        else if( deviceInfo->maxInputChannels > 0 )
+            channelString = "input only";
+        else
+            channelString = "output only";
+
+        fprintf( stderr, "%d (%s, %s, %s)\n", i, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name, channelString );
+    }
+    Pa_Terminate();
+    exit(-1);
+}
+
+int main( int argc, const char* argv[] );
+int main( int argc, const char* argv[] )
 {
     PaStreamParameters outputParameters, inputParameters;
     PaStream *stream;
@@ -94,16 +120,39 @@ int main(void)
     PaTime suggestedLatency;
     PaStreamInfo *streamInfo;
     PaDeviceInfo *deviceInfo;
-
+    int deviceCount;
+    int framesPerBuffer = FRAMES_PER_BUFFER;
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
-    printf("# sample rate=%f, frames per buffer=%d\n", (float)SAMPLE_RATE, FRAMES_PER_BUFFER );
+    if( argc > 1 && strcmp(argv[1],"-h") == 0 )
+        usage();
 
-    outputParameters.device = Pa_GetDefaultOutputDevice();
-    if (outputParameters.device == paNoDevice) {
-      fprintf(stderr,"Error: No default output device.\n");
-      goto error;
+    if( argc > 3 ){
+        framesPerBuffer = atoi(argv[3]);
+    }
+
+    printf("# sample rate=%f, frames per buffer=%d\n", (float)SAMPLE_RATE, framesPerBuffer );
+
+    outputParameters.device = -1;
+    if( argc > 1 )
+        outputParameters.device = atoi(argv[1]);
+    if( outputParameters.device == -1 ){
+        outputParameters.device = Pa_GetDefaultOutputDevice();
+        if (outputParameters.device == paNoDevice) {
+          fprintf(stderr,"Error: No default output device available.\n");
+          goto error;
+        }
+    }else{
+        deviceInfo = Pa_GetDeviceInfo(outputParameters.device);
+        if( !deviceInfo ){
+            fprintf(stderr,"Error: Invalid output device index.\n");
+            usage();
+        }
+        if( deviceInfo->maxOutputChannels == 0 ){
+            fprintf(stderr,"Error: Specified output device has no output channels (an input only device?).\n");
+            usage();
+        }
     }
     
     outputParameters.channelCount = NUM_CHANNELS;
@@ -114,11 +163,27 @@ int main(void)
     printf( "# using output device id %d (%s, %s)\n", outputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name );
 
 
-    inputParameters.device = Pa_GetDefaultInputDevice();
-    if (inputParameters.device == paNoDevice) {
-      fprintf(stderr,"Error: No default input device.\n");
-      goto error;
+    inputParameters.device = -1;
+    if( argc > 2 )
+        inputParameters.device = atoi(argv[1]);
+    if( inputParameters.device == -1 ){
+        inputParameters.device = Pa_GetDefaultInputDevice();
+        if (inputParameters.device == paNoDevice) {
+          fprintf(stderr,"Error: No default input device available.\n");
+          goto error;
+        }
+    }else{
+        deviceInfo = Pa_GetDeviceInfo(inputParameters.device);
+        if( !deviceInfo ){
+            fprintf(stderr,"Error: Invalid input device index.\n");
+            usage();
+        }
+        if( deviceInfo->maxInputChannels == 0 ){
+            fprintf(stderr,"Error: Specified input device has no input channels (an output only device?).\n");
+            usage();
+        }
     }
+
     
     inputParameters.channelCount = NUM_CHANNELS;
     inputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
@@ -144,7 +209,7 @@ int main(void)
                   NULL, /* no input */
                   &outputParameters,
                   SAMPLE_RATE,
-                  FRAMES_PER_BUFFER,
+                  framesPerBuffer,
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   patestCallback,
                   0 );
@@ -164,7 +229,7 @@ int main(void)
                   &inputParameters, 
                   NULL, /* no output */
                   SAMPLE_RATE,
-                  FRAMES_PER_BUFFER,
+                  framesPerBuffer,
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   patestCallback,
                   0 );
@@ -184,7 +249,7 @@ int main(void)
                   &inputParameters, 
                   &outputParameters,
                   SAMPLE_RATE,
-                  FRAMES_PER_BUFFER,
+                  framesPerBuffer,
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   patestCallback,
                   0 );
