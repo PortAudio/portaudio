@@ -9,6 +9,8 @@ Requires matplotlib for plotting: http://matplotlib.sourceforge.net/
 import os
 from pylab import *
 import numpy
+from matplotlib.backends.backend_pdf import PdfPages
+pdfFile = PdfPages('patest_suggested_vs_streaminfo_latency.pdf')
 
 testExeName = "PATest.exe" # rename to whatever the compiled patest_suggested_vs_streaminfo_latency.c binary is
 dataFileName = 'patest_suggested_vs_streaminfo_latency.csv' # code below calls the exe to generate this file
@@ -34,7 +36,13 @@ def loadCsvData( dataFileName ):
 
     class R(object): pass
     result = R()
-    result.titleInfo = '%s\n%s\n%s'%(params,inputDevice,outputDevice)
+    result.params = params
+    for s in params.split(','):
+        if "sample rate" in s:
+            result.sampleRate = s
+
+    result.inputDevice = inputDevice
+    result.outputDevice = outputDevice
     result.suggestedLatency = data[0]
     result.halfDuplexOutputLatency = data[1]
     result.halfDuplexInputLatency = data[2]
@@ -51,7 +59,7 @@ framesPerBufferValues = [0]
 
 # could also test: multiples of 10, random numbers, powers of primes, etc
 
-    
+isFirst = True    
 
 for framesPerBuffer in framesPerBufferValues:
 
@@ -59,15 +67,28 @@ for framesPerBuffer in framesPerBufferValues:
 
     d = loadCsvData(dataFileName)
 
+    if isFirst:
+        figure(1)
+        gcf().text(0.1, 0.0,
+           'patest_suggested_vs_streaminfo_latency\n%s\n%s\n%s\n'%(d.inputDevice,d.outputDevice,d.sampleRate))
+        pdfFile.savefig()
+        isFirst = False
+            
+    figure(2)
+
     plot( d.suggestedLatency, d.suggestedLatency )
     plot( d.suggestedLatency, d.halfDuplexOutputLatency )
     plot( d.suggestedLatency, d.halfDuplexInputLatency )
     plot( d.suggestedLatency, d.fullDuplexOutputLatency )
     plot( d.suggestedLatency, d.fullDuplexInputLatency )
 
-title('PortAudio suggested (requested) vs. resulting (reported) stream latency\n%s'%d.titleInfo)
+title('PortAudio suggested (requested) vs. resulting (reported) stream latency\n%s'%str(framesPerBufferValues))
 ylabel('PaStreamInfo::{input,output}Latency (s)')
 xlabel('Pa_OpenStream suggestedLatency (s)')
 grid(True)
+
+pdfFile.savefig()
+
+pdfFile.close()
 
 show()
