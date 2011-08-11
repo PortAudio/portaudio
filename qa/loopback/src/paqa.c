@@ -101,6 +101,10 @@ typedef struct LoopbackContext_s
 	// Record each channel individually.
 	PaQaRecording      recordings[MAX_NUM_RECORDINGS];
 	
+	// Reported by the stream after it's opened
+	PaTime             streamInfoInputLatency;
+	PaTime             streamInfoOutputLatency;
+
 	// Measured at runtime.
 	int                callbackCount; // incremented for each callback
 	int                inputBufferCount; // incremented if input buffer not NULL
@@ -239,6 +243,15 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	return loopbackContext->done ? paComplete : paContinue;
 }
 
+static void CopyStreamInfoToLoopbackContext( LoopbackContext *loopbackContext, const PaStream *inputStream, const PaStream *outputStream )
+{
+	PaStreamInfo *inputStreamInfo = Pa_GetStreamInfo( inputStream );
+	PaStreamInfo *outputStreamInfo = Pa_GetStreamInfo( outputStream );
+
+	loopbackContext->streamInfoInputLatency = inputStreamInfo ? inputStreamInfo->inputLatency : -1;
+	loopbackContext->streamInfoOutputLatency = outputStreamInfo ? outputStreamInfo->outputLatency : -1;
+}
+
 /*******************************************************************/
 /** 
  * Open a full duplex audio stream.
@@ -264,6 +277,8 @@ int PaQa_RunLoopbackFullDuplex( LoopbackContext *loopbackContext )
 					loopbackContext );
 	if( err != paNoError ) goto error;
 	
+	CopyStreamInfoToLoopbackContext( loopbackContext, stream, stream );
+
 	err = Pa_StartStream( stream );
 	if( err != paNoError ) goto error;
 		
@@ -349,7 +364,9 @@ int PaQa_RunLoopbackHalfDuplex( LoopbackContext *loopbackContext )
 						RecordAndPlaySinesCallback,
 						loopbackContext );
 	if( err != paNoError ) goto error;
-			
+
+	CopyStreamInfoToLoopbackContext( loopbackContext, inStream, outStream );
+
 	err = Pa_StartStream( inStream );
 	if( err != paNoError ) goto error;
 	
@@ -404,7 +421,7 @@ int PaQa_RunInputOnly( LoopbackContext *loopbackContext )
 						RecordAndPlaySinesCallback,
 						loopbackContext );
 	if( err != paNoError ) goto error;
-	
+
 	err = Pa_StartStream( inStream );
 	if( err != paNoError ) goto error;
 	
@@ -535,6 +552,8 @@ int PaQa_RunLoopbackHalfDuplexBlockingIO( LoopbackContext *loopbackContext )
 						NULL );
 	if( err != paNoError ) goto error2;
 	
+	CopyStreamInfoToLoopbackContext( loopbackContext, inStream, outStream );
+
 	err = Pa_StartStream( outStream );
 	if( err != paNoError ) goto error3;
 	
@@ -596,6 +615,8 @@ int PaQa_RunLoopbackFullDuplexBlockingIO( LoopbackContext *loopbackContext )
 						NULL );
 	if( err != paNoError ) goto error1;
 		
+	CopyStreamInfoToLoopbackContext( loopbackContext, stream, stream );
+
 	err = Pa_StartStream( stream );
 	if( err != paNoError ) goto error2;
 	
@@ -780,7 +801,13 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 	
 	err = PaQa_RunLoopback( &loopbackContext );
 	QA_ASSERT_TRUE("loopback did not run", (loopbackContext.callbackCount > 1) );
-	
+
+	printf( "%7.2f %7.2f %7.2f | ",
+		   loopbackContext.streamInfoInputLatency * 1000.0,
+		   loopbackContext.streamInfoOutputLatency * 1000.0,
+		   (loopbackContext.streamInfoInputLatency + loopbackContext.streamInfoOutputLatency) * 1000.0
+		   );
+
 	printf( "%4d/%4d/%4d, %4d/%4d/%4d | ",
 		   loopbackContext.inputOverflowCount,
 		   loopbackContext.inputUnderflowCount,
@@ -957,8 +984,9 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 		testParams.flags = flagSettings[iFlags];
 		printf( "\n************ Mode = %s ************\n",
 			   (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
-		printf("|-   requested  -|- measured ------------------------------\n");
-		printf("|-sRate-|-fr/buf-|- over/under/calls for in, out -|- frm/buf -|-latency-|- channel results -\n");
+
+		printf("|-   requested  -|-  stream info latency  -|- measured ------------------------------\n");
+		printf("|-sRate-|-fr/buf-|- in    - out   - total -|- over/under/calls for in, out -|- frm/buf -|-latency-|- channel results -\n");
 
 		// Loop though various sample rates.
 		if( userOptions->sampleRate < 0 )
