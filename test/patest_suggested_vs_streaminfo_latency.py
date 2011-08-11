@@ -10,13 +10,16 @@ import os
 from pylab import *
 import numpy
 from matplotlib.backends.backend_pdf import PdfPages
-pdfFile = PdfPages('patest_suggested_vs_streaminfo_latency.pdf')
 
 testExeName = "PATest.exe" # rename to whatever the compiled patest_suggested_vs_streaminfo_latency.c binary is
-dataFileName = 'patest_suggested_vs_streaminfo_latency.csv' # code below calls the exe to generate this file
+dataFileName = "patest_suggested_vs_streaminfo_latency.csv" # code below calls the exe to generate this file
 
 inputDeviceIndex = -1 # -1 means default
-inputDeviceIndex = -1 # -1 means default
+outputDeviceIndex = -1 # -1 means default
+sampleRate = 44100
+pdfFilenameSuffix = "_wmme"
+
+pdfFile = PdfPages("patest_suggested_vs_streaminfo_latency_" + str(sampleRate) + pdfFilenameSuffix +".pdf") #output this pdf file
 
 
 def loadCsvData( dataFileName ):
@@ -50,45 +53,93 @@ def loadCsvData( dataFileName ):
     result.fullDuplexInputLatency = data[4]
     return result;
 
+
+def setFigureTitleAndAxisLabels( framesPerBufferString ):
+    title("PortAudio suggested (requested) vs. resulting (reported) stream latency\n" + framesPerBufferString)
+    ylabel("PaStreamInfo::{input,output}Latency (s)")
+    xlabel("Pa_OpenStream suggestedLatency (s)")
+    grid(True)
+    legend(loc="upper left")
+
+def setDisplayRangeSeconds( maxSeconds ):
+    xlim(0, maxSeconds)
+    ylim(0, maxSeconds)
+
+
 # run the test with different frames per buffer values:
 
-framesPerBufferValues = [0]
+compositeTestFramesPerBufferValues = [0]
 # powers of two
-#for i in range (1,11):
-#    framesPerBufferValues.append( 2 ^ i )
+for i in range (1,11):
+    compositeTestFramesPerBufferValues.append( pow(2,i) )
 
-# could also test: multiples of 10, random numbers, powers of primes, etc
+# multiples of 50
+for i in range (1,20):
+    compositeTestFramesPerBufferValues.append( i * 50 )
+
+# 10ms buffer sizes
+compositeTestFramesPerBufferValues.append( 441 )
+compositeTestFramesPerBufferValues.append( 882 )
+
+individualPlotFramesPerBufferValues = [0,64,128,256,512] #output separate plots for these
 
 isFirst = True    
 
-for framesPerBuffer in framesPerBufferValues:
-
-    os.system(testExeName + " -1 -1 " + str(framesPerBuffer) + ' > ' + dataFileName)
+for framesPerBuffer in compositeTestFramesPerBufferValues:
+    commandString = testExeName + " " + str(inputDeviceIndex) + " " + str(outputDeviceIndex) + " " + str(sampleRate) + " " + str(framesPerBuffer) + ' > ' + dataFileName
+    print commandString
+    os.system(commandString)
 
     d = loadCsvData(dataFileName)
 
     if isFirst:
-        figure(1)
+        figure(1) # title sheet
         gcf().text(0.1, 0.0,
-           'patest_suggested_vs_streaminfo_latency\n%s\n%s\n%s\n'%(d.inputDevice,d.outputDevice,d.sampleRate))
+           "patest_suggested_vs_streaminfo_latency\n%s\n%s\n%s\n"%(d.inputDevice,d.outputDevice,d.sampleRate))
         pdfFile.savefig()
-        isFirst = False
-            
-    figure(2)
+        
+        
+    figure(2) # composite plot, includes all compositeTestFramesPerBufferValues
 
-    plot( d.suggestedLatency, d.suggestedLatency )
+    if isFirst:
+        plot( d.suggestedLatency, d.suggestedLatency, label="Suggested latency" )
+    
     plot( d.suggestedLatency, d.halfDuplexOutputLatency )
     plot( d.suggestedLatency, d.halfDuplexInputLatency )
     plot( d.suggestedLatency, d.fullDuplexOutputLatency )
     plot( d.suggestedLatency, d.fullDuplexInputLatency )
 
-title('PortAudio suggested (requested) vs. resulting (reported) stream latency\n%s'%str(framesPerBufferValues))
-ylabel('PaStreamInfo::{input,output}Latency (s)')
-xlabel('Pa_OpenStream suggestedLatency (s)')
-grid(True)
+    if framesPerBuffer in individualPlotFramesPerBufferValues: # individual plots
+        figure( 3 + individualPlotFramesPerBufferValues.index(framesPerBuffer) )
 
+        plot( d.suggestedLatency, d.suggestedLatency, label="Suggested latency" )
+        plot( d.suggestedLatency, d.halfDuplexOutputLatency, label="Half-duplex output latency" )
+        plot( d.suggestedLatency, d.halfDuplexInputLatency, label="Half-duplex input latency" )
+        plot( d.suggestedLatency, d.fullDuplexOutputLatency, label="Full-duplex output latency" )
+        plot( d.suggestedLatency, d.fullDuplexInputLatency, label="Full-duplex input latency" )
+
+        if framesPerBuffer == 0:
+            framesPerBufferText = "paFramesPerBufferUnspecified"
+        else:
+            framesPerBufferText = str(framesPerBuffer)
+        setFigureTitleAndAxisLabels( "user frames per buffer: "+str(framesPerBufferText) )
+        setDisplayRangeSeconds(2.2)
+        pdfFile.savefig()
+        setDisplayRangeSeconds(0.1)
+        setFigureTitleAndAxisLabels( "user frames per buffer: "+str(framesPerBufferText)+" (detail)" )
+        pdfFile.savefig()
+
+    isFirst = False
+
+figure(2)
+setFigureTitleAndAxisLabels( "composite of frames per buffer values:\n"+str(compositeTestFramesPerBufferValues) )
+setDisplayRangeSeconds(2.2)
+pdfFile.savefig()
+setDisplayRangeSeconds(0.1)
+setFigureTitleAndAxisLabels( "composite of frames per buffer values:\n"+str(compositeTestFramesPerBufferValues)+" (detail)" )
 pdfFile.savefig()
 
 pdfFile.close()
 
-show()
+#uncomment this to display interactively, otherwise we just output a pdf
+#show()

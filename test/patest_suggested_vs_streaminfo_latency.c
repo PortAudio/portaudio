@@ -2,6 +2,12 @@
 	@ingroup test_src
 	@brief Print suggested vs. PaStreamInfo reported actual latency
 	@author Ross Bencina <rossb@audiomulch.com>
+
+	Opens streams with a sequence of suggested latency values 
+	from 0 to 2 seconds in .5ms intervals and gathers the resulting actual 
+	latency values. Output a csv file and graph suggested vs. actual. Run 
+	with framesPerBuffer unspecified, powers of 2 and multiples of 50 and 
+	prime number buffer sizes.
 */
 /*
  * $Id: patest_sine.c 1368 2008-03-01 00:38:27Z rossb $
@@ -44,18 +50,16 @@
 #include <math.h>
 #include "portaudio.h"
 
-#define NUM_SECONDS   (5)
-#define SAMPLE_RATE   (44100)
-#define FRAMES_PER_BUFFER  (64)
-
-#define NUM_CHANNELS  (2)
+#define SAMPLE_RATE             (44100)
+#define FRAMES_PER_BUFFER       (128)
+#define NUM_CHANNELS            (2)
 
 #define SUGGESTED_LATENCY_START_SECONDS     (0.0)
-#define SUGGESTED_LATENCY_END_SECONDS       (.5)
-#define SUGGESTED_LATENCY_INCREMENT_SECONDS (0.0005) // half a millisecond increments
+#define SUGGESTED_LATENCY_END_SECONDS       (2.0)
+#define SUGGESTED_LATENCY_INCREMENT_SECONDS (0.0005) /* half a millisecond increments */
 
 
-// dummy callback. does nothing
+/* dummy callback. does nothing. never gets called */
 static int patestCallback( const void *inputBuffer, void *outputBuffer,
                             unsigned long framesPerBuffer,
                             const PaStreamCallbackTimeInfo* timeInfo,
@@ -63,27 +67,6 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
                             void *userData )
 {
 }
-
-
-/*
-    TODO:
-        
-
-        A test that opens streams with a sequence of suggested latency values 
-        from 0 to 2 seconds in .5ms intervals and gathers the resulting actual 
-        latency values. Output a csv file and graph suggested vs. actual. Run 
-        with framesPerBuffer unspecified, powers of 2 and multiples of 50 and 
-        prime number buffer sizes.
-
-        o- add command line parameters to specify frames per buffer, sample rate, devices
-
-        o- test at standard sample rates
-
-
-
-
-
-*/
 
 /*******************************************************************/
 static void usage()
@@ -93,7 +76,7 @@ static void usage()
     const char *channelString;
 
     fprintf( stderr, "PortAudio suggested (requested) vs. resulting (reported) stream latency test\n" );
-    fprintf( stderr, "Usage: x.exe input-device-index output-device-index frames-per-buffer\n" );
+    fprintf( stderr, "Usage: x.exe input-device-index output-device-index sample-rate frames-per-buffer\n" );
     fprintf( stderr, "Use -1 for default device index, or use one of these:\n" );
     for( i=0; i < Pa_GetDeviceCount(); ++i ){
         deviceInfo = Pa_GetDeviceInfo(i);
@@ -121,6 +104,7 @@ int main( int argc, const char* argv[] )
     PaStreamInfo *streamInfo;
     PaDeviceInfo *deviceInfo;
     int deviceCount;
+    float sampleRate = SAMPLE_RATE;
     int framesPerBuffer = FRAMES_PER_BUFFER;
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -129,10 +113,14 @@ int main( int argc, const char* argv[] )
         usage();
 
     if( argc > 3 ){
-        framesPerBuffer = atoi(argv[3]);
+        sampleRate = atoi(argv[3]);
     }
 
-    printf("# sample rate=%f, frames per buffer=%d\n", (float)SAMPLE_RATE, framesPerBuffer );
+    if( argc > 4 ){
+        framesPerBuffer = atoi(argv[4]);
+    }
+
+    printf("# sample rate=%f, frames per buffer=%d\n", (float)sampleRate, framesPerBuffer );
 
     outputParameters.device = -1;
     if( argc > 1 )
@@ -208,7 +196,7 @@ int main( int argc, const char* argv[] )
                   &stream,
                   NULL, /* no input */
                   &outputParameters,
-                  SAMPLE_RATE,
+                  sampleRate,
                   framesPerBuffer,
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   patestCallback,
@@ -228,7 +216,7 @@ int main( int argc, const char* argv[] )
                   &stream,
                   &inputParameters, 
                   NULL, /* no output */
-                  SAMPLE_RATE,
+                  sampleRate,
                   framesPerBuffer,
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   patestCallback,
@@ -248,7 +236,7 @@ int main( int argc, const char* argv[] )
                   &stream,
                   &inputParameters, 
                   &outputParameters,
-                  SAMPLE_RATE,
+                  sampleRate,
                   framesPerBuffer,
                   paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                   patestCallback,
