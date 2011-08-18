@@ -127,10 +127,8 @@ ring_buffer_size_t PaUtil_GetRingBufferWriteRegions( PaUtilRingBuffer *rbuf, rin
         *sizePtr2 = 0;
     }
 
-    /* fixme: do we want a memory barrier here for write-after-read / acquire ? 
     if( available )
-        PaUtil_WriteMemoryBarrier(); / * (write-after-read? / acquire) * /
-    */
+        PaUtil_FullMemoryBarrier(); /* (write-after-read) => full barrier */
 
     return elementCount;
 }
@@ -140,8 +138,8 @@ ring_buffer_size_t PaUtil_GetRingBufferWriteRegions( PaUtilRingBuffer *rbuf, rin
 */
 ring_buffer_size_t PaUtil_AdvanceRingBufferWriteIndex( PaUtilRingBuffer *rbuf, ring_buffer_size_t elementCount )
 {
-    /* we need to ensure that previous writes are seen before we update the write index 
-       (write after write / release)
+    /* ensure that previous writes are seen before we update the write index 
+       (write after write)
     */
     PaUtil_WriteMemoryBarrier();
     return rbuf->writeIndex = (rbuf->writeIndex + elementCount) & rbuf->bigMask;
@@ -180,7 +178,7 @@ ring_buffer_size_t PaUtil_GetRingBufferReadRegions( PaUtilRingBuffer *rbuf, ring
     }
     
     if( available )
-        PaUtil_ReadMemoryBarrier(); /* (read-after-read / acquire) */
+        PaUtil_ReadMemoryBarrier(); /* (read-after-read) => read barrier */
 
     return elementCount;
 }
@@ -188,10 +186,10 @@ ring_buffer_size_t PaUtil_GetRingBufferReadRegions( PaUtilRingBuffer *rbuf, ring
 */
 ring_buffer_size_t PaUtil_AdvanceRingBufferReadIndex( PaUtilRingBuffer *rbuf, ring_buffer_size_t elementCount )
 {
-    /* ensure that previous reads (copies out of the ring buffer) are always completed before updating the read index. 
-       (write-after-read / release)
+    /* ensure that previous reads (copies out of the ring buffer) are always completed before updating (writing) the read index. 
+       (write-after-read) => full barrier
     */
-    PaUtil_WriteMemoryBarrier();
+    PaUtil_FullMemoryBarrier();
     return rbuf->readIndex = (rbuf->readIndex + elementCount) & rbuf->bigMask;
 }
 
