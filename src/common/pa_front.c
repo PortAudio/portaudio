@@ -147,6 +147,7 @@ static void TerminateHostApis( void )
         hostApis_[hostApisCount_]->Terminate( hostApis_[hostApisCount_] );
     }
     hostApisCount_ = 0;
+    defaultHostApiIndex_ = 0;
     deviceCount_ = 0;
 
     if( hostApis_ != 0 )
