@@ -90,8 +90,8 @@ extern "C"
 typedef struct PaUtilRingBuffer
 {
     ring_buffer_size_t  bufferSize; /**< Number of elements in FIFO. Power of 2. Set by PaUtil_InitRingBuffer. */
-    ring_buffer_size_t  writeIndex; /**< Index of next writable element. Set by PaUtil_AdvanceRingBufferWriteIndex. */
-    ring_buffer_size_t  readIndex;  /**< Index of next readable element. Set by PaUtil_AdvanceRingBufferReadIndex. */
+    volatile ring_buffer_size_t  writeIndex; /**< Index of next writable element. Set by PaUtil_AdvanceRingBufferWriteIndex. */
+    volatile ring_buffer_size_t  readIndex;  /**< Index of next readable element. Set by PaUtil_AdvanceRingBufferReadIndex. */
     ring_buffer_size_t  bigMask;    /**< Used for wrapping indices with extra bit to distinguish full/empty. */
     ring_buffer_size_t  smallMask;  /**< Used for fitting indices to buffer. */
     ring_buffer_size_t  elementSizeBytes; /**< Number of bytes per element. */
