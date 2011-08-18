@@ -294,20 +294,19 @@ typedef PaError PaUtilHostApiInitializer( PaUtilHostApiRepresentation**, PaHostA
 
 /** paHostApiInitializers is a NULL-terminated array of host API initialization
  functions. These functions are called by pa_front.c to initialize the host APIs
- when the client calls Pa_Initialize().
+ when the client calls Pa_Initialize(). 
+ 
+ The initialization functions are invoked in order.
 
- There is a platform specific file which defines paHostApiInitializers for that
+ The first successfully initialized host API that has a default input *or* output 
+ device is used as the default PortAudio host API. This is based on the logic that
+ there is only one default host API, and it must contain the default input and output
+ devices (if defined).
+
+ There is a platform specific file that defines paHostApiInitializers for that
  platform, pa_win/pa_win_hostapis.c contains the Win32 definitions for example.
 */
 extern PaUtilHostApiInitializer *paHostApiInitializers[];
-
-
-/** The index of the default host API in the paHostApiInitializers array.
- 
- There is a platform specific file which defines paDefaultHostApiIndex for that
- platform, see pa_win/pa_win_hostapis.c for example.
-*/
-extern int paDefaultHostApiIndex;
 
 
 #ifdef __cplusplus
