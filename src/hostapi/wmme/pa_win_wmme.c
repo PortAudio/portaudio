@@ -174,16 +174,27 @@
 /* Use higher latency for NT because it is even worse at real-time
    operation than Win9x.
 */
-#define PA_MME_WIN_NT_DEFAULT_LATENCY_      (PA_MME_WIN_9X_DEFAULT_LATENCY_ * 2)
-#define PA_MME_WIN_WDM_DEFAULT_LATENCY_     (PA_MME_WIN_9X_DEFAULT_LATENCY_)
+#define PA_MME_WIN_NT_DEFAULT_LATENCY_                              (0.4)
+
+/* Default low latency for WDM based systems. This is based on a rough
+   survey of workable latency settings using patest_wmme_find_best_latency_params.c.
+   See pdf attached to ticket 185 for a graph of the survey results:
+   http://www.portaudio.com/trac/ticket/185
+   
+   Workable latencies varied between 40ms and ~80ms on different systems (different
+   combinations of hardware, 32 and 64 bit, WinXP, Vista and Win7. We didn't
+   get enough Vista results to know if Vista has systemically worse latency.
+   For now we choose a safe value across all Windows versions here.
+*/
+#define PA_MME_WIN_WDM_DEFAULT_LATENCY_                             (0.090)
+
 
 /* When client suggestedLatency could result in many host buffers, we aim to have around 8, 
    based off Windows documentation that suggests that the kmixer uses 8 buffers. This choice
    is somewhat arbitrary here, since we havn't observed significant stability degredation 
    with using either more, or less buffers.     
 */
-
-#define PA_MME_TARGET_HOST_BUFFER_COUNT_    8 
+#define PA_MME_TARGET_HOST_BUFFER_COUNT_    8
 
 #define PA_MME_MIN_TIMEOUT_MSEC_        (1000)
 
