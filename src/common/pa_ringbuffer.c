@@ -129,7 +129,7 @@ ring_buffer_size_t PaUtil_GetRingBufferWriteRegions( PaUtilRingBuffer *rbuf, rin
 
     /* fixme: do we want a memory barrier here for write-after-read / acquire ? 
     if( available )
-        PaUtil_ReadMemoryBarrier(); / * (read-after-read / acquire) * /
+        PaUtil_WriteMemoryBarrier(); / * (write-after-read? / acquire) * /
     */
 
     return elementCount;
