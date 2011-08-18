@@ -195,7 +195,7 @@ static PaError InitializeHostApis( void )
             assert( hostApi->info.defaultInputDevice < hostApi->info.deviceCount );
             assert( hostApi->info.defaultOutputDevice < hostApi->info.deviceCount );
 
-            /* the first successfully initialized host API with at least one input *or* 
+            /* the first successfully initialized host API with a default input *or* 
                output device is used as the default host API.
             */
             if( (defaultHostApiIndex_ == -1) &&
