@@ -243,10 +243,10 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
 	return loopbackContext->done ? paComplete : paContinue;
 }
 
-static void CopyStreamInfoToLoopbackContext( LoopbackContext *loopbackContext, const PaStream *inputStream, const PaStream *outputStream )
+static void CopyStreamInfoToLoopbackContext( LoopbackContext *loopbackContext, PaStream *inputStream, PaStream *outputStream )
 {
-	PaStreamInfo *inputStreamInfo = Pa_GetStreamInfo( inputStream );
-	PaStreamInfo *outputStreamInfo = Pa_GetStreamInfo( outputStream );
+	const PaStreamInfo *inputStreamInfo = Pa_GetStreamInfo( inputStream );
+	const PaStreamInfo *outputStreamInfo = Pa_GetStreamInfo( outputStream );
 
 	loopbackContext->streamInfoInputLatency = inputStreamInfo ? inputStreamInfo->inputLatency : -1;
 	loopbackContext->streamInfoOutputLatency = outputStreamInfo ? outputStreamInfo->outputLatency : -1;
@@ -903,12 +903,14 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
 	testParamsPtr->inputParameters.device = inputDevice;
 	testParamsPtr->inputParameters.sampleFormat = paFloat32;
 	testParamsPtr->inputParameters.channelCount = testParamsPtr->samplesPerFrame;
-	testParamsPtr->inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputDevice )->defaultHighInputLatency;
+	testParamsPtr->inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputDevice )->defaultLowInputLatency;
+	//testParamsPtr->inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputDevice )->defaultHighInputLatency;
 	
 	testParamsPtr->outputParameters.device = outputDevice;
 	testParamsPtr->outputParameters.sampleFormat = paFloat32;
 	testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
-	testParamsPtr->outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputDevice )->defaultHighOutputLatency;
+	testParamsPtr->outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputDevice )->defaultLowOutputLatency;
+	//testParamsPtr->outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputDevice )->defaultHighOutputLatency;
 }
 
 /*******************************************************************/

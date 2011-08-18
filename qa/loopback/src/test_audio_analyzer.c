@@ -527,6 +527,7 @@ static int TestInitialSpike( void )
 {
 	int result;
 	
+//( double sampleRate, int stepPosition, int cycleSize, int latencyFrames, double stepAmplitude )
 	// No spike.
 	result = TestSingleInitialSpike( 44100, 32, 100, 537, 0.0 );
 	if( result < 0 ) return result;
@@ -555,7 +556,7 @@ static int TestInitialSpike( void )
 #if TEST_SAVED_WAVE
 /*==========================================================================================*/
 /**
- * Simple test that write a sawtooth waveform to a file.
+ * Simple test that writes a sawtooth waveform to a file.
  */
 static int TestSavedWave()
 {

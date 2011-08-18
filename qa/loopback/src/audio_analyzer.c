@@ -494,7 +494,7 @@ int PaQa_MeasureLatency( PaQaRecording *recording, PaQaTestTone *testTone, PaQaA
 	PaQa_EraseBuffer( buffer, cycleSize, testTone->samplesPerFrame );
 	PaQa_MixSine( &generator, buffer, cycleSize, testTone->samplesPerFrame );
 
-	threshold = cycleSize * 0.01;
+	threshold = cycleSize * 0.02;
 	analysisResult->latency = PaQa_FindFirstMatch( recording, buffer, cycleSize, threshold );	
 	QA_ASSERT_TRUE( "Could not find the start of the signal.", (analysisResult->latency >= 0) );
 	analysisResult->amplitudeRatio = PaQa_CompareAmplitudes( recording, analysisResult->latency, buffer, cycleSize );
