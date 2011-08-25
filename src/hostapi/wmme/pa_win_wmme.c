@@ -1368,6 +1368,48 @@ static unsigned long ComputeHostBufferCountForFixedBufferSizeFrames(
 }
 
 
+static unsigned long ComputeHostBufferSizeGivenHardUpperLimit( 
+        unsigned long userFramesPerBuffer,
+        unsigned long absoluteMaximumBufferSizeFrames )
+{
+    static unsigned long primes_[] = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 
+            29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 0 }; /* zero terminated */
+
+    unsigned long result = userFramesPerBuffer;
+    int i;
+
+    assert( absoluteMaximumBufferSizeFrames > 67 ); /* assume maximum is large and we're only factoring by small primes */
+
+    /* search for the largest integer factor of userFramesPerBuffer less 
+       than or equal to absoluteMaximumBufferSizeFrames */
+
+    /* repeatedly divide by smallest prime factors until a buffer size 
+       smaller than absoluteMaximumBufferSizeFrames is found */
+    while( result > absoluteMaximumBufferSizeFrames ){
+
+        /* search for the smallest prime factor of result */
+        for( i=0; primes_[i] != 0; ++i ) 
+        {
+            unsigned long p = primes_[i];
+            unsigned long divided = result / p;
+            if( divided*p == result )
+            {
+                result = divided;
+                break; /* continue with outer while loop */
+            }
+        }
+        if( primes_[i] == 0 )
+        { /* loop failed to find a prime factor, return an approximate result */
+            unsigned long d = (userFramesPerBuffer + (absoluteMaximumBufferSizeFrames-1))
+                    / absoluteMaximumBufferSizeFrames;
+            return userFramesPerBuffer / d;
+        }
+    }
+
+    return result;
+}
+
+
 static PaError SelectHostBufferSizeFramesAndHostBufferCount(
         unsigned long suggestedLatencyFrames,
         unsigned long userFramesPerBuffer,
@@ -1387,16 +1429,26 @@ static PaError SelectHostBufferSizeFramesAndHostBufferCount(
 
     }else{
 
-        effectiveUserFramesPerBuffer = userFramesPerBuffer;
+        if( userFramesPerBuffer > absoluteMaximumBufferSizeFrames ){
 
-        if( effectiveUserFramesPerBuffer > absoluteMaximumBufferSizeFrames ){
-            /* user has requested a user buffer that's larger than absoluteMaximumBufferSizeFrames */
-            
-            /* @todo FIXME/REVIEW right now we allow the user to request an oversize host buffer,
-                even though elsewhere in the code there are suggestions that oversize buffers
-                can cause crashes with some drivers. see http://www.portaudio.com/trac/ticket/189
-                */
-            /* return paBufferTooBig; */
+            /* user has requested a user buffer that's larger than absoluteMaximumBufferSizeFrames.
+               try to choose a buffer size that is equal or smaller than absoluteMaximumBufferSizeFrames
+               but is also an integer factor of userFramesPerBuffer, so as to distribute computation evenly.
+               the buffer processor will handle the block adaption between host and user buffer sizes.
+               see http://www.portaudio.com/trac/ticket/189 for discussion.
+            */
+
+            effectiveUserFramesPerBuffer = ComputeHostBufferSizeGivenHardUpperLimit( userFramesPerBuffer, absoluteMaximumBufferSizeFrames );
+            assert( effectiveUserFramesPerBuffer <= absoluteMaximumBufferSizeFrames );
+
+            /* try to ensure that duration of host buffering is at least as 
+                large as duration of user buffer. */
+            if( suggestedLatencyFrames < userFramesPerBuffer )
+                suggestedLatencyFrames = userFramesPerBuffer; 
+
+        }else{
+
+            effectiveUserFramesPerBuffer = userFramesPerBuffer;
         }
     }
                         
@@ -1407,39 +1459,42 @@ static PaError SelectHostBufferSizeFramesAndHostBufferCount(
     *hostBufferCount = ComputeHostBufferCountForFixedBufferSizeFrames(
             suggestedLatencyFrames, *hostBufferSizeFrames, minimumBufferCount );
 
-    /*
-        If there are too many host buffers we would like to coalesce 
-        them by packing an integer number of user buffers into each host buffer.
-        We try to coalesce such that hostBufferCount will lie between 
-        PA_MME_TARGET_HOST_BUFFER_COUNT_ and (PA_MME_TARGET_HOST_BUFFER_COUNT_*2)-1.
-        We limit coalescing to avoid exceeding either absoluteMaximumBufferSizeFrames and
-        preferredMaximumBufferSizeFrames. 
-
-        First, compute a coalescing factor: the number of user buffers per host buffer.
-        The goal is to achieve PA_MME_TARGET_HOST_BUFFER_COUNT_ total buffer count.
-        Since our latency is computed based on (*hostBufferCount - 1) we compute a
-        coalescing factor based on (*hostBufferCount - 1) and (PA_MME_TARGET_HOST_BUFFER_COUNT_-1).
-
-        The + (PA_MME_TARGET_HOST_BUFFER_COUNT_-2) term below is intended to round up.
-    */
-    numberOfUserBuffersPerHostBuffer = ((*hostBufferCount - 1) + (PA_MME_TARGET_HOST_BUFFER_COUNT_-2)) / (PA_MME_TARGET_HOST_BUFFER_COUNT_ - 1);
-    
-    if( numberOfUserBuffersPerHostBuffer > 1 )
+    if( *hostBufferSizeFrames >= userFramesPerBuffer )
     {
-        unsigned long maxCoalescedBufferSizeFrames = (absoluteMaximumBufferSizeFrames < preferredMaximumBufferSizeFrames) /* minimum of our limits */
-                        ? absoluteMaximumBufferSizeFrames
-                        : preferredMaximumBufferSizeFrames;
+        /*
+            If there are too many host buffers we would like to coalesce 
+            them by packing an integer number of user buffers into each host buffer.
+            We try to coalesce such that hostBufferCount will lie between 
+            PA_MME_TARGET_HOST_BUFFER_COUNT_ and (PA_MME_TARGET_HOST_BUFFER_COUNT_*2)-1.
+            We limit coalescing to avoid exceeding either absoluteMaximumBufferSizeFrames and
+            preferredMaximumBufferSizeFrames. 
 
-        unsigned long maxUserBuffersPerHostBuffer = maxCoalescedBufferSizeFrames / effectiveUserFramesPerBuffer; /* don't coalesce more than this */
+            First, compute a coalescing factor: the number of user buffers per host buffer.
+            The goal is to achieve PA_MME_TARGET_HOST_BUFFER_COUNT_ total buffer count.
+            Since our latency is computed based on (*hostBufferCount - 1) we compute a
+            coalescing factor based on (*hostBufferCount - 1) and (PA_MME_TARGET_HOST_BUFFER_COUNT_-1).
 
-        if( numberOfUserBuffersPerHostBuffer > maxUserBuffersPerHostBuffer )
-            numberOfUserBuffersPerHostBuffer = maxUserBuffersPerHostBuffer;
+            The + (PA_MME_TARGET_HOST_BUFFER_COUNT_-2) term below is intended to round up.
+        */
+        numberOfUserBuffersPerHostBuffer = ((*hostBufferCount - 1) + (PA_MME_TARGET_HOST_BUFFER_COUNT_-2)) / (PA_MME_TARGET_HOST_BUFFER_COUNT_ - 1);
+        
+        if( numberOfUserBuffersPerHostBuffer > 1 )
+        {
+            unsigned long maxCoalescedBufferSizeFrames = (absoluteMaximumBufferSizeFrames < preferredMaximumBufferSizeFrames) /* minimum of our limits */
+                            ? absoluteMaximumBufferSizeFrames
+                            : preferredMaximumBufferSizeFrames;
 
-        *hostBufferSizeFrames = effectiveUserFramesPerBuffer * numberOfUserBuffersPerHostBuffer;
+            unsigned long maxUserBuffersPerHostBuffer = maxCoalescedBufferSizeFrames / effectiveUserFramesPerBuffer; /* don't coalesce more than this */
 
-        /* recompute hostBufferCount to approximate suggestedLatencyFrames now that hostBufferSizeFrames is larger */
-        *hostBufferCount = ComputeHostBufferCountForFixedBufferSizeFrames(
-                suggestedLatencyFrames, *hostBufferSizeFrames, minimumBufferCount );
+            if( numberOfUserBuffersPerHostBuffer > maxUserBuffersPerHostBuffer )
+                numberOfUserBuffersPerHostBuffer = maxUserBuffersPerHostBuffer;
+
+            *hostBufferSizeFrames = effectiveUserFramesPerBuffer * numberOfUserBuffersPerHostBuffer;
+
+            /* recompute hostBufferCount to approximate suggestedLatencyFrames now that hostBufferSizeFrames is larger */
+            *hostBufferCount = ComputeHostBufferCountForFixedBufferSizeFrames(
+                    suggestedLatencyFrames, *hostBufferSizeFrames, minimumBufferCount );
+        }
     }
 
     return paNoError;
