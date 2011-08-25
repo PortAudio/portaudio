@@ -59,43 +59,43 @@ PaUtilHostApiInitializer *paHostApiInitializers[] =
     {
 #ifdef __linux__
 
-#ifdef PA_USE_ALSA
+#if PA_USE_ALSA
         PaAlsa_Initialize,
 #endif
 
-#ifdef PA_USE_OSS
+#if PA_USE_OSS
         PaOSS_Initialize,
 #endif
 
 #else   /* __linux__ */
 
-#ifdef PA_USE_OSS
+#if PA_USE_OSS
         PaOSS_Initialize,
 #endif
 
-#ifdef PA_USE_ALSA
+#if PA_USE_ALSA
         PaAlsa_Initialize,
 #endif
 
 #endif  /* __linux__ */
 
-#ifdef PA_USE_JACK
+#if PA_USE_JACK
         PaJack_Initialize,
 #endif
                     /* Added for IRIX, Pieter, oct 2, 2003: */
-#ifdef PA_USE_SGI 
+#if PA_USE_SGI 
         PaSGI_Initialize,
 #endif
 
-#ifdef PA_USE_ASIHPI
+#if PA_USE_ASIHPI
         PaAsiHpi_Initialize,
 #endif
 
-#ifdef PA_USE_COREAUDIO
+#if PA_USE_COREAUDIO
         PaMacCore_Initialize,
 #endif
 
-#ifdef PA_USE_SKELETON
+#if PA_USE_SKELETON
         PaSkeleton_Initialize,
 #endif
 

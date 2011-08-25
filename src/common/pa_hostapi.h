@@ -106,6 +106,53 @@ are defaulted to 1.
 #define PA_USE_WDMKS 1
 #endif 
 
+/* Set default values for Unix based APIs. */
+#if defined(PA_NO_OSS) || defined(PA_NO_ALSA) || defined(PA_NO_JACK) || defined(PA_NO_COREAUDIO) || defined(PA_NO_SGI) || defined(PA_NO_ASIHPI)
+#error "Portaudio: PA_NO_<APINAME> is no longer supported, please remove definition and use PA_USE_<APINAME> instead"
+#endif
+
+#ifndef PA_USE_OSS
+#define PA_USE_OSS 0
+#elif (PA_USE_OSS != 0) && (PA_USE_OSS != 1)
+#undef PA_USE_OSS
+#define PA_USE_OSS 1
+#endif 
+
+#ifndef PA_USE_ALSA
+#define PA_USE_ALSA 0
+#elif (PA_USE_ALSA != 0) && (PA_USE_ALSA != 1)
+#undef PA_USE_ALSA
+#define PA_USE_ALSA 1
+#endif 
+
+#ifndef PA_USE_JACK
+#define PA_USE_JACK 0
+#elif (PA_USE_JACK != 0) && (PA_USE_JACK != 1)
+#undef PA_USE_JACK
+#define PA_USE_JACK 1
+#endif 
+
+#ifndef PA_USE_SGI
+#define PA_USE_SGI 0
+#elif (PA_USE_SGI != 0) && (PA_USE_SGI != 1)
+#undef PA_USE_SGI
+#define PA_USE_SGI 1
+#endif 
+
+#ifndef PA_USE_COREAUDIO
+#define PA_USE_COREAUDIO 0
+#elif (PA_USE_COREAUDIO != 0) && (PA_USE_COREAUDIO != 1)
+#undef PA_USE_COREAUDIO
+#define PA_USE_COREAUDIO 1
+#endif 
+
+#ifndef PA_USE_ASIHPI
+#define PA_USE_ASIHPI 0
+#elif (PA_USE_ASIHPI != 0) && (PA_USE_ASIHPI != 1)
+#undef PA_USE_ASIHPI
+#define PA_USE_ASIHPI 1
+#endif 
+
 #ifdef __cplusplus
 extern "C"
 {
