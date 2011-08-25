@@ -47,6 +47,7 @@
  * license above.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "portaudio.h"
 
@@ -99,11 +100,9 @@ int main( int argc, const char* argv[] )
     PaStreamParameters outputParameters, inputParameters;
     PaStream *stream;
     PaError err;
-    int i;
     PaTime suggestedLatency;
     PaStreamInfo *streamInfo;
     PaDeviceInfo *deviceInfo;
-    int deviceCount;
     float sampleRate = SAMPLE_RATE;
     int framesPerBuffer = FRAMES_PER_BUFFER;
     err = Pa_Initialize();
