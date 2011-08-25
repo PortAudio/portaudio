@@ -48,11 +48,12 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "portaudio.h"
 
 #define SAMPLE_RATE             (44100)
-#define FRAMES_PER_BUFFER       (128)
+#define FRAMES_PER_BUFFER       2//(128)
 #define NUM_CHANNELS            (2)
 
 #define SUGGESTED_LATENCY_START_SECONDS     (0.0)
@@ -67,6 +68,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
                             PaStreamCallbackFlags statusFlags,
                             void *userData )
 {
+    return paContinue;
 }
 
 /*******************************************************************/
@@ -97,12 +99,12 @@ static void usage()
 int main( int argc, const char* argv[] );
 int main( int argc, const char* argv[] )
 {
-    PaStreamParameters outputParameters, inputParameters;
+    PaStreamParameters inputParameters, outputParameters;
     PaStream *stream;
     PaError err;
     PaTime suggestedLatency;
-    PaStreamInfo *streamInfo;
-    PaDeviceInfo *deviceInfo;
+    const PaStreamInfo *streamInfo;
+    const PaDeviceInfo *deviceInfo;
     float sampleRate = SAMPLE_RATE;
     int framesPerBuffer = FRAMES_PER_BUFFER;
     err = Pa_Initialize();
@@ -121,37 +123,8 @@ int main( int argc, const char* argv[] )
 
     printf("# sample rate=%f, frames per buffer=%d\n", (float)sampleRate, framesPerBuffer );
 
-    outputParameters.device = -1;
-    if( argc > 1 )
-        outputParameters.device = atoi(argv[1]);
-    if( outputParameters.device == -1 ){
-        outputParameters.device = Pa_GetDefaultOutputDevice();
-        if (outputParameters.device == paNoDevice) {
-          fprintf(stderr,"Error: No default output device available.\n");
-          goto error;
-        }
-    }else{
-        deviceInfo = Pa_GetDeviceInfo(outputParameters.device);
-        if( !deviceInfo ){
-            fprintf(stderr,"Error: Invalid output device index.\n");
-            usage();
-        }
-        if( deviceInfo->maxOutputChannels == 0 ){
-            fprintf(stderr,"Error: Specified output device has no output channels (an input only device?).\n");
-            usage();
-        }
-    }
-    
-    outputParameters.channelCount = NUM_CHANNELS;
-    outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
-    outputParameters.hostApiSpecificStreamInfo = NULL;
-
-    deviceInfo = Pa_GetDeviceInfo(outputParameters.device);
-    printf( "# using output device id %d (%s, %s)\n", outputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name );
-
-
     inputParameters.device = -1;
-    if( argc > 2 )
+    if( argc > 1 )
         inputParameters.device = atoi(argv[1]);
     if( inputParameters.device == -1 ){
         inputParameters.device = Pa_GetDefaultInputDevice();
@@ -170,7 +143,6 @@ int main( int argc, const char* argv[] )
             usage();
         }
     }
-
     
     inputParameters.channelCount = NUM_CHANNELS;
     inputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
@@ -180,7 +152,36 @@ int main( int argc, const char* argv[] )
     printf( "# using input device id %d (%s, %s)\n", inputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name );
 
 
-    printf( "# suggested latency, half duplex PaStreamInfo::outputLatency, half duplex PaStreamInfo::inputLatency, half duplex PaStreamInfo::outputLatency, half duplex PaStreamInfo::inputLatency\n" );
+    outputParameters.device = -1;
+    if( argc > 2 )
+        outputParameters.device = atoi(argv[2]);
+    if( outputParameters.device == -1 ){
+        outputParameters.device = Pa_GetDefaultOutputDevice();
+        if (outputParameters.device == paNoDevice) {
+          fprintf(stderr,"Error: No default output device available.\n");
+          goto error;
+        }
+    }else{
+        deviceInfo = Pa_GetDeviceInfo(outputParameters.device);
+        if( !deviceInfo ){
+            fprintf(stderr,"Error: Invalid output device index.\n");
+            usage();
+        }
+        if( deviceInfo->maxOutputChannels == 0 ){
+            fprintf(stderr,"Error: Specified output device has no output channels (an input only device?).\n");
+            usage();
+        }
+    }
+
+    outputParameters.channelCount = NUM_CHANNELS;
+    outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+
+    deviceInfo = Pa_GetDeviceInfo(outputParameters.device);
+    printf( "# using output device id %d (%s, %s)\n", outputParameters.device, deviceInfo->name, Pa_GetHostApiInfo(deviceInfo->hostApi)->name );
+
+
+    printf( "# suggested latency, half duplex PaStreamInfo::outputLatency, half duplex PaStreamInfo::inputLatency, full duplex PaStreamInfo::outputLatency, full duplex PaStreamInfo::inputLatency\n" );
     suggestedLatency = SUGGESTED_LATENCY_START_SECONDS;
     while( suggestedLatency <= SUGGESTED_LATENCY_END_SECONDS ){
 
