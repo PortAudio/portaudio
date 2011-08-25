@@ -81,6 +81,11 @@ for i in range (1,20):
 compositeTestFramesPerBufferValues.append( 441 )
 compositeTestFramesPerBufferValues.append( 882 )
 
+# large primes
+#compositeTestFramesPerBufferValues.append( 39209 )
+#compositeTestFramesPerBufferValues.append( 37537 )
+#compositeTestFramesPerBufferValues.append( 26437 )
+
 individualPlotFramesPerBufferValues = [0,64,128,256,512] #output separate plots for these
 
 isFirst = True    
