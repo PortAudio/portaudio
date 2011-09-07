@@ -96,7 +96,6 @@ TESTS = \
 	bin/patest_ringmix \
 	bin/patest_saw \
 	bin/patest_sine8 \
-	bin/patest_sine \
 	bin/patest_sine_channelmaps \
 	bin/patest_sine_formats \
 	bin/patest_sine_time \
