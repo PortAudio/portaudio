@@ -67,6 +67,9 @@ LOOPBACK_OBJS = \
 	qa/loopback/src/write_wav.o \
 	qa/loopback/src/paqa.o
 	
+EXAMPLES = \
+	bin/paex_sine
+	
 TESTS = \
 	bin/paqa_devs \
 	bin/paqa_errs \
@@ -151,9 +154,11 @@ SRC_DIRS = \
 SUBDIRS =
 @ENABLE_CXX_TRUE@SUBDIRS += bindings/cpp
 
-all: lib/$(PALIB) all-recursive tests
+all: lib/$(PALIB) all-recursive tests examples
 
 tests: bin-stamp $(TESTS)
+
+examples: bin-stamp $(EXAMPLES)
 
 loopback: bin-stamp bin/paloopback
 
@@ -165,6 +170,10 @@ lib/$(PALIB): lib-stamp $(LTOBJS) $(MAKEFILE) $(PAINC)
 $(ALL_TESTS): bin/%: lib/$(PALIB) $(MAKEFILE) $(PAINC) test/%.c
 	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(top_srcdir)/test/$*.c lib/$(PALIB) $(LIBS)
 	@WITH_ASIO_TRUE@  $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS) $(top_srcdir)/test/$*.c lib/$(PALIB) $(LIBS)
+
+$(EXAMPLES): bin/%: lib/$(PALIB) $(MAKEFILE) $(PAINC) examples/%.c
+	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(top_srcdir)/examples/$*.c lib/$(PALIB) $(LIBS)
+	@WITH_ASIO_TRUE@  $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS) $(top_srcdir)/examples/$*.c lib/$(PALIB) $(LIBS)
 
 bin/paloopback: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(LOOPBACK_OBJS)
 	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(LOOPBACK_OBJS) lib/$(PALIB) $(LIBS)
