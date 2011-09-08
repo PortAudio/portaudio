@@ -1,11 +1,11 @@
-/** @file patest_write_sine_nonint.c
-	@ingroup test_src
-	@brief Play a non-interleaved sine wave using the blocking API (Pa_WriteStream())
+/** @file paex_write_sine.c
+	@ingroup examples_src
+	@brief Play a sine wave for several seconds using the blocking API (Pa_WriteStream())
 	@author Ross Bencina <rossb@audiomulch.com>
     @author Phil Burk <philburk@softsynth.com>
 */
 /*
- * $Id: patest_write_sine.c 1368 2008-03-01 00:38:27Z rossb $
+ * $Id$
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com/
@@ -63,11 +63,7 @@ int main(void)
     PaStreamParameters outputParameters;
     PaStream *stream;
     PaError err;
-    
-	float leftBuffer[FRAMES_PER_BUFFER];
-    float rightBuffer[FRAMES_PER_BUFFER];
-    void *buffers[2]; /* points to both non-interleaved buffers. */
-	
+    float buffer[FRAMES_PER_BUFFER][2]; /* stereo output buffer */
     float sine[TABLE_SIZE]; /* sine wavetable */
     int left_phase = 0;
     int right_phase = 0;
@@ -77,7 +73,7 @@ int main(void)
     int bufferCount;
 
     
-    printf("PortAudio Test: output sine wave NON-INTERLEAVED. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
+    printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
     
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
@@ -95,7 +91,7 @@ int main(void)
       goto error;
     }
     outputParameters.channelCount = 2;       /* stereo output */
-    outputParameters.sampleFormat = paFloat32 | paNonInterleaved; /* 32 bit floating point output NON-INTERLEAVED */
+    outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = NULL;
 
@@ -113,10 +109,6 @@ int main(void)
 
     printf( "Play 3 times, higher each time.\n" );
     
-	/* Set up array of buffer pointers for Pa_WriteStream */
-	buffers[0] = leftBuffer;
-	buffers[1] = rightBuffer;
-	
     for( k=0; k < 3; ++k )
     {
         err = Pa_StartStream( stream );
@@ -130,15 +122,15 @@ int main(void)
         {
             for( j=0; j < FRAMES_PER_BUFFER; j++ )
             {
-                leftBuffer[j] = sine[left_phase];  /* left */
-                rightBuffer[j] = sine[right_phase];  /* right */
+                buffer[j][0] = sine[left_phase];  /* left */
+                buffer[j][1] = sine[right_phase];  /* right */
                 left_phase += left_inc;
                 if( left_phase >= TABLE_SIZE ) left_phase -= TABLE_SIZE;
                 right_phase += right_inc;
                 if( right_phase >= TABLE_SIZE ) right_phase -= TABLE_SIZE;
             }
 
-            err = Pa_WriteStream( stream, buffers, FRAMES_PER_BUFFER );
+            err = Pa_WriteStream( stream, buffer, FRAMES_PER_BUFFER );
             if( err != paNoError ) goto error;
         }   
 

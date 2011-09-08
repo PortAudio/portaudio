@@ -1,5 +1,5 @@
 /** @file pa_devs.c
-	@ingroup test_src
+	@ingroup examples_src
     @brief List available devices, including device information.
 	@author Phil Burk http://www.softsynth.com
 

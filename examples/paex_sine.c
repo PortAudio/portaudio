@@ -1,5 +1,5 @@
-/** @file patest_sine.c
-	@ingroup test_src
+/** @file paex_sine.c
+	@ingroup examples_src
 	@brief Play a sine wave for several seconds.
 	@author Ross Bencina <rossb@audiomulch.com>
     @author Phil Burk <philburk@softsynth.com>

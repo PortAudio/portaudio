@@ -68,8 +68,16 @@ LOOPBACK_OBJS = \
 	qa/loopback/src/paqa.o
 	
 EXAMPLES = \
-	bin/paex_sine
-	
+	bin/pa_devs \
+	bin/pa_fuzz \
+	bin/paex_pink \
+	bin/paex_read_write_wire \
+	bin/paex_record \
+	bin/paex_saw \
+	bin/paex_sine \
+	bin/paex_write_sine \
+	bin/paex_write_sine_nonint
+
 TESTS = \
 	bin/paqa_devs \
 	bin/paqa_errs \
@@ -88,13 +96,8 @@ TESTS = \
 	bin/patest_mono \
 	bin/patest_multi_sine \
 	bin/patest_out_underflow \
-	bin/patest_pink \
 	bin/patest_prime \
-	bin/patest_read_record \
-	bin/patest_read_write_wire \
-	bin/patest_record \
 	bin/patest_ringmix \
-	bin/patest_saw \
 	bin/patest_sine8 \
 	bin/patest_sine_channelmaps \
 	bin/patest_sine_formats \
@@ -107,10 +110,6 @@ TESTS = \
 	bin/patest_two_rates \
 	bin/patest_underflow \
 	bin/patest_wire \
-	bin/patest_write_sine \
-	bin/patest_write_sine_nonint \
-	bin/pa_devs \
-	bin/pa_fuzz \
 	bin/pa_minlat
 
 # Most of these don't compile yet.  Put them in TESTS, above, if

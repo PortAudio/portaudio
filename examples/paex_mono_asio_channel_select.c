@@ -1,10 +1,15 @@
-/** @file patest_saw.c
-	@ingroup test_src
-	@brief Play a simple (aliasing) sawtooth wave.
-	@author Phil Burk  http://www.softsynth.com
+/** @file paex_mono_asio_channel_select.c
+	@ingroup examples_src
+	@brief Play a monophonic sine wave on a specific ASIO channel.
+	@author Ross Bencina <rossb@audiomulch.com>
+	@author Phil Burk <philburk@softsynth.com>
 */
 /*
  * $Id$
+ *
+ * Authors:
+ *    Ross Bencina <rossb@audiomulch.com>
+ *    Phil Burk <philburk@softsynth.com>
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -44,13 +49,23 @@
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
-#define NUM_SECONDS   (4)
-#define SAMPLE_RATE   (44100)
+#include "pa_asio.h"
 
+#define NUM_SECONDS   (10)
+#define SAMPLE_RATE   (44100)
+#define AMPLITUDE     (0.8)
+#define FRAMES_PER_BUFFER  (64)
+#define OUTPUT_DEVICE Pa_GetDefaultOutputDevice()
+
+#ifndef M_PI
+#define M_PI  (3.14159265)
+#endif
+
+#define TABLE_SIZE   (200)
 typedef struct
 {
-    float left_phase;
-    float right_phase;
+    float sine[TABLE_SIZE];
+    int phase;
 }
 paTestData;
 
@@ -59,68 +74,86 @@ paTestData;
 ** that could mess up the system like calling malloc() or free().
 */
 static int patestCallback( const void *inputBuffer, void *outputBuffer,
-                           unsigned long framesPerBuffer,
-                           const PaStreamCallbackTimeInfo* timeInfo,
-                           PaStreamCallbackFlags statusFlags,
-                           void *userData )
+                            unsigned long framesPerBuffer,
+                            const PaStreamCallbackTimeInfo* timeInfo,
+                            PaStreamCallbackFlags statusFlags,
+                            void *userData )
 {
-    /* Cast data passed through stream to our structure. */
     paTestData *data = (paTestData*)userData;
     float *out = (float*)outputBuffer;
-    unsigned int i;
-    (void) inputBuffer; /* Prevent unused variable warning. */
-
+    unsigned long i;
+    int finished = 0;
+    /* avoid unused variable warnings */
+    (void) inputBuffer;
+    (void) timeInfo;
+    (void) statusFlags;
     for( i=0; i<framesPerBuffer; i++ )
     {
-        *out++ = data->left_phase;  /* left */
-        *out++ = data->right_phase;  /* right */
-        /* Generate simple sawtooth phaser that ranges between -1.0 and 1.0. */
-        data->left_phase += 0.01f;
-        /* When signal reaches top, drop back down. */
-        if( data->left_phase >= 1.0f ) data->left_phase -= 2.0f;
-        /* higher pitch so we can distinguish left and right. */
-        data->right_phase += 0.03f;
-        if( data->right_phase >= 1.0f ) data->right_phase -= 2.0f;
+        *out++ = data->sine[data->phase];  /* left */
+        data->phase += 1;
+        if( data->phase >= TABLE_SIZE ) data->phase -= TABLE_SIZE;
     }
-    return 0;
+    return finished;
 }
 
 /*******************************************************************/
-static paTestData data;
 int main(void);
 int main(void)
 {
+    PaStreamParameters outputParameters;
+    PaAsioStreamInfo asioOutputInfo;
     PaStream *stream;
     PaError err;
+    paTestData data;
+    int outputChannelSelectors[1];
+    int i;
+    printf("PortAudio Test: output MONO sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
+    /* initialise sinusoidal wavetable */
+    for( i=0; i<TABLE_SIZE; i++ )
+    {
+        data.sine[i] = (float) (AMPLITUDE * sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. ));
+    }
+    data.phase = 0;
     
-    printf("PortAudio Test: output sawtooth wave.\n");
-    /* Initialize our data for use by callback. */
-    data.left_phase = data.right_phase = 0.0;
-    /* Initialize library before making any other calls. */
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
-    
-    /* Open an audio I/O stream. */
-    err = Pa_OpenDefaultStream( &stream,
-                                0,          /* no input channels */
-                                2,          /* stereo output */
-                                paFloat32,  /* 32 bit floating point output */
-                                SAMPLE_RATE,
-                                256,        /* frames per buffer */
-                                patestCallback,
-                                &data );
+
+    outputParameters.device = OUTPUT_DEVICE;
+    outputParameters.channelCount = 1;       /* MONO output */
+    outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+
+    asioOutputInfo.size = sizeof(PaAsioStreamInfo);
+    asioOutputInfo.hostApiType = paASIO;
+    asioOutputInfo.version = 1;
+    asioOutputInfo.flags = paAsioUseChannelSelectors;
+    outputChannelSelectors[0] = 1; /* select the second (right) ASIO device channel */
+    asioOutputInfo.channelSelectors = outputChannelSelectors;
+    outputParameters.hostApiSpecificStreamInfo = &asioOutputInfo;
+
+    err = Pa_OpenStream(
+              &stream,
+              NULL, /* no input */
+              &outputParameters,
+              SAMPLE_RATE,
+              FRAMES_PER_BUFFER,
+              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+              patestCallback,
+              &data );
     if( err != paNoError ) goto error;
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
-
-    /* Sleep for several seconds. */
-    Pa_Sleep(NUM_SECONDS*1000);
+    
+    printf("Play for %d seconds.\n", NUM_SECONDS ); fflush(stdout);
+    Pa_Sleep( NUM_SECONDS * 1000 );
 
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
+    
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
+    
     Pa_Terminate();
     printf("Test finished.\n");
     return err;
