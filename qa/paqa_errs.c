@@ -343,7 +343,7 @@ static int TestBadActions( void )
 {
     PaStream*           stream = NULL;
     const PaDeviceInfo* deviceInfo = NULL;
-    PaError             result;
+    PaError             result = 0;
     PaQaData            myData;
     PaStreamParameters  opp;
     const PaDeviceInfo* info = NULL;

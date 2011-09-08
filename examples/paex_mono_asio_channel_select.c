@@ -123,11 +123,12 @@ int main(void)
     outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
 
+	/* Use an ASIO specific structure. WARNING - this is not portable. */
     asioOutputInfo.size = sizeof(PaAsioStreamInfo);
     asioOutputInfo.hostApiType = paASIO;
     asioOutputInfo.version = 1;
     asioOutputInfo.flags = paAsioUseChannelSelectors;
-    outputChannelSelectors[0] = 1; /* select the second (right) ASIO device channel */
+    outputChannelSelectors[0] = 1; /* skip channel 0 and use the second (right) ASIO device channel */
     asioOutputInfo.channelSelectors = outputChannelSelectors;
     outputParameters.hostApiSpecificStreamInfo = &asioOutputInfo;
 

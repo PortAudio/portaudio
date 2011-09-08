@@ -157,6 +157,7 @@ static int QaCallback( const void *inputBuffer, void *outputBuffer,
                 }
             }
             break;
+                
         case paInt16:
             {
                 short *out =  (short *) outputBuffer;
