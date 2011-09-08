@@ -1,6 +1,6 @@
-/** @file patest_sine.c
-	@ingroup test_src
-	@brief Play a sine wave for several seconds.
+/** @file paqa_latency.c
+	@ingroup qa_src
+	@brief Test latency estimates.
 	@author Ross Bencina <rossb@audiomulch.com>
     @author Phil Burk <philburk@softsynth.com>
 */
@@ -138,7 +138,6 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
     dataPtr->maxDeltaDacTime = 0.0;
     dataPtr->callbackCount = 0;
     
-    printf("-------------------------------------\n");
     printf("Stream parameter: suggestedOutputLatency = %g\n", outputParamsPtr->suggestedLatency );
     if( framesPerBuffer == paFramesPerBufferUnspecified ){
         printf("Stream parameter: user framesPerBuffer = paFramesPerBufferUnspecified\n" );
@@ -178,10 +177,12 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
     Pa_Sleep( 1 * 1000 );
 
     
+    printf("-------------------------------------\n");
     return err;
 error2:
     Pa_CloseStream( stream );
 error1:
+    printf("-------------------------------------\n");
     return err;
 }
 
@@ -225,36 +226,44 @@ int main(void)
     printf("Device info: defaultHighOutputLatency = %f seconds\n", deviceInfo->defaultHighOutputLatency);
     outputParameters.hostApiSpecificStreamInfo = NULL;
     
+    
     // Try to use a small buffer that is smaller than we think the device can handle.
     // Try to force combining multiple user buffers into a host buffer.
+    printf("------------- Try a very small buffer.\n");
     framesPerBuffer = 9;
     outputParameters.suggestedLatency = deviceInfo->defaultLowOutputLatency;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, framesPerBuffer );
     if( err != paNoError ) goto error;
     
+    printf("------------- 64 frame buffer with 1.1 * defaultLow latency.\n");
     framesPerBuffer = 64;
     outputParameters.suggestedLatency = deviceInfo->defaultLowOutputLatency * 1.1;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, framesPerBuffer );
     if( err != paNoError ) goto error;
 
     // Try to create a huge buffer that is bigger than the allowed device maximum.
+    printf("------------- Try a huge buffer.\n");
     framesPerBuffer = 16*1024;
     outputParameters.suggestedLatency = ((double)framesPerBuffer) / sampleRate; // approximate
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, framesPerBuffer );
     if( err != paNoError ) goto error;
     
+    printf("------------- Try suggestedLatency = 0.0\n");
     outputParameters.suggestedLatency = 0.0;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, paFramesPerBufferUnspecified );
     if( err != paNoError ) goto error;
     
+    printf("------------- Try suggestedLatency = defaultLowOutputLatency\n");
     outputParameters.suggestedLatency = deviceInfo->defaultLowOutputLatency;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, paFramesPerBufferUnspecified );
     if( err != paNoError ) goto error;
     
+    printf("------------- Try suggestedLatency = defaultHighOutputLatency\n");
     outputParameters.suggestedLatency = deviceInfo->defaultHighOutputLatency;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, paFramesPerBufferUnspecified );
     if( err != paNoError ) goto error;
-        
+    
+    printf("------------- Try suggestedLatency = defaultHighOutputLatency * 4\n");
     outputParameters.suggestedLatency = deviceInfo->defaultHighOutputLatency * 4;
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, paFramesPerBufferUnspecified );
     if( err != paNoError ) goto error;
