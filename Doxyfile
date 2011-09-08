@@ -43,7 +43,7 @@ SUBGROUPING            = YES
 #---------------------------------------------------------------------------
 # Build related configuration options
 #---------------------------------------------------------------------------
-EXTRACT_ALL            = YES
+EXTRACT_ALL            = NO
 EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = NO
 EXTRACT_LOCAL_CLASSES  = YES
@@ -60,9 +60,9 @@ INLINE_INFO            = YES
 SORT_MEMBER_DOCS       = YES
 SORT_BRIEF_DOCS        = NO
 SORT_BY_SCOPE_NAME     = NO
-GENERATE_TODOLIST      = YES
-GENERATE_TESTLIST      = YES
-GENERATE_BUGLIST       = YES
+GENERATE_TODOLIST      = NO
+GENERATE_TESTLIST      = NO
+GENERATE_BUGLIST       = NO
 GENERATE_DEPRECATEDLIST= YES
 ENABLED_SECTIONS       = 
 MAX_INITIALIZER_LINES  = 30
@@ -84,10 +84,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 INPUT                  = doc/src \
                          include \
-                         examples #\          
-#                         src \
-#                         test \
-#                         qa
+                         examples
 FILE_PATTERNS          = *.h \
                          *.c \
                          *.cpp \

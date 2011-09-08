@@ -1,3 +1,8 @@
+/** @file paex_wmme_ac3.c
+	@ingroup examples_src
+	@brief Use WMME-specific interface to send raw AC3 data to a S/PDIF output.
+	@author Ross Bencina <rossb@audiomulch.com>
+*/
 /*
  * $Id: $
  * Portable Audio I/O Library

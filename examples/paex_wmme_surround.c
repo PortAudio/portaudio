@@ -1,3 +1,8 @@
+/** @file paex_wmme_surround.c
+	@ingroup examples_src
+	@brief Use WMME-specific channelMask to request 5.1 surround sound output.
+	@author Ross Bencina <rossb@audiomulch.com>
+*/
 /*
  * $Id: $
  * Portable Audio I/O Library

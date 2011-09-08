@@ -42,10 +42,10 @@
 
 /**
  @internal
- @page srcguide A guide to the PortAudio sources.
+ @page srcguide A guide to the PortAudio sources
 
  - \ref public_header
- - \ref example_src
+ - \ref examples_src
  - \ref common_src
  - \ref win_src
  - \ref unix_src

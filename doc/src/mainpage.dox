@@ -11,7 +11,7 @@ PortAudio is a cross-platform, open-source C language library for real-time audi
 - @ref api_overview<br>
 A top-down view of the PortAudio API, its capabilities, functions and data structures
 
-- <a href="http://www.portaudio.com/trac/wiki/TutorialDir/TutorialStart">PortAudio tutorials</a><br>
+- <a href="http://www.portaudio.com/trac/wiki/TutorialDir/TutorialStart">PortAudio Tutorials</a><br>
 Get started writing code with PortAudio tutorials
 
 - @ref examples_src "Examples"<br>
@@ -26,7 +26,7 @@ PortAudio is licenced under the MIT Expat open source licence. We make a non-bin
 - portaudio.h Portable API<br>
 Detailed documentation for each portable API function and data type
 
-- @ref public_header "Host API specific extensions"<br>
+- @ref public_header "Host API Specific Extensions"<br>
 Documentation for non-portable platform-specific host API extensions
 
 
@@ -39,11 +39,11 @@ Documentation for non-portable platform-specific host API extensions
 - <a href="http://www.portaudio.com/trac">The PortAudio wiki</a>
 
 
-@section developer_resources Developer resources
+@section developer_resources Developer Resources
 
-\if INTERNAL
-- @ref srcguide 
-\endif
+@if INTERNAL
+- @ref srcguide
+@endif
 
 - <a href="http://www.portaudio.com/trac">Our Trac wiki and issue tracking system</a>
 
@@ -52,7 +52,7 @@ Documentation for non-portable platform-specific host API extensions
 If you're interested in helping out with PortAudio development we're more than happy for you to be involved. Just drop by the PortAudio mailing list and ask how you can help. Or <a href="http://www.portaudio.com/trac/report/3">check out the starter tickets in Trac</a>.
 
 
-@section older_api_versions Older API versions
+@section older_api_versions Older API Versions
 
 This documentation covers the current API version: PortAudio V19, API version 2.0. API 2.0 differs in a number of ways from previous versions (most often encountered in PortAudio V18), please consult the enhancement proposals for details of what was added/changed for V19:
 http://www.portaudio.com/docs/proposals/index.html
