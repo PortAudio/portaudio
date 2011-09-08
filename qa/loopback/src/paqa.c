@@ -1063,7 +1063,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
     
 	PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
 	testParams.flags = PAQA_FLAG_TWO_STREAMS;	
-    for( int iFlags= 0; iFlags<4; iFlags++ )
+    for( iFlags= 0; iFlags<4; iFlags++ )
     {
         // Cycle through combinations of flags.
         testParams.streamFlags = 0;

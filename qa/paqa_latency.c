@@ -248,6 +248,11 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     printf(" highLatency = %g\n", highLatency );
     printf(" numChannels = %d\n", numChannels );
     
+    if( (highLatency - lowLatency) < 0.001 )
+    {
+		numLoops = 1;
+	}
+	
     for( i=0; i<numLoops; i++ )
     {   
         streamParameters.suggestedLatency = lowLatency + ((highLatency - lowLatency) * i /(numLoops - 1.0));
@@ -335,7 +340,7 @@ static int paqaVerifyDeviceInfoLatency( void )
             printf("  Output info: defaultHighOutputLatency = %f seconds\n", pdi->defaultHighOutputLatency);
             QA_ASSERT_TRUE( "defaultLowOutputLatency should be > 0", (pdi->defaultLowOutputLatency > 0.0) );
             QA_ASSERT_TRUE( "defaultHighOutputLatency should be > 0", (pdi->defaultHighOutputLatency > 0.0) );
-            QA_ASSERT_TRUE( "defaultHighOutputLatency should be > Low", (pdi->defaultHighOutputLatency > pdi->defaultLowOutputLatency) );
+            //QA_ASSERT_TRUE( "defaultHighOutputLatency should be > Low", (pdi->defaultHighOutputLatency > pdi->defaultLowOutputLatency) );
         }
         if( pdi->maxInputChannels > 0 )
         {
@@ -343,7 +348,7 @@ static int paqaVerifyDeviceInfoLatency( void )
             printf("  Input defaultHighOutputLatency = %f seconds\n", pdi->defaultHighInputLatency);
             QA_ASSERT_TRUE( "defaultLowOutputLatency should be > 0", (pdi->defaultLowInputLatency > 0.0) );
             QA_ASSERT_TRUE( "defaultHighOutputLatency should be > 0", (pdi->defaultHighInputLatency > 0.0) );
-            QA_ASSERT_TRUE( "defaultHighOutputLatency should be > Low", (pdi->defaultHighInputLatency > pdi->defaultLowInputLatency) );
+            //QA_ASSERT_TRUE( "defaultHighOutputLatency should be > Low", (pdi->defaultHighInputLatency > pdi->defaultLowInputLatency) );
         }
     }
     return 0;
