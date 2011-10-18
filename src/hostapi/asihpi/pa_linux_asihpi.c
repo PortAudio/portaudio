@@ -1,12 +1,16 @@
 /*
+ * $Id:$
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
+ * AudioScience HPI implementation by Fred Gleason, Ludwig Schwardt and
+ * Eliot Blennerhassett
  *
- * PortAudio v18 version of AudioScience HPI driver by Fred Gleason <fredg@salemradiolabs.com>
- * PortAudio v19 version of AudioScience HPI driver by Ludwig Schwardt <schwardt@sun.ac.za>
+ * Copyright (c) 2003 Fred Gleason <fredg@salemradiolabs.com>
+ * Copyright (c) 2005,2006 Ludwig Schwardt <schwardt@sun.ac.za>
+ * Copyright (c) 2011 Eliot Blennerhassett <eblennerhassett@audioscience.com>
  *
- * Copyright (c) 2003 Fred Gleason
- * Copyright (c) 2005,2006 Ludwig Schwardt
+ * Based on the Open Source API proposed by Ross Bencina
+ * Copyright (c) 1999-2008 Ross Bencina, Phil Burk
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -61,7 +65,7 @@
 
  Documentation for the HPI API can be found at:
 
-     http://www.audioscience.com/internet/download/sdk/spchpi.pdf
+     http://www.audioscience.com/internet/download/sdk/hpi_usermanual_html/html/index.html
 
  The Linux HPI driver itself (a kernel module + library) can be downloaded from:
 
@@ -134,8 +138,6 @@
 
  Output buffer priming via the user callback (i.e. paPrimeOutputBuffersUsingStreamCallback
  and friends) is not implemented yet. All output is primed with silence.
-
- Please send bug reports etc. to Ludwig Schwardt <schwardt@sun.ac.za>
  */
 
 #include <unistd.h>
@@ -553,7 +555,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
             PA_ASIHPI_REPORT_ERROR_( hpiError );
             continue;
         }
-        hpiError = HPI_AdapterGetInfo( NULL, idx, &outStreams, &inStreams, 
+        hpiError = HPI_AdapterGetInfo( NULL, idx, &outStreams, &inStreams,
 					&version, &serial, &type );
         /* Skip to next device on failure */
         if( hpiError )
