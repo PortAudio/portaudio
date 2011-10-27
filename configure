@@ -11663,7 +11663,7 @@ fi
               THREAD_CFLAGS="-mt"
               ;;
            *)
-              SHARED_FLAGS="-shared -fPIC"
+              SHARED_FLAGS="-fPIC"
               THREAD_CFLAGS="-pthread"
               ;;
         esac
