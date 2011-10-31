@@ -97,6 +97,10 @@ AC_ARG_WITH(host_os, [], host_os=$withval)
 dnl Checks for programs.
 
 AC_PROG_CC
+dnl ASIO and CXX bindings need a C++ compiler
+if [[ "$with_asio" = "yes" ] || [ "$enable_cxx" = "yes" ]] ; then
+       AC_PROG_CXX
+fi
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
 AC_PROG_INSTALL
