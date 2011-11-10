@@ -1214,7 +1214,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                 if( foundDefaultSampleRate ){
 
                     /* calculate default latency values from bufferPreferredSize
-                        for default low latency, and bufferPreferredSize * 3
+                        for default low latency, and bufferMaxSize
                         for default high latency.
                         use the default sample rate to convert from samples to
                         seconds. Without knowing what sample rate the user will
@@ -1227,17 +1227,11 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                     deviceInfo->defaultLowInputLatency = defaultLowLatency;
                     deviceInfo->defaultLowOutputLatency = defaultLowLatency;
 
-                    long defaultHighLatencyBufferSize =
-                            paAsioDriverInfo.bufferPreferredSize * 3;
-
-                    if( defaultHighLatencyBufferSize > paAsioDriverInfo.bufferMaxSize )
-                        defaultHighLatencyBufferSize = paAsioDriverInfo.bufferMaxSize;
-
                     double defaultHighLatency =
-                            defaultHighLatencyBufferSize / deviceInfo->defaultSampleRate;
+                            paAsioDriverInfo.bufferMaxSize / deviceInfo->defaultSampleRate;
 
                     if( defaultHighLatency < defaultLowLatency )
-                        defaultHighLatency = defaultLowLatency; /* just incase the driver returns something strange */ 
+                        defaultHighLatency = defaultLowLatency; /* just in case the driver returns something strange */ 
                             
                     deviceInfo->defaultHighInputLatency = defaultHighLatency;
                     deviceInfo->defaultHighOutputLatency = defaultHighLatency;
