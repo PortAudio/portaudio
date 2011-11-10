@@ -2238,10 +2238,29 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
     else /* Using callback interface... */
     {
-        framesPerHostBuffer = SelectHostBufferSize(
+        /* Select the host buffer size based on user framesPerBuffer and the
+           maximum of suggestedInputLatencyFrames and 
+           suggestedOutputLatencyFrames.
+
+           We should subtract any fixed known driver latency from 
+           suggestedLatencyFrames before computing the host buffer size.
+           However, the ASIO API doesn't provide a method for determining fixed 
+           latencies independent of the host buffer size. ASIOGetLatencies()  
+           only returns latencies after the buffer size has been configured, so 
+           we can't reliably use it to determine fixed latencies here.
+
+           We could set the preferred buffer size and then subtract it from
+           the values returned from ASIOGetLatencies, but this would not be 100%
+           reliable, so we don't do it.
+        */
+
+        unsigned long suggestedLatencyFrames = 
                 (( suggestedInputLatencyFrames > suggestedOutputLatencyFrames )
-                        ? suggestedInputLatencyFrames : suggestedOutputLatencyFrames), framesPerBuffer,
-                driverInfo );
+                ? suggestedInputLatencyFrames 
+                : suggestedOutputLatencyFrames);
+
+        framesPerHostBuffer = SelectHostBufferSize( suggestedLatencyFrames, 
+                framesPerBuffer, driverInfo );
     }
 
 
@@ -2391,7 +2410,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->outputBufferConverter = 0;
     }
 
-
+    /* Values returned by ASIOGetLatencies() include the latency introduced by 
+       the ASIO double buffer. */
     ASIOGetLatencies( &stream->asioInputLatencyFrames, &stream->asioOutputLatencyFrames );
 
 
