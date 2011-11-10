@@ -1629,73 +1629,210 @@ static void ZeroOutputBuffers( PaAsioStream *stream, long index )
 }
 
 
-static unsigned long SelectHostBufferSize( unsigned long suggestedLatencyFrames, unsigned long userFramesPerBuffer,
+/* return the next power of two >= x. 
+   Returns the input parameter if it is already a power of two. 
+   http://stackoverflow.com/questions/364985/algorithm-for-finding-the-smallest-power-of-two-thats-greater-or-equal-to-a-giv 
+*/
+static unsigned long NextPowerOfTwo( unsigned long x )
+{
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    /* If you needed to deal with numbers > 2^32 the following would be needed. 
+       For latencies, we don't deal with values this large. 
+     x |= x >> 16;
+    */
+
+    return x + 1;
+}
+
+
+static unsigned long SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer( 
+        unsigned long suggestedLatencyFrames, PaAsioDriverInfo *driverInfo )
+{
+	/* Choose a host buffer size based only on suggestedLatencyFrames and the 
+	   device's supported buffer sizes. Always returns a valid value.
+	*/
+
+	unsigned long result;
+
+	if( suggestedLatencyFrames <= (unsigned long)driverInfo->bufferMinSize )
+    {
+        result = driverInfo->bufferMinSize;
+    }
+    else if( suggestedLatencyFrames >= (unsigned long)driverInfo->bufferMaxSize )
+    {
+        result = driverInfo->bufferMaxSize;
+    }
+    else
+    {
+		if( driverInfo->bufferGranularity == 0 ) /* single fixed host buffer size */
+        {
+            /* The documentation states that bufferGranularity should be zero 
+               when bufferMinSize, bufferMaxSize and bufferPreferredSize are the 
+               same. We assume that is the case.
+            */
+
+            result = driverInfo->bufferPreferredSize;
+        }
+		else if( driverInfo->bufferGranularity == -1 ) /* power-of-two */
+        {
+		    /* We assume bufferMinSize and bufferMaxSize are powers of two. */
+
+            result = NextPowerOfTwo( suggestedLatencyFrames );
+
+            if( result < (unsigned long)driverInfo->bufferMinSize )
+                result = driverInfo->bufferMinSize;
+
+            if( result > (unsigned long)driverInfo->bufferMaxSize )
+                result = driverInfo->bufferMaxSize;
+        }
+        else /* modulo bufferGranularity */
+        {
+            /* round up to the next multiple of granularity */
+            unsigned long n = (suggestedLatencyFrames + driverInfo->bufferGranularity - 1) 
+                    / driverInfo->bufferGranularity;
+            
+            result = n * driverInfo->bufferGranularity;
+
+            if( result < (unsigned long)driverInfo->bufferMinSize )
+                result = driverInfo->bufferMinSize;
+
+            if( result > (unsigned long)driverInfo->bufferMaxSize )
+                result = driverInfo->bufferMaxSize;
+        }
+    }
+
+	return result;
+}
+
+
+static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer( 
+        unsigned long suggestedLatencyFrames, unsigned long userFramesPerBuffer,
         PaAsioDriverInfo *driverInfo )
 {
-    unsigned long result;
+	/* Select a host buffer size conforming to suggestedLatencyFrames 
+	   and the device's supported buffer sizes.
+	   The return value will always be a multiple of userFramesPerBuffer. 
+	   If a valid buffer size can not be found the function returns 0.
 
-    if( suggestedLatencyFrames == 0 )
+	   The current implementation uses a simple iterative search for clarity.
+	   Feel free to suggest a closed form solution.
+	*/
+	unsigned long result = 0;
+
+	assert( userFramesPerBuffer != 0 );
+	
+	if( driverInfo->bufferGranularity == 0 ) /* single fixed host buffer size */
     {
-        result = driverInfo->bufferPreferredSize;
+        /* The documentation states that bufferGranularity should be zero 
+           when bufferMinSize, bufferMaxSize and bufferPreferredSize are the 
+           same. We assume that is the case.
+        */
+
+		if( (driverInfo->bufferPreferredSize % userFramesPerBuffer) == 0 )
+			result = driverInfo->bufferPreferredSize;
     }
-    else{
-        if( suggestedLatencyFrames <= (unsigned long)driverInfo->bufferMinSize )
-        {
-            result = driverInfo->bufferMinSize;
-        }
-        else if( suggestedLatencyFrames >= (unsigned long)driverInfo->bufferMaxSize )
-        {
-            result = driverInfo->bufferMaxSize;
-        }
-        else
-        {
-            if( driverInfo->bufferGranularity == -1 )
-            {
-                /* power-of-two */
-                result = 2;
+	else if( driverInfo->bufferGranularity == -1 ) /* power-of-two */
+    {
+		/* We assume bufferMinSize and bufferMaxSize are powers of two. */
 
-                while( result < suggestedLatencyFrames )
-                    result *= 2;
+        /* Search all powers of two in the range [bufferMinSize,bufferMaxSize] 
+           for multiples of userFramesPerBuffer. We prefer the first multiple
+           that is equal or greater than suggestedLatencyFrames, or failing 
+           that, the largest multiple less than suggestedLatencyFrames.
+        */
+        unsigned long x = (unsigned long)driverInfo->bufferMinSize; 
+		do {
+			if( (x % userFramesPerBuffer) == 0 )
+			{
+                /* any power-of-two multiple of userFramesPerBuffer is acceptable */
+				result = x;
+				if( result >= suggestedLatencyFrames )
+					break; /* stop. a value >= to suggestedLatencyFrames is ideal. */
+			}
 
-                if( result < (unsigned long)driverInfo->bufferMinSize )
-                    result = driverInfo->bufferMinSize;
+			x *= 2;
+		} while( x <= (unsigned long)driverInfo->bufferMaxSize );
+    }
+    else /* modulo granularity */
+    {
+		/* We assume bufferMinSize is a multiple of bufferGranularity. */
 
-                if( result > (unsigned long)driverInfo->bufferMaxSize )
-                    result = driverInfo->bufferMaxSize;
-            }
-            else if( driverInfo->bufferGranularity == 0 )
-            {
-                /* the documentation states that bufferGranularity should be
-                    zero when bufferMinSize, bufferMaxSize and
-                    bufferPreferredSize are the same. We assume that is the case.
-                */
+        /* Search all multiples of bufferGranularity in the range 
+           [bufferMinSize,bufferMaxSize] for multiples of userFramesPerBuffer. 
+           We prefer the first multiple that is equal or greater than 
+           suggestedLatencyFrames, or failing that, the largest multiple less 
+           than suggestedLatencyFrames.
+        */
+		unsigned long x = (unsigned long)driverInfo->bufferMinSize; 
+		do {
+			if( (x % userFramesPerBuffer) == 0 )
+			{
+                /* any power-of-two multiple of userFramesPerBuffer is acceptable */
+				result = x;
+				if( result >= suggestedLatencyFrames )
+					break; /* stop. a value >= to suggestedLatencyFrames is ideal. */
+			}
 
-                result = driverInfo->bufferPreferredSize;
-            }
-            else
-            {
-                /* modulo granularity */
-
-                unsigned long remainder =
-                        suggestedLatencyFrames % driverInfo->bufferGranularity;
-
-                if( remainder == 0 )
-                {
-                    result = suggestedLatencyFrames;
-                }
-                else
-                {
-                    result = suggestedLatencyFrames
-                            + (driverInfo->bufferGranularity - remainder);
-
-                    if( result > (unsigned long)driverInfo->bufferMaxSize )
-                        result = driverInfo->bufferMaxSize;
-                }
-            }
-        }
+			x += driverInfo->bufferGranularity;
+		} while( x <= (unsigned long)driverInfo->bufferMaxSize );
     }
 
-    return result;
+	return result;
+}
+
+
+static unsigned long SelectHostBufferSize( unsigned long suggestedLatencyFrames, 
+        unsigned long userFramesPerBuffer, PaAsioDriverInfo *driverInfo )
+{
+    unsigned long result = 0;
+
+    /* We select a host buffer size based on the following requirements 
+       (in priority order):
+
+        1. The host buffer size must be permissible according to the ASIO 
+           driverInfo buffer size constraints (min, max, granularity or 
+           powers-of-two).
+
+        2. If the user specifies a non-zero framesPerBuffer parameter 
+           (userFramesPerBuffer here) the host buffer should be a multiple of 
+           this (subject to the constraints in (1) above).
+
+           [NOTE: Where no permissible host buffer size is a multiple of 
+           userFramesPerBuffer, we choose a value as if userFramesPerBuffer were 
+           zero (i.e. we ignore it). This strategy is open for review ~ perhaps 
+           there are still "more optimal" buffer sizes related to 
+           userFramesPerBuffer that we could use.]
+
+        3. The host buffer size should be greater than or equal to 
+           suggestedLatencyFrames, subject to (1) and (2) above. Where it is not 
+           possible to select a host buffer size equal or greater than 
+           suggestedLatencyFrames, the highest buffer size conforming to (1) 
+           and (2) should be chosen.
+    */
+
+	if( userFramesPerBuffer != 0 )
+	{
+		/* userFramesPerBuffer is specified, try to find a buffer size that's a multiple of it */
+		result = SelectHostBufferSizeForSpecifiedUserFramesPerBuffer( 
+                suggestedLatencyFrames, userFramesPerBuffer, driverInfo );
+	}
+
+	if( result == 0 )
+	{
+		/* either userFramesPerBuffer was not specified, or we couldn't find a host buffer size that 
+		   is a multiple of it. Select a host buffer size according to suggestedLatencyFrames
+		   and the ASIO driverInfo buffer size constraints.
+	     */
+		result = SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer( 
+                suggestedLatencyFrames, driverInfo );
+	}
+
+	return result;
 }
 
 
