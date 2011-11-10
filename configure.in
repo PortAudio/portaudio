@@ -257,6 +257,13 @@ case "${host_os}" in
             LIBS="-lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lm -lole32 -luuid"
             CFLAGS="$CFLAGS -ffast-math -fomit-frame-pointer -I\$(top_srcdir)/src/hostapi/asio -I$ASIODIR/host/pc -I$ASIODIR/common -I$ASIODIR/host -UPA_USE_ASIO -DPA_USE_ASIO=1 -DWINDOWS"
+
+            dnl Setting the windows version flags below resolves a conflict between Interlocked* 
+            dnl definitions in mingw winbase.h and Interlocked* hacks in ASIO SDK combase.h 
+            dnl combase.h is included by asiodrvr.h
+            dnl PortAudio does not actually require Win XP (winver 501) APIs 
+            CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0501 -DWINVER=0x0501"
+            
             CXXFLAGS="$CFLAGS"
         fi
 
