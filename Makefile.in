@@ -18,7 +18,8 @@ libdir = @libdir@
 includedir = @includedir@
 CC = @CC@
 CXX = @CXX@
-CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/common -I$(top_srcdir)/src/os/unix @CFLAGS@ @DEFS@
+# note platform include directories are added to CFLAGS in configure.in
+CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/common @CFLAGS@ @DEFS@
 LIBS = @LIBS@
 AR = @AR@
 RANLIB = @RANLIB@
