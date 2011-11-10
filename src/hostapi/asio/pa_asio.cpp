@@ -1645,19 +1645,19 @@ static unsigned long NextPowerOfTwo( unsigned long x )
 
 
 static unsigned long SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer( 
-        unsigned long suggestedLatencyFrames, PaAsioDriverInfo *driverInfo )
+        unsigned long targetBufferingLatencyFrames, PaAsioDriverInfo *driverInfo )
 {
-	/* Choose a host buffer size based only on suggestedLatencyFrames and the 
+	/* Choose a host buffer size based only on targetBufferingLatencyFrames and the 
 	   device's supported buffer sizes. Always returns a valid value.
 	*/
 
 	unsigned long result;
 
-	if( suggestedLatencyFrames <= (unsigned long)driverInfo->bufferMinSize )
+	if( targetBufferingLatencyFrames <= (unsigned long)driverInfo->bufferMinSize )
     {
         result = driverInfo->bufferMinSize;
     }
-    else if( suggestedLatencyFrames >= (unsigned long)driverInfo->bufferMaxSize )
+    else if( targetBufferingLatencyFrames >= (unsigned long)driverInfo->bufferMaxSize )
     {
         result = driverInfo->bufferMaxSize;
     }
@@ -1676,7 +1676,7 @@ static unsigned long SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer(
         {
 		    /* We assume bufferMinSize and bufferMaxSize are powers of two. */
 
-            result = NextPowerOfTwo( suggestedLatencyFrames );
+            result = NextPowerOfTwo( targetBufferingLatencyFrames );
 
             if( result < (unsigned long)driverInfo->bufferMinSize )
                 result = driverInfo->bufferMinSize;
@@ -1687,7 +1687,7 @@ static unsigned long SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer(
         else /* modulo bufferGranularity */
         {
             /* round up to the next multiple of granularity */
-            unsigned long n = (suggestedLatencyFrames + driverInfo->bufferGranularity - 1) 
+            unsigned long n = (targetBufferingLatencyFrames + driverInfo->bufferGranularity - 1) 
                     / driverInfo->bufferGranularity;
             
             result = n * driverInfo->bufferGranularity;
@@ -1705,10 +1705,10 @@ static unsigned long SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer(
 
 
 static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer( 
-        unsigned long suggestedLatencyFrames, unsigned long userFramesPerBuffer,
+        unsigned long targetBufferingLatencyFrames, unsigned long userFramesPerBuffer,
         PaAsioDriverInfo *driverInfo )
 {
-	/* Select a host buffer size conforming to suggestedLatencyFrames 
+	/* Select a host buffer size conforming to targetBufferingLatencyFrames 
 	   and the device's supported buffer sizes.
 	   The return value will always be a multiple of userFramesPerBuffer. 
 	   If a valid buffer size can not be found the function returns 0.
@@ -1736,8 +1736,9 @@ static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer(
 
         /* Search all powers of two in the range [bufferMinSize,bufferMaxSize] 
            for multiples of userFramesPerBuffer. We prefer the first multiple
-           that is equal or greater than suggestedLatencyFrames, or failing 
-           that, the largest multiple less than suggestedLatencyFrames.
+           that is equal or greater than targetBufferingLatencyFrames, or  
+           failing that, the largest multiple less than 
+           targetBufferingLatencyFrames.
         */
         unsigned long x = (unsigned long)driverInfo->bufferMinSize; 
 		do {
@@ -1745,8 +1746,8 @@ static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer(
 			{
                 /* any power-of-two multiple of userFramesPerBuffer is acceptable */
 				result = x;
-				if( result >= suggestedLatencyFrames )
-					break; /* stop. a value >= to suggestedLatencyFrames is ideal. */
+				if( result >= targetBufferingLatencyFrames )
+					break; /* stop. a value >= to targetBufferingLatencyFrames is ideal. */
 			}
 
 			x *= 2;
@@ -1759,8 +1760,8 @@ static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer(
         /* Search all multiples of bufferGranularity in the range 
            [bufferMinSize,bufferMaxSize] for multiples of userFramesPerBuffer. 
            We prefer the first multiple that is equal or greater than 
-           suggestedLatencyFrames, or failing that, the largest multiple less 
-           than suggestedLatencyFrames.
+           targetBufferingLatencyFrames, or failing that, the largest multiple  
+           less than targetBufferingLatencyFrames.
         */
 		unsigned long x = (unsigned long)driverInfo->bufferMinSize; 
 		do {
@@ -1768,8 +1769,8 @@ static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer(
 			{
                 /* any power-of-two multiple of userFramesPerBuffer is acceptable */
 				result = x;
-				if( result >= suggestedLatencyFrames )
-					break; /* stop. a value >= to suggestedLatencyFrames is ideal. */
+				if( result >= targetBufferingLatencyFrames )
+					break; /* stop. a value >= to targetBufferingLatencyFrames is ideal. */
 			}
 
 			x += driverInfo->bufferGranularity;
@@ -1780,7 +1781,8 @@ static unsigned long SelectHostBufferSizeForSpecifiedUserFramesPerBuffer(
 }
 
 
-static unsigned long SelectHostBufferSize( unsigned long suggestedLatencyFrames, 
+static unsigned long SelectHostBufferSize( 
+        unsigned long targetBufferingLatencyFrames, 
         unsigned long userFramesPerBuffer, PaAsioDriverInfo *driverInfo )
 {
     unsigned long result = 0;
@@ -1803,27 +1805,29 @@ static unsigned long SelectHostBufferSize( unsigned long suggestedLatencyFrames,
            userFramesPerBuffer that we could use.]
 
         3. The host buffer size should be greater than or equal to 
-           suggestedLatencyFrames, subject to (1) and (2) above. Where it is not 
-           possible to select a host buffer size equal or greater than 
-           suggestedLatencyFrames, the highest buffer size conforming to (1) 
-           and (2) should be chosen.
+           targetBufferingLatencyFrames, subject to (1) and (2) above. Where it 
+           is not possible to select a host buffer size equal or greater than 
+           targetBufferingLatencyFrames, the highest buffer size conforming to  
+           (1) and (2) should be chosen.
     */
 
 	if( userFramesPerBuffer != 0 )
 	{
-		/* userFramesPerBuffer is specified, try to find a buffer size that's a multiple of it */
+		/* userFramesPerBuffer is specified, try to find a buffer size that's 
+           a multiple of it */
 		result = SelectHostBufferSizeForSpecifiedUserFramesPerBuffer( 
-                suggestedLatencyFrames, userFramesPerBuffer, driverInfo );
+                targetBufferingLatencyFrames, userFramesPerBuffer, driverInfo );
 	}
 
 	if( result == 0 )
 	{
-		/* either userFramesPerBuffer was not specified, or we couldn't find a host buffer size that 
-		   is a multiple of it. Select a host buffer size according to suggestedLatencyFrames
-		   and the ASIO driverInfo buffer size constraints.
+		/* either userFramesPerBuffer was not specified, or we couldn't find a 
+           host buffer size that is a multiple of it. Select a host buffer size 
+           according to targetBufferingLatencyFrames and the ASIO driverInfo 
+           buffer size constraints.
 	     */
 		result = SelectHostBufferSizeForUnspecifiedUserFramesPerBuffer( 
-                suggestedLatencyFrames, driverInfo );
+                targetBufferingLatencyFrames, driverInfo );
 	}
 
 	return result;
@@ -2248,12 +2252,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
            reliable, so we don't do it.
         */
 
-        unsigned long suggestedLatencyFrames = 
+        unsigned long targetBufferingLatencyFrames = 
                 (( suggestedInputLatencyFrames > suggestedOutputLatencyFrames )
                 ? suggestedInputLatencyFrames 
                 : suggestedOutputLatencyFrames);
 
-        framesPerHostBuffer = SelectHostBufferSize( suggestedLatencyFrames, 
+        framesPerHostBuffer = SelectHostBufferSize( targetBufferingLatencyFrames, 
                 framesPerBuffer, driverInfo );
     }
 
