@@ -1689,9 +1689,9 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
     
     if( userFramesPerBuffer == paFramesPerBufferUnspecified )
     {
-        unsigned long suggestedLatencyFrames = max( suggestedInputLatencyFrames, suggestedOutputLatencyFrames );
+        unsigned long targetBufferingLatencyFrames = max( suggestedInputLatencyFrames, suggestedOutputLatencyFrames );
 
-        *pollingPeriodFrames = suggestedLatencyFrames / 4;
+        *pollingPeriodFrames = targetBufferingLatencyFrames / 4;
         if( *pollingPeriodFrames < minimumPollingPeriodFrames )
         {
             *pollingPeriodFrames = minimumPollingPeriodFrames;
@@ -1702,14 +1702,14 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
         }
 
         *hostBufferSizeFrames = *pollingPeriodFrames 
-                + max( *pollingPeriodFrames + pollingJitterFrames, suggestedLatencyFrames);
+                + max( *pollingPeriodFrames + pollingJitterFrames, targetBufferingLatencyFrames);
     }
     else
     {
-        unsigned long suggestedLatencyFrames = suggestedInputLatencyFrames;
+        unsigned long targetBufferingLatencyFrames = suggestedInputLatencyFrames;
         if( isFullDuplex )
         {
-            /* in full duplex streams we know that the buffer adapter adds userFramesPerBuffer
+            /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
                extra fixed latency. so we subtract it here as a fixed latency before computing
                the buffer size. being careful not to produce an unrepresentable negative result.
                
@@ -1723,21 +1723,21 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
                         suggestedOutputLatencyFrames - userFramesPerBuffer;
 
                 /* maximum of input and adjusted output suggested latency */
-                if( adjustedSuggestedOutputLatencyFrames > suggestedInputLatencyFrames )
-                    suggestedLatencyFrames = adjustedSuggestedOutputLatencyFrames;
+                if( adjustedSuggestedOutputLatencyFrames > targetBufferingLatencyFrames )
+                    targetBufferingLatencyFrames = adjustedSuggestedOutputLatencyFrames;
             }
         }
         else
         {
             /* maximum of input and output suggested latency */
             if( suggestedOutputLatencyFrames > suggestedInputLatencyFrames )
-                suggestedLatencyFrames = suggestedOutputLatencyFrames;
+                targetBufferingLatencyFrames = suggestedOutputLatencyFrames;
         }   
 
         *hostBufferSizeFrames = userFramesPerBuffer 
-                + max( userFramesPerBuffer + pollingJitterFrames, suggestedLatencyFrames);
+                + max( userFramesPerBuffer + pollingJitterFrames, targetBufferingLatencyFrames);
 
-        *pollingPeriodFrames = max( max(1, userFramesPerBuffer / 4), suggestedLatencyFrames / 16 );
+        *pollingPeriodFrames = max( max(1, userFramesPerBuffer / 4), targetBufferingLatencyFrames / 16 );
 
         if( *pollingPeriodFrames > maximumPollingPeriodFrames )
         {
