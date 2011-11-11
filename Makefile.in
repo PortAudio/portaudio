@@ -18,8 +18,7 @@ libdir = @libdir@
 includedir = @includedir@
 CC = @CC@
 CXX = @CXX@
-# note platform include directories are added to CFLAGS in configure.in
-CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/common @CFLAGS@ @DEFS@
+CFLAGS = @CFLAGS@ @DEFS@
 LIBS = @LIBS@
 AR = @AR@
 RANLIB = @RANLIB@
