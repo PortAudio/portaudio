@@ -15757,13 +15757,15 @@ add_objects()
 
 INCLUDES=portaudio.h
 
+CFLAGS="$CFLAGS -I\$(top_srcdir)/include -I\$(top_srcdir)/src/common"
+
 case "${host_os}" in
   darwin* )
 
         $as_echo "#define PA_USE_COREAUDIO 1" >>confdefs.h
 
 
-        CFLAGS="$CFLAGS -I$(top_srcdir)/src/os/unix -Werror"
+        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Werror"
         LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework Carbon"
 
         if test "x$enable_mac_universal" = "xyes" ; then
@@ -15852,7 +15854,7 @@ case "${host_os}" in
   cygwin* )
 
         OTHER_OBJS="src/hostapi/wmme/pa_win_wmme.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_waveformat.o"
-        CFLAGS="$CFLAGS -I$(top_srcdir)/src/os/unix -DPA_USE_DS=0 -DPA_USE_WDMKS=0 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=0 -DPA_USE_WMME=1"
+        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/win -DPA_USE_DS=0 -DPA_USE_WDMKS=0 -DPA_USE_ASIO=0 -DPA_USE_WASAPI=0 -DPA_USE_WMME=1"
         LIBS="-lwinmm -lm"
         PADLL="portaudio.dll"
         THREAD_CFLAGS="-mthreads"
@@ -16006,7 +16008,7 @@ fi
                                 $as_echo "#define PA_USE_SGI 1" >>confdefs.h
 
 
-        CFLAGS="$CFLAGS -I$(top_srcdir)/src/os/unix"
+        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix"
 
                         THREAD_CFLAGS="-D_REENTRANT"
 
@@ -16019,7 +16021,7 @@ fi
 
   *)
 
-        CFLAGS="$CFLAGS -I$(top_srcdir)/src/os/unix"
+        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix"
 
         { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_create in -lpthread" >&5
 $as_echo_n "checking for pthread_create in -lpthread... " >&6; }
