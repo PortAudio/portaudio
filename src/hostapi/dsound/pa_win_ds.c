@@ -152,6 +152,13 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg );
 
 #define PA_DS_WIN_WDM_DEFAULT_LATENCY_    (.120)
 
+/* we allow the polling period to range between 1 and 100ms.
+   prior to August 2011 we limited the minimum polling period to 10ms.
+*/
+#define PA_DS_MINIMUM_POLLING_PERIOD_SECONDS    (0.001) /* 1ms */
+#define PA_DS_MAXIMUM_POLLING_PERIOD_SECONDS    (0.100) /* 100ms */
+#define PA_DS_POLLING_JITTER_SECONDS            (0.001) /* 1ms */
+
 #define SECONDS_PER_MSEC      (0.001)
 #define MSECS_PER_SECOND       (1000)
 
@@ -1336,6 +1343,13 @@ static PaError ValidateWinDirectSoundSpecificStreamInfo(
 	    {
 	        return paIncompatibleHostApiSpecificStreamInfo;
 	    }
+
+        if( streamInfo->flags & paWinDirectSoundUseLowLevelLatencyParameters )
+        {
+            if( streamInfo->framesPerBuffer <= 0 )
+                return paIncompatibleHostApiSpecificStreamInfo;
+
+        }
 	}
 
 	return paNoError;
@@ -1541,7 +1555,13 @@ static HRESULT InitFullDuplexInputOutputBuffers( PaWinDsStream *stream,
 #endif /* PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE */
 
 
-static HRESULT InitInputBuffer( PaWinDsStream *stream, PaWinDsDeviceInfo *device, PaSampleFormat sampleFormat, unsigned long nFrameRate, WORD nChannels, int bytesPerBuffer, PaWinWaveFormatChannelMask channelMask )
+static HRESULT InitInputBuffer( PaWinDsStream *stream, 
+                               PaWinDsDeviceInfo *device, 
+                               PaSampleFormat sampleFormat, 
+                               unsigned long nFrameRate, 
+                               WORD nChannels, 
+                               int bytesPerBuffer, 
+                               PaWinWaveFormatChannelMask channelMask )
 {
     DSCBUFFERDESC  captureDesc;
     PaWinWaveFormat waveFormat;
@@ -1582,7 +1602,10 @@ static HRESULT InitInputBuffer( PaWinDsStream *stream, PaWinDsDeviceInfo *device
 }
 
 
-static HRESULT InitOutputBuffer( PaWinDsStream *stream, PaWinDsDeviceInfo *device, PaSampleFormat sampleFormat, unsigned long nFrameRate, WORD nChannels, int bytesPerBuffer, PaWinWaveFormatChannelMask channelMask )
+static HRESULT InitOutputBuffer( PaWinDsStream *stream, PaWinDsDeviceInfo *device, 
+                                PaSampleFormat sampleFormat, unsigned long nFrameRate, 
+                                WORD nChannels, int bytesPerBuffer, 
+                                PaWinWaveFormatChannelMask channelMask )
 {
     HRESULT        result;
     HWND           hWnd;
@@ -1680,12 +1703,9 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
                                     unsigned long suggestedOutputLatencyFrames,
                                     double sampleRate, unsigned long userFramesPerBuffer )
 {
-    /* we allow the polling period to range between 1 and 100ms.
-       prior to August 2011 we limited the minimum polling period to 10ms.
-    */
-    unsigned long minimumPollingPeriodFrames = sampleRate / 1000; /* 1ms */
-    unsigned long maximumPollingPeriodFrames = sampleRate / 10; /* 100ms */ 
-    unsigned long pollingJitterFrames = sampleRate / 1000; /* 1ms */
+    unsigned long minimumPollingPeriodFrames = sampleRate * PA_DS_MINIMUM_POLLING_PERIOD_SECONDS;
+    unsigned long maximumPollingPeriodFrames = sampleRate * PA_DS_MAXIMUM_POLLING_PERIOD_SECONDS;
+    unsigned long pollingJitterFrames = sampleRate * PA_DS_POLLING_JITTER_SECONDS;
     
     if( userFramesPerBuffer == paFramesPerBufferUnspecified )
     {
@@ -1744,6 +1764,23 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
             *pollingPeriodFrames = maximumPollingPeriodFrames;
         }
     } 
+}
+
+
+static void CalculatePollingPeriodFrames( unsigned long hostBufferSizeFrames, 
+                                    unsigned long *pollingPeriodFrames,
+                                    double sampleRate, unsigned long userFramesPerBuffer )
+{
+    unsigned long minimumPollingPeriodFrames = sampleRate * PA_DS_MINIMUM_POLLING_PERIOD_SECONDS;
+    unsigned long maximumPollingPeriodFrames = sampleRate * PA_DS_MAXIMUM_POLLING_PERIOD_SECONDS;
+    unsigned long pollingJitterFrames = sampleRate * PA_DS_POLLING_JITTER_SECONDS;
+
+    *pollingPeriodFrames = max( max(1, userFramesPerBuffer / 4), hostBufferSizeFrames / 16 );
+
+    if( *pollingPeriodFrames > maximumPollingPeriodFrames )
+    {
+        *pollingPeriodFrames = maximumPollingPeriodFrames;
+    }
 }
 
 
@@ -1808,6 +1845,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     int inputChannelCount, outputChannelCount;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
+    int userRequestedHostInputBufferSizeFrames = 0;
+    int userRequestedHostOutputBufferSizeFrames = 0;
     unsigned long suggestedInputLatencyFrames, suggestedOutputLatencyFrames;
     PaWinDirectSoundStreamInfo *inputStreamInfo, *outputStreamInfo;
     PaWinWaveFormatChannelMask inputChannelMask, outputChannelMask;
@@ -1839,6 +1878,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         inputStreamInfo = (PaWinDirectSoundStreamInfo*)inputParameters->hostApiSpecificStreamInfo;
 		result = ValidateWinDirectSoundSpecificStreamInfo( inputParameters, inputStreamInfo );
 		if( result != paNoError ) return result;
+
+        if( inputStreamInfo && inputStreamInfo->flags & paWinDirectSoundUseLowLevelLatencyParameters )
+            userRequestedHostInputBufferSizeFrames = inputStreamInfo->framesPerBuffer;
 
         if( inputStreamInfo && inputStreamInfo->flags & paWinDirectSoundUseChannelMask )
             inputChannelMask = inputStreamInfo->channelMask;
@@ -1877,6 +1919,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		result = ValidateWinDirectSoundSpecificStreamInfo( outputParameters, outputStreamInfo );
 		if( result != paNoError ) return result;   
 
+        if( outputStreamInfo && outputStreamInfo->flags & paWinDirectSoundUseLowLevelLatencyParameters )
+            userRequestedHostOutputBufferSizeFrames = outputStreamInfo->framesPerBuffer;
+
         if( outputStreamInfo && outputStreamInfo->flags & paWinDirectSoundUseChannelMask )
             outputChannelMask = outputStreamInfo->channelMask;
         else
@@ -1888,6 +1933,16 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		outputSampleFormat = 0;
         suggestedOutputLatencyFrames = 0;
     }
+
+    /*
+        If low level host buffer size is specified for both input and output
+        the current code requires the sizes to match.
+    */
+
+    if( (userRequestedHostInputBufferSizeFrames > 0 && userRequestedHostOutputBufferSizeFrames > 0)
+            && userRequestedHostInputBufferSizeFrames != userRequestedHostOutputBufferSizeFrames )
+        return paIncompatibleHostApiSpecificStreamInfo;
+
 
 
     /*
@@ -2027,13 +2082,33 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         /* set up i/o parameters */
 
-        CalculateBufferSettings( &stream->hostBufferSizeFrames, &pollingPeriodFrames,
-                /* isFullDuplex = */ (inputParameters && outputParameters),
-                suggestedInputLatencyFrames,
-                suggestedOutputLatencyFrames, 
-                sampleRate, framesPerBuffer );
+        if( userRequestedHostInputBufferSizeFrames > 0 || userRequestedHostOutputBufferSizeFrames > 0 )
+        {
+            /* use low level parameters */
+
+            /* since we use the same host buffer size for input and output
+               we choose the highest user specified value.
+            */
+            stream->hostBufferSizeFrames = max( userRequestedHostInputBufferSizeFrames, userRequestedHostOutputBufferSizeFrames );
+
+            CalculatePollingPeriodFrames( 
+                    stream->hostBufferSizeFrames, &pollingPeriodFrames,
+                    sampleRate, framesPerBuffer );
+        }
+        else
+        {
+            CalculateBufferSettings( &stream->hostBufferSizeFrames, &pollingPeriodFrames,
+                    /* isFullDuplex = */ (inputParameters && outputParameters),
+                    suggestedInputLatencyFrames,
+                    suggestedOutputLatencyFrames, 
+                    sampleRate, framesPerBuffer );
+        }
 
         stream->pollingPeriodSeconds = pollingPeriodFrames / sampleRate;
+
+        DBUG(("DirectSound host buffer size frames: %d, polling period seconds: %f, @ sr: %f\n", 
+                stream->hostBufferSizeFrames, stream->pollingPeriodSeconds, sampleRate ));
+
 
         /* ------------------ OUTPUT */
         if( outputParameters )
