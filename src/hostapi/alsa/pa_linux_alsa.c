@@ -957,10 +957,10 @@ typedef struct
 
 HwDevInfo predefinedNames[] = {
     { "center_lfe", NULL, 0, 1, 0 },
-/* { "default", NULL, 0, 1, 0 }, */
-/* { "dmix", NULL, 0, 1, 0 }, */
+/* { "default", NULL, 0, 1, 1 }, */
+    { "dmix", NULL, 0, 1, 0 },
 /* { "dpl", NULL, 0, 1, 0 }, */
-/* { "dsnoop", NULL, 0, 1, 0 }, */
+/* { "dsnoop", NULL, 0, 0, 1 }, */
     { "front", NULL, 0, 1, 0 },
     { "iec958", NULL, 0, 1, 0 },
 /* { "modem", NULL, 0, 1, 0 }, */
