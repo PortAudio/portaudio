@@ -1628,12 +1628,19 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
         resultBufferSizeFrames = MAX( resultBufferSizeFrames, (UInt32) variableLatencyFrames );
     }
     
+    // can't have zero frames. code to round up to next user buffer requires non-zero
+    resultBufferSizeFrames = MAX( resultBufferSizeFrames, 1 );
+    
     if( requestedFramesPerBuffer != paFramesPerBufferUnspecified )
     {
         // make host buffer the next highest integer multiple of user frames per buffer
         UInt32 n = (resultBufferSizeFrames + requestedFramesPerBuffer - 1) / requestedFramesPerBuffer;
         resultBufferSizeFrames = n * requestedFramesPerBuffer;
 
+        
+        // FIXME: really we should be searching for a multiple of requestedFramesPerBuffer
+        // that is >= suggested latency and also fits within device buffer min/max
+        
     }else{
     	VDBUG( ("Block Size unspecified. Based on Latency, the user wants a Block Size near: %ld.\n",
             resultBufferSizeFrames ) );
