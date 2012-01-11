@@ -204,8 +204,40 @@ const char *PaMacCore_GetChannelName( int device, int channelIndex, bool input )
    return channelName;
 }
 
+    
+PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
+                                      long *minBufferSizeFrames, long *maxBufferSizeFrames )
+{
+    PaError result;
+    PaUtilHostApiRepresentation *hostApi;
+    
+    result = PaUtil_GetHostApiRepresentation( &hostApi, paCoreAudio );
+    
+    if( result == paNoError )
+    {
+        PaDeviceIndex hostApiDeviceIndex;
+        result = PaUtil_DeviceIndexToHostApiDeviceIndex( &hostApiDeviceIndex, device, hostApi );
+        if( result == paNoError )
+        {
+            PaMacAUHAL *macCoreHostApi = (PaMacAUHAL*)hostApi;
+            AudioDeviceID macCoreDeviceId = macCoreHostApi->devIds[hostApiDeviceIndex];
+            AudioValueRange audioRange;
+            UInt32 propSize = sizeof( audioRange );
+            
+            // return the size range for the output scope unless we only have inputs
+            Boolean isInput = 0;
+            if( macCoreHostApi->inheritedHostApiRep.deviceInfos[hostApiDeviceIndex]->maxOutputChannels == 0 )
+                isInput = 1;
+           
+            result = WARNING(AudioDeviceGetProperty( macCoreDeviceId, 0, isInput, kAudioDevicePropertyBufferFrameSizeRange, &propSize, &audioRange ) );
 
-
+            *minBufferSizeFrames = audioRange.mMinimum;
+            *maxBufferSizeFrames = audioRange.mMaximum;
+        }
+    }
+    
+    return result;
+}
 
 
 AudioDeviceID PaMacCore_GetStreamInputDevice( PaStream* s )
