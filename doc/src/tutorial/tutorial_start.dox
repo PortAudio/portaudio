@@ -1,25 +1,29 @@
 /** @page tutorial_start PortAudio Tutorials
 @ingroup tutorial
 
-@section tut_start1 Overview of PortAudio
+These tutorials takes you through a hands-on example of using PortAudio to make sound. If you'd prefer to start with a top-down overview of the PortAudio API, check out the @ref api_overview.
 
-PortAudio is a cross-platform, open-source C language library for real-time audio input and output. The library provides functions that allow your software to acquire and output real-time audio streams from your computer's sound card or audio interface. It is designed to simplify writing cross-platform audio applications, and also to simplify the development of audio software in general by hiding the complexities of dealing directly with each native audio API. PortAudio is used to implement sound recording, editing and mixing applications, software synthesizers, effects processors, music players, Internet telephony applications, software-defined radios and more. Supported platforms include Microsoft Windows®, Mac OS X and Linux. In addition to the C language, third-party language bindings make it possible to call PortAudio from other programming languages including C++, C#, Python, PureBasic, FreePascal and Lazarus.
+@section tut_start1 Downloading
 
-Among the operating systems and audio subsystems supported by PortAudio:
+First thing you need to do is download the PortAudio source code either <a href="http://www.portaudio.com/download.html">as a tarball from the website</a>, or <a href="http://www.portaudio.com/usingsvn.html">from the Subversion Repository</a>.
 
-- Windows
- - MME
- - DirectSound
- - WASAPI
- - ASIO
+@section tut_start2 Compiling
 
-- Mac OS X
- - Core Audio
+Once you've downloaded PortAudio you'll need to compile it, which of course, depends on your environment:
 
-- Linux
- - ALSA
- - JACK
- - OSS
+ - Windows
+   - \ref compile_windows
+   - \ref compile_windows_mingw
+   - \ref compile_windows_asio_msvc
+   - \ref compile_cmake
+ - Mac OS X
+   - \ref compile_mac_coreaudio
+ - POSIX
+   - \ref compile_linux
+
+Many platforms with GCC/make can use the simple ./configure && make combination and simply use the resulting libraries in their code.
+
+@section tut_start3 Programming with PortAudio
 
 Below are the steps to writing a PortAudio application:
 
@@ -32,31 +36,9 @@ Below are the steps to writing a PortAudio application:
 
 In addition to this "Callback" architecture, V19 also supports a "Blocking I/O" model which uses read and write calls which may be more familiar to non-audio programmers. Note that at this time, not all APIs support this functionality.
 
+In this tutorial, we'll show how to use the callback architecture to play a sawtooth wave. Much of the tutorial is taken from the file paex_saw.c, which is part of the PortAudio distribution. When you're done with this tutorial, you'll be armed with the basic knowledge you need to write an audio program. If you need more sample code, look in the "examples" and "test" directory of the PortAudio distribution. Another great source of info is the portaudio.h Doxygen page, which documents the entire V19 API. Also see the page for <a href="http://www.assembla.com/spaces/portaudio/wiki/Tips">tips on programming PortAudio</a> on the PortAudio wiki.
 
-@section tut_start2 Compiling
-
-First thing you'll need to know, after you've gotten PortAudio from the [wiki:UsingThePortAudioSvnRepository Subversion Repository] is how to compile your application, which of course, depends on your environment:
-
-<i>ED: not actually sure this is how it should be organized, since it's possible to compile for multiple interfaces.</i>
-
- - Windows
-   - \ref compile_windows
-   - \ref compile_windows_mingw
-   - \ref compile_windows_asio_msvc
-   - \ref compile_cmake
- - Mac OS X
-   - \ref compile_mac_coreaudio
- - POSIX
-   - \ref compile_linux
- - Others?
-
-Many platforms with GCC/make can use the simple ./configure && make combination and simply use the resulting libraries in their code.
-
-@section tut_start3 Programming with PortAudio
-
-In this tutorial, we'll show how to use the callback architecture to play a sawtooth wave. Much of the tutorial is taken from the file patest_saw.c, which is part of the PortAudio distribution. When you're done with this tutorial, you'll be armed with the basic knowledge you need to write an audio program. If you need more sample code, look in the "test" directory of the PortAudio distribution. Another great source of info is the portaudio.h Doxygen page, which documents the entire V19 API. Also see the page for tips on programming PortAudio located here: [http://www.assembla.com/spaces/portaudio/wiki/Tips].
-
-If you are upgrading from V18, you may want to see our [http://www.portaudio.com/docs/proposals/index.html Proposed Enhancements to PortAudio], which describes the differences between V18 and V19.
+If you are upgrading from V18, you may want to look at the <a href="http://www.portaudio.com/docs/proposals/index.html">Proposed Enhancements to PortAudio</a>, which describes the differences between V18 and V19.
 
 - \ref writing_a_callback
 - \ref initializing_portaudio
@@ -66,12 +48,8 @@ If you are upgrading from V18, you may want to see our [http://www.portaudio.com
 - \ref utility_functions
 - \ref querying_devices
 - \ref blocking_read_write
-- \ref exploring
 
-Once you understand how PortAudio works, you might be interested in \ref exploring.
-
-TO DO:
- * Complete tutorial with utility and info about querying devices/opening non-default devices
+Once you have a basic understanding of how to use PortAudio, you might be interested in \ref exploring.
 
 Next: \ref writing_a_callback
 
