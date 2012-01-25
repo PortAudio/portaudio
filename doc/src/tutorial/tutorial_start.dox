@@ -1,0 +1,78 @@
+/** @page tutorial_start PortAudio Tutorials
+@ingroup tutorial
+
+@section tut_start1 Overview of PortAudio
+
+PortAudio is a cross-platform, open-source C language library for real-time audio input and output. The library provides functions that allow your software to acquire and output real-time audio streams from your computer's sound card or audio interface. It is designed to simplify writing cross-platform audio applications, and also to simplify the development of audio software in general by hiding the complexities of dealing directly with each native audio API. PortAudio is used to implement sound recording, editing and mixing applications, software synthesizers, effects processors, music players, Internet telephony applications, software-defined radios and more. Supported platforms include Microsoft Windows®, Mac OS X and Linux. In addition to the C language, third-party language bindings make it possible to call PortAudio from other programming languages including C++, C#, Python, PureBasic, FreePascal and Lazarus.
+
+Among the operating systems and audio subsystems supported by PortAudio:
+
+- Windows
+ - MME
+ - DirectSound
+ - WASAPI
+ - ASIO
+
+- Mac OS X
+ - Core Audio
+
+- Linux
+ - ALSA
+ - JACK
+ - OSS
+
+Below are the steps to writing a PortAudio application:
+
+ - Write a callback function that will be called by PortAudio when audio processing is needed.
+ - Initialize the PA library and open a stream for audio I/O.
+ - Start the stream. Your callback function will be now be called repeatedly by PA in the background.
+ - In your callback you can read audio data from the inputBuffer and/or write data to the outputBuffer.
+ - Stop the stream by returning 1 from your callback, or by calling a stop function.
+ - Close the stream and terminate the library.
+
+In addition to this "Callback" architecture, V19 also supports a "Blocking I/O" model which uses read and write calls which may be more familiar to non-audio programmers. Note that at this time, not all APIs support this functionality.
+
+
+@section tut_start2 Compiling
+
+First thing you'll need to know, after you've gotten PortAudio from the [wiki:UsingThePortAudioSvnRepository Subversion Repository] is how to compile your application, which of course, depends on your environment:
+
+<i>ED: not actually sure this is how it should be organized, since it's possible to compile for multiple interfaces.</i>
+
+ - Windows
+   - \ref compile_windows
+   - \ref compile_windows_mingw
+   - \ref compile_windows_asio_msvc
+   - \ref compile_cmake
+ - Mac OS X
+   - \ref compile_mac_coreaudio
+ - POSIX
+   - \ref compile_linux
+ - Others?
+
+Many platforms with GCC/make can use the simple ./configure && make combination and simply use the resulting libraries in their code.
+
+@section tut_start3 Programming with PortAudio
+
+In this tutorial, we'll show how to use the callback architecture to play a sawtooth wave. Much of the tutorial is taken from the file patest_saw.c, which is part of the PortAudio distribution. When you're done with this tutorial, you'll be armed with the basic knowledge you need to write an audio program. If you need more sample code, look in the "test" directory of the PortAudio distribution. Another great source of info is the portaudio.h Doxygen page, which documents the entire V19 API. Also see the page for tips on programming PortAudio located here: [http://www.assembla.com/spaces/portaudio/wiki/Tips].
+
+If you are upgrading from V18, you may want to see our [http://www.portaudio.com/docs/proposals/index.html Proposed Enhancements to PortAudio], which describes the differences between V18 and V19.
+
+- \ref writing_a_callback
+- \ref initializing_portaudio
+- \ref open_default_stream
+- \ref start_stop_abort
+- \ref terminating_portaudio
+- \ref utility_functions
+- \ref querying_devices
+- \ref blocking_read_write
+- \ref exploring
+
+Once you understand how PortAudio works, you might be interested in \ref exploring.
+
+TO DO:
+ * Complete tutorial with utility and info about querying devices/opening non-default devices
+
+Next: \ref writing_a_callback
+
+*/
