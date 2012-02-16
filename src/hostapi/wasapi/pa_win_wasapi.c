@@ -4799,13 +4799,15 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					// output
 					if (stream->bufferMode == paUtilFixedHostBufferSize)
 					{
-						if (frames >= stream->out.framesPerBuffer)
+						while (frames >= stream->out.framesPerBuffer)
 						{
 							if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
 							{
 								LogHostError(hr);
 								goto thread_error;
 							}
+
+							frames -= stream->out.framesPerBuffer;
 						}
 					}
 					else
