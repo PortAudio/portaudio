@@ -1248,7 +1248,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                         goto error;
                     }
 					if (value.pwszVal)
-						wcstombs(deviceName, value.pwszVal, MAX_STR_LEN-1);
+						WideCharToMultiByte(CP_UTF8, 0, value.pwszVal, (int)wcslen(value.pwszVal), deviceName, MAX_STR_LEN-1, 0, 0);
 					else
 						_snprintf(deviceName, MAX_STR_LEN-1, "baddev%d", i);
                     deviceInfo->name = deviceName;
@@ -2211,11 +2211,15 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	if (framesPerLatency == 0)
 		framesPerLatency = MakeFramesFromHns(pInfo->DefaultDevicePeriod, pSub->wavex.Format.nSamplesPerSec);
 
-	//! Exclusive Input stream renders data in 6 packets, we must set then the size of
-	//! single packet, total buffer size, e.g. required latency will be PacketSize * 6
+	// Exclusive Input stream renders data in 6 packets, we must set then the size of
+	// single packet, total buffer size, e.g. required latency will be PacketSize * 6
 	if (!output && (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE))
 	{
-		framesPerLatency /= WASAPI_PACKETS_PER_INPUT_BUFFER;
+		// Do it only for Polling mode
+		if ((pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)
+		{
+			framesPerLatency /= WASAPI_PACKETS_PER_INPUT_BUFFER;
+		}
 	}
 
 	// Calculate aligned period
@@ -3460,7 +3464,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
 
 		// Limit desired to amount of requested frames
 		desired = available;
-		if (desired > frames)
+		if ((UINT32)desired > frames)
 			desired = frames;
 		
 		// Get pointers to read regions
