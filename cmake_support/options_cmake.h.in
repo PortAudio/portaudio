@@ -21,11 +21,11 @@
 #error "This header needs to be included before pa_hostapi.h!!"
 #endif
 
-#define PA_USE_ASIO     @PA_ENABLE_ASIO@
-#define PA_USE_DS       @PA_ENABLE_DSOUND@
-#define PA_USE_WMME     @PA_ENABLE_WMME@
-#define PA_USE_WASAPI   @PA_ENABLE_WASAPI@
-#define PA_USE_WDMKS    @PA_ENABLE_WDMKS@
+#cmakedefine01 PA_USE_ASIO
+#cmakedefine01 PA_USE_DS
+#cmakedefine01 PA_USE_WMME
+#cmakedefine01 PA_USE_WASAPI
+#cmakedefine01 PA_USE_WDMKS
 #else
 #error "Platform currently not supported by CMake script"
 #endif

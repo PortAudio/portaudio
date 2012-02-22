@@ -257,7 +257,7 @@ struct __PaWinWdmPin
     unsigned long               frameSize;
     int                         maxChannels;
     unsigned long               formats;
-    int                         bestSampleRate;
+    int                         defaultSampleRate;
     ULONG                       *positionRegister;  /* WaveRT */
     ULONG                       hwLatency;          /* WaveRT */
     FunctionMemoryBarrier       fnMemBarrier;       /* WaveRT */
@@ -1217,6 +1217,44 @@ static PaError GetNameFromCategory(const GUID* pGUID, BOOL input, wchar_t* name,
     return result;
 }
 
+static BOOL IsFrequencyWithinRange(const KSDATARANGE_AUDIO* range, int frequency)
+{
+    if (frequency < (int)range->MinimumSampleFrequency)
+        return FALSE;
+    if (frequency > (int)range->MaximumSampleFrequency)
+        return FALSE;
+    return TRUE;
+}
+
+static BOOL IsBitsWithinRange(const KSDATARANGE_AUDIO* range, int noOfBits)
+{
+    if (noOfBits < (int)range->MinimumBitsPerSample)
+        return FALSE;
+    if (noOfBits > (int)range->MaximumBitsPerSample)
+        return FALSE;
+    return TRUE;
+}
+
+static int SearchDefaultSampleFrequency(const KSDATARANGE_AUDIO* range)
+{
+    /* Note: Somewhat different order compared to WMME implementation, as we want to focus on fidelity first */
+    static const int defaultSampleRateSearchOrder[] =
+    { 44100, 48000, 88200, 96000, 192000, 32000, 24000, 22050, 16000, 12000, 11025, 9600, 8000 };
+    static const int defaultSampleRateSearchOrderCount = sizeof(defaultSampleRateSearchOrder)/sizeof(defaultSampleRateSearchOrder[0]);
+    int i;
+
+    for(i=0; i < defaultSampleRateSearchOrderCount; ++i)
+    {
+        int currentFrequency = defaultSampleRateSearchOrder[i];
+
+        if (IsFrequencyWithinRange(range, currentFrequency))
+        {
+            return currentFrequency;
+        }
+    }
+
+    return 0;
+}
 
 /*
 Create a new pin object belonging to a filter
@@ -1398,7 +1436,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
     result = paUnanticipatedHostError;
     dataRange = pin->dataRanges;
     pin->maxChannels = 0;
-    pin->bestSampleRate = 0;
+    pin->defaultSampleRate = 0;
     pin->formats = 0;
     PA_DEBUG(("PinNew: Checking %u no of dataranges...\n", pin->dataRangesItem->Count));
     for( i = 0; i < pin->dataRangesItem->Count; i++)
@@ -1424,26 +1462,22 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
             PA_DEBUG(("PinNew: MaxChannel: %d\n",pin->maxChannels));
 
             /* Record the formats (bit depths) that are supported */
-            if( ((KSDATARANGE_AUDIO*)dataRange)->MinimumBitsPerSample <= 8 &&
-                ((KSDATARANGE_AUDIO*)dataRange)->MaximumBitsPerSample >= 8)
+            if( IsBitsWithinRange((KSDATARANGE_AUDIO*)dataRange, 8) )
             {
                 pin->formats |= paInt8;
                 PA_DEBUG(("PinNew: Format PCM 8 bit supported\n"));
             }
-            if( ((KSDATARANGE_AUDIO*)dataRange)->MinimumBitsPerSample <= 16 &&
-                ((KSDATARANGE_AUDIO*)dataRange)->MaximumBitsPerSample >= 16)
+            if( IsBitsWithinRange((KSDATARANGE_AUDIO*)dataRange, 16) )
             {
                 pin->formats |= paInt16;
                 PA_DEBUG(("PinNew: Format PCM 16 bit supported\n"));
             }
-            if( ((KSDATARANGE_AUDIO*)dataRange)->MinimumBitsPerSample <= 24 &&
-                ((KSDATARANGE_AUDIO*)dataRange)->MaximumBitsPerSample >= 24 )
+            if( IsBitsWithinRange((KSDATARANGE_AUDIO*)dataRange, 24) )
             {
                 pin->formats |= paInt24;
                 PA_DEBUG(("PinNew: Format PCM 24 bit supported\n"));
             }
-            if( ((KSDATARANGE_AUDIO*)dataRange)->MinimumBitsPerSample <= 32 &&
-                ((KSDATARANGE_AUDIO*)dataRange)->MaximumBitsPerSample >= 32 )
+            if( IsBitsWithinRange((KSDATARANGE_AUDIO*)dataRange, 32) )
             {
                 if (IsEqualGUID(&dataRange->SubFormat, &KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
                 {
@@ -1456,23 +1490,11 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                     PA_DEBUG(("PinNew: Format PCM 32 bit supported\n"));
                 }
             }
-            if( ( pin->bestSampleRate != 48000) &&
-                (((KSDATARANGE_AUDIO*)dataRange)->MaximumSampleFrequency >= 48000) &&
-                (((KSDATARANGE_AUDIO*)dataRange)->MinimumSampleFrequency <= 48000) )
+
+            if (pin->defaultSampleRate == 0)
             {
-                pin->bestSampleRate = 48000;
-                PA_DEBUG(("PinNew: 48kHz supported\n"));
-            }
-            else if(( pin->bestSampleRate != 48000) && ( pin->bestSampleRate != 44100 ) &&
-                (((KSDATARANGE_AUDIO*)dataRange)->MaximumSampleFrequency >= 44100) &&
-                (((KSDATARANGE_AUDIO*)dataRange)->MinimumSampleFrequency <= 44100) )
-            {
-                pin->bestSampleRate = 44100;
-                PA_DEBUG(("PinNew: 44.1kHz supported\n"));
-            }
-            else
-            {
-                pin->bestSampleRate = ((KSDATARANGE_AUDIO*)dataRange)->MaximumSampleFrequency;
+                pin->defaultSampleRate = SearchDefaultSampleFrequency((KSDATARANGE_AUDIO*)dataRange);
+                PA_DEBUG(("PinNew: Default sample rate = %d Hz\n", pin->defaultSampleRate));
             }
         }
         dataRange = (KSDATARANGE*)( ((char*)dataRange) + dataRange->FormatSize);
@@ -1553,6 +1575,17 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                     {
                         result = GetNameFromCategory(&category, (pin->dataFlow == KSPIN_DATAFLOW_OUT), pin->friendlyName, MAX_PATH);
                     }
+                }
+
+                /* Make sure pin gets a name here... */
+                if (wcslen(pin->friendlyName) == 0)
+                {
+                    wcscpy(pin->friendlyName, (pin->dataFlow == KSPIN_DATAFLOW_IN) ? L"Output" : L"Input");
+#ifdef UNICODE
+                    PA_DEBUG(("PinNew: Setting pin friendly name to '%s'\n", pin->friendlyName));
+#else
+                    PA_DEBUG(("PinNew: Setting pin friendly name to '%S'\n", pin->friendlyName));
+#endif
                 }
 
                 /* This is then == the endpoint pin */
@@ -1658,25 +1691,28 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
                                 if (result == paNoError && wcslen(pinName)>0)
                                 {
-                                    wcstombs(pin->friendlyName, pinName, MAX_PATH);
+                                    wcsncpy(pin->friendlyName, pinName, MAX_PATH);
                                 }
                                 else
 #endif
                                 {
                                     result = GetNameFromCategory(&category, (pin->dataFlow == KSPIN_DATAFLOW_OUT), pin->friendlyName, MAX_PATH);
-
-                                    if (result != paNoError)
-                                    {
-                                        wcscpy(pin->friendlyName, L"Output");
-                                    }
                                 }
 
+                                if (wcslen(pin->friendlyName) == 0)
+                                {
+                                    wcscpy(pin->friendlyName, L"Output");
+                                }
+#ifdef UNICODE
+                                PA_DEBUG(("PinNew: Pin name '%s'\n", pin->friendlyName));
+#else
                                 PA_DEBUG(("PinNew: Pin name '%S'\n", pin->friendlyName));
+#endif                                
                             }
 
                             /* Set endpoint pin ID (this is the topology INPUT pin, since portmixer will always traverse the
                             filter in audio streaming direction, see http://msdn.microsoft.com/en-us/library/windows/hardware/ff536331(v=vs.85).aspx
-                            for more information.
+                            for more information)
                             */
                             pin->endpointPinId = pc->Pin;
                         }
@@ -1736,11 +1772,6 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                                             if (result != paNoError)
                                             {
                                                 result = GetNameFromCategory(&category, TRUE, pin->friendlyName, MAX_PATH);
-
-                                                if( result != paNoError )
-                                                {
-                                                    wcscpy(pin->friendlyName, L"Input");
-                                                }
                                             }
                                             break;
                                         }
@@ -1754,12 +1785,26 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                                             }
                                         }
                                     }
+                                    else
+                                    {
+                                        PA_DEBUG(("PinNew: Failed to get pin category"));
+                                    }
                                 }
                             }
 
                             if (muxCount == 0)
                             {
                                 pin->endpointPinId = endpointPinId;
+                                /* Make sure we get a name for the pin */
+                                if (wcslen(pin->friendlyName) == 0)
+                                {
+                                    wcscpy(pin->friendlyName, L"Input");
+                                }
+#ifdef UNICODE
+                                PA_DEBUG(("PinNew: Input friendly name '%s'\n", pin->friendlyName));
+#else
+                                PA_DEBUG(("PinNew: Input friendly name '%S'\n", pin->friendlyName));
+#endif
                             }
                             else // muxCount > 0
                             {
@@ -1777,6 +1822,8 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
                                 for (i = 0; i < muxCount; ++muxPos)
                                 {
+                                    PA_DEBUG(("PinNew: Setting up input %u...\n", i));
+
                                     if (pin->inputs[i] == NULL)
                                     {
                                         pin->inputs[i] = (PaWinWdmMuxedInput*)PaUtil_AllocateMemory(sizeof(PaWinWdmMuxedInput));
@@ -1814,25 +1861,29 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
                                         if (result == paNoError)
                                         {
-                                            result = GetNameFromCategory(&category, TRUE, pin->inputs[i]->friendlyName, MAX_PATH);
-                                            if (result == paNoError)
-                                            {
-                                                /* Try pin name also, and if that is defined, use that instead */
-                                                result = WdmGetPinPropertySimple(pin->parentFilter->topologyFilter->handle,
-                                                    endpointPinId,
-                                                    &KSPROPSETID_Pin,
-                                                    KSPROPERTY_PIN_NAME,
-                                                    pin->inputs[i]->friendlyName,
-                                                    MAX_PATH,
-                                                    NULL);
+                                            /* Try pin name first, and if that is not defined, use category instead */
+                                            result = WdmGetPinPropertySimple(pin->parentFilter->topologyFilter->handle,
+                                                endpointPinId,
+                                                &KSPROPSETID_Pin,
+                                                KSPROPERTY_PIN_NAME,
+                                                pin->inputs[i]->friendlyName,
+                                                MAX_PATH,
+                                                NULL);
 
+                                            if (result != paNoError)
+                                            {
+                                                result = GetNameFromCategory(&category, TRUE, pin->inputs[i]->friendlyName, MAX_PATH);
                                                 if (result != paNoError)
                                                 {
                                                     _snwprintf(pin->inputs[i]->friendlyName, MAX_PATH, L"Input %d", i + 1);
                                                 }
-
-                                                ++i;
                                             }
+#ifdef UNICODE
+                                            PA_DEBUG(("PinNew: Input (%u) friendly name '%s'\n", i, pin->inputs[i]->friendlyName));
+#else
+                                            PA_DEBUG(("PinNew: Input (%u) friendly name '%S'\n", i, pin->inputs[i]->friendlyName));
+#endif
+                                            ++i;
                                         }
                                     }
                                     else
@@ -2847,14 +2898,21 @@ static PaWinWdmPin* FilterCreatePin(PaWinWdmFilter* filter,
     return result == paNoError ? pin : 0;
 }
 
+static const wchar_t kUsbPrefix[] = L"\\\\?\\USB";
+
 static BOOL IsUSBDevice(const wchar_t* devicePath)
 {
-    return (wcscmp(devicePath, L"\\\\?\\USB") == 0);
+    /* Alex Lessard pointed out that different devices might present the device path with
+       lower case letters. */
+    return (_wcsnicmp(devicePath, kUsbPrefix, sizeof(kUsbPrefix)/sizeof(kUsbPrefix[0]) ) == 0);
 }
+
+/* This should make it more language tolerant, I hope... */
+static const wchar_t kUsbNamePrefix[] = L"USB Audio";
 
 static BOOL IsNameUSBAudioDevice(const wchar_t* friendlyName)
 {
-    return (wcscmp(friendlyName, L"USB Audio Device") == 0);
+    return (_wcsnicmp(friendlyName, kUsbNamePrefix, sizeof(kUsbNamePrefix)/sizeof(kUsbNamePrefix[0])) == 0);
 }
 
 typedef enum _tag_EAlias
@@ -3475,7 +3533,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                         }
                         deviceInfo->defaultHighInputLatency = (4096.0/48000.0);
                         deviceInfo->defaultHighOutputLatency = (4096.0/48000.0);
-                        deviceInfo->defaultSampleRate = (double)(pin->bestSampleRate);
+                        deviceInfo->defaultSampleRate = (double)(pin->defaultSampleRate);
                         break;
                     case Type_kWaveRT:
                         /* This is also a conservative estimate, based on WaveRT polled mode. In polled mode, the latency will be dictated
@@ -3484,7 +3542,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                         deviceInfo->defaultLowOutputLatency = 0.01;
                         deviceInfo->defaultHighInputLatency = 0.04;
                         deviceInfo->defaultHighOutputLatency = 0.04;
-                        deviceInfo->defaultSampleRate = (double)(pin->bestSampleRate);
+                        deviceInfo->defaultSampleRate = (double)(pin->defaultSampleRate);
                         break;
                     default:
                         assert(0);
@@ -5496,8 +5554,8 @@ static PaError PaDoProcessing(PaProcessThreadInfo* pInfo)
         if (inputFramesAvailable && (!pInfo->stream->userOutputChannels || inputFramesAvailable >= (int)pInfo->stream->render.framesPerBuffer))
         {
             unsigned wrapCntr = 0;
-            char* data[2] = {0,0};
-            ring_buffer_size_t size[2] = {0,0};
+            char* data[2] = {0};
+            ring_buffer_size_t size[2] = {0};
 
             /* If full-duplex, we just extract output buffer number of frames */
             if (pInfo->stream->userOutputChannels)
@@ -5527,17 +5585,6 @@ static PaError PaDoProcessing(PaProcessThreadInfo* pInfo)
                         pInfo->stream->deviceInputChannels);
                 }
             }
-#if 0
-            if (pInfo->stream->userOutputChannels && pInfo->stream->capture.framesPerBuffer <= pInfo->stream->render.framesPerBuffer)
-            {
-                ring_buffer_size_t n = PaUtil_GetRingBufferReadAvailable(&pInfo->stream->ringBuffer);
-                if (n - inputFramesAvailable > 0)
-                {
-                    PA_HP_TRACE((pInfo->stream->hLog, "Synchronizing input buffer (read advance = %d) ", n - inputFramesAvailable));
-                    PaUtil_AdvanceRingBufferReadIndex(&pInfo->stream->ringBuffer, n - inputFramesAvailable);
-                }
-            }
-#endif
         }
         else
         {
@@ -6472,7 +6519,6 @@ static PaError PaPinRenderEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo, 
     pos %= pRender->hostBufferSize;
     /* And align it, not sure its really needed though */
     pos &= ~(pRender->bytesPerFrame - 1);
-
 
     if (pInfo->priming)
     {
