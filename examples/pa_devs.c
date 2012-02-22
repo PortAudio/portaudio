@@ -49,6 +49,8 @@
 #include "portaudio.h"
 
 #ifdef WIN32
+#include <windows.h>
+
 #if PA_USE_ASIO
 #include "pa_asio.h"
 #endif
@@ -157,7 +159,15 @@ int main(void)
             printf( " ]\n" );
 
     /* print device info fields */
+#ifdef WIN32
+        {   /* Use wide char on windows, so we can show UTF-8 encoded device names */
+            wchar_t wideName[MAX_PATH];
+            MultiByteToWideChar(CP_UTF8, 0, deviceInfo->name, -1, wideName, MAX_PATH-1);
+            wprintf( L"Name                        = %s\n", wideName );
+        }
+#else
         printf( "Name                        = %s\n", deviceInfo->name );
+#endif
         printf( "Host API                    = %s\n",  Pa_GetHostApiInfo( deviceInfo->hostApi )->name );
         printf( "Max inputs = %d", deviceInfo->maxInputChannels  );
         printf( ", Max outputs = %d\n", deviceInfo->maxOutputChannels  );
