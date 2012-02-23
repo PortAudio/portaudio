@@ -1031,8 +1031,6 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     PaAsioHostApiRepresentation *asioHostApi;
     PaAsioDeviceInfo *deviceInfoArray;
     char **names;
-    PaAsioDriverInfo paAsioDriverInfo;
-
     asioHostApi = (PaAsioHostApiRepresentation*)PaUtil_AllocateMemory( sizeof(PaAsioHostApiRepresentation) );
     if( !asioHostApi )
     {
@@ -1142,6 +1140,13 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 
         for( i=0; i < driverCount; ++i )
         {
+            /* Due to the headless design of the ASIO API, drivers are free to write over data given to them (like M-Audio
+               drivers f.i.). This is an attempt to overcome that. */
+            union _tag_local {
+                PaAsioDriverInfo info;
+                char _padding[4096];
+            } paAsioDriver;
+
 
             PA_DEBUG(("ASIO names[%d]:%s\n",i,names[i]));
 
@@ -1176,7 +1181,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 
 
             /* Attempt to load the asio driver... */
-            if( LoadAsioDriver( asioHostApi, names[i], &paAsioDriverInfo, asioHostApi->systemSpecific ) == paNoError )
+            if( LoadAsioDriver( asioHostApi, names[i], &paAsioDriver.info, asioHostApi->systemSpecific ) == paNoError )
             {
                 PaAsioDeviceInfo *asioDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &asioDeviceInfo->commonDeviceInfo;
@@ -1186,15 +1191,15 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 
                 deviceInfo->name = names[i];
                 PA_DEBUG(("PaAsio_Initialize: drv:%d name = %s\n",  i,deviceInfo->name));
-                PA_DEBUG(("PaAsio_Initialize: drv:%d inputChannels       = %d\n", i, paAsioDriverInfo.inputChannelCount));
-                PA_DEBUG(("PaAsio_Initialize: drv:%d outputChannels      = %d\n", i, paAsioDriverInfo.outputChannelCount));
-                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferMinSize       = %d\n", i, paAsioDriverInfo.bufferMinSize));
-                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferMaxSize       = %d\n", i, paAsioDriverInfo.bufferMaxSize));
-                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferPreferredSize = %d\n", i, paAsioDriverInfo.bufferPreferredSize));
-                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferGranularity   = %d\n", i, paAsioDriverInfo.bufferGranularity));
+                PA_DEBUG(("PaAsio_Initialize: drv:%d inputChannels       = %d\n", i, paAsioDriver.info.inputChannelCount));
+                PA_DEBUG(("PaAsio_Initialize: drv:%d outputChannels      = %d\n", i, paAsioDriver.info.outputChannelCount));
+                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferMinSize       = %d\n", i, paAsioDriver.info.bufferMinSize));
+                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferMaxSize       = %d\n", i, paAsioDriver.info.bufferMaxSize));
+                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferPreferredSize = %d\n", i, paAsioDriver.info.bufferPreferredSize));
+                PA_DEBUG(("PaAsio_Initialize: drv:%d bufferGranularity   = %d\n", i, paAsioDriver.info.bufferGranularity));
 
-                deviceInfo->maxInputChannels  = paAsioDriverInfo.inputChannelCount;
-                deviceInfo->maxOutputChannels = paAsioDriverInfo.outputChannelCount;
+                deviceInfo->maxInputChannels  = paAsioDriver.info.inputChannelCount;
+                deviceInfo->maxOutputChannels = paAsioDriver.info.outputChannelCount;
 
                 deviceInfo->defaultSampleRate = 0.;
                 bool foundDefaultSampleRate = false;
@@ -1222,13 +1227,13 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                     */
 
                     double defaultLowLatency =
-                            paAsioDriverInfo.bufferPreferredSize / deviceInfo->defaultSampleRate;
+                            paAsioDriver.info.bufferPreferredSize / deviceInfo->defaultSampleRate;
 
                     deviceInfo->defaultLowInputLatency = defaultLowLatency;
                     deviceInfo->defaultLowOutputLatency = defaultLowLatency;
 
                     double defaultHighLatency =
-                            paAsioDriverInfo.bufferMaxSize / deviceInfo->defaultSampleRate;
+                            paAsioDriver.info.bufferMaxSize / deviceInfo->defaultSampleRate;
 
                     if( defaultHighLatency < defaultLowLatency )
                         defaultHighLatency = defaultLowLatency; /* just in case the driver returns something strange */ 
@@ -1249,10 +1254,10 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                 PA_DEBUG(("PaAsio_Initialize: drv:%d defaultHighInputLatency = %f\n", i, deviceInfo->defaultHighInputLatency));
                 PA_DEBUG(("PaAsio_Initialize: drv:%d defaultHighOutputLatency = %f\n", i, deviceInfo->defaultHighOutputLatency));
 
-                asioDeviceInfo->minBufferSize = paAsioDriverInfo.bufferMinSize;
-                asioDeviceInfo->maxBufferSize = paAsioDriverInfo.bufferMaxSize;
-                asioDeviceInfo->preferredBufferSize = paAsioDriverInfo.bufferPreferredSize;
-                asioDeviceInfo->bufferGranularity = paAsioDriverInfo.bufferGranularity;
+                asioDeviceInfo->minBufferSize = paAsioDriver.info.bufferMinSize;
+                asioDeviceInfo->maxBufferSize = paAsioDriver.info.bufferMaxSize;
+                asioDeviceInfo->preferredBufferSize = paAsioDriver.info.bufferPreferredSize;
+                asioDeviceInfo->bufferGranularity = paAsioDriver.info.bufferGranularity;
 
 
                 asioDeviceInfo->asioChannelInfos = (ASIOChannelInfo*)PaUtil_GroupAllocateMemory(

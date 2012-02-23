@@ -1532,6 +1532,8 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
     {
         ULONG topoPinId = GetConnectedPin(pinId, (pin->dataFlow == KSPIN_DATAFLOW_IN), parentFilter, -1, NULL, NULL);
+        const wchar_t kInputName[] = L"Input";
+        const wchar_t kOutputName[] = L"Output";
 
         if (topoPinId != KSFILTER_NODE)
         {
@@ -1580,7 +1582,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                 /* Make sure pin gets a name here... */
                 if (wcslen(pin->friendlyName) == 0)
                 {
-                    wcscpy(pin->friendlyName, (pin->dataFlow == KSPIN_DATAFLOW_IN) ? L"Output" : L"Input");
+                    wcscpy(pin->friendlyName, (pin->dataFlow == KSPIN_DATAFLOW_IN) ? kOutputName : kInputName);
 #ifdef UNICODE
                     PA_DEBUG(("PinNew: Setting pin friendly name to '%s'\n", pin->friendlyName));
 #else
@@ -1798,7 +1800,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                                 /* Make sure we get a name for the pin */
                                 if (wcslen(pin->friendlyName) == 0)
                                 {
-                                    wcscpy(pin->friendlyName, L"Input");
+                                    wcscpy(pin->friendlyName, kInputName);
                                 }
 #ifdef UNICODE
                                 PA_DEBUG(("PinNew: Input friendly name '%s'\n", pin->friendlyName));
@@ -1875,7 +1877,8 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                                                 result = GetNameFromCategory(&category, TRUE, pin->inputs[i]->friendlyName, MAX_PATH);
                                                 if (result != paNoError)
                                                 {
-                                                    _snwprintf(pin->inputs[i]->friendlyName, MAX_PATH, L"Input %d", i + 1);
+                                                    /* Only specify name, let name hash in ScanDeviceInfos fix postfix enumerators */
+                                                    wcscpy(pin->inputs[i]->friendlyName, kInputName);
                                                 }
                                             }
 #ifdef UNICODE
@@ -1903,14 +1906,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
         {
             PA_DEBUG(("PinNew: No topology pin id found. Bad...\n"));
             /* No TOPO pin id ??? This is bad. Ok, so we just say it is an input or output... */
-            if (pin->dataFlow == KSPIN_DATAFLOW_IN)
-            {
-                wcscpy(pin->friendlyName, L"Line Out");
-            }
-            else
-            {
-                wcscpy(pin->friendlyName, L"Line In");
-            }
+            wcscpy(pin->friendlyName, (pin->dataFlow == KSPIN_DATAFLOW_IN) ? kOutputName : kInputName);
         }
     }
 
@@ -5422,8 +5418,6 @@ static PaError PreparePinsForStart(PaProcessThreadInfo* pInfo)
                 {
                     goto error;
                 }
-                /* Reset the events as some devices SET the event on PinRead */
-                ResetEvent(pInfo->stream->capture.packets[i].Signal.hEvent);
                 ++pInfo->pending;
             }
         }
@@ -5903,24 +5897,27 @@ PA_THREAD_FUNC ProcessingThread(void* pParam)
         {
             if (eventSignalled < captureEvents)
             {
-                timeStamp[0] = dwCurrentTime;
-                info.stream->capture.pPin->fnEventHandler(&info, eventSignalled);
-                /* Since we use the ring buffer, we can submit the buffers directly */
-                if (!info.stream->streamStop)
+                if (info.stream->capture.pPin->fnEventHandler(&info, eventSignalled) == paNoError)
                 {
-                    result = info.stream->capture.pPin->fnSubmitHandler(&info, info.captureTail);
-                    if (result != paNoError)
+                    timeStamp[0] = dwCurrentTime;
+
+                    /* Since we use the ring buffer, we can submit the buffers directly */
+                    if (!info.stream->streamStop)
                     {
-                        PA_HP_TRACE((info.stream->hLog, "Capture submit handler failed with result %d", result));
-                        break;
+                        result = info.stream->capture.pPin->fnSubmitHandler(&info, info.captureTail);
+                        if (result != paNoError)
+                        {
+                            PA_HP_TRACE((info.stream->hLog, "Capture submit handler failed with result %d", result));
+                            break;
+                        }
                     }
-                }
-                ++info.captureTail;
-                /* If full-duplex, let _only_ render event trigger processing. We still need the stream stop
-                handling working, so let that be processed anyways... */
-                if (info.stream->userOutputChannels > 0)
-                {
-                    doProcessing = 0;
+                    ++info.captureTail;
+                    /* If full-duplex, let _only_ render event trigger processing. We still need the stream stop
+                    handling working, so let that be processed anyways... */
+                    if (info.stream->userOutputChannels > 0)
+                    {
+                        doProcessing = 0;
+                    }
                 }
             }
             else if (eventSignalled < renderEvents)
@@ -6317,6 +6314,16 @@ static PaError PaPinCaptureEventHandler_WaveCyclic(PaProcessThreadInfo* pInfo, u
 
     assert( eventIndex < pInfo->stream->capture.noOfPackets );
 
+    if (packet->Header.DataUsed == 0)
+    {
+        PA_HP_TRACE((pInfo->stream->hLog, ">>> Capture bogus event: idx=%u (DataUsed=%u)", eventIndex, packet->Header.DataUsed));
+
+        /* Bogus event, reset! This is to handle the behavior of this USB mic: http://shop.xtz.se/measurement-system/microphone-to-dirac-live-room-correction-suite 
+           on startup of streaming, where it erroneously sets the event without the corresponding buffer being filled (DataUsed == 0) */
+        ResetEvent(packet->Signal.hEvent);
+        return -1;
+    }
+
     pInfo->capturePackets[pInfo->captureHead & cPacketsArrayMask].packet = packet;
 
     frameCount = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer, packet->Header.Data, pInfo->stream->capture.framesPerBuffer);
@@ -6335,9 +6342,8 @@ static PaError PaPinCaptureSubmitHandler_WaveCyclic(PaProcessThreadInfo* pInfo, 
     assert(packet != 0);
     PA_HP_TRACE((pInfo->stream->hLog, "Capture submit: %u", eventIndex));
     packet->Header.DataUsed = 0; /* Reset for reuse */
-    result = PinRead(pInfo->stream->capture.pPin->handle, packet);
-    /* Reset event, as some drivers might not do so (or even set the event!!), resulting in a 100% CPU capture loop */
     ResetEvent(packet->Signal.hEvent);
+    result = PinRead(pInfo->stream->capture.pPin->handle, packet);
     ++pInfo->pending;
     return result;
 }
