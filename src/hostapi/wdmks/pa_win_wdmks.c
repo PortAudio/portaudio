@@ -52,7 +52,7 @@ of a device for the duration of active stream using those devices
 
 #include <stdio.h>
 
-#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#if (defined(_WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
 #pragma comment( lib, "setupapi.lib" )
 #endif
 
@@ -1235,12 +1235,13 @@ static BOOL IsBitsWithinRange(const KSDATARANGE_AUDIO* range, int noOfBits)
     return TRUE;
 }
 
-static int SearchDefaultSampleFrequency(const KSDATARANGE_AUDIO* range)
+/* Note: Somewhat different order compared to WMME implementation, as we want to focus on fidelity first */
+static const int defaultSampleRateSearchOrder[] =
+{ 44100, 48000, 88200, 96000, 192000, 32000, 24000, 22050, 16000, 12000, 11025, 9600, 8000 };
+static const int defaultSampleRateSearchOrderCount = sizeof(defaultSampleRateSearchOrder)/sizeof(defaultSampleRateSearchOrder[0]);
+
+static int DefaultSampleFrequencyIndex(const KSDATARANGE_AUDIO* range)
 {
-    /* Note: Somewhat different order compared to WMME implementation, as we want to focus on fidelity first */
-    static const int defaultSampleRateSearchOrder[] =
-    { 44100, 48000, 88200, 96000, 192000, 32000, 24000, 22050, 16000, 12000, 11025, 9600, 8000 };
-    static const int defaultSampleRateSearchOrderCount = sizeof(defaultSampleRateSearchOrder)/sizeof(defaultSampleRateSearchOrder[0]);
     int i;
 
     for(i=0; i < defaultSampleRateSearchOrderCount; ++i)
@@ -1249,11 +1250,11 @@ static int SearchDefaultSampleFrequency(const KSDATARANGE_AUDIO* range)
 
         if (IsFrequencyWithinRange(range, currentFrequency))
         {
-            return currentFrequency;
+            return i;
         }
     }
 
-    return 0;
+    return -1;
 }
 
 /*
@@ -1270,6 +1271,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
     KSIDENTIFIER* identifier;
     KSDATARANGE* dataRange;
     const ULONG streamingId = (parentFilter->devInfo.streamingType == Type_kWaveRT) ? KSINTERFACE_STANDARD_LOOPED_STREAMING : KSINTERFACE_STANDARD_STREAMING;
+    int defaultSampleRateIndex = defaultSampleRateSearchOrderCount;
 
     PA_LOGE_;
     PA_DEBUG(("PinNew: Creating pin %d:\n",pinId));
@@ -1449,6 +1451,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
             IsEqualGUID(&dataRange->SubFormat, &KSDATAFORMAT_SUBTYPE_WILDCARD) ||
             IsEqualGUID(&dataRange->MajorFormat, &KSDATAFORMAT_TYPE_AUDIO) )
         {
+            int defaultIndex;
             result = paNoError;
             /* Record the maximum possible channels with this pin */
             if( ((KSDATARANGE_AUDIO*)dataRange)->MaximumChannels == (ULONG) -1 )
@@ -1491,10 +1494,10 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                 }
             }
 
-            if (pin->defaultSampleRate == 0)
+            defaultIndex = DefaultSampleFrequencyIndex((KSDATARANGE_AUDIO*)dataRange);
+            if (defaultIndex >= 0 && defaultIndex < defaultSampleRateIndex)
             {
-                pin->defaultSampleRate = SearchDefaultSampleFrequency((KSDATARANGE_AUDIO*)dataRange);
-                PA_DEBUG(("PinNew: Default sample rate = %d Hz\n", pin->defaultSampleRate));
+                defaultSampleRateIndex = defaultIndex;
             }
         }
         dataRange = (KSDATARANGE*)( ((char*)dataRange) + dataRange->FormatSize);
@@ -1502,6 +1505,19 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
     if( result != paNoError )
         goto error;
+
+    /* If none of the frequencies searched for are present, there's something seriously wrong */
+    if (defaultSampleRateIndex == defaultSampleRateSearchOrderCount)
+    {
+        PA_DEBUG(("PinNew: No default sample rate found, skipping pin!\n"));
+        PaWinWDM_SetLastErrorInfo(paUnanticipatedHostError, "PinNew: No default sample rate found");
+        result = paUnanticipatedHostError;
+        goto error;
+    }
+
+    /* Set the default sample rate */
+    pin->defaultSampleRate = defaultSampleRateSearchOrder[defaultSampleRateIndex];
+    PA_DEBUG(("PinNew: Default sample rate = %d Hz\n", pin->defaultSampleRate));
 
     /* Get instance information */
     result = WdmGetPinPropertySimple(
