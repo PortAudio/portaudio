@@ -85,6 +85,9 @@
     #define SND_PCM_TSTAMP_ENABLE SND_PCM_TSTAMP_MMAP
 #endif
 
+/* Combine version elements into a single (unsigned) integer */
+#define ALSA_VERSION_INT(major, minor, subminor)  ((major << 16) | (minor << 8) | subminor)
+
 /* Specifies that hardware audio sample needs byte-swapping into platfom native value representation. */
 #define paSwapEndian ((PaSampleFormat) 0x40000000) /**< @see PaSampleFormat */
 
@@ -230,6 +233,7 @@ _PA_DEFINE_FUNC(snd_pcm_status_get_delay);
 #define alsa_snd_pcm_status_alloca(ptr) __alsa_snd_alloca(ptr, snd_pcm_status)
 
 _PA_DEFINE_FUNC(snd_card_next);
+_PA_DEFINE_FUNC(snd_asoundlib_version);
 _PA_DEFINE_FUNC(snd_strerror);
 _PA_DEFINE_FUNC(snd_output_stdio_attach);
 
@@ -508,6 +512,7 @@ _PA_LOAD_FUNC(snd_pcm_status_get_trigger_tstamp);
 _PA_LOAD_FUNC(snd_pcm_status_get_delay);
 
 _PA_LOAD_FUNC(snd_card_next);
+_PA_LOAD_FUNC(snd_asoundlib_version);
 _PA_LOAD_FUNC(snd_strerror);
 _PA_LOAD_FUNC(snd_output_stdio_attach);
 #undef _PA_LOAD_FUNC
@@ -614,6 +619,8 @@ typedef struct
     void *nonMmapBuffer;
     unsigned int nonMmapBufferSize;
     PaDeviceIndex device;     /* Keep the device index */
+    int deviceIsPlug; /* Distinguish plug types from direct 'hw:' devices */
+    int useReventFix; /* Alsa older than 1.0.16, plug devices need a fix */
 
     snd_pcm_t *pcm;
     snd_pcm_uframes_t bufferSize;
@@ -673,6 +680,7 @@ typedef struct PaAlsaHostApiRepresentation
     PaUtilAllocationGroup *allocations;
 
     PaHostApiIndex hostApiIndex;
+    PaUint32 alsaLibVersion; /* Retrieved from the library at run-time */
 }
 PaAlsaHostApiRepresentation;
 
@@ -713,6 +721,7 @@ static double GetStreamCpuLoad( PaStream* stream );
 static PaError BuildDeviceList( PaAlsaHostApiRepresentation *hostApi );
 static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwParams, double sampleRate );
 static int GetExactSampleRate( snd_pcm_hw_params_t *hwParams, double *sampleRate );
+static PaUint32 PaAlsaVersionNum(void);
 
 /* Callback prototypes */
 static void *CallbackThreadFunc( void *userData );
@@ -752,6 +761,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                 sizeof(PaAlsaHostApiRepresentation) ), paInsufficientMemory );
     PA_UNLESS( alsaHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
     alsaHostApi->hostApiIndex = hostApiIndex;
+    alsaHostApi->alsaLibVersion = PaAlsaVersionNum();
 
     *hostApi = (PaUtilHostApiRepresentation*)alsaHostApi;
     (*hostApi)->info.structVersion = 1;
@@ -960,6 +970,24 @@ static void InitializeDeviceInfo( PaDeviceInfo *deviceInfo )
     deviceInfo->defaultHighOutputLatency = -1.;
     deviceInfo->defaultSampleRate = -1.;
 }
+
+
+/* Retrieve the version of the runtime Alsa-lib, as a single number equivalent to
+ * SND_LIB_VERSION.  Only a version string is available ("a.b.c") so this has to be converted.
+ * Assume 'a' and 'b' are single digits only.
+ */
+static PaUint32 PaAlsaVersionNum(void)
+{
+    char* verStr;
+    PaUint32 verNum;
+
+    verStr = (char*) alsa_snd_asoundlib_version();
+    verNum = ALSA_VERSION_INT( atoi(verStr), atoi(verStr + 2), atoi(verStr + 4) );
+    PA_DEBUG(( "ALSA version (build): " SND_LIB_VERSION_STR "\nALSA version (runtime): %s\n", verStr ));
+
+    return verNum;
+}
+
 
 /* Helper struct */
 typedef struct
@@ -1861,6 +1889,7 @@ error:
     return result;
 }
 
+
 static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, PaAlsaHostApiRepresentation *alsaApi,
         const PaStreamParameters *params, StreamDirection streamDir, int callbackMode )
 {
@@ -1877,12 +1906,18 @@ static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, Pa
         const PaAlsaDeviceInfo *devInfo = GetDeviceInfo( &alsaApi->baseHostApiRep, params->device );
         self->numHostChannels = PA_MAX( params->channelCount, StreamDirection_In == streamDir ? devInfo->minInputChannels
                 : devInfo->minOutputChannels );
+        self->deviceIsPlug = devInfo->isPlug;
     }
     else
     {
         /* We're blissfully unaware of the minimum channelCount */
         self->numHostChannels = params->channelCount;
+        /* Check if device name does not start with hw: to determine if it is a 'plug' device */
+        if( strncmp( "hw:", ((PaAlsaStreamInfo *)params->hostApiSpecificStreamInfo)->deviceString, 3 ) != 0  )
+            self->deviceIsPlug = 1; /* An Alsa plug device, not a direct hw device */
     }
+    if( self->deviceIsPlug && alsaApi->alsaLibVersion < ALSA_VERSION_INT( 1, 0, 16 ) )
+        self->useReventFix = 1; /* Prior to Alsa1.0.16, plug devices may stutter without this fix */
 
     self->device = params->device;
 
@@ -3679,6 +3714,16 @@ static PaError PaAlsaStreamComponent_EndPolling( PaAlsaStreamComponent* self, st
         else
             self->ready = 1;
 
+        *shouldPoll = 0;
+    }
+    else /* (A zero revent occurred) */
+    /* Work around an issue with Alsa older than 1.0.16 using some plugins (eg default with plug + dmix) where
+     * POLLIN or POLLOUT are zeroed by Alsa-lib if _mmap_avail() is a few frames short of avail_min at period
+     * boundary, possibly due to erratic dma interrupts at period boundary?  Treat as a valid event.
+     */
+    if( self->useReventFix )
+    {
+        self->ready = 1;
         *shouldPoll = 0;
     }
 
