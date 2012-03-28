@@ -738,7 +738,7 @@ static const PaAlsaDeviceInfo *GetDeviceInfo( const PaUtilHostApiRepresentation 
     return (const PaAlsaDeviceInfo *)hostApi->deviceInfos[device];
 }
 
-static void CheckAndReplaceConverterForSwapEndian(PaAlsaStream *stream, PaSampleFormat hostInputSampleFormat, 
+static void CheckAndReplaceConverterForSwapEndian(PaAlsaStream *stream, PaSampleFormat hostInputSampleFormat,
     PaSampleFormat hostOutputSampleFormat);
 
 /** Uncommented because AlsaErrorHandler is unused for anything good yet. If AlsaErrorHandler is
@@ -1174,13 +1174,13 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
     if( baseDeviceInfo->maxInputChannels > 0 || baseDeviceInfo->maxOutputChannels > 0 )
     {
         /* Make device default if there isn't already one or it is the ALSA "default" device */
-        if( (baseApi->info.defaultInputDevice == paNoDevice || 
+        if( (baseApi->info.defaultInputDevice == paNoDevice ||
             !strcmp(deviceName->alsaName, "default" )) && baseDeviceInfo->maxInputChannels > 0 )
         {
             baseApi->info.defaultInputDevice = *devIdx;
             PA_DEBUG(("Default input device: %s\n", deviceName->name));
         }
-        if( (baseApi->info.defaultOutputDevice == paNoDevice || 
+        if( (baseApi->info.defaultOutputDevice == paNoDevice ||
             !strcmp(deviceName->alsaName, "default" )) && baseDeviceInfo->maxOutputChannels > 0 )
         {
             baseApi->info.defaultOutputDevice = *devIdx;
@@ -1253,9 +1253,9 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
             continue;
         }
         alsa_snd_ctl_card_info( ctl, cardInfo );
-        
+
         PA_ENSURE( PaAlsa_StrDup( alsaApi, &cardName, alsa_snd_ctl_card_info_get_name( cardInfo )) );
-        
+
         PA_DEBUG(( "%s: Open card: id[%s] name[%s]\n", __FUNCTION__, alsaCardNameId, cardName ));
 
         /* Iterate devices */
@@ -1265,7 +1265,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
             size_t len;
             int hasPlayback = 0, hasCapture = 0;
             int subDevIdx, subDevCount = 1;
-            
+
             PA_DEBUG(( "%s: - idx = %d:\n", __FUNCTION__, devIdx ));
 
             /* Make this device current */
@@ -1317,7 +1317,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
                 if( subDevCount <= 1 )
                 {
                     const char *snd_deviceName = alsa_snd_pcm_info_get_name( pcmInfo );
-                    
+
                     len = snprintf( NULL, 0, "%s: %s (%s)", cardName, snd_deviceName, buf ) + 1;
                     PA_UNLESS( deviceName = (char *)PaUtil_GroupAllocateMemory( alsaApi->allocations, len ), paInsufficientMemory );
                     snprintf( deviceName, len, "%s: %s (%s)", cardName, snd_deviceName, buf );
@@ -1326,7 +1326,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
                 {
                     const char *snd_deviceName    = alsa_snd_pcm_info_get_name( pcmInfo );
                     const char *snd_subDeviceName = alsa_snd_pcm_info_get_subdevice_name( pcmInfo );
-                    
+
                     len = snprintf( NULL, 0, "%s: %s (%s) {%s}", cardName, snd_deviceName, buf, snd_subDeviceName ) + 1;
                     PA_UNLESS( deviceName = (char *)PaUtil_GroupAllocateMemory( alsaApi->allocations, len ), paInsufficientMemory );
                     snprintf( deviceName, len, "%s: %s (%s) {%s}", cardName, snd_deviceName, buf, snd_subDeviceName );
@@ -1346,7 +1346,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
                 hwDevInfos[ numDeviceNames - 1 ].isPlug      = 0;
                 hwDevInfos[ numDeviceNames - 1 ].hasPlayback = hasPlayback;
                 hwDevInfos[ numDeviceNames - 1 ].hasCapture  = hasCapture;
-                
+
                 PA_DEBUG(( "%s: Registered device: id[%s] name[%s]\n", __FUNCTION__, alsaDeviceName, deviceName ));
             }
         }
@@ -1395,7 +1395,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
 
             PA_UNLESS( alsaDeviceName = (char*)PaUtil_GroupAllocateMemory( alsaApi->allocations, strlen(idStr) + 6 ), paInsufficientMemory );
             strcpy( alsaDeviceName, idStr );
-            
+
             PA_UNLESS( deviceName = (char*)PaUtil_GroupAllocateMemory( alsaApi->allocations, strlen(idStr) + 1 ), paInsufficientMemory );
             strcpy( deviceName, idStr );
 
@@ -1528,34 +1528,56 @@ static PaSampleFormat GetAvailableFormats( snd_pcm_t *pcm )
 
     alsa_snd_pcm_hw_params_any( pcm, hwParams );
 
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_FLOAT ) >= 0)
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_FLOAT ) >= 0 )
         available |= paFloat32;
 
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S32 ) >= 0)
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S32 ) >= 0 )
         available |= paInt32;
 
-#ifdef PA_LITTLE_ENDIAN
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3LE ) >= 0)
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3LE ) >= 0 )
         available |= paInt24;
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3BE ) >= 0)
-        available |= (paInt24|paSwapEndian);
-#elif defined PA_BIG_ENDIAN
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3BE ) >= 0)
+    else
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3BE ) >= 0 )
         available |= paInt24;
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3LE ) >= 0)
-        available |= (paInt24|paSwapEndian);		
-#endif
 
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S16 ) >= 0)
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S16 ) >= 0 )
         available |= paInt16;
 
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_U8 ) >= 0)
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_U8 ) >= 0 )
         available |= paUInt8;
 
-    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S8 ) >= 0)
+    if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S8 ) >= 0 )
         available |= paInt8;
 
     return available;
+}
+
+/* Check if format is available in native endianness, if not apply paSwapEndian flag for futher
+   processing by Alsa swapping converters.
+*/
+static void CheckAndApplyEndianSwapToFormat( PaSampleFormat *format, snd_pcm_t *pcm )
+{
+    snd_pcm_hw_params_t *hwParams;
+    alsa_snd_pcm_hw_params_alloca( &hwParams );
+
+    alsa_snd_pcm_hw_params_any( pcm, hwParams );
+
+    if( *format & paInt24 )
+    {
+#ifdef PA_LITTLE_ENDIAN
+        if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3LE ) < 0 )
+        {
+            if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3BE ) >= 0 )
+                *format |= paSwapEndian;
+        }
+#elif defined PA_BIG_ENDIAN
+        if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3BE ) < 0 )
+        {
+            if( alsa_snd_pcm_hw_params_test_format( pcm, hwParams, SND_PCM_FORMAT_S24_3LE ) >= 0 )
+                *format |= paSwapEndian;
+        }
+#endif
+    }
 }
 
 /* Output to console all formats supported by device */
@@ -1801,10 +1823,7 @@ static PaError TestParameters( const PaUtilHostApiRepresentation *hostApi, const
     PA_ENSURE( hostFormat = PaUtil_SelectClosestAvailableFormat( PA_ALSA_TO_FORMAT(availableFormats), parameters->sampleFormat ) );
 
     /* Append endiannes conversion flag */
-    if ( availableFormats & paSwapEndian )
-    {
-        hostFormat |= paSwapEndian;
-    }
+    CheckAndApplyEndianSwapToFormat( &hostFormat, pcm );
 
     /* Some specific hardware (reported: Audio8 DJ) can fail with assertion during this step. */
     ENSURE_( alsa_snd_pcm_hw_params_set_format( pcm, hwParams, Pa2AlsaFormat( hostFormat ) ), paUnanticipatedHostError );
@@ -1929,11 +1948,8 @@ static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, Pa
     PA_ENSURE( hostSampleFormat = PaUtil_SelectClosestAvailableFormat( PA_ALSA_TO_FORMAT(availableFormats), userSampleFormat ) );
 
     /* Append endiannes conversion flag */
-    if ( availableFormats & paSwapEndian )
-    {
-        hostSampleFormat |= paSwapEndian;
-    }
-    
+    CheckAndApplyEndianSwapToFormat( &hostSampleFormat, self->pcm );
+
     self->hostSampleFormat = hostSampleFormat;
     self->nativeFormat = Pa2AlsaFormat( hostSampleFormat );
     self->hostInterleaved = self->userInterleaved = !(userSampleFormat & paNonInterleaved);
@@ -4692,7 +4708,7 @@ static void Copy_24_To_24_Swap(
     unsigned char *dest = (unsigned char*)destinationBuffer;
 
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
         dest[2] = src[0];
@@ -4714,7 +4730,7 @@ static void UInt8_To_Int24_Swap(
     unsigned char *src  = (unsigned char*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
     (void) ditherGenerator; /* unused parameters */
-    
+
     while( count-- )
     {
 
@@ -4727,9 +4743,9 @@ static void UInt8_To_Int24_Swap(
         dest[1] = 0;
         dest[0] = 0;
 #endif
-        
+
         src += sourceStride;
-        dest += destinationStride * 3;    
+        dest += destinationStride * 3;
     }
 }
 
@@ -4774,11 +4790,11 @@ static void Int16_To_Int24_Swap(
     PaInt16 temp;
 
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
         temp = *src;
-        
+
 #if defined(PA_LITTLE_ENDIAN)
         dest[2] = 0;
         dest[1] = (unsigned char)(temp);
@@ -4804,7 +4820,7 @@ static void Int32_To_Int24_Swap(
     PaInt32 *src    = (PaInt32*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
         /* REVIEW */
@@ -4834,13 +4850,13 @@ static void Float32_To_Int24_Swap(
     PaInt32 temp;
 
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
         /* convert to 32 bit and drop the low 8 bits */
         double scaled = (double)(*src) * 2147483647.0;
         temp = (PaInt32) scaled;
-        
+
 #if defined(PA_LITTLE_ENDIAN)
         dest[2] = (unsigned char)(temp >> 8);
         dest[1] = (unsigned char)(temp >> 16);
@@ -4874,7 +4890,7 @@ static void Float32_To_Int24_Dither_Swap(
         double dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
-        
+
         temp = (PaInt32) dithered;
 
 #if defined(PA_LITTLE_ENDIAN)
@@ -4904,7 +4920,7 @@ static void Float32_To_Int24_Clip_Swap(
     PaInt32 temp;
 
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
         /* convert to 32 bit and drop the low 8 bits */
@@ -4937,16 +4953,16 @@ static void Float32_To_Int24_DitherClip_Swap(
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
     PaInt32 temp;
-    
+
     while( count-- )
     {
         /* convert to 32 bit and drop the low 8 bits */
-        
+
         double dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
         PA_CLIP_( dithered, -2147483648., 2147483647.  );
-        
+
         temp = (PaInt32) dithered;
 
 #if defined(PA_LITTLE_ENDIAN)
@@ -4976,12 +4992,12 @@ static void Int24_To_Float32_Swap(
     PaInt32 temp;
 
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[2]) << 8);  
+        temp = (((PaInt32)src[2]) << 8);
         temp = temp | (((PaInt32)src[1]) << 16);
         temp = temp | (((PaInt32)src[0]) << 24);
 #elif defined(PA_BIG_ENDIAN)
@@ -5009,12 +5025,12 @@ static void Int24_To_Int32_Swap(
     PaInt32 temp;
 
     (void) ditherGenerator; /* unused parameter */
-    
+
     while( count-- )
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[2]) << 8);  
+        temp = (((PaInt32)src[2]) << 8);
         temp = temp | (((PaInt32)src[1]) << 16);
         temp = temp | (((PaInt32)src[0]) << 24);
 #elif defined(PA_BIG_ENDIAN)
@@ -5039,14 +5055,14 @@ static void Int24_To_Int16_Swap(
 {
     unsigned char *src = (unsigned char*)sourceBuffer;
     PaInt16 *dest = (PaInt16*)destinationBuffer;
-    
+
     PaInt16 temp;
 
     (void) ditherGenerator; /* unused parameter */
-        
+
     while( count-- )
     {
-        
+
 #if defined(PA_LITTLE_ENDIAN)
         /* src[2] is discarded */
         temp = (((PaInt16)src[1]));
@@ -5080,7 +5096,7 @@ static void Int24_To_Int16_Dither_Swap(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[2]) << 8);  
+        temp = (((PaInt32)src[2]) << 8);
         temp = temp | (((PaInt32)src[1]) << 16);
         temp = temp | (((PaInt32)src[0]) << 24);
 #elif defined(PA_BIG_ENDIAN)
@@ -5107,12 +5123,12 @@ static void Int24_To_Int8_Swap(
 {
     unsigned char *src = (unsigned char*)sourceBuffer;
     signed char  *dest = (signed char*)destinationBuffer;
-    
+
     (void) ditherGenerator; /* unused parameter */
-        
+
     while( count-- )
-    {    
-    
+    {
+
 #if defined(PA_LITTLE_ENDIAN)
         /* src[0] is discarded */
         /* src[1] is discarded */
@@ -5137,14 +5153,14 @@ static void Int24_To_Int8_Dither_Swap(
 {
     unsigned char *src = (unsigned char*)sourceBuffer;
     signed char  *dest = (signed char*)destinationBuffer;
-    
+
     PaInt32 temp, dither;
 
     while( count-- )
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[2]) << 8);  
+        temp = (((PaInt32)src[2]) << 8);
         temp = temp | (((PaInt32)src[1]) << 16);
         temp = temp | (((PaInt32)src[0]) << 24);
 #elif defined(PA_BIG_ENDIAN)
@@ -5171,12 +5187,12 @@ static void Int24_To_UInt8_Swap(
 {
     unsigned char *src = (unsigned char*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    
+
     (void) ditherGenerator; /* unused parameter */
-        
+
     while( count-- )
     {
-        
+
 #if defined(PA_LITTLE_ENDIAN)
         /* src[0] is discarded */
         /* src[1] is discarded */
@@ -5184,7 +5200,7 @@ static void Int24_To_UInt8_Swap(
 #elif defined(PA_BIG_ENDIAN)
         *dest = (unsigned char)(src[2] + 128);
         /* src[1] is discarded */
-        /* src[2] is discarded */        
+        /* src[2] is discarded */
 #endif
 
         src += sourceStride * 3;
@@ -5222,7 +5238,7 @@ static PaUtilConverterTable paAlsaSwapConverters = {
     Float32_To_Int24_Dither_Swap,       /* PaUtilConverter *Float32_To_Int24_Dither; */
     Float32_To_Int24_Clip_Swap,         /* PaUtilConverter *Float32_To_Int24_Clip; */
     Float32_To_Int24_DitherClip_Swap,   /* PaUtilConverter *Float32_To_Int24_DitherClip; */
-    
+
     X_To_X_Stub,              /* PaUtilConverter *Float32_To_Int16; */
     X_To_X_Stub,       /* PaUtilConverter *Float32_To_Int16_Dither; */
     X_To_X_Stub,         /* PaUtilConverter *Float32_To_Int16_Clip; */
@@ -5282,12 +5298,12 @@ static PaUtilConverterTable paAlsaSwapConverters = {
     Copy_24_To_24_Swap,                 /* PaUtilConverter *Copy_24_To_24; */
     X_To_X_Stub                  /* PaUtilConverter *Copy_32_To_32; */
 };
-void CheckAndReplaceConverterForSwapEndian(PaAlsaStream *stream, PaSampleFormat hostInputSampleFormat, 
+void CheckAndReplaceConverterForSwapEndian(PaAlsaStream *stream, PaSampleFormat hostInputSampleFormat,
     PaSampleFormat hostOutputSampleFormat)
 {
     PaUtilConverter **cv_org = (PaUtilConverter **)&paConverters,
                     **cv_swp = (PaUtilConverter **)&paAlsaSwapConverters;
-    
+
     int i, i_max = sizeof(PaUtilConverterTable)/sizeof(PaUtilConverter *);
 
     if (hostInputSampleFormat & paSwapEndian)
