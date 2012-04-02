@@ -1038,6 +1038,8 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
         goto error;
     }
 
+    memset( asioHostApi, 0, sizeof(PaAsioHostApiRepresentation) ); /* ensure all fields are zeroed. especially asioHostApi->allocations */
+
     /*
         We initialize COM ourselves here and uninitialize it in Terminate().
         This should be the only COM initialization needed in this module.
