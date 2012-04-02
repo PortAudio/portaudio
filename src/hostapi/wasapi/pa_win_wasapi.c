@@ -1065,6 +1065,8 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         result = paInsufficientMemory;
         goto error;
     }
+	
+    memset( paWasapi, 0, sizeof(PaWasapiHostApiRepresentation) ); /* ensure all fields are zeroed. especially paWasapi->allocations */
 
     result = PaWinUtil_CoInitialize( paWASAPI, &paWasapi->comInitializationResult );
     if( result != paNoError )
