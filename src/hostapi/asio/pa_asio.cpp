@@ -3051,7 +3051,7 @@ previousIndex = index;
                 paTimeInfo.outputBufferDacTime = paTimeInfo.currentTime + theAsioStream->streamRepresentation.streamInfo.outputLatency;
                 */
 
-/* Disabled! Stopping and re-starting the stream causes an input overflow / output undeflow. S.Fischer */
+/* Disabled! Stopping and re-starting the stream causes an input overflow / output underflow. S.Fischer */
 #if 0
 // detect underflows by checking inter-callback time > 2 buffer period
 static double previousTime = -1;
@@ -3503,6 +3503,7 @@ static PaError IsStreamActive( PaStream *s )
 static PaTime GetStreamTime( PaStream *s )
 {
     (void) s; /* unused parameter */
+
     return (double)timeGetTime() * .001;
 }
 
