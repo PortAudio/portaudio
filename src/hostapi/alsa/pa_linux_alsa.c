@@ -879,6 +879,9 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     if( defaultSr < 0. )           /* Default sample rate not set */
     {
         unsigned int sampleRate = 44100;        /* Will contain approximate rate returned by alsa-lib */
+
+        /* Don't allow rate resampling when probing for the default rate (but ignore if this call fails) */
+        alsa_snd_pcm_hw_params_set_rate_resample( pcm, hwParams, 0 );
         if( alsa_snd_pcm_hw_params_set_rate_near( pcm, hwParams, &sampleRate, NULL ) < 0)
         {
             result = paUnanticipatedHostError;
