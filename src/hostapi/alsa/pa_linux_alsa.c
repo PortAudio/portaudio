@@ -87,6 +87,9 @@
 /* Combine version elements into a single (unsigned) integer */
 #define ALSA_VERSION_INT(major, minor, subminor)  ((major << 16) | (minor << 8) | subminor)
 
+/* The acceptable tolerance of sample rate set, to that requested (as a ratio, eg 50 is 2%, 100 is 1%) */
+#define RATE_MAX_DEVIATE_RATIO 100
+
 /* Defines Alsa function types and pointers to these functions. */
 #define _PA_DEFINE_FUNC(x)  typedef typeof(x) x##_ft; static x##_ft *alsa_##x = 0
 
@@ -872,6 +875,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
         if( SetApproximateSampleRate( pcm, hwParams, defaultSr ) < 0 )
         {
             defaultSr = -1.;
+            alsa_snd_pcm_hw_params_any( pcm, hwParams ); /* Clear any params (rate) that might have been set */
             PA_DEBUG(( "%s: Original default samplerate failed, trying again ..\n", __FUNCTION__ ));
         }
     }
@@ -926,7 +930,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
 
     /* Have to reset hwParams, to set new buffer size; need to also set sample rate again */
     ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_hw_params_set_rate( pcm, hwParams, defaultSr, 0 ), paUnanticipatedHostError );
+    ENSURE_( SetApproximateSampleRate( pcm, hwParams, defaultSr ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &highLatency ), paUnanticipatedHostError );
 
     *minChannels = (int)minChans;
@@ -1995,13 +1999,18 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
     /* Some specific hardware (reported: Audio8 DJ) can fail with assertion during this step. */
     ENSURE_( alsa_snd_pcm_hw_params_set_format( pcm, hwParams, self->nativeFormat ), paUnanticipatedHostError );
 
-    ENSURE_( SetApproximateSampleRate( pcm, hwParams, sr ), paInvalidSampleRate );
-    ENSURE_( GetExactSampleRate( hwParams, &sr ), paUnanticipatedHostError );
-    /* reject if there's no sample rate within 1% of the one requested */
-    if( ( fabs( *sampleRate - sr ) / *sampleRate ) > 0.01 )
+    if( ( result = SetApproximateSampleRate( pcm, hwParams, sr )) != paUnanticipatedHostError )
     {
-        PA_DEBUG(( "%s: Wanted %f, closest sample rate was %d\n", __FUNCTION__, sampleRate, sr ));
-        PA_ENSURE( paInvalidSampleRate );
+        ENSURE_( GetExactSampleRate( hwParams, &sr ), paUnanticipatedHostError );
+        if( result == paInvalidSampleRate ) /* From the SetApproximateSampleRate() call above */
+        { /* The sample rate was returned as 'out of tolerance' of the one requested */
+            PA_DEBUG(( "%s: Wanted %.3f, closest sample rate was %.3f\n", __FUNCTION__, sampleRate, sr ));
+            PA_ENSURE( paInvalidSampleRate );
+        }
+    }
+    else
+    {
+       PA_ENSURE( paUnanticipatedHostError );
     }
 
     ENSURE_( alsa_snd_pcm_hw_params_set_channels( pcm, hwParams, self->numHostChannels ), paInvalidChannelCount );
@@ -3138,51 +3147,43 @@ static double GetStreamCpuLoad( PaStream* s )
     return PaUtil_GetCpuLoad( &stream->cpuLoadMeasurer );
 }
 
+/* Set the stream sample rate to a nominal value requested; allow only a defined tolerance range */
 static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwParams, double sampleRate )
 {
     PaError result = paNoError;
-    unsigned long approx = (unsigned long) sampleRate;
-    int dir = 0;
-    double fraction = sampleRate - approx;
+    unsigned int reqRate, setRate, deviation;
 
     assert( pcm && hwParams );
 
-    if( fraction > 0.0 )
-    {
-        if( fraction > 0.5 )
-        {
-            ++approx;
-            dir = -1;
-        }
-        else
-            dir = 1;
-    }
+    /* The Alsa sample rate is set by integer value; also the actual rate may differ */
+    reqRate = setRate = (unsigned int) sampleRate;
 
-    if( alsa_snd_pcm_hw_params_set_rate( pcm, hwParams, approx, dir ) < 0 )
+    ENSURE_( alsa_snd_pcm_hw_params_set_rate_near( pcm, hwParams, &setRate, NULL ), paUnanticipatedHostError );
+    /* The value actually set will be put in 'setRate' (may be way off); check the deviation as a proportion
+     * of the requested-rate with reference to the max-deviate-ratio (larger values allow less deviation) */
+    deviation = abs( setRate - reqRate );
+    if( deviation > 0 && deviation * RATE_MAX_DEVIATE_RATIO > reqRate )
         result = paInvalidSampleRate;
 
 end:
-
     return result;
 
 error:
-
     /* Log */
     {
         unsigned int _min = 0, _max = 0;
         int _dir = 0;
         ENSURE_( alsa_snd_pcm_hw_params_get_rate_min( hwParams, &_min, &_dir ), paUnanticipatedHostError );
         ENSURE_( alsa_snd_pcm_hw_params_get_rate_max( hwParams, &_max, &_dir ), paUnanticipatedHostError );
-        PA_DEBUG(( "%s: SR min = %d, max = %d, req = %lu\n", __FUNCTION__, _min, _max, approx ));
+        PA_DEBUG(( "%s: SR min = %u, max = %u, req = %u\n", __FUNCTION__, _min, _max, reqRate ));
     }
-
     goto end;
 }
 
 /* Return exact sample rate in param sampleRate */
 static int GetExactSampleRate( snd_pcm_hw_params_t *hwParams, double *sampleRate )
 {
-    unsigned int num, den;
+    unsigned int num, den = 1;
     int err;
 
     assert( hwParams );
