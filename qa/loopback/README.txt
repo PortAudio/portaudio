@@ -10,6 +10,15 @@ and phase analysers can detect errors in the audio stream.
 
 This test can be run from a script as part of a nightly build and test.
 
+--- How to Build the Loopback Test ---
+
+The loopback test is not normally built by the makefile.
+To build the loopback test, enter:
+
+  ./configure && make loopback
+  
+This will build the "bin/paloopback" executable.
+  
 --- How To Run Test ---
 
 Connect stereo cables from one or more output audio devices to audio input devices. 
