@@ -2968,7 +2968,7 @@ static PaError StartStream( PaStream *s )
            we're using an MM timer callback via timeSetEvent or not.
         */
         assert( stream->systemTimerResolutionPeriodMs == 0 );
-        if( timeGetDevCaps( &timecaps, sizeof(TIMECAPS) == MMSYSERR_NOERROR && timecaps.wPeriodMin > 0 ) )
+        if( timeGetDevCaps( &timecaps, sizeof(TIMECAPS) ) == MMSYSERR_NOERROR && timecaps.wPeriodMin > 0 )
         {
             /* aim for resolution 4 times higher than polling rate */
             stream->systemTimerResolutionPeriodMs = (UINT)((stream->pollingPeriodSeconds * MSECS_PER_SECOND) * .25);
