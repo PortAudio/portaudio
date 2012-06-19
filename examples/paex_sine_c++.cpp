@@ -94,6 +94,12 @@ public:
             this            /* Using 'this' for userData so we can cast to Sine* in paCallback method */
             );
 
+        if (err != paNoError)
+        {
+            /* Failed to open stream to device !!! */
+            return false;
+        }
+
         err = Pa_SetStreamFinishedCallback( stream, &Sine::paStreamFinished );
 
         if (err != paNoError)
@@ -121,6 +127,9 @@ public:
 
     bool start()
     {
+        if (stream == 0)
+            return false;
+
         PaError err = Pa_StartStream( stream );
 
         return (err == paNoError);
@@ -128,6 +137,9 @@ public:
 
     bool stop()
     {
+        if (stream == 0)
+            return false;
+
         PaError err = Pa_StopStream( stream );
 
         return (err == paNoError);
