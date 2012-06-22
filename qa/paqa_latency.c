@@ -253,8 +253,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     
     if( (highLatency - lowLatency) < 0.001 )
     {
-		numLoops = 1;
-	}
+        numLoops = 1;
+    }
 	
     for( i=0; i<numLoops; i++ )
     {   
@@ -291,17 +291,19 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         printf("          finalLatency = %6.4f\n", finalLatency );
         /* For the default low & high latency values, expect quite close; for other requested
          * values, at worst the next power-of-2 may result (eg 513 -> 1024) */
-        if( i == 0 | i == ( numLoops - 1 ))
-            toleranceRatio = 0.1;
-        else
-            toleranceRatio = 1.0;
+        toleranceRatio = ( (i == 0) || (i == ( numLoops - 1 )) ) ? 0.1 : 1.0;
         QA_ASSERT_CLOSE( "final latency should be close to suggested latency",
                         streamParameters.suggestedLatency, finalLatency, (streamParameters.suggestedLatency * toleranceRatio) );
         if( i == 0 )
+        {
             previousLatency = finalLatency;
+        }
     }
+
     if( numLoops > 1 )
+    {
         QA_ASSERT_TRUE( " final latency should increase with suggested latency", (finalLatency > previousLatency) );
+    }
 
     return 0;
 error:
@@ -323,18 +325,22 @@ static int paqaVerifySuggestedLatency( void )
         printf("\nUsing device #%d: '%s' (%s)\n", id, pdi->name, Pa_GetHostApiInfo(pdi->hostApi)->name);
         if( pdi->maxOutputChannels > 0 )
         {
-            if( (result = paqaCheckMultipleSuggested( id, 0 )) != 0 )
+            if( paqaCheckMultipleSuggested( id, 0 ) < 0 )
+            {
                 printf("OUTPUT CHECK FAILED !!! #%d: '%s'\n", id, pdi->name);
+                result -= 1;
+            }
         }
         if( pdi->maxInputChannels > 0 )
         {
-            if( (result = paqaCheckMultipleSuggested( id, 1 )) != 0 )
+            if( paqaCheckMultipleSuggested( id, 1 ) < 0 )
+            {
                 printf("INPUT CHECK FAILED !!! #%d: '%s'\n", id, pdi->name);
+                result -= 1;
+            }
         }
     }
-    return 0;
-error:
-    return -1;
+    return result;
 }
 
 /*******************************************************************/
@@ -463,14 +469,13 @@ int main(void)
     err = paqaCheckLatency( &outputParameters, &data, sampleRate, paFramesPerBufferUnspecified );
     if( err != paNoError ) goto error;
     
-    
     Pa_Terminate();
-    printf("Test finished.\n");
-    
+    printf("SUCCESS - test finished.\n");
     return err;
+    
 error:
     Pa_Terminate();
-    fprintf( stderr, "An error occured while using the portaudio stream\n" );
+    fprintf( stderr, "ERROR - test failed.\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
     return err;
