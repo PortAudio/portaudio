@@ -514,9 +514,15 @@ void PaQa_FadeInRecording( PaQaRecording *recording, int startFrame, int count )
 	
     assert( startFrame >= 0 );
 	assert( count > 0 );
-
-	for( is=0; is<count; is++ )
+    
+    /* Zero out initial part of the recording. */
+	for( is=0; is<startFrame; is++ )
 	{
+        recording->buffer[ is ] = 0.0f;
+    }
+    /* Fade in where signal begins. */
+    for( is=0; is<count; is++ )
+    {
 		double c = cos( phase );
 		double w = c * c;
 		float x = recording->buffer[ is + startFrame ];

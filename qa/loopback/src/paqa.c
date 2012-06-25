@@ -989,8 +989,8 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
 	int framesPerBuffers[] = { 0, 16, 32, 40, 64, 100, 128, 256, 512, 1024 };
 	int numBufferSizes = (sizeof(framesPerBuffers)/sizeof(int));
 	
-	PaSampleFormat sampleFormats[] = { paUInt8, paInt8, paInt16, paInt32 };
-	const char *sampleFormatNames[] = { "paUInt8", "paInt8", "paInt16", "paInt32" };
+	PaSampleFormat sampleFormats[] = { paFloat32, paUInt8, paInt8, paInt16, paInt32 };
+	const char *sampleFormatNames[] = { "paFloat32", "paUInt8", "paInt8", "paInt16", "paInt32" };
 	int numSampleFormats = (sizeof(sampleFormats)/sizeof(PaSampleFormat));
 	
     printf( "=============== Analysing Loopback %d to %d =====================\n", outputDevice, inputDevice  );
