@@ -257,7 +257,7 @@ typedef void (*MixMonoToStereoF) (void *__to, void *__from, UINT32 count);
 typedef BOOL   (WINAPI *FAvRtCreateThreadOrderingGroup)  (PHANDLE,PLARGE_INTEGER,GUID*,PLARGE_INTEGER);
 typedef BOOL   (WINAPI *FAvRtDeleteThreadOrderingGroup)  (HANDLE);
 typedef BOOL   (WINAPI *FAvRtWaitOnThreadOrderingGroup)  (HANDLE);
-typedef HANDLE (WINAPI *FAvSetMmThreadCharacteristics)   (LPCTSTR,LPDWORD);
+typedef HANDLE (WINAPI *FAvSetMmThreadCharacteristics)   (LPCSTR,LPDWORD);
 typedef BOOL   (WINAPI *FAvRevertMmThreadCharacteristics)(HANDLE);
 typedef BOOL   (WINAPI *FAvSetMmThreadPriority)          (HANDLE,AVRT_PRIORITY);
 
@@ -830,7 +830,7 @@ static BOOL IsWow64()
     // and GetProcAddress to get a pointer to the function if available.
 
     fnIsWow64Process = (LPFN_ISWOW64PROCESS) GetProcAddress(
-        GetModuleHandle(TEXT("kernel32")), TEXT("IsWow64Process"));
+        GetModuleHandleA("kernel32"), "IsWow64Process");
 
     if (fnIsWow64Process == NULL)
 		return FALSE;
@@ -868,7 +868,7 @@ static UINT32 GetWindowsVersion()
 		typedef DWORD (WINAPI *LPFN_GETVERSION)(VOID);
 		LPFN_GETVERSION fnGetVersion;
 
-		fnGetVersion = (LPFN_GETVERSION) GetProcAddress(GetModuleHandle(TEXT("kernel32")), TEXT("GetVersion"));
+		fnGetVersion = (LPFN_GETVERSION) GetProcAddress(GetModuleHandleA("kernel32"), "GetVersion");
 		if (fnGetVersion == NULL)
 			return WINDOWS_UNKNOWN;
 
