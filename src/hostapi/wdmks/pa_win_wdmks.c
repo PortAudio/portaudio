@@ -69,6 +69,7 @@ of a device for the duration of active stream using those devices
 
 #include <string.h> /* strlen() */
 #include <assert.h>
+#include <wchar.h>  /* iswspace() */
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -188,7 +189,7 @@ Default is to use the pin category.
 #include <stdio.h>
 
 /* These next definitions allow the use of the KSUSER DLL */
-typedef KSDDKAPI DWORD WINAPI KSCREATEPIN(HANDLE, PKSPIN_CONNECT, ACCESS_MASK, PHANDLE);
+typedef /*KSDDKAPI*/ DWORD WINAPI KSCREATEPIN(HANDLE, PKSPIN_CONNECT, ACCESS_MASK, PHANDLE);
 extern HMODULE      DllKsUser;
 extern KSCREATEPIN* FunctionKsCreatePin;
 
@@ -5592,7 +5593,7 @@ static PaError PaDoProcessing(PaProcessThreadInfo* pInfo)
         if (inputFramesAvailable && (!pInfo->stream->userOutputChannels || inputFramesAvailable >= (int)pInfo->stream->render.framesPerBuffer))
         {
             unsigned wrapCntr = 0;
-            char* data[2] = {0};
+            void* data[2] = {0};
             ring_buffer_size_t size[2] = {0};
 
             /* If full-duplex, we just extract output buffer number of frames */
@@ -6070,7 +6071,6 @@ static PaError StartStream( PaStream *s )
 {
     PaError result = paNoError;
     PaWinWdmStream *stream = (PaWinWdmStream*)s;
-    DWORD dwID;
 
     PA_LOGE_;
 
@@ -6093,7 +6093,7 @@ static PaError StartStream( PaStream *s )
     /*ret = SetPriorityClass(GetCurrentProcess(),REALTIME_PRIORITY_CLASS);
     PA_DEBUG(("Class ret = %d;",ret));*/
 
-    stream->streamThread = CREATE_THREAD_FUNCTION (NULL, 0, ProcessingThread, stream, CREATE_SUSPENDED, &dwID);
+    stream->streamThread = CREATE_THREAD_FUNCTION (NULL, 0, ProcessingThread, stream, CREATE_SUSPENDED, NULL);
     if(stream->streamThread == NULL)
     {
         result = paInsufficientMemory;
