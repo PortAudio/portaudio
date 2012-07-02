@@ -451,13 +451,13 @@ static PaError WdmSyncIoctl(HANDLE handle,
                             void* outBuffer,
                             unsigned long outBufferCount,
                             unsigned long* bytesReturned);
+
 static PaError WdmGetPropertySimple(HANDLE handle,
                                     const GUID* const guidPropertySet,
                                     unsigned long property,
                                     void* value,
-                                    unsigned long valueCount,
-                                    void* instance,
-                                    unsigned long instanceCount);
+                                    unsigned long valueCount);
+
 static PaError WdmSetPropertySimple(HANDLE handle,
                                     const GUID* const guidPropertySet,
                                     unsigned long property,
@@ -473,11 +473,13 @@ static PaError WdmGetPinPropertySimple(HANDLE  handle,
                                        void* value,
                                        unsigned long valueCount,
                                        unsigned long* byteCount);
+
 static PaError WdmGetPinPropertyMulti(HANDLE  handle,
                                       unsigned long pinId,
                                       const GUID* const guidPropertySet,
                                       unsigned long property,
                                       KSMULTIPLE_ITEM** ksMultipleItem);
+
 static PaError WdmGetPropertyMulti(HANDLE handle,
                                    const GUID* const guidPropertySet,
                                    unsigned long property,
@@ -730,36 +732,20 @@ static PaError WdmGetPropertySimple(HANDLE handle,
                                     const GUID* const guidPropertySet,
                                     unsigned long property,
                                     void* value,
-                                    unsigned long valueCount,
-                                    void* instance,
-                                    unsigned long instanceCount)
+                                    unsigned long valueCount)
 {
     PaError result;
-    KSPROPERTY* ksProperty;
-    unsigned long propertyCount;
+    KSPROPERTY ksProperty;
 
-    propertyCount = sizeof(KSPROPERTY) + instanceCount;
-    ksProperty = (KSPROPERTY*)_alloca( propertyCount );
-    if( !ksProperty )
-    {
-        return paInsufficientMemory;
-    }
-
-    FillMemory((void*)ksProperty,sizeof(ksProperty),0);
-    ksProperty->Set = *guidPropertySet;
-    ksProperty->Id = property;
-    ksProperty->Flags = KSPROPERTY_TYPE_GET;
-
-    if( instance )
-    {
-        memcpy( (void*)(((char*)ksProperty)+sizeof(KSPROPERTY)), instance, instanceCount );
-    }
+    ksProperty.Set = *guidPropertySet;
+    ksProperty.Id = property;
+    ksProperty.Flags = KSPROPERTY_TYPE_GET;
 
     result = WdmSyncIoctl(
         handle,
         IOCTL_KS_PROPERTY,
-        ksProperty,
-        propertyCount,
+        &ksProperty,
+        sizeof(KSPROPERTY),
         value,
         valueCount,
         NULL);
@@ -2117,9 +2103,7 @@ static PaError PinInstantiate(PaWinWdmPin* pin)
             &KSPROPSETID_Connection,
             KSPROPERTY_CONNECTION_ALLOCATORFRAMING,
             &ksaf,
-            sizeof(ksaf),
-            NULL,
-            0);
+            sizeof(ksaf));
 
         if( result != paNoError )
         {
@@ -2128,9 +2112,7 @@ static PaError PinInstantiate(PaWinWdmPin* pin)
                 &KSPROPSETID_Connection,
                 KSPROPERTY_CONNECTION_ALLOCATORFRAMING_EX,
                 &ksafex,
-                sizeof(ksafex),
-                NULL,
-                0);
+                sizeof(ksafex));
             if( result == paNoError )
             {
                 pin->frameSize = ksafex.FramingItem[0].FramingRange.Range.MinFrameSize;
@@ -2699,7 +2681,7 @@ static PaWinWdmFilter* FilterNew( PaWDMKSType type, DWORD devNode, const wchar_t
     /* Get product GUID (it might not be supported) */
     {
         KSCOMPONENTID compId;
-        if (WdmGetPropertySimple(filter->handle, &KSPROPSETID_General, KSPROPERTY_GENERAL_COMPONENTID, &compId, sizeof(KSCOMPONENTID), NULL, 0) == paNoError)
+        if (WdmGetPropertySimple(filter->handle, &KSPROPSETID_General, KSPROPERTY_GENERAL_COMPONENTID, &compId, sizeof(KSCOMPONENTID)) == paNoError)
         {
             filter->devInfo.deviceProductGuid = compId.Product;
         }
