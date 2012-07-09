@@ -258,7 +258,7 @@ static int playCallback( const void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     ring_buffer_size_t elementsToPlay = PaUtil_GetRingBufferReadAvailable(&data->ringBuffer);
-    ring_buffer_size_t elementsToRead = min(elementsToPlay, (ring_buffer_size_t)framesPerBuffer);
+    ring_buffer_size_t elementsToRead = min(elementsToPlay, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
     SAMPLE* wptr = (SAMPLE*)outputBuffer;
 
     (void) inputBuffer; /* Prevent unused variable warnings. */
@@ -272,14 +272,14 @@ static int playCallback( const void *inputBuffer, void *outputBuffer,
     if ((ring_buffer_size_t)framesPerBuffer > elementsToRead)
     {
         int i;
-        const int samplesToClear = (framesPerBuffer - elementsToRead) * NUM_CHANNELS;
+        const int samplesToClear = framesPerBuffer * NUM_CHANNELS - elementsToRead;
         for (i = 0; i < samplesToClear; ++i)
         {
             *wptr++ = 0;
         }
     }
 
-    data->frameIndex += PaUtil_ReadRingBuffer(&data->ringBuffer, wptr, elementsToRead * NUM_CHANNELS);
+    data->frameIndex += PaUtil_ReadRingBuffer(&data->ringBuffer, wptr, elementsToRead);
 
     return data->threadSyncFlag ? paComplete : paContinue;
 }
