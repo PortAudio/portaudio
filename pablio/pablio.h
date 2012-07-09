@@ -53,7 +53,7 @@ extern "C"
 #include <stdlib.h>
 #include <math.h>
 #include "portaudio.h"
-#include "ringbuffer.h"
+#include "pa_ringbuffer.h"
 #include <string.h>
 
 typedef struct
