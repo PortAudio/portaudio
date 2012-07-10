@@ -147,9 +147,6 @@ static int threadFunctionReadFromRawFile(void* ptr)
 {
     paTestData* pData = (paTestData*)ptr;
 
-    /* Mark thread started */
-    pData->threadSyncFlag = 0;
-
     while (1)
     {
         ring_buffer_size_t elementsInBuffer = PaUtil_GetRingBufferWriteAvailable(&pData->ringBuffer);
@@ -171,6 +168,9 @@ static int threadFunctionReadFromRawFile(void* ptr)
                     itemsReadFromFile += (ring_buffer_size_t)fread(ptr[i], pData->ringBuffer.elementSizeBytes, sizes[i], pData->file);
                 }
                 PaUtil_AdvanceRingBufferWriteIndex(&pData->ringBuffer, itemsReadFromFile);
+
+                /* Mark thread started here, that way we "prime" the ring buffer before playback */
+                pData->threadSyncFlag = 0;
             }
             else
             {
@@ -194,16 +194,23 @@ typedef int (*ThreadFunctionType)(void*);
 static PaError startThread( paTestData* pData, ThreadFunctionType fn )
 {
 #ifdef _WIN32
-    pData->threadSyncFlag = 1;
-    pData->threadHandle = (void*)_beginthreadex(NULL, 0, fn, pData, 0, NULL);
+    pData->threadHandle = (void*)_beginthreadex(NULL, 0, fn, pData, CREATE_SUSPENDED, NULL);
     if (pData->threadHandle == NULL) return paUnanticipatedHostError;
+
+    /* Set file thread to a little higher prio than normal */
+    SetThreadPriority(pData->threadHandle, THREAD_PRIORITY_ABOVE_NORMAL);
+
+    /* Start it up */
+    pData->threadSyncFlag = 1;
+    ResumeThread(pData->threadHandle);
+
+#endif
+
     /* Wait for thread to startup */
     while (pData->threadSyncFlag) {
         Pa_Sleep(10);
     }
-    /* Set file thread to a little higher prio than normal */
-    SetThreadPriority(pData->threadHandle, THREAD_PRIORITY_ABOVE_NORMAL);
-#endif
+
     return paNoError;
 }
 
@@ -234,6 +241,8 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
                            void *userData )
 {
     paTestData *data = (paTestData*)userData;
+    ring_buffer_size_t elementsWriteable = PaUtil_GetRingBufferWriteAvailable(&data->ringBuffer);
+    ring_buffer_size_t elementsToWrite = min(elementsWriteable, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
     const SAMPLE *rptr = (const SAMPLE*)inputBuffer;
 
     (void) outputBuffer; /* Prevent unused variable warnings. */
@@ -241,7 +250,7 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     (void) statusFlags;
     (void) userData;
 
-    data->frameIndex += PaUtil_WriteRingBuffer(&data->ringBuffer, rptr, framesPerBuffer * NUM_CHANNELS);
+    data->frameIndex += PaUtil_WriteRingBuffer(&data->ringBuffer, rptr, elementsToWrite);
 
     return paContinue;
 }
@@ -265,19 +274,6 @@ static int playCallback( const void *inputBuffer, void *outputBuffer,
     (void) timeInfo;
     (void) statusFlags;
     (void) userData;
-
-    /* If we have less data in the ring buffer than framesPerBuffer, we must clear the first N frames where
-       N = (framesPerBuffer - elementsToRead) */
-      
-    if ((ring_buffer_size_t)framesPerBuffer > elementsToRead)
-    {
-        int i;
-        const int samplesToClear = framesPerBuffer * NUM_CHANNELS - elementsToRead;
-        for (i = 0; i < samplesToClear; ++i)
-        {
-            *wptr++ = 0;
-        }
-    }
 
     data->frameIndex += PaUtil_ReadRingBuffer(&data->ringBuffer, wptr, elementsToRead);
 
@@ -313,15 +309,16 @@ int main(void)
     /* We set the ring buffer size to about 500 ms */
     numSamples = NextPowerOf2((unsigned)(SAMPLE_RATE * 0.5 * NUM_CHANNELS));
     numBytes = numSamples * sizeof(SAMPLE);
-    data.ringBufferData = (SAMPLE *) PaUtil_AllocateMemory( numBytes ); /* From now on, recordedSamples is initialised. */
+    data.ringBufferData = (SAMPLE *) PaUtil_AllocateMemory( numBytes );
     if( data.ringBufferData == NULL )
     {
-        printf("Could not allocate record array.\n");
+        printf("Could not allocate ring buffer data.\n");
         goto done;
     }
 
     if (PaUtil_InitializeRingBuffer(&data.ringBuffer, sizeof(SAMPLE), numSamples, data.ringBufferData) < 0)
     {
+        printf("Failed to initialize ring buffer. Size is not power of 2 ??\n");
         goto done;
     }
 
@@ -412,26 +409,29 @@ int main(void)
     {
         /* Open file again for reading */
         data.file = fopen(FILE_NAME, "rb");
-        if (data.file == 0) goto done;
+        if (data.file != 0)
+        {
+            /* Start the file reading thread */
+            err = startThread(&data, threadFunctionReadFromRawFile);
+            if( err != paNoError ) goto done;
 
-        /* Start the file reading thread */
-        err = startThread(&data, threadFunctionReadFromRawFile);
-        if( err != paNoError ) goto done;
+            err = Pa_StartStream( stream );
+            if( err != paNoError ) goto done;
 
-        err = Pa_StartStream( stream );
-        if( err != paNoError ) goto done;
-        
-        printf("Waiting for playback to finish.\n"); fflush(stdout);
+            printf("Waiting for playback to finish.\n"); fflush(stdout);
 
-        /* The playback will end when EOF is reached */
-        while( ( err = Pa_IsStreamActive( stream ) ) == 1 ) {
-            printf("index = %d\n", data.frameIndex ); fflush(stdout);
-            Pa_Sleep(1000);
+            /* The playback will end when EOF is reached */
+            while( ( err = Pa_IsStreamActive( stream ) ) == 1 ) {
+                printf("index = %d\n", data.frameIndex ); fflush(stdout);
+                Pa_Sleep(1000);
+            }
+            if( err < 0 ) goto done;
         }
-        if( err < 0 ) goto done;
         
         err = Pa_CloseStream( stream );
         if( err != paNoError ) goto done;
+
+        fclose(data.file);
         
         printf("Done.\n"); fflush(stdout);
     }
