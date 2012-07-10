@@ -194,7 +194,8 @@ typedef int (*ThreadFunctionType)(void*);
 static PaError startThread( paTestData* pData, ThreadFunctionType fn )
 {
 #ifdef _WIN32
-    pData->threadHandle = (void*)_beginthreadex(NULL, 0, fn, pData, CREATE_SUSPENDED, NULL);
+    typedef unsigned (__stdcall* WinThreadFunctionType)(void*);
+    pData->threadHandle = (void*)_beginthreadex(NULL, 0, (WinThreadFunctionType)fn, pData, CREATE_SUSPENDED, NULL);
     if (pData->threadHandle == NULL) return paUnanticipatedHostError;
 
     /* Set file thread to a little higher prio than normal */
