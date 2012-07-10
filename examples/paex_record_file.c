@@ -151,7 +151,7 @@ static int threadFunctionReadFromRawFile(void* ptr)
     {
         ring_buffer_size_t elementsInBuffer = PaUtil_GetRingBufferWriteAvailable(&pData->ringBuffer);
 
-        if (elementsInBuffer >= pData->ringBuffer.bufferSize / 4)
+        if (elementsInBuffer >= pData->ringBuffer.bufferSize / NUM_WRITES_PER_BUFFER)
         {
             void* ptr[2] = {0};
             ring_buffer_size_t sizes[2] = {0};
