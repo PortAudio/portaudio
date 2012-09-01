@@ -1,0 +1,37 @@
+/** 
+@page java_binding JPortAudio Java Binding
+@ingroup jportaudio
+
+<i>Note: this page has not been reviewed, and may contain errors.</i>
+
+@section java_draft DRAFT - IN PROGRESS
+
+9/1/12 JPortAudio is very new and should be considered an "alpha" release.
+The building of JPortAudio will eventually be integrated into the Makefile as an optional build.
+
+Currently JPortAudio is only supported for Windows. Please contact us if you want to help with porting to Mac or Linux.
+
+@section java_comp_windows Building JPortAudio on Windows
+
+Build the Java code using the Eclipse project in "jportaudio". Export as "jportaudio.jar".
+
+If you modify the JNI API then you will need to regenerate the JNI .h files using:
+
+@code
+cd bindings/java/scripts
+make_header.bat
+@endcode
+
+Build the JNI DLL using the Visual Studio 2010 solution in "java/c/build/vs2010/PortAudioJNI".
+
+@section java_use_windows Using JPortAudio on Windows
+
+Put the "jportaudio.jar" in the classpath for your application.
+Place the following libraries where they can be found, typically in the same folder as your application.
+
+- portaudio_x86.dll
+- portaudio_x64.dll
+- jportaudio_x86.dll
+- jportaudio_x64.dll
+
+*/

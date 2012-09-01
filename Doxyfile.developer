@@ -84,6 +84,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 INPUT                  = doc/src \
                          include \
+                         bindings/java \
                          examples \          
                          src \
                          test \
