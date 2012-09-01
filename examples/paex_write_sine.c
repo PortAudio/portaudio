@@ -158,7 +158,7 @@ error:
 	if( err == paUnanticipatedHostError )
 	{
 		const PaHostErrorInfo *hostErrorInfo = Pa_GetLastHostErrorInfo();
-		fprintf( stderr, "Host API error = #%d, hostApiType = %d\n", hostErrorInfo->errorCode, hostErrorInfo->hostApiType );
+		fprintf( stderr, "Host API error = #%ld, hostApiType = %d\n", hostErrorInfo->errorCode, hostErrorInfo->hostApiType );
 		fprintf( stderr, "Host API error = %s\n", hostErrorInfo->errorText );
 	}
     Pa_Terminate();
