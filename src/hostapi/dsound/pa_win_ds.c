@@ -2728,8 +2728,6 @@ static void CALLBACK WaitableTimerAPCProc(
 PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
 {
     PaWinDsStream *stream = (PaWinDsStream *)pArg;
-    MMRESULT mmResult;
-    HANDLE hWaitableTimer;
     LARGE_INTEGER dueTime;
     int timerPeriodMs;
 

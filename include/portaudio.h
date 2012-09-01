@@ -1021,7 +1021,7 @@ typedef struct PaStreamInfo
 /** Retrieve a pointer to a PaStreamInfo structure containing information
  about the specified stream.
  @return A pointer to an immutable PaStreamInfo structure. If the stream
- parameter invalid, or an error is encountered, the function returns NULL.
+ parameter is invalid, or an error is encountered, the function returns NULL.
 
  @param stream A pointer to an open stream previously created with Pa_OpenStream.
 
