@@ -178,8 +178,12 @@ jint jpa_ThrowError( JNIEnv *env, const char *message )
 // Throw an exception on error.
 jint jpa_CheckError( JNIEnv *env, PaError err )
 {
-	if( err < 0 )
+	if( err == -1 )
 	{
+        return jpa_ThrowError( env, "-1, possibly no available default device" );
+    }
+    else if( err < 0 )
+    {
 		if( err == paUnanticipatedHostError )
 		{
 			const PaHostErrorInfo *hostErrorInfo = Pa_GetLastHostErrorInfo();
