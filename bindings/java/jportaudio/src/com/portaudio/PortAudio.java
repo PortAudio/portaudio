@@ -39,26 +39,27 @@
 package com.portaudio;
 
 /**
- * Java methods that call PortAudio via JNI.
- * This is a portable audio I/O library that can be used as an alternative to JavaSound.
+ * Java methods that call PortAudio via JNI. This is a portable audio I/O
+ * library that can be used as an alternative to JavaSound.
  * 
  * Please see the PortAudio documentation for a full explanation.
  * 
  * http://portaudio.com/docs/
  * http://portaudio.com/docs/v19-doxydocs/portaudio_8h.html
  * 
- * This Java binding does not support audio callbacks because an audio callback should never block.
- * Calling into a Java virtual machine might block for garbage collection or synchronization.
- * So only the blocking read/write mode is supported.
+ * This Java binding does not support audio callbacks because an audio callback
+ * should never block. Calling into a Java virtual machine might block for
+ * garbage collection or synchronization. So only the blocking read/write mode
+ * is supported.
  * 
  * @author Phil Burk
- *
+ * 
  */
 public class PortAudio
 {
 	public final static int FLAG_CLIP_OFF = (1 << 0);
 	public final static int FLAG_DITHER_OFF = (1 << 1);
-	
+
 	/** Sample Formats */
 	public final static int FORMAT_FLOAT_32 = (1 << 0);
 	public final static int FORMAT_INT_32 = (1 << 1); // not supported
@@ -84,51 +85,75 @@ public class PortAudio
 	public final static int HOST_API_TYPE_WASAPI = 13;
 	public final static int HOST_API_TYPE_AUDIOSCIENCE = 14;
 	public final static int HOST_API_TYPE_COUNT = 15;
-	
+
 	static
 	{
-		if( System.getProperty( "os.arch" ).contains( "64" ) )
+		String os = System.getProperty( "os.name" ).toLowerCase();
+		// On Windows we have separate libraries for 32 and 64-bit JVMs.
+		if( os.indexOf( "win" ) >= 0 )
 		{
-			System.loadLibrary( "jportaudio_x64" );
+			if( System.getProperty( "os.arch" ).contains( "64" ) )
+			{
+				System.loadLibrary( "jportaudio_x64" );
+			}
+			else
+			{
+				System.loadLibrary( "jportaudio_x86" );
+			}
 		}
 		else
 		{
-			System.loadLibrary( "jportaudio_x86" );
+			System.loadLibrary( "jportaudio" );
 		}
-		System.out.println("---- JPortAudio version " + getVersion() + ", " + getVersionText());
+		System.out.println( "---- JPortAudio version " + getVersion() + ", "
+				+ getVersionText() );
 	}
 
 	/**
-	 * @return the release number of the currently running PortAudio build, eg 1900.
+	 * @return the release number of the currently running PortAudio build, eg
+	 *         1900.
 	 */
 	public native static int getVersion();
-	
+
 	/**
-	 * @return a textual description of the current PortAudio build, eg "PortAudio V19-devel 13 October 2002".
+	 * @return a textual description of the current PortAudio build, eg
+	 *         "PortAudio V19-devel 13 October 2002".
 	 */
 	public native static String getVersionText();
 
-	
 	/**
-	 * Library initialization function - call this before using PortAudio. This function initializes internal data structures and prepares underlying host APIs for use. With the exception of getVersion(), getVersionText(), and getErrorText(), this function MUST be called before using any other PortAudio API functions.
+	 * Library initialization function - call this before using PortAudio. This
+	 * function initializes internal data structures and prepares underlying
+	 * host APIs for use. With the exception of getVersion(), getVersionText(),
+	 * and getErrorText(), this function MUST be called before using any other
+	 * PortAudio API functions.
 	 */
 	public native static void initialize();
+
 	/**
-	 * Library termination function - call this when finished using PortAudio. This function deallocates all resources allocated by PortAudio since it was initialized by a call to initialize(). In cases where Pa_Initialise() has been called multiple times, each call must be matched with a corresponding call to terminate(). The final matching call to terminate() will automatically close any PortAudio streams that are still open.
+	 * Library termination function - call this when finished using PortAudio.
+	 * This function deallocates all resources allocated by PortAudio since it
+	 * was initialized by a call to initialize(). In cases where Pa_Initialise()
+	 * has been called multiple times, each call must be matched with a
+	 * corresponding call to terminate(). The final matching call to terminate()
+	 * will automatically close any PortAudio streams that are still open.
 	 */
 	public native static void terminate();
 
 	/**
-	 * @return  the number of available devices. The number of available devices may be zero.
+	 * @return the number of available devices. The number of available devices
+	 *         may be zero.
 	 */
 	public native static int getDeviceCount();
 
 	private native static void getDeviceInfo( int index, DeviceInfo deviceInfo );
 
 	/**
-	 * @param index A valid device index in the range 0 to (getDeviceCount()-1)
-	 * @return An DeviceInfo structure. 
-	 * @throws RuntimeException if the device parameter is out of range.
+	 * @param index
+	 *            A valid device index in the range 0 to (getDeviceCount()-1)
+	 * @return An DeviceInfo structure.
+	 * @throws RuntimeException
+	 *             if the device parameter is out of range.
 	 */
 	public static DeviceInfo getDeviceInfo( int index )
 	{
@@ -141,8 +166,9 @@ public class PortAudio
 	 * @return the number of available host APIs.
 	 */
 	public native static int getHostApiCount();
-	
-	private native static void getHostApiInfo( int index, HostApiInfo hostApiInfo );
+
+	private native static void getHostApiInfo( int index,
+			HostApiInfo hostApiInfo );
 
 	/**
 	 * @param index
@@ -156,27 +182,37 @@ public class PortAudio
 	}
 
 	/**
-	 * @param hostApiType A unique host API identifier, for example HOST_API_TYPE_COREAUDIO.
+	 * @param hostApiType
+	 *            A unique host API identifier, for example
+	 *            HOST_API_TYPE_COREAUDIO.
 	 * @return a runtime host API index
 	 */
 	public native static int hostApiTypeIdToHostApiIndex( int hostApiType );
 
 	/**
-	 * @param hostApiIndex A valid host API index ranging from 0 to (getHostApiCount()-1)
-	 * @param apiDeviceIndex A valid per-host device index in the range 0 to (getHostApiInfo(hostApi).deviceCount-1)
+	 * @param hostApiIndex
+	 *            A valid host API index ranging from 0 to (getHostApiCount()-1)
+	 * @param apiDeviceIndex
+	 *            A valid per-host device index in the range 0 to
+	 *            (getHostApiInfo(hostApi).deviceCount-1)
 	 * @return standard PortAudio device index
 	 */
 	public native static int hostApiDeviceIndexToDeviceIndex( int hostApiIndex,
 			int apiDeviceIndex );
-	
+
 	public native static int getDefaultInputDevice();
+
 	public native static int getDefaultOutputDevice();
+
 	public native static int getDefaultHostApi();
 
 	/**
-	 * @param inputStreamParameters input description, may be null
-	 * @param outputStreamParameters output description, may be null
-	 * @param sampleRate typically 44100 or 48000, or maybe 22050, 16000, 8000, 96000
+	 * @param inputStreamParameters
+	 *            input description, may be null
+	 * @param outputStreamParameters
+	 *            output description, may be null
+	 * @param sampleRate
+	 *            typically 44100 or 48000, or maybe 22050, 16000, 8000, 96000
 	 * @return 0 if supported or a negative error
 	 */
 	public native static int isFormatSupported(
@@ -187,26 +223,28 @@ public class PortAudio
 			StreamParameters inputStreamParameters,
 			StreamParameters outputStreamParameters, int sampleRate,
 			int framesPerBuffer, int flags );
+
 	/**
 	 * 
-	 * @param inputStreamParameters input description, may be null
-	 * @param outputStreamParameters output description, may be null
-	 * @param sampleRate typically 44100 or 48000, or maybe 22050, 16000, 8000, 96000
+	 * @param inputStreamParameters
+	 *            input description, may be null
+	 * @param outputStreamParameters
+	 *            output description, may be null
+	 * @param sampleRate
+	 *            typically 44100 or 48000, or maybe 22050, 16000, 8000, 96000
 	 * @param framesPerBuffer
 	 * @param flags
 	 * @return
 	 */
-	public static BlockingStream openStream( 
+	public static BlockingStream openStream(
 			StreamParameters inputStreamParameters,
-			StreamParameters outputStreamParameters, int sampleRate, int framesPerBuffer,
-			int flags )
+			StreamParameters outputStreamParameters, int sampleRate,
+			int framesPerBuffer, int flags )
 	{
 		BlockingStream blockingStream = new BlockingStream();
 		openStream( blockingStream, inputStreamParameters,
-			 outputStreamParameters,  sampleRate,  framesPerBuffer,
-			 flags);
+				outputStreamParameters, sampleRate, framesPerBuffer, flags );
 		return blockingStream;
 	}
-
 
 }
