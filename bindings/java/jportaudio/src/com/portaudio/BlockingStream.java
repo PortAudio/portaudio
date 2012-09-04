@@ -71,9 +71,9 @@ public class BlockingStream
 	 */
 	public native int getWriteAvailable();
 
-	private native void readFloats( float[] buffer, int numFrames );
+	private native boolean readFloats( float[] buffer, int numFrames );
 
-	private native void writeFloats( float[] buffer, int numFrames );
+	private native boolean writeFloats( float[] buffer, int numFrames );
 
 	/**
 	 * Read 32-bit floating point data from the stream into the array.
@@ -81,15 +81,16 @@ public class BlockingStream
 	 * @param buffer
 	 * @param numFrames
 	 *            number of frames to read
+	 * @return true if an input overflow occurred
 	 */
-	public void read( float[] buffer, int numFrames )
+	public boolean read( float[] buffer, int numFrames )
 	{
 		if( inputFormat != PortAudio.FORMAT_FLOAT_32 )
 		{
 			throw new RuntimeException(
 					"Tried to read float samples from a non float stream." );
 		}
-		readFloats( buffer, numFrames );
+		return readFloats( buffer, numFrames );
 	}
 
 	/**
@@ -99,20 +100,21 @@ public class BlockingStream
 	 * @param buffer
 	 * @param numFrames
 	 *            number of frames to write
+	 * @return true if an output underflow occurred
 	 */
-	public void write( float[] buffer, int numFrames )
+	public boolean write( float[] buffer, int numFrames )
 	{
 		if( outputFormat != PortAudio.FORMAT_FLOAT_32 )
 		{
 			throw new RuntimeException(
 					"Tried to write float samples to a non float stream." );
 		}
-		writeFloats( buffer, numFrames );
+		return writeFloats( buffer, numFrames );
 	}
 
-	private native void readShorts( short[] buffer, int numFrames );
+	private native boolean readShorts( short[] buffer, int numFrames );
 
-	private native void writeShorts( short[] buffer, int numFrames );
+	private native boolean writeShorts( short[] buffer, int numFrames );
 
 	/**
 	 * Read 16-bit integer data to the stream from the array.
@@ -120,15 +122,16 @@ public class BlockingStream
 	 * @param buffer
 	 * @param numFrames
 	 *            number of frames to write
+	 * @return true if an input overflow occurred
 	 */
-	public void read( short[] buffer, int numFrames )
+	public boolean read( short[] buffer, int numFrames )
 	{
 		if( inputFormat != PortAudio.FORMAT_INT_16 )
 		{
 			throw new RuntimeException(
 					"Tried to read short samples from a non short stream." );
 		}
-		readShorts( buffer, numFrames );
+		return readShorts( buffer, numFrames );
 	}
 
 	/**
@@ -137,15 +140,16 @@ public class BlockingStream
 	 * @param buffer
 	 * @param numFrames
 	 *            number of frames to write
+	 * @return true if an output underflow occurred
 	 */
-	public void write( short[] buffer, int numFrames )
+	public boolean write( short[] buffer, int numFrames )
 	{
 		if( outputFormat != PortAudio.FORMAT_INT_16 )
 		{
 			throw new RuntimeException(
 					"Tried to write short samples from a non short stream." );
 		}
-		writeShorts( buffer, numFrames );
+		return writeShorts( buffer, numFrames );
 	}
 
 	/**

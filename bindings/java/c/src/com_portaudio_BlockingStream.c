@@ -40,6 +40,13 @@
 #include "portaudio.h"
 #include "jpa_tools.h"
 
+#ifndef FALSE
+#define FALSE  (0)
+#endif
+#ifndef TRUE
+#define TRUE  (!FALSE)
+#endif
+
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    getReadAvailable
@@ -70,9 +77,9 @@ JNIEXPORT jint JNICALL Java_com_portaudio_BlockingStream_getWriteAvailable
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    writeFloats
- * Signature: ([FI)V
+ * Signature: ([FI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_writeFloats
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeFloats
   (JNIEnv *env, jobject blockingStream, jfloatArray buffer, jint numFrames)
 {
 	jfloat *carr;
@@ -82,26 +89,34 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_writeFloats
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "null stream buffer");
-		return;
+		return FALSE;
 	}
 	carr = (*env)->GetFloatArrayElements(env, buffer, NULL);
 	if (carr == NULL)
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "invalid stream buffer");
-		return;
+		return FALSE;
 	}
 	err = Pa_WriteStream( stream, carr, numFrames );
 	(*env)->ReleaseFloatArrayElements(env, buffer, carr, 0);
-	jpa_CheckError( env, err );
+	if( err == paOutputUnderflowed )
+	{
+		return TRUE;
+	}
+	else
+	{
+		jpa_CheckError( env, err );
+		return FALSE;
+	}
 }
 
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    readFloats
- * Signature: ([FI)V
+ * Signature: ([FI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_readFloats
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readFloats
   (JNIEnv *env, jobject blockingStream, jfloatArray buffer, jint numFrames)
 {
 	jfloat *carr;
@@ -111,25 +126,34 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_readFloats
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "null stream buffer");
-		return;
+		return FALSE;
 	}
 	carr = (*env)->GetFloatArrayElements(env, buffer, NULL);
 	if (carr == NULL)
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "invalid stream buffer");
-		return;
+		return FALSE;
 	}
 	err = Pa_ReadStream( stream, carr, numFrames );
 	(*env)->ReleaseFloatArrayElements(env, buffer, carr, 0);
-	jpa_CheckError( env, err );
+	if( err == paInputOverflowed )
+	{
+		return TRUE;
+	}
+	else
+	{
+		jpa_CheckError( env, err );
+		return FALSE;
+	}
 }
+
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    writeShorts
- * Signature: ([FI)V
+ * Signature: ([SI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_writeShorts
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeShorts
   (JNIEnv *env, jobject blockingStream, jfloatArray buffer, jint numFrames)
 {
 	jshort *carr;
@@ -139,26 +163,34 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_writeShorts
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "null stream buffer");
-		return;
+		return FALSE;
 	}
 	carr = (*env)->GetShortArrayElements(env, buffer, NULL);
 	if (carr == NULL)
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "invalid stream buffer");
-		return;
+		return FALSE;
 	}
 	err = Pa_WriteStream( stream, carr, numFrames );
 	(*env)->ReleaseShortArrayElements(env, buffer, carr, 0);
-	jpa_CheckError( env, err );
+	if( err == paOutputUnderflowed )
+	{
+		return TRUE;
+	}
+	else
+	{
+		jpa_CheckError( env, err );
+		return FALSE;
+	}
 }
 
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    readShorts
- * Signature: ([FI)V
+ * Signature: ([SI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_readShorts
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readShorts
   (JNIEnv *env, jobject blockingStream, jfloatArray buffer, jint numFrames)
 {
 	jshort *carr;
@@ -168,18 +200,26 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_readShorts
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "null stream buffer");
-		return;
+		return FALSE;
 	}
 	carr = (*env)->GetShortArrayElements(env, buffer, NULL);
 	if (carr == NULL)
 	{
 		(*env)->ThrowNew( env, (*env)->FindClass(env,"java/lang/RuntimeException"),
                   "invalid stream buffer");
-		return;
+		return FALSE;
 	}
 	err = Pa_ReadStream( stream, carr, numFrames );
 	(*env)->ReleaseShortArrayElements(env, buffer, carr, 0);
-	jpa_CheckError( env, err );
+	if( err == paInputOverflowed )
+	{
+		return TRUE;
+	}
+	else
+	{
+		jpa_CheckError( env, err );
+		return FALSE;
+	}
 }
 
 /*

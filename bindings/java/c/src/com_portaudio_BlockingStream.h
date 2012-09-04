@@ -31,33 +31,33 @@ JNIEXPORT jint JNICALL Java_com_portaudio_BlockingStream_getWriteAvailable
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    readFloats
- * Signature: ([FI)V
+ * Signature: ([FI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_readFloats
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readFloats
   (JNIEnv *, jobject, jfloatArray, jint);
 
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    writeFloats
- * Signature: ([FI)V
+ * Signature: ([FI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_writeFloats
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeFloats
   (JNIEnv *, jobject, jfloatArray, jint);
 
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    readShorts
- * Signature: ([SI)V
+ * Signature: ([SI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_readShorts
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readShorts
   (JNIEnv *, jobject, jshortArray, jint);
 
 /*
  * Class:     com_portaudio_BlockingStream
  * Method:    writeShorts
- * Signature: ([SI)V
+ * Signature: ([SI)Z
  */
-JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_writeShorts
+JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeShorts
   (JNIEnv *, jobject, jshortArray, jint);
 
 /*
