@@ -36,10 +36,18 @@
  * license above.
  */
 
+
+/** @file
+ @ingroup bindings_java
+
+ @brief Information about a JPortAudio Stream.
+*/
+
 package com.portaudio;
 
 /**
  * Equivalent to PaStreamInfo
+ * @see PortAudio
  * @author Phil Burk
  *
  */

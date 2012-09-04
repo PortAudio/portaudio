@@ -36,9 +36,15 @@
  * license above.
  */
 
+/** @file
+ @ingroup bindings_java
+
+ @brief Options to use when opening a stream.
+*/
 package com.portaudio;
 /**
  * Equivalent to PaStreamParameters
+ * @see PortAudio
  * @author Phil Burk
  *
  */

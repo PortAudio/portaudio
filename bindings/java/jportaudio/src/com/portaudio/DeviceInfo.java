@@ -36,10 +36,17 @@
  * license above.
  */
 
+/** @file
+ @ingroup bindings_java
+
+ @brief Information about a JPortAudio device.
+*/
 package com.portaudio;
 
 /**
  * Equivalent to PaDeviceInfo
+ * @see PortAudio
+ * @see HostApiInfo
  * @author Phil Burk
  *
  */

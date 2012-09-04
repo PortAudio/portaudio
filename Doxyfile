@@ -89,6 +89,7 @@ INPUT                  = doc/src \
 FILE_PATTERNS          = *.h \
                          *.c \
                          *.cpp \
+                         *.java \
                          *.dox
 RECURSIVE              = YES
 EXCLUDE                = src/hostapi/wasapi/mingw-include

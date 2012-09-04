@@ -36,6 +36,11 @@
  * license above.
  */
 
+/** @file
+ @ingroup bindings_java
+
+ @brief Java wrapper for the PortAudio API.
+*/
 package com.portaudio;
 
 /**
@@ -51,6 +56,12 @@ package com.portaudio;
  * should never block. Calling into a Java virtual machine might block for
  * garbage collection or synchronization. So only the blocking read/write mode
  * is supported.
+ * 
+ * @see BlockingStream
+ * @see DeviceInfo
+ * @see HostApiInfo
+ * @see StreamInfo
+ * @see StreamParameters
  * 
  * @author Phil Burk
  * 

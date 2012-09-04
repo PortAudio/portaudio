@@ -36,6 +36,11 @@
  * license above.
  */
 
+/** @file
+ @ingroup bindings_java
+
+ @brief A blocking read/write stream.
+*/
 package com.portaudio;
 
 /**
@@ -45,6 +50,8 @@ package com.portaudio;
  * It is passed to PortAudio when calling stream related functions.
  * 
  * To create one of these, call PortAudio.openStream().
+ * 
+ * @see PortAudio
  * 
  * @author Phil Burk
  * 

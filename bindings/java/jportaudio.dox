@@ -6,10 +6,14 @@
 
 @section java_draft DRAFT - IN PROGRESS
 
-9/1/12 JPortAudio is very new and should be considered an "alpha" release.
+9/4/12 JPortAudio is very new and should be considered an "alpha" release.
 The building of JPortAudio will eventually be integrated into the Makefile as an optional build.
 
-Currently JPortAudio is only supported for Windows. Please contact us if you want to help with porting to Mac or Linux.
+Currently JPortAudio is only supported for Windows and Macintosh. Please contact us if you want to help with porting Linux.
+
+For reference documentation of the JPortAudio API see: com.portaudio.PortAudio
+
+For an example see: PlaySine.java
 
 @section java_comp_windows Building JPortAudio on Windows
 
