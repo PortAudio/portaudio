@@ -3677,7 +3677,7 @@ PaError PaWinWdm_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     PaError result = paNoError;
     int deviceCount = 0;
     void *scanResults = 0;
-    PaWinWdmHostApiRepresentation *wdmHostApi;
+    PaWinWdmHostApiRepresentation *wdmHostApi = NULL;
 
     PA_LOGE_;
 
