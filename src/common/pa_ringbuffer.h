@@ -65,6 +65,9 @@
  The memory area used to store the buffer elements must be allocated by 
  the client prior to calling PaUtil_InitializeRingBuffer() and must outlive
  the use of the ring buffer.
+ 
+ @note The ring buffer functions are not normally exposed in the PortAudio libraries. 
+ If you want to call them then you will need to add pa_ringbuffer.c to your application source code.
 */
 
 #if defined(__APPLE__)
