@@ -208,9 +208,9 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
     PaUtil_SetLastHostErrorInfo( paDirectSound, hr, "DirectSound error" )
 
 /************************************************* DX Prototypes **********/
-static BOOL CALLBACK CollectGUIDsProc(LPGUID lpGUID,
-                                     LPCTSTR lpszDesc,
-                                     LPCTSTR lpszDrvName,
+static BOOL CALLBACK CollectGUIDsProcA(LPGUID lpGUID,
+                                     LPCSTR lpszDesc,
+                                     LPCSTR lpszDrvName,
                                      LPVOID lpContext );
 
 /************************************************************************************/
@@ -367,7 +367,7 @@ static double PaWinDs_GetMinLatencySeconds( double sampleRate )
     double    minLatencySeconds = 0;
 
     /* Let user determine minimal latency by setting environment variable. */
-    hresult = GetEnvironmentVariable( PA_LATENCY_ENV_NAME, envbuf, PA_ENV_BUF_SIZE );
+    hresult = GetEnvironmentVariableA( PA_LATENCY_ENV_NAME, envbuf, PA_ENV_BUF_SIZE );
     if( (hresult > 0) && (hresult < PA_ENV_BUF_SIZE) )
     {
         minLatencySeconds = atoi( envbuf ) * SECONDS_PER_MSEC;
@@ -513,9 +513,9 @@ static PaError TerminateDSDeviceNameAndGUIDVector( DSDeviceNameAndGUIDVector *gu
 /************************************************************************************
 ** Collect preliminary device information during DirectSound enumeration 
 */
-static BOOL CALLBACK CollectGUIDsProc(LPGUID lpGUID,
-                                     LPCTSTR lpszDesc,
-                                     LPCTSTR lpszDrvName,
+static BOOL CALLBACK CollectGUIDsProcA(LPGUID lpGUID,
+                                     LPCSTR lpszDesc,
+                                     LPCSTR lpszDrvName,
                                      LPVOID lpContext )
 {
     DSDeviceNameAndGUIDVector *namesAndGUIDs = (DSDeviceNameAndGUIDVector*)lpContext;
@@ -1202,9 +1202,9 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     if( result != paNoError )
         goto error;
 
-    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA( (LPDSENUMCALLBACKA)CollectGUIDsProcA, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
 
-    paWinDsDSoundEntryPoints.DirectSoundEnumerateA( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundEnumerateA( (LPDSENUMCALLBACKA)CollectGUIDsProcA, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
 
     if( deviceNamesAndGUIDs.inputNamesAndGUIDs.enumerationError != paNoError )
     {
