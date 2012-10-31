@@ -450,7 +450,7 @@ static PaDeviceIndex GetEnvDefaultDeviceID( char *envName )
 #ifndef WIN32_PLATFORM_PSPC /* no GetEnvironmentVariable on PocketPC */
 
     /* Let user determine default device by setting environment variable. */
-    hresult = GetEnvironmentVariable( envName, envbuf, PA_ENV_BUF_SIZE_ );
+    hresult = GetEnvironmentVariableA( envName, envbuf, PA_ENV_BUF_SIZE_ );
     if( (hresult > 0) && (hresult < PA_ENV_BUF_SIZE_) )
     {
         recommendedIndex = atoi( envbuf );
