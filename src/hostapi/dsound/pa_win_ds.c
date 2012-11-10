@@ -581,29 +581,38 @@ static BOOL CALLBACK KsPropertySetEnumerateCallback( PDSPROPERTY_DIRECTSOUNDDEVI
     int i;
     DSDeviceNamesAndGUIDs *deviceNamesAndGUIDs = (DSDeviceNamesAndGUIDs*)context;
 
-    if( data->DataFlow == DIRECTSOUNDDEVICE_DATAFLOW_RENDER )
+    /*
+        Apparently data->Interface can be NULL in some cases. 
+        Possibly virtual devices without hardware.
+        So we check for NULLs now. See mailing list message November 10, 2012:
+        "[Portaudio] portaudio initialization crash in KsPropertySetEnumerateCallback(pa_win_ds.c)"
+    */
+    if( data->Interface )
     {
-        for( i=0; i < deviceNamesAndGUIDs->outputNamesAndGUIDs.count; ++i )
+        if( data->DataFlow == DIRECTSOUNDDEVICE_DATAFLOW_RENDER )
         {
-            if( deviceNamesAndGUIDs->outputNamesAndGUIDs.items[i].lpGUID
-                && memcmp( &data->DeviceId, deviceNamesAndGUIDs->outputNamesAndGUIDs.items[i].lpGUID, sizeof(GUID) ) == 0 )
+            for( i=0; i < deviceNamesAndGUIDs->outputNamesAndGUIDs.count; ++i )
             {
-                deviceNamesAndGUIDs->outputNamesAndGUIDs.items[i].pnpInterface = 
+                if( deviceNamesAndGUIDs->outputNamesAndGUIDs.items[i].lpGUID
+                    && memcmp( &data->DeviceId, deviceNamesAndGUIDs->outputNamesAndGUIDs.items[i].lpGUID, sizeof(GUID) ) == 0 )
+                {
+                    deviceNamesAndGUIDs->outputNamesAndGUIDs.items[i].pnpInterface = 
                         (char*)DuplicateWCharString( deviceNamesAndGUIDs->winDsHostApi->allocations, data->Interface );
-                break;
+                    break;
+                }
             }
         }
-    }
-    else if( data->DataFlow == DIRECTSOUNDDEVICE_DATAFLOW_CAPTURE )
-    {
-        for( i=0; i < deviceNamesAndGUIDs->inputNamesAndGUIDs.count; ++i )
+        else if( data->DataFlow == DIRECTSOUNDDEVICE_DATAFLOW_CAPTURE )
         {
-            if( deviceNamesAndGUIDs->inputNamesAndGUIDs.items[i].lpGUID
-                && memcmp( &data->DeviceId, deviceNamesAndGUIDs->inputNamesAndGUIDs.items[i].lpGUID, sizeof(GUID) ) == 0 )
+            for( i=0; i < deviceNamesAndGUIDs->inputNamesAndGUIDs.count; ++i )
             {
-                deviceNamesAndGUIDs->inputNamesAndGUIDs.items[i].pnpInterface = 
+                if( deviceNamesAndGUIDs->inputNamesAndGUIDs.items[i].lpGUID
+                    && memcmp( &data->DeviceId, deviceNamesAndGUIDs->inputNamesAndGUIDs.items[i].lpGUID, sizeof(GUID) ) == 0 )
+                {
+                    deviceNamesAndGUIDs->inputNamesAndGUIDs.items[i].pnpInterface = 
                         (char*)DuplicateWCharString( deviceNamesAndGUIDs->winDsHostApi->allocations, data->Interface );
-                break;
+                    break;
+                }
             }
         }
     }
