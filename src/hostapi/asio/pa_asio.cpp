@@ -2454,10 +2454,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         result = PaUtil_InitializeBufferProcessor( &stream->bufferProcessor               ,
                                                     inputChannelCount                     ,
                                                     inputSampleFormat & ~paNonInterleaved , /* Ring buffer. */
-                                                    hostInputSampleFormat                 , /* Host format. */
+                                                    (hostInputSampleFormat | paNonInterleaved), /* Host format. */
                                                     outputChannelCount                    ,
                                                     outputSampleFormat & ~paNonInterleaved, /* Ring buffer. */
-                                                    hostOutputSampleFormat                , /* Host format. */
+                                                    (hostOutputSampleFormat | paNonInterleaved), /* Host format. */
                                                     sampleRate                            ,
                                                     streamFlags                           ,
                                                     framesPerBuffer                       , /* Frames per ring buffer block. */
