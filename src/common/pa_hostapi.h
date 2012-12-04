@@ -264,7 +264,7 @@ typedef struct PaUtilHostApiRepresentation {
                 - if supplied its hostApi field matches the output device's host Api
  
             double sampleRate
-                - is not an 'absurd' rate (less than 1000. or greater than 200000.)
+                - is not an 'absurd' rate (less than 1000. or greater than 384000.)
                 - sampleRate is NOT validated against device capabilities
  
             PaStreamFlags streamFlags
