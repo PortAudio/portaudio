@@ -4959,8 +4959,18 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
                 if (result != paNoError)
                 {
+                    unsigned long pos = 0xdeadc0de;
                     PA_DEBUG(("Failed to register capture position register, using PinGetAudioPositionViaIOCTL\n"));
                     stream->capture.pPin->fnAudioPosition = PinGetAudioPositionViaIOCTL;
+                    /* Test position function */
+                    result = (stream->capture.pPin->fnAudioPosition)(stream->capture.pPin, &pos);
+                    if (result != paNoError || pos != 0x0)
+                    {
+                        PA_DEBUG(("Failed to read capture position register (IOCTL)\n"));
+                        PaWinWDM_SetLastErrorInfo(paUnanticipatedHostError, "Failed to read capture position register (IOCTL)");
+                        result = paUnanticipatedHostError;
+                        goto error;
+                    }                
                 }
                 else
                 {
@@ -5071,8 +5081,18 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
                 if (result != paNoError)
                 {
+                    unsigned long pos = 0xdeadc0de;
                     PA_DEBUG(("Failed to register rendering position register, using PinGetAudioPositionViaIOCTL\n"));
                     stream->render.pPin->fnAudioPosition = PinGetAudioPositionViaIOCTL;
+                    /* Test position function */
+                    result = (stream->render.pPin->fnAudioPosition)(stream->render.pPin, &pos);
+                    if (result != paNoError || pos != 0x0)
+                    {
+                        PA_DEBUG(("Failed to read render position register (IOCTL)\n"));
+                        PaWinWDM_SetLastErrorInfo(paUnanticipatedHostError, "Failed to read render position register (IOCTL)");
+                        result = paUnanticipatedHostError;
+                        goto error;
+                    }
                 }
                 else
                 {
