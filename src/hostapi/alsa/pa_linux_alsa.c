@@ -837,12 +837,13 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
 {
     PaError result = paNoError;
     snd_pcm_hw_params_t *hwParams;
-    snd_pcm_uframes_t lowLatency = 512, highLatency = 2048;
+    snd_pcm_uframes_t alsaBufferFrames, alsaPeriodFrames;
     unsigned int minChans, maxChans;
     int* minChannels, * maxChannels;
     double * defaultLowLatency, * defaultHighLatency, * defaultSampleRate =
         &devInfo->baseDeviceInfo.defaultSampleRate;
     double defaultSr = *defaultSampleRate;
+    int dir;
 
     assert( pcm );
 
@@ -908,36 +909,34 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     }
 
     /* TWEAKME:
-     *
-     * Giving values for default min and max latency is not
-     * straightforward.  Here are our objectives:
-     *
-     *         * for low latency, we want to give the lowest value
-     *         that will work reliably.  This varies based on the
-     *         sound card, kernel, CPU, etc.  I think it is better
-     *         to give sub-optimal latency than to give a number
-     *         too low and cause dropouts.  My conservative
-     *         estimate at this point is to base it on 4096-sample
-     *         latency at 44.1 kHz, which gives a latency of 23ms.
-     *         * for high latency we want to give a large enough
-     *         value that dropouts are basically impossible.  This
-     *         doesn't really require as much tweaking, since
-     *         providing too large a number will just cause us to
-     *         select the nearest setting that will work at stream
-     *         config time.
+     * Giving values for default min and max latency is not straightforward.
+     *  * for low latency, we want to give the lowest value that will work reliably.
+     *      This varies based on the sound card, kernel, CPU, etc.  Better to give
+     *      sub-optimal latency than to give a number too low and cause dropouts.
+     *  * for high latency we want to give a large enough value that dropouts are basically impossible.
+     *      This doesn't really require as much tweaking, since providing too large a number will
+     *      just cause us to select the nearest setting that will work at stream config time.
      */
-    ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &lowLatency ), paUnanticipatedHostError );
+    /* Try low latency values, (sometimes the buffer & period that result are larger) */
+    alsaBufferFrames = 512;
+    alsaPeriodFrames = 128;
+    ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
+    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, &dir ), paUnanticipatedHostError );
+    *defaultLowLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
 
+    /* Base the high latency case on values four times larger */
+    alsaBufferFrames = 2048;
+    alsaPeriodFrames = 512;
     /* Have to reset hwParams, to set new buffer size; need to also set sample rate again */
     ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
     ENSURE_( SetApproximateSampleRate( pcm, hwParams, defaultSr ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &highLatency ), paUnanticipatedHostError );
+    ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
+    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, &dir ), paUnanticipatedHostError );
+    *defaultHighLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
 
     *minChannels = (int)minChans;
     *maxChannels = (int)maxChans;
     *defaultSampleRate = defaultSr;
-    *defaultLowLatency = (double) lowLatency / *defaultSampleRate;
-    *defaultHighLatency = (double) highLatency / *defaultSampleRate;
 
 end:
     alsa_snd_pcm_close( pcm );
@@ -2040,7 +2039,7 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
 
     alsa_snd_pcm_sw_params_alloca( &swParams );
 
-    bufSz = params->suggestedLatency * sampleRate;
+    bufSz = params->suggestedLatency * sampleRate + self->framesPerBuffer;
     ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( self->pcm, hwParams, &bufSz ), paUnanticipatedHostError );
 
     /* Set the parameters! */
@@ -2066,7 +2065,7 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
     }
 
     /* Latency in seconds */
-    *latency = self->bufferSize / sampleRate;
+    *latency = (self->bufferSize - self->framesPerBuffer) / sampleRate;
 
     /* Now software parameters... */
     ENSURE_( alsa_snd_pcm_sw_params_current( self->pcm, swParams ), paUnanticipatedHostError );
