@@ -3770,7 +3770,8 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
         }
         if( pollPlayback )
         {
-            playbackPfds = self->pfds + (self->capture.pcm ? self->capture.nfds : 0);
+            /* self->pfds is in effect an array of fds; if necessary, index past the capture fds */
+            playbackPfds = self->pfds + (pollCapture ? self->capture.nfds : 0);
             PA_ENSURE( PaAlsaStreamComponent_BeginPolling( &self->playback, playbackPfds ) );
             totalFds += self->playback.nfds;
         }
