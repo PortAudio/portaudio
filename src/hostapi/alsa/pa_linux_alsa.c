@@ -1898,8 +1898,8 @@ error:
 static void PaAlsaStreamComponent_Terminate( PaAlsaStreamComponent *self )
 {
     alsa_snd_pcm_close( self->pcm );
-    if( self->userBuffers )
-        PaUtil_FreeMemory( self->userBuffers );
+    PaUtil_FreeMemory( self->userBuffers ); /* (Ptr can be NULL; PaUtil_FreeMemory includes a NULL check) */
+    PaUtil_FreeMemory( self->nonMmapBuffer );
 }
 
 /*
@@ -3450,13 +3450,6 @@ static PaError PaAlsaStreamComponent_EndProcessing( PaAlsaStreamComponent *self,
 
     if( self->canMmap )
         res = alsa_snd_pcm_mmap_commit( self->pcm, self->offset, numFrames );
-    else
-    {
-        /* using realloc for optimisation
-        free( self->nonMmapBuffer );
-        self->nonMmapBuffer = NULL;
-        */
-    }
 
     if( res == -EPIPE || res == -ESTRPIPE )
     {
