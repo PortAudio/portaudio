@@ -1078,6 +1078,38 @@ static int IgnorePlugin( const char *pluginId )
     return 0;
 }
 
+/* Skip past parts at the beginning of a (pcm) info name that are already in the card name, to avoid duplication */
+static char *SkipCardDetailsInName( char *infoSkipName, char *cardRefName )
+{
+    char *lastSpacePosn = infoSkipName;
+
+    /* Skip matching chars; but only in chunks separated by ' ' (not part words etc), so track lastSpacePosn */
+    while( *cardRefName )
+    {
+        while( *infoSkipName && *cardRefName && *infoSkipName == *cardRefName)
+        {
+            infoSkipName++;
+            cardRefName++;
+            if( *infoSkipName == ' ' || *infoSkipName == '\0' )
+                lastSpacePosn = infoSkipName;
+        }
+        infoSkipName = lastSpacePosn;
+        /* Look for another chunk; post-increment means ends pointing to next char */
+        while( *cardRefName && ( *cardRefName++ != ' ' ));
+    }
+    if( *infoSkipName == '\0' )
+        return "-"; /* The 2 names were identical; instead of a nul-string, return a marker string */
+
+    /* Now want to move to the first char after any spaces */
+    while( *lastSpacePosn && *lastSpacePosn == ' ' )
+        lastSpacePosn++;
+    /* Skip a single separator char if present in the remaining pcm name; (pa will add its own) */
+    if(( *lastSpacePosn == '-' || *lastSpacePosn == ':' ) && *(lastSpacePosn + 1) == ' ' )
+        lastSpacePosn += 2;
+
+    return lastSpacePosn;
+}
+
 /** Open PCM device.
  *
  * Wrapper around alsa_snd_pcm_open which may repeatedly retry opening a device if it is busy, for
@@ -1248,7 +1280,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
 
         while( alsa_snd_ctl_pcm_next_device( ctl, &devIdx ) == 0 && devIdx >= 0 )
         {
-            char *alsaDeviceName, *deviceName;
+            char *alsaDeviceName, *deviceName, *infoName;
             size_t len;
             int hasPlayback = 0, hasCapture = 0;
             snprintf( buf, sizeof (buf), "hw:%d,%d", cardIdx, devIdx );
@@ -1274,12 +1306,13 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
                 continue;
             }
 
+            infoName = SkipCardDetailsInName( (char *)alsa_snd_pcm_info_get_name( pcmInfo ), cardName );
+
             /* The length of the string written by snprintf plus terminating 0 */
-            len = snprintf( NULL, 0, "%s: %s (%s)", cardName, alsa_snd_pcm_info_get_name( pcmInfo ), buf ) + 1;
+            len = snprintf( NULL, 0, "%s: %s (%s)", cardName, infoName, buf ) + 1;
             PA_UNLESS( deviceName = (char *)PaUtil_GroupAllocateMemory( alsaApi->allocations, len ),
                     paInsufficientMemory );
-            snprintf( deviceName, len, "%s: %s (%s)", cardName,
-                    alsa_snd_pcm_info_get_name( pcmInfo ), buf );
+            snprintf( deviceName, len, "%s: %s (%s)", cardName, infoName, buf );
 
             ++numDeviceNames;
             if( !hwDevInfos || numDeviceNames > maxDeviceNames )
