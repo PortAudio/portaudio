@@ -227,4 +227,12 @@ void PaUtil_DiscardHighSpeedLog( LogHandle hLog )
     PaUtil_FreeMemory(pLog);
 }
 
+#else
+/* This stub was added so that this file will generate a symbol.
+ * Otherwise linker/archiver programs will complain.
+ */
+int PaUtil_TraceStubToSatisfyLinker(void)
+{
+	return 0;
+}
 #endif /* TRACE_REALTIME_EVENTS */
