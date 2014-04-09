@@ -86,6 +86,13 @@ of a device for the duration of active stream using those devices
 
 #include "pa_win_wdmks.h"
 
+#ifndef DRV_QUERYDEVICEINTERFACE
+#define DRV_QUERYDEVICEINTERFACE     (DRV_RESERVED + 12)
+#endif
+#ifndef DRV_QUERYDEVICEINTERFACESIZE
+#define DRV_QUERYDEVICEINTERFACESIZE (DRV_RESERVED + 13)
+#endif
+
 #include <windows.h>
 #include <winioctl.h>
 #include <process.h>
@@ -506,8 +513,9 @@ static PaError PinRegisterPositionRegister(PaWinWdmPin* pPin);
 static PaError PinRegisterNotificationHandle(PaWinWdmPin* pPin, HANDLE handle);
 static PaError PinUnregisterNotificationHandle(PaWinWdmPin* pPin, HANDLE handle);
 static PaError PinGetHwLatency(PaWinWdmPin* pPin, ULONG* pFifoSize, ULONG* pChipsetDelay, ULONG* pCodecDelay);
-static PaError PinGetAudioPositionDirect(PaWinWdmPin* pPin, ULONG* pPosition);
-static PaError PinGetAudioPositionViaIOCTL(PaWinWdmPin* pPin, ULONG* pPosition);
+static PaError PinGetAudioPositionMemoryMapped(PaWinWdmPin* pPin, ULONG* pPosition);
+static PaError PinGetAudioPositionViaIOCTLRead(PaWinWdmPin* pPin, ULONG* pPosition);
+static PaError PinGetAudioPositionViaIOCTLWrite(PaWinWdmPin* pPin, ULONG* pPosition);
 
 /* Filter management functions */
 static PaWinWdmFilter* FilterNew(PaWDMKSType type, DWORD devNode, const wchar_t* filterName, const wchar_t* friendlyName, PaError* error);
@@ -2221,12 +2229,7 @@ static PaError PinIsFormatSupported(PaWinWdmPin* pin, const WAVEFORMATEX* format
 
         if (pFormatExt != 0)
         {
-            if ( dataRange->MinimumBitsPerSample > pFormatExt->Samples.wValidBitsPerSample )
-            {
-                result = paSampleFormatNotSupported;
-                continue;
-            }
-            if ( dataRange->MaximumBitsPerSample < pFormatExt->Samples.wValidBitsPerSample )
+            if (!IsBitsWithinRange(dataRange, pFormatExt->Samples.wValidBitsPerSample))
             {
                 result = paSampleFormatNotSupported;
                 continue;
@@ -2234,26 +2237,14 @@ static PaError PinIsFormatSupported(PaWinWdmPin* pin, const WAVEFORMATEX* format
         }
         else
         {
-            if( dataRange->MinimumBitsPerSample > format->wBitsPerSample )
-            {
-                result = paSampleFormatNotSupported;
-                continue;
-            }
-
-            if( dataRange->MaximumBitsPerSample < format->wBitsPerSample )
+            if (!IsBitsWithinRange(dataRange, format->wBitsPerSample))
             {
                 result = paSampleFormatNotSupported;
                 continue;
             }
         }
 
-        if( dataRange->MinimumSampleFrequency > format->nSamplesPerSec )
-        {
-            result = paInvalidSampleRate;
-            continue;
-        }
-
-        if( dataRange->MaximumSampleFrequency < format->nSamplesPerSec )
+        if (!IsFrequencyWithinRange(dataRange, format->nSamplesPerSec))
         {
             result = paInvalidSampleRate;
             continue;
@@ -2466,7 +2457,7 @@ static PaError PinRegisterNotificationHandle(PaWinWdmPin* pPin, HANDLE handle)
     prop.NotificationEvent = handle;
     prop.Property.Set = KSPROPSETID_RtAudio;
     prop.Property.Id = KSPROPERTY_RTAUDIO_REGISTER_NOTIFICATION_EVENT;
-    prop.Property.Flags = KSPROPERTY_TYPE_GET;
+    prop.Property.Flags = KSPROPERTY_TYPE_SET;
 
     result = WdmSyncIoctl(pPin->handle,
         IOCTL_KS_PROPERTY,
@@ -2497,7 +2488,7 @@ static PaError PinUnregisterNotificationHandle(PaWinWdmPin* pPin, HANDLE handle)
         prop.NotificationEvent = handle;
         prop.Property.Set = KSPROPSETID_RtAudio;
         prop.Property.Id = KSPROPERTY_RTAUDIO_UNREGISTER_NOTIFICATION_EVENT;
-        prop.Property.Flags = KSPROPERTY_TYPE_GET;
+        prop.Property.Flags = KSPROPERTY_TYPE_SET;
 
         result = WdmSyncIoctl(pPin->handle,
             IOCTL_KS_PROPERTY,
@@ -2552,14 +2543,14 @@ static PaError PinGetHwLatency(PaWinWdmPin* pPin, ULONG* pFifoSize, ULONG* pChip
 }
 
 /* This one is used for WaveRT */
-static PaError PinGetAudioPositionDirect(PaWinWdmPin* pPin, ULONG* pPosition)
+static PaError PinGetAudioPositionMemoryMapped(PaWinWdmPin* pPin, ULONG* pPosition)
 {
     *pPosition = (*pPin->positionRegister);
     return paNoError;
 }
 
 /* This one also, but in case the driver hasn't implemented memory mapped access to the position register */
-static PaError PinGetAudioPositionViaIOCTL(PaWinWdmPin* pPin, ULONG* pPosition)
+static PaError PinGetAudioPositionViaIOCTLRead(PaWinWdmPin* pPin, ULONG* pPosition)
 {
     PaError result = paNoError;
     KSPROPERTY propIn;
@@ -2583,7 +2574,41 @@ static PaError PinGetAudioPositionViaIOCTL(PaWinWdmPin* pPin, ULONG* pPosition)
     }
     else
     {
-        PA_DEBUG(("Failed to get audio position!\n"));
+        PA_DEBUG(("Failed to get audio play position!\n"));
+    }
+
+    PA_LOGL_;
+
+    return result;
+
+}
+
+/* This one also, but in case the driver hasn't implemented memory mapped access to the position register */
+static PaError PinGetAudioPositionViaIOCTLWrite(PaWinWdmPin* pPin, ULONG* pPosition)
+{
+    PaError result = paNoError;
+    KSPROPERTY propIn;
+    KSAUDIO_POSITION propOut;
+
+    PA_LOGE_;
+
+    propIn.Set = KSPROPSETID_Audio;
+    propIn.Id = KSPROPERTY_AUDIO_POSITION;
+    propIn.Flags = KSPROPERTY_TYPE_GET;
+
+    result = WdmSyncIoctl(pPin->handle,
+        IOCTL_KS_PROPERTY,
+        &propIn, sizeof(KSPROPERTY),
+        &propOut, sizeof(KSAUDIO_POSITION),
+        NULL);
+
+    if (result == paNoError)
+    {
+        *pPosition = (ULONG)(propOut.WriteOffset);
+    }
+    else
+    {
+        PA_DEBUG(("Failed to get audio write position!\n"));
     }
 
     PA_LOGL_;
@@ -2800,7 +2825,6 @@ error:
 */
 static void FilterFree(PaWinWdmFilter* filter)
 {
-    int pinId;
     PA_LOGL_;
     if( filter )
     {
@@ -2810,13 +2834,14 @@ static void FilterFree(PaWinWdmFilter* filter)
             return;
         }
 
-        if (filter->topologyFilter)
+        if ( filter->topologyFilter )
         {
             FilterFree(filter->topologyFilter);
             filter->topologyFilter = 0;
         }
         if ( filter->pins )
         {
+            int pinId;
             for( pinId = 0; pinId < filter->pinCount; pinId++ )
                 PinFree(filter->pins[pinId]);
             PaUtil_FreeMemory( filter->pins );
@@ -3374,6 +3399,10 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
     int filterCount = 0;
     int totalDeviceCount = 0;
     int idxDevice = 0;
+    DWORD defaultInDevPathSize = 0;
+    DWORD defaultOutDevPathSize = 0;
+    wchar_t* defaultInDevPath = 0;
+    wchar_t* defaultOutDevPath = 0;
 
     ppFilters = BuildFilterList( &filterCount, &totalDeviceCount, &result );
     if( result != paNoError )
@@ -3381,11 +3410,24 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         goto error;
     }
 
+    // Get hold of default device paths for capture & playback
+    if( waveInMessage(0, DRV_QUERYDEVICEINTERFACESIZE, (DWORD_PTR)&defaultInDevPathSize, 0 ) == MMSYSERR_NOERROR )
+    {
+        defaultInDevPath = (wchar_t *)PaUtil_AllocateMemory((defaultInDevPathSize + 1) * sizeof(wchar_t));
+        waveInMessage(0, DRV_QUERYDEVICEINTERFACE, (DWORD_PTR)defaultInDevPath, defaultInDevPathSize);
+    }
+    if( waveOutMessage(0, DRV_QUERYDEVICEINTERFACESIZE, (DWORD_PTR)&defaultOutDevPathSize, 0 ) == MMSYSERR_NOERROR )
+    {
+        defaultOutDevPath = (wchar_t *)PaUtil_AllocateMemory((defaultOutDevPathSize + 1) * sizeof(wchar_t));
+        waveOutMessage(0, DRV_QUERYDEVICEINTERFACE, (DWORD_PTR)defaultOutDevPath, defaultOutDevPathSize);
+    }
+
     if( totalDeviceCount > 0 )
     {
         PaWinWdmDeviceInfo *deviceInfoArray = 0;
         int idxFilter;
         int i;
+        unsigned devIsDefaultIn = 0, devIsDefaultOut = 0;
 
         /* Allocate the out param for all the info we need */
         outArgument = (PaWinWDMScanDeviceInfosResults *) PaUtil_GroupAllocateMemory(
@@ -3439,6 +3481,9 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                 DeinitNameHashObject(&nameHash);
                 continue;
             }
+
+            devIsDefaultIn = (defaultInDevPath && (_wcsicmp(pFilter->devInfo.filterPath, defaultInDevPath) == 0));
+            devIsDefaultOut = (defaultOutDevPath && (_wcsicmp(pFilter->devInfo.filterPath, defaultOutDevPath) == 0));
 
             for (i = 0; i < pFilter->pinCount; ++i)
             {
@@ -3501,14 +3546,19 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                     /* Convert wide char string to utf-8 */
                     WideCharToMultiByte(CP_UTF8, 0, localCompositeName, -1, wdmDeviceInfo->compositeName, MAX_PATH, NULL, NULL);
 
-                    /* NB! WDM/KS has no concept of a full-duplex device, each pin is either an input or and output */
+                    /* NB! WDM/KS has no concept of a full-duplex device, each pin is either an input or an output */
                     if (isInput)
                     {
                         /* INPUT ! */
                         deviceInfo->maxInputChannels  = pin->maxChannels;
                         deviceInfo->maxOutputChannels = 0;
 
-                        if (outArgument->defaultInputDevice == paNoDevice)
+                        /* RoBi NB: Due to the fact that input audio endpoints in Vista (& later OSs) can be the same device, but with
+                           different input mux settings, there might be a discrepancy between the default input device chosen, and
+                           that which will be used by Portaudio. Not much to do about that unfortunately.
+                        */
+                        if ((defaultInDevPath == 0 || devIsDefaultIn) &&
+                             outArgument->defaultInputDevice == paNoDevice)
                         {
                             outArgument->defaultInputDevice = idxDevice;
                         }
@@ -3519,7 +3569,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                         deviceInfo->maxInputChannels  = 0;
                         deviceInfo->maxOutputChannels = pin->maxChannels;
 
-                        if (outArgument->defaultOutputDevice == paNoDevice)
+                        if ((defaultOutDevPath == 0 || devIsDefaultOut) &&
+                            outArgument->defaultOutputDevice == paNoDevice)
                         {
                             outArgument->defaultOutputDevice = idxDevice;
                         }
@@ -4159,7 +4210,8 @@ static unsigned NextPowerOf2(unsigned val)
 
 static PaError ValidateSpecificStreamParameters(
     const PaStreamParameters *streamParameters,
-    const PaWinWDMKSInfo *streamInfo)
+    const PaWinWDMKSInfo *streamInfo,
+    unsigned isInput)
 {
     if( streamInfo )
     {
@@ -4170,6 +4222,12 @@ static PaError ValidateSpecificStreamParameters(
             return paIncompatibleHostApiSpecificStreamInfo;
         }
 
+        if (!!(streamInfo->flags & ~(paWinWDMKSOverrideFramesize | paWinWDMKSUseGivenChannelMask)))
+        {
+            PA_DEBUG(("Stream parameters: non supported flags set"));
+            return paIncompatibleHostApiSpecificStreamInfo;
+        }
+
         if (streamInfo->noOfPackets != 0 &&
             (streamInfo->noOfPackets < 2 || streamInfo->noOfPackets > 8))
         {
@@ -4177,10 +4235,26 @@ static PaError ValidateSpecificStreamParameters(
             return paIncompatibleHostApiSpecificStreamInfo;
         }
 
+        if (streamInfo->flags & paWinWDMKSUseGivenChannelMask)
+        {
+            if (isInput)
+            {
+                PA_DEBUG(("Stream parameters: Channels mask setting not supported for input stream"));
+                return paIncompatibleHostApiSpecificStreamInfo;
+            }
+
+            if (streamInfo->channelMask & PAWIN_SPEAKER_RESERVED)
+            {
+                PA_DEBUG(("Stream parameters: Given channels mask 0x%08X not supported", streamInfo->channelMask));
+                return paIncompatibleHostApiSpecificStreamInfo;
+            }
+        }
+
     }
 
     return paNoError;
 }
+
 
 
 
@@ -4231,7 +4305,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         /* validate inputStreamInfo */
-        result = ValidateSpecificStreamParameters(inputParameters, inputParameters->hostApiSpecificStreamInfo);
+        result = ValidateSpecificStreamParameters(inputParameters, inputParameters->hostApiSpecificStreamInfo, 1 );
         if(result != paNoError)
         {
             PaWinWDM_SetLastErrorInfo(result, "Host API stream info not supported (in)");
@@ -4266,7 +4340,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         /* validate outputStreamInfo */
-        result = ValidateSpecificStreamParameters( outputParameters, outputParameters->hostApiSpecificStreamInfo );
+        result = ValidateSpecificStreamParameters( outputParameters, outputParameters->hostApiSpecificStreamInfo, 0 );
         if (result != paNoError)
         {
             PaWinWDM_SetLastErrorInfo(result, "Host API stream info not supported (out)");
@@ -4471,8 +4545,16 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         PaWinWdmFilter* pFilter;
         PaWinWdmDeviceInfo* pDeviceInfo;
         PaWinWdmPin* pPin;
+        PaWinWDMKSInfo* pInfo = (PaWinWDMKSInfo*)(outputParameters->hostApiSpecificStreamInfo);
         unsigned validBitsPerSample = 0;
         PaWinWaveFormatChannelMask channelMask = PaWin_DefaultChannelMask( userOutputChannels );
+        if (pInfo && (pInfo->flags & paWinWDMKSUseGivenChannelMask))
+        {
+            PA_DEBUG(("Using channelMask 0x%08X instead of default 0x%08X\n",
+                pInfo->channelMask,
+                channelMask));
+            channelMask = pInfo->channelMask;
+        }
 
         result = paSampleFormatNotSupported;
         pDeviceInfo = (PaWinWdmDeviceInfo*)wdmHostApi->inheritedHostApiRep.deviceInfos[outputParameters->device];
@@ -4960,8 +5042,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 if (result != paNoError)
                 {
                     unsigned long pos = 0xdeadc0de;
-                    PA_DEBUG(("Failed to register capture position register, using PinGetAudioPositionViaIOCTL\n"));
-                    stream->capture.pPin->fnAudioPosition = PinGetAudioPositionViaIOCTL;
+                    PA_DEBUG(("Failed to register capture position register, using PinGetAudioPositionViaIOCTLWrite\n"));
+                    stream->capture.pPin->fnAudioPosition = PinGetAudioPositionViaIOCTLWrite;
                     /* Test position function */
                     result = (stream->capture.pPin->fnAudioPosition)(stream->capture.pPin, &pos);
                     if (result != paNoError || pos != 0x0)
@@ -4974,7 +5056,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 }
                 else
                 {
-                    stream->capture.pPin->fnAudioPosition = PinGetAudioPositionDirect;
+                    stream->capture.pPin->fnAudioPosition = PinGetAudioPositionMemoryMapped;
                 }
             }
             break;
@@ -5082,8 +5164,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 if (result != paNoError)
                 {
                     unsigned long pos = 0xdeadc0de;
-                    PA_DEBUG(("Failed to register rendering position register, using PinGetAudioPositionViaIOCTL\n"));
-                    stream->render.pPin->fnAudioPosition = PinGetAudioPositionViaIOCTL;
+                    PA_DEBUG(("Failed to register rendering position register, using PinGetAudioPositionViaIOCTLRead\n"));
+                    stream->render.pPin->fnAudioPosition = PinGetAudioPositionViaIOCTLRead;
                     /* Test position function */
                     result = (stream->render.pPin->fnAudioPosition)(stream->render.pPin, &pos);
                     if (result != paNoError || pos != 0x0)
@@ -5096,7 +5178,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 }
                 else
                 {
-                    stream->render.pPin->fnAudioPosition = PinGetAudioPositionDirect;
+                    stream->render.pPin->fnAudioPosition = PinGetAudioPositionMemoryMapped;
                 }
             }
             break;
