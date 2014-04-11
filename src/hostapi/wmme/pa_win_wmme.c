@@ -201,31 +201,37 @@
 static const char constInputMapperSuffix_[] = " - Input";
 static const char constOutputMapperSuffix_[] = " - Output";
 
-/*
-copies TCHAR string to explicit char string
-*/
-char *StrTCpyToC(char *to, const TCHAR *from)
+/********************************************************************/
+
+/* Copy null-terminated TCHAR string to explicit char string using UTF8 encoding */
+static char *CopyTCharStringToUtf8CString(char *destination, size_t destLengthBytes, const TCHAR *source)
 {
 #if !defined(_UNICODE) && !defined(UNICODE)
-	return strcpy(to, from);
+	return strcpy(destination, source);
 #else
-	int count = wcslen(from);
-	if (count != 0)
-		if (WideCharToMultiByte(CP_ACP, 0, from, count, to, count, NULL, NULL) == 0)
-			return NULL;
-	return to;
+    /* The cbMultiByte parameter ["destLengthBytes" below] is:
+    """
+    Size, in bytes, of the buffer indicated by lpMultiByteStr ["destination" below]. 
+    If this parameter is set to 0, the function returns the required buffer 
+    size for lpMultiByteStr and makes no use of the output parameter itself.
+    """
+    Source: WideCharToMultiByte at MSDN:
+    http://msdn.microsoft.com/en-us/library/windows/desktop/dd374130(v=vs.85).aspx
+    */
+	if (WideCharToMultiByte(CP_UTF8, 0, source, -1, destination, (int)destLengthBytes, NULL, NULL) == 0)
+		return NULL;
+	return destination;
 #endif
 }
 
-/*
-returns length of TCHAR string
-*/
-size_t StrTLen(const TCHAR *str)
+/* returns required length (in bytes) of destination buffer when 
+   converting TCHAR string to UTF8 bytes, not including the terminating null. */
+static size_t TCharStringLen(const TCHAR *str)
 {
 #if !defined(_UNICODE) && !defined(UNICODE)
 	return strlen(str);
 #else
-	return wcslen(str);	
+	return WideCharToMultiByte(CP_UTF8, 0, str, -1, NULL, 0, NULL, NULL);	
 #endif
 }
 
@@ -686,6 +692,7 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     MMRESULT mmresult;
     WAVEINCAPS wic;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
+    size_t len;
     
     *success = 0;
 
@@ -705,31 +712,35 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
         return paNoError;
     }           
 
+    /* NOTE: the WAVEOUTCAPS.szPname is a null-terminated array of 32 characters,
+        so we are limited to displaying only the first 31 characters of the device name. */
     if( winMmeInputDeviceId == WAVE_MAPPER )
     {
+        len = TCharStringLen( wic.szPname ) + 1 + sizeof(constInputMapperSuffix_);
         /* Append I/O suffix to WAVE_MAPPER device. */
-        deviceName = (char *)PaUtil_GroupAllocateMemory(
+        deviceName = (char*)PaUtil_GroupAllocateMemory(
                     winMmeHostApi->allocations,
-					(long) (StrTLen( wic.szPname ) + 1 + sizeof(constInputMapperSuffix_)) );
+                    (long)len );
         if( !deviceName )
         {
             result = paInsufficientMemory;
             goto error;
         }
-        StrTCpyToC( deviceName, wic.szPname );
+        CopyTCharStringToUtf8CString( deviceName, len, wic.szPname );
         strcat( deviceName, constInputMapperSuffix_ );
     }
     else
     {
+        len = TCharStringLen( wic.szPname ) + 1;
         deviceName = (char*)PaUtil_GroupAllocateMemory(
-                    winMmeHostApi->allocations, 
-					(long) (StrTLen( wic.szPname ) + 1) );
+                    winMmeHostApi->allocations,
+                    (long)len );
         if( !deviceName )
         {
             result = paInsufficientMemory;
             goto error;
         }
-        StrTCpyToC( deviceName, wic.szPname  );
+        CopyTCharStringToUtf8CString( deviceName, len, wic.szPname  );
     }
     deviceInfo->name = deviceName;
 
@@ -811,6 +822,7 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     MMRESULT mmresult;
     WAVEOUTCAPS woc;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
+    size_t len;
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
     int wdmksDeviceOutputChannelCountIsKnown;
 #endif
@@ -833,31 +845,35 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
         return paNoError;
     }
 
+    /* NOTE: the WAVEOUTCAPS.szPname is a null-terminated array of 32 characters,
+        so we are limited to displaying only the first 31 characters of the device name. */
     if( winMmeOutputDeviceId == WAVE_MAPPER )
     {
         /* Append I/O suffix to WAVE_MAPPER device. */
-        deviceName = (char *)PaUtil_GroupAllocateMemory(
+        len = TCharStringLen( woc.szPname ) + 1 + sizeof(constOutputMapperSuffix_);
+        deviceName = (char*)PaUtil_GroupAllocateMemory(
                     winMmeHostApi->allocations, 
-					(long) (StrTLen( woc.szPname ) + 1 + sizeof(constOutputMapperSuffix_)) );
+					(long)len );
         if( !deviceName )
         {
             result = paInsufficientMemory;
             goto error;
         }
-        StrTCpyToC( deviceName, woc.szPname );
+        CopyTCharStringToUtf8CString( deviceName, len, woc.szPname );
         strcat( deviceName, constOutputMapperSuffix_ );
     }
     else
     {
+        len = TCharStringLen( woc.szPname ) + 1;
         deviceName = (char*)PaUtil_GroupAllocateMemory(
                     winMmeHostApi->allocations, 
-					(long) (StrTLen( woc.szPname ) + 1) );
+					(long)len );
         if( !deviceName )
         {
             result = paInsufficientMemory;
             goto error;
         }
-        StrTCpyToC( deviceName, woc.szPname  );
+        CopyTCharStringToUtf8CString( deviceName, len, woc.szPname );
     }
     deviceInfo->name = deviceName;
 
