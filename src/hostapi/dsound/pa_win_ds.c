@@ -208,9 +208,9 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
     PaUtil_SetLastHostErrorInfo( paDirectSound, hr, "DirectSound error" )
 
 /************************************************* DX Prototypes **********/
-static BOOL CALLBACK CollectGUIDsProcA(LPGUID lpGUID,
-                                     LPCSTR lpszDesc,
-                                     LPCSTR lpszDrvName,
+static BOOL CALLBACK CollectGUIDsProcW(LPGUID lpGUID,
+                                     LPCWSTR lpszDesc,
+                                     LPCWSTR lpszDrvName,
                                      LPVOID lpContext );
 
 /************************************************************************************/
@@ -385,20 +385,35 @@ static double PaWinDs_GetMinLatencySeconds( double sampleRate )
 
 
 /************************************************************************************
-** Duplicate the input string using the allocations allocator.
+** Duplicate and convert the input string using the group allocations allocator.
 ** A NULL string is converted to a zero length string.
 ** If memory cannot be allocated, NULL is returned.
 **/
-static char *DuplicateDeviceNameString( PaUtilAllocationGroup *allocations, const char* src )
+static char *DuplicateDeviceNameString( PaUtilAllocationGroup *allocations, const wchar_t* src )
 {
     char *result = 0;
     
     if( src != NULL )
     {
-        size_t len = strlen(src);
+#if !defined(_UNICODE) && !defined(UNICODE)
+        size_t len = WideCharToMultiByte(CP_ACP, 0, src, -1, NULL, 0, NULL, NULL);
+
+	    result = (char*)PaUtil_GroupAllocateMemory( allocations, (long)(len + 1) );
+        if( result ) {
+            if (WideCharToMultiByte(CP_ACP, 0, src, -1, result, (int)len, NULL, NULL) == 0) {
+                result = 0;
+            }
+        }
+#else
+        size_t len = WideCharToMultiByte(CP_UTF8, 0, src, -1, NULL, 0, NULL, NULL);
+
         result = (char*)PaUtil_GroupAllocateMemory( allocations, (long)(len + 1) );
-        if( result )
-            memcpy( (void *) result, src, len+1 );
+        if( result ) {
+            if (WideCharToMultiByte(CP_UTF8, 0, src, -1, result, (int)len, NULL, NULL) == 0) {
+                result = 0;
+            }
+        }
+#endif
     }
     else
     {
@@ -513,9 +528,9 @@ static PaError TerminateDSDeviceNameAndGUIDVector( DSDeviceNameAndGUIDVector *gu
 /************************************************************************************
 ** Collect preliminary device information during DirectSound enumeration 
 */
-static BOOL CALLBACK CollectGUIDsProcA(LPGUID lpGUID,
-                                     LPCSTR lpszDesc,
-                                     LPCSTR lpszDrvName,
+static BOOL CALLBACK CollectGUIDsProcW(LPGUID lpGUID,
+                                     LPCWSTR lpszDesc,
+                                     LPCWSTR lpszDrvName,
                                      LPVOID lpContext )
 {
     DSDeviceNameAndGUIDVector *namesAndGUIDs = (DSDeviceNameAndGUIDVector*)lpContext;
@@ -1211,9 +1226,9 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     if( result != paNoError )
         goto error;
 
-    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA( (LPDSENUMCALLBACKA)CollectGUIDsProcA, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateW( (LPDSENUMCALLBACKW)CollectGUIDsProcW, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
 
-    paWinDsDSoundEntryPoints.DirectSoundEnumerateA( (LPDSENUMCALLBACKA)CollectGUIDsProcA, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundEnumerateW( (LPDSENUMCALLBACKW)CollectGUIDsProcW, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
 
     if( deviceNamesAndGUIDs.inputNamesAndGUIDs.enumerationError != paNoError )
     {
