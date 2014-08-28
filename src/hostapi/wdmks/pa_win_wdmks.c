@@ -1032,7 +1032,7 @@ static const KSTOPOLOGY_CONNECTION* FindStartConnectionFrom(ULONG startPin, PaWi
 {
     unsigned i;
     const KSTOPOLOGY_CONNECTION* connections = (const KSTOPOLOGY_CONNECTION*)(filter->connections + 1);
-    PA_DEBUG(("FindStartConnectionFrom: Checking %u connections...\n", filter->connections->Count));
+    PA_DEBUG(("FindStartConnectionFrom: Startpin %u, Checking %u connections...\n", startPin, filter->connections->Count));
     for (i = 0; i < filter->connections->Count; ++i)
     {
         const KSTOPOLOGY_CONNECTION* pConn = connections + i;
@@ -1052,7 +1052,7 @@ static const KSTOPOLOGY_CONNECTION* FindStartConnectionTo(ULONG startPin, PaWinW
 {
     unsigned i;
     const KSTOPOLOGY_CONNECTION* connections = (const KSTOPOLOGY_CONNECTION*)(filter->connections + 1);
-    PA_DEBUG(("FindStartConnectionTo: Checking %u connections...\n", filter->connections->Count));
+    PA_DEBUG(("FindStartConnectionTo: Startpin %u, Checking %u connections...\n", startPin, filter->connections->Count));
     for (i = 0; i < filter->connections->Count; ++i)
     {
         const KSTOPOLOGY_CONNECTION* pConn = connections + i;
