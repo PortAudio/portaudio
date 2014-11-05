@@ -307,7 +307,7 @@ static PaError OpenAndSetupOneAudioUnit(
 
 /* for setting errors. */
 #define PA_AUHAL_SET_LAST_HOST_ERROR( errorCode, errorText ) \
-    PaUtil_SetLastHostErrorInfo( paInDevelopment, errorCode, errorText )
+    PaUtil_SetLastHostErrorInfo( paCoreAudio, errorCode, errorText )
 
 /*
  * Callback called when starting or stopping a stream.
