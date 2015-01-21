@@ -86,6 +86,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <math.h>
 #include <windows.h>
 #include <mmsystem.h>
@@ -218,7 +219,22 @@ static char *CopyTCharStringToUtf8CString(char *destination, size_t destLengthBy
     Source: WideCharToMultiByte at MSDN:
     http://msdn.microsoft.com/en-us/library/windows/desktop/dd374130(v=vs.85).aspx
     */
-    if (WideCharToMultiByte(CP_UTF8, 0, source, -1, destination, (int)destLengthBytes, NULL, NULL) == 0)
+    int intDestLengthBytes; /* cbMultiByte */
+    /* intDestLengthBytes is an int, destLengthBytes is a size_t. Ensure that we don't overflow
+    intDestLengthBytes by only using at most INT_MAX bytes of destination buffer.
+    */
+    if (destLengthBytes < INT_MAX)
+    {
+#pragma warning (disable : 4267) /* "conversion from 'size_t' to 'int', possible loss of data" */
+        intDestLengthBytes = (int)destLengthBytes; /* destLengthBytes is guaranteed < INT_MAX here */
+#pragma warning (default : 4267)
+    }
+    else
+    {
+        intDestLengthBytes = INT_MAX;
+    }
+    
+    if (WideCharToMultiByte(CP_UTF8, 0, source, -1, destination, /*cbMultiByte=*/intDestLengthBytes, NULL, NULL) == 0)
         return NULL;
     return destination;
 #endif
