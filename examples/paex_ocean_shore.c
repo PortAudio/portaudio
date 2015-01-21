@@ -381,7 +381,7 @@ OceanWave* InitializeWave(double SR, float attackInSeconds, float maxLevel, floa
         wave->wave_attack_incr = wave->wave_envelope_max_level / (attackInSeconds * (float)SR);
         wave->wave_decay_incr = - wave->wave_envelope_max_level / (attackInSeconds * 4 * (float)SR);
 
-        wave->wave_pan_left = sqrtf(1.0 - positionLeftRight);
+        wave->wave_pan_left = sqrtf(1.0f - positionLeftRight);
         wave->wave_pan_right = sqrtf(positionLeftRight);
     }
     return wave;
