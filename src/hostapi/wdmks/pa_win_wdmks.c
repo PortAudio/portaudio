@@ -641,6 +641,16 @@ static BOOL IsDeviceTheSame(const PaWinWdmDeviceInfo* pDev1,
 
 static BOOL IsEarlierThanVista()
 {
+/*
+NOTE: GetVersionEx() is deprecated as of Windows 8.1 and can not be used to reliably detect
+versions of Windows higher than Windows 8 (due to manifest requirements for reporting higher versions).
+Microsoft recommends switching to VerifyVersionInfo (available on Win 2k and later), however GetVersionEx
+is is faster, for now we just disable the deprecation warning.
+See: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451(v=vs.85).aspx
+See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprecation-of-GetVe
+*/
+#pragma warning (disable : 4996) /* use of GetVersionEx */
+
     OSVERSIONINFO osvi;
     osvi.dwOSVersionInfoSize = sizeof(osvi);
     if (GetVersionEx(&osvi) && osvi.dwMajorVersion<6)
@@ -648,6 +658,8 @@ static BOOL IsEarlierThanVista()
         return TRUE;
     }
     return FALSE;
+
+#pragma warning (default : 4996)
 }
 
 
