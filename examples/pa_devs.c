@@ -114,7 +114,7 @@ int main(void)
         goto error;
     }
 
-    printf( "PortAudio version number = %d\nPortAudio version text = '%s'\n",
+    printf( "PortAudio version number = 0x%08X\nPortAudio version text = '%s'\n",
             Pa_GetVersion(), Pa_GetVersionText() );
 
             

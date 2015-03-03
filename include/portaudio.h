@@ -50,18 +50,26 @@ extern "C"
 {
 #endif /* __cplusplus */
 
- 
-/** Retrieve the release number of the currently running PortAudio build,
- eg 1900.
-*/
+/** Retrieve the release number of the currently running PortAudio build.
+ * For example, for version "19.5.1" this will return 0x00130501.
+ */
 int Pa_GetVersion( void );
 
-
 /** Retrieve a textual description of the current PortAudio build,
- eg "PortAudio V19-devel 13 October 2002".
-*/
+ * eg "PortAudio V19.5.0-devel (built Mar  3 2015 09:16:35)".
+ * The format of the text may change so do not try to parse the returned string.
+ */
 const char* Pa_GetVersionText( void );
 
+/**
+ * Generate a packed integer version number in the same format used
+ * by Pa_GetVersion(). Use this to compare a specified version number with 
+ * the currently running version. For example:
+ *
+ * if (Pa_GetVersion() < paMakeVersionNumber(19.5.1)) {}
+ */
+#define paMakeVersionNumber(major, minor, subminor) \
+    (((major)&0xFF)<<16 | ((minor)&0xFF)<<8 | ((subminor)&0xFF))
 
 /** Error codes returned by PortAudio functions.
  Note that with the exception of paNoError, all PaErrorCodes are negative.

@@ -76,25 +76,46 @@
 #include "pa_trace.h" /* still usefull?*/
 #include "pa_debugprint.h"
 
+/**
+ * This is incremented if we make incompatible API changes.
+ * This version scheme is based loosely on http://semver.org/
+ */
+#define paVersionMajor     19
 
-#define PA_VERSION_  1899
-#define PA_VERSION_TEXT_ "PortAudio V19-devel (built " __DATE__  " " __TIME__ ")"
+/**
+ * This is incremented when we add functionality in a backwards-compatible manner.
+ * Or it is set to zero when paVersionMajor is incremented.
+ */
+#define paVersionMinor      5
 
+/**
+ * This is incremented when we make backwards-compatible bug fixes.
+ * Or it is set to zero when paVersionMinor changes.
+ */
+#define paVersionSubMinor   0
 
+/**
+ * This is a combination of paVersionMajor, paVersionMinor and paVersionSubMinor.
+ * It will always increase so that version numbers can be compared as integers to 
+ * see which is later.
+ */
+#define paVersion  paMakeVersionNumber(paVersionMajor, paVersionMinor, paVersionSubMinor)
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+#define PA_VERSION_STRING_  TOSTRING(paVersionMajor) "." TOSTRING(paVersionMinor) "." TOSTRING(paVersionSubMinor)
+#define PA_VERSION_TEXT_    "PortAudio V" PA_VERSION_STRING_ "-devel (built " __DATE__  " " __TIME__ ")"
 
 int Pa_GetVersion( void )
 {
-    return PA_VERSION_;
+    return paVersion;
 }
-
 
 const char* Pa_GetVersionText( void )
 {
     return PA_VERSION_TEXT_;
 }
-
-
 
 #define PA_LAST_HOST_ERROR_TEXT_LENGTH_  1024
 
