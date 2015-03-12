@@ -1,0 +1,7 @@
+This is used to test the SVN versioning system.
+
+    $Revision$
+    $Author$
+    $Date$
+    $Id$
+
