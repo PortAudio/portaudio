@@ -65,6 +65,7 @@
 #include <stdio.h>
 #include <memory.h>
 #include <string.h>
+#include <stdlib.h> /* needed for strtol() */
 #include <assert.h> /* needed by PA_VALIDATE_ENDIANNESS */
 
 #include "portaudio.h"
@@ -75,6 +76,10 @@
 #include "pa_stream.h"
 #include "pa_trace.h" /* still usefull?*/
 #include "pa_debugprint.h"
+
+#ifndef PA_SVN_REVISION
+#include "pa_svnrevision.h"
+#endif
 
 /**
  * This is incremented if we make incompatible API changes.
@@ -104,8 +109,8 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
-#define PA_VERSION_STRING_  TOSTRING(paVersionMajor) "." TOSTRING(paVersionMinor) "." TOSTRING(paVersionSubMinor)
-#define PA_VERSION_TEXT_    "PortAudio V" PA_VERSION_STRING_ "-devel (built " __DATE__  " " __TIME__ ")"
+#define PA_VERSION_STRING_ TOSTRING(paVersionMajor) "." TOSTRING(paVersionMinor) "." TOSTRING(paVersionSubMinor)
+#define PA_VERSION_TEXT_   "PortAudio V" PA_VERSION_STRING_ "-devel, revision " TOSTRING(PA_SVN_REVISION)
 
 int Pa_GetVersion( void )
 {
@@ -115,6 +120,19 @@ int Pa_GetVersion( void )
 const char* Pa_GetVersionText( void )
 {
     return PA_VERSION_TEXT_;
+}
+
+static PaVersionInfo versionInfo_ = {
+    .versionMajor = paVersionMajor,
+    .versionMinor = paVersionMinor,
+    .versionSubMinor = paVersionSubMinor,
+    .versionControlRevision = TOSTRING(PA_SVN_REVISION),
+    .versionText = PA_VERSION_TEXT_
+};
+
+const PaVersionInfo* Pa_GetVersionInfo()
+{
+    return &versionInfo_;
 }
 
 #define PA_LAST_HOST_ERROR_TEXT_LENGTH_  1024

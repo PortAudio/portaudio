@@ -56,8 +56,9 @@ extern "C"
 int Pa_GetVersion( void );
 
 /** Retrieve a textual description of the current PortAudio build,
- * eg "PortAudio V19.5.0-devel (built Mar  3 2015 09:16:35)".
+ * eg "PortAudio V19.5.0-devel, revision 1952M".
  * The format of the text may change so do not try to parse the returned string.
+ * @deprecated use PaVersionInfo() instead
  */
 const char* Pa_GetVersionText( void );
 
@@ -66,10 +67,35 @@ const char* Pa_GetVersionText( void );
  * by Pa_GetVersion(). Use this to compare a specified version number with 
  * the currently running version. For example:
  *
- * if (Pa_GetVersion() < paMakeVersionNumber(19.5.1)) {}
+ * if (Pa_GetVersion() < paMakeVersionNumber(19,5,1)) {}
  */
 #define paMakeVersionNumber(major, minor, subminor) \
     (((major)&0xFF)<<16 | ((minor)&0xFF)<<8 | ((subminor)&0xFF))
+
+
+/**
+ * A structure containing the components of the version numbers.
+ */
+typedef struct PaVersionInfo {
+    int versionMajor;
+    int versionMinor;
+    int versionSubMinor;
+    /**
+     * This is currently the SVN revision but may change in the future.
+     * The versionControlRevision is updated by running a script before compiling code.
+     * If the update does not occur then this value may be less 
+     * than the actual SVN revision number.
+     */
+    const char *versionControlRevision;
+    /** Version as a string, for example "PortAudio V19.5.0-devel, revision 1952M" */
+    const char *versionText;
+} PaVersionInfo;
+    
+/**
+ * The structure that this points to is statically allocated.
+ * Do not attempt to free it or modify it.
+ */
+const PaVersionInfo* Pa_GetVersionInfo();
 
 /** Error codes returned by PortAudio functions.
  Note that with the exception of paNoError, all PaErrorCodes are negative.

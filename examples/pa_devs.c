@@ -113,11 +113,10 @@ int main(void)
         printf( "ERROR: Pa_Initialize returned 0x%x\n", err );
         goto error;
     }
+    
+    printf( "PortAudio version: 0x%08X\n", Pa_GetVersion());
+    printf( "Version text: '%s'\n", Pa_GetVersionInfo()->versionText );
 
-    printf( "PortAudio version number = 0x%08X\nPortAudio version text = '%s'\n",
-            Pa_GetVersion(), Pa_GetVersionText() );
-
-            
     numDevices = Pa_GetDeviceCount();
     if( numDevices < 0 )
     {
