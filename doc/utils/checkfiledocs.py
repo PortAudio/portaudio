@@ -18,7 +18,10 @@ paHtmlDocDirectory = os.path.join( paRootDirectory, "doc", "html" )
 ## This can be used as a first-level check to make sure the documentation is in order.
 ##
 ## The idea is to get a list of which files are missing doxygen documentation.
-
+##
+## How to run:
+##  $ cd doc/utils
+##  $ python checkfiledocs.py
 
 # recurse from top and return a list of all with the given
 # extensions. ignore .svn directories. return absolute paths
@@ -41,7 +44,8 @@ def doxygenHtmlDocFileName( sourceFile ):
     return sourceFile.replace( '_', '__' ).replace( '.', '_8' ) + '.html'
 
 
-sourceFiles = recursiveFindFiles( paRootDirectory, [ '.c', '.h', '.cpp' ], True );
+sourceFiles = recursiveFindFiles( os.path.join(paRootDirectory,"src"), [ '.c', '.h', '.cpp' ], True );
+sourceFiles += recursiveFindFiles( os.path.join(paRootDirectory,"include"), [ '.c', '.h', '.cpp' ], True );
 docFiles = recursiveFindFiles( paHtmlDocDirectory, [ '.html' ], False );
 
 
