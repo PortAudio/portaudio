@@ -1283,6 +1283,11 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 	IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
     paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_AllocateMemory(sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
+    if (paWasapi->devInfo == NULL)
+	{
+        result = paInsufficientMemory;
+        goto error;
+    }
 	for (i = 0; i < paWasapi->deviceCount; ++i)
 		memset(&paWasapi->devInfo[i], 0, sizeof(PaWasapiDeviceInfo));
 
@@ -1446,9 +1451,14 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 hr = IAudioClient_GetDevicePeriod(tmpClient,
                     &paWasapi->devInfo[i].DefaultDevicePeriod,
                     &paWasapi->devInfo[i].MinimumDevicePeriod);
-				// We need to set the result to a value otherwise we will return paNoError
-				// [IF_FAILED_JUMP(hResult, error);]
-				IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
+				if (FAILED(hr))
+				{
+					PA_DEBUG(("WASAPI:%d| failed getting min/default periods by IAudioClient::GetDevicePeriod() with error[%d], will use 30000/100000 hns\n", i));
+
+					// assign WASAPI common values
+					paWasapi->devInfo[i].DefaultDevicePeriod = 100000;
+					paWasapi->devInfo[i].MinimumDevicePeriod = 30000;
+				}
 
                 //hr = tmpClient->GetMixFormat(&paWasapi->devInfo[i].MixFormat);
 
@@ -1492,7 +1502,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 				// We need to set the result to a value otherwise we will return paNoError
 				result = paInternalError;
                 //continue; // do not skip from list, allow to initialize
-            break;
+				 break;
             }
 
             (*hostApi)->deviceInfos[i] = deviceInfo;
