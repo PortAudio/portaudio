@@ -1453,11 +1453,14 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                     &paWasapi->devInfo[i].MinimumDevicePeriod);
 				if (FAILED(hr))
 				{
-					PA_DEBUG(("WASAPI:%d| failed getting min/default periods by IAudioClient::GetDevicePeriod() with error[%d], will use 30000/100000 hns\n", i));
+					PA_DEBUG(("WASAPI:%d| failed getting min/default periods by IAudioClient::GetDevicePeriod() with error[%08X], will use 30000/100000 hns\n", i, (UINT32)hr));
 
 					// assign WASAPI common values
 					paWasapi->devInfo[i].DefaultDevicePeriod = 100000;
 					paWasapi->devInfo[i].MinimumDevicePeriod = 30000;
+
+					// ignore error, let continue further without failing with paInternalError
+					hr = S_OK;
 				}
 
                 //hr = tmpClient->GetMixFormat(&paWasapi->devInfo[i].MixFormat);
