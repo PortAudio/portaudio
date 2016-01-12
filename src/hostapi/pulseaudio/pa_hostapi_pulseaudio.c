@@ -826,7 +826,7 @@ PaError PulseAudioConvertPortaudioFormatToPulseAudio(
         case paNonInterleaved:
             PA_DEBUG(("PulseAudio %s: THIS IS NOT SUPPORTED BY PULSEAUDIO!\n",
                       __FUNCTION__));
-            return paNotInitialized;
+            return paSampleFormatNotSupported;
             break;
     }
 
@@ -945,8 +945,13 @@ static PaError OpenStream(
         stream->inputFrameSize =
             Pa_GetSampleSize(inputSampleFormat) * inputChannelCount;
 
-        PulseAudioConvertPortaudioFormatToPulseAudio(inputSampleFormat,
-                                                     &stream->inSampleSpec);
+        result = PulseAudioConvertPortaudioFormatToPulseAudio(hostInputSampleFormat,
+                                                              &stream->inSampleSpec);
+        if (result != paNoError)
+        {
+            goto error;
+        }
+
         stream->inSampleSpec.rate = sampleRate;
         stream->inSampleSpec.channels = inputChannelCount;
 
@@ -954,6 +959,7 @@ static PaError OpenStream(
         {
             PA_DEBUG(("Portaudio %s: Invalid input audio spec!\n",
                       __FUNCTION__));
+            result = paUnanticipatedHostError; /* should have been caught above */
             goto error;
         }
 
@@ -982,8 +988,12 @@ static PaError OpenStream(
 
         if (!streamCallback)
         {
-            PulseAudioBlockingInitRingBuffer(stream, &stream->inputRing,
-                                             stream->inputFrameSize);
+            result = PulseAudioBlockingInitRingBuffer(stream, &stream->inputRing,
+                                                      stream->inputFrameSize);
+            if (result != paNoError)
+            {
+                goto error;
+            }
         }
 
     }
@@ -1032,8 +1042,13 @@ static PaError OpenStream(
         stream->outputFrameSize =
             Pa_GetSampleSize(outputSampleFormat) * outputChannelCount;
 
-        PulseAudioConvertPortaudioFormatToPulseAudio(outputSampleFormat,
-                                                     &stream->outSampleSpec);
+        result = PulseAudioConvertPortaudioFormatToPulseAudio(hostOutputSampleFormat,
+                                                              &stream->outSampleSpec);
+        if (result != paNoError)
+        {
+            goto error;
+        }
+
         stream->outSampleSpec.rate = sampleRate;
         stream->outSampleSpec.channels = outputChannelCount;
 
@@ -1041,6 +1056,7 @@ static PaError OpenStream(
         {
             PA_DEBUG(("Portaudio %s: Invalid audio spec for output!\n",
                       __FUNCTION__));
+            result = paUnanticipatedHostError; /* should have been caught above */
             goto error;
         }
 
@@ -1054,8 +1070,12 @@ static PaError OpenStream(
                                          PulseAudioStreamStateCb, NULL);
             pa_stream_set_started_callback(stream->outStream,
                                            PulseAudioStreamStartedCb, NULL);
-            pa_stream_set_write_callback(stream->outStream,
-                                         PulseAudioStreamWriteCb, stream);
+            /* If we use callback then use callback in PulseAudio */
+            if (streamCallback)
+            {
+                pa_stream_set_write_callback(stream->outStream,
+                                             PulseAudioStreamWriteCb, stream);
+            }
         }
 
         else
@@ -1066,16 +1086,12 @@ static PaError OpenStream(
 
         if (!streamCallback)
         {
-            long l_lnumBytes = 0;
-            if ((l_lnumBytes =
-                 PulseAudioBlockingInitRingBuffer(stream, &stream->outputRing,
-                                                  stream->outputFrameSize)) !=
-                0)
+            result = PulseAudioBlockingInitRingBuffer(stream, &stream->outputRing,
+                                                      stream->outputFrameSize);
+            if (result != paNoError)
             {
-                PA_DEBUG(("Portaudio %s: Can't alloc output RingBuffer (Error: %ld)!\n", __FUNCTION__, l_lnumBytes));
                 goto error;
             }
-
         }
 
         stream->device = outputParameters->device;
@@ -1149,10 +1165,9 @@ static PaError OpenStream(
     if (stream)
     {
         PaUtil_FreeMemory(stream);
-        PulseAudioFree(l_ptrPulseAudioHostApi);
     }
 
-    return paNotInitialized;
+    return result;
 }
 
 static PaError IsStreamStopped(
