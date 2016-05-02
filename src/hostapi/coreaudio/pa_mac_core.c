@@ -2277,9 +2277,11 @@ static OSStatus AudioIOProc( void *inRefCon,
                     INPUT_ELEMENT,
                     inNumberFrames,
                     &stream->inputAudioBufferList );
-      /* FEEDBACK: I'm not sure what to do when this call fails. There's nothing in the PA API to
-       * do about failures in the callback system. */
-      assert( !err );
+      if(err != noErr)
+      {
+        /* We used to assert on error. Now we try to just stop the stream. */
+        goto stop_stream;
+      }
 
       PaUtil_SetInputFrameCount( &(stream->bufferProcessor), frames );
       PaUtil_SetInterleavedInputChannels( &(stream->bufferProcessor),
@@ -2370,8 +2372,12 @@ static OSStatus AudioIOProc( void *inRefCon,
                   }
                }
                ERR( err );
-               assert( !err );
-               
+               if(err != noErr)
+               {
+                 /* We used to assert on error. Now we try to just stop the stream. */
+                 goto stop_stream;
+               }
+
                PaUtil_SetInputFrameCount( &(stream->bufferProcessor), frames );
                PaUtil_SetInterleavedInputChannels( &(stream->bufferProcessor),
                                    0,
@@ -2477,9 +2483,13 @@ static OSStatus AudioIOProc( void *inRefCon,
          if( err == -10874 )
             inNumberFrames /= 2;
       } while( err == -10874 && inNumberFrames > 1 );
-      /* FEEDBACK: I'm not sure what to do when this call fails */
       ERR( err );
-      assert( !err );
+      if(err != noErr)
+      {
+          /* We used to assert on error. Now we try to just stop the stream. */
+          goto stop_stream;
+      }
+
       if( stream->inputSRConverter || stream->outputUnit )
       {
          /* If this is duplex or we use a converter, put the data
@@ -2522,11 +2532,11 @@ static OSStatus AudioIOProc( void *inRefCon,
           * chunks, and let the BufferProcessor deal with the rest.
           *
           */
-         /*This might be too big or small depending on SR conversion*/
+         /* This might be too big or small depending on SR conversion. */
          float data[ chan * inNumberFrames ];
          OSStatus err;
          do
-         { /*Run the buffer processor until we are out of data*/
+         { /* Run the buffer processor until we are out of data. */
             UInt32 size;
             long f;
 
@@ -2539,7 +2549,12 @@ static OSStatus AudioIOProc( void *inRefCon,
                           (void *)data );
             if( err != RING_BUFFER_EMPTY )
                ERR( err );
-            assert( err == 0 || err == RING_BUFFER_EMPTY );
+            if( err != noErr && err != RING_BUFFER_EMPTY )
+            {
+              /* We used to assert on error. Now we try to just stop the stream. */
+              goto stop_stream;
+            }
+
 
             f = size / ( chan * sizeof(float) );
             PaUtil_SetInputFrameCount( &(stream->bufferProcessor), f );
@@ -2564,19 +2579,26 @@ static OSStatus AudioIOProc( void *inRefCon,
 
    switch( callbackResult )
    {
-   case paContinue: break;
+   case paContinue:
+           break;
    case paComplete:
    case paAbort:
-      stream->state = CALLBACK_STOPPED ;
-      if( stream->outputUnit )
-         AudioOutputUnitStop(stream->outputUnit);
-      if( stream->inputUnit )
-         AudioOutputUnitStop(stream->inputUnit);
+           goto stop_stream;
       break;
    }
 
    PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed );
    return noErr;
+
+stop_stream:
+    stream->state = CALLBACK_STOPPED ;
+    if( stream->outputUnit )
+        AudioOutputUnitStop(stream->outputUnit);
+    if( stream->inputUnit )
+        AudioOutputUnitStop(stream->inputUnit);
+
+    PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed );
+    return noErr;
 }
 
 
