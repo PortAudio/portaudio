@@ -2279,7 +2279,6 @@ static OSStatus AudioIOProc( void *inRefCon,
                     &stream->inputAudioBufferList );
       if(err != noErr)
       {
-        /* We used to assert on error. Now we try to just stop the stream. */
         goto stop_stream;
       }
 
@@ -2361,7 +2360,7 @@ static OSStatus AudioIOProc( void *inRefCon,
                              &size,
                              (void *)&data );
                if( err == RING_BUFFER_EMPTY )
-               { /*the ring buffer callback underflowed */
+               { /* the ring buffer callback underflowed */
                   err = 0;
                   bzero( ((char *)data) + size, sizeof(data)-size );
                   /* The ring buffer can underflow normally when the stream is stopping.
@@ -2374,7 +2373,6 @@ static OSStatus AudioIOProc( void *inRefCon,
                ERR( err );
                if(err != noErr)
                {
-                 /* We used to assert on error. Now we try to just stop the stream. */
                  goto stop_stream;
                }
 
@@ -2486,7 +2484,6 @@ static OSStatus AudioIOProc( void *inRefCon,
       ERR( err );
       if(err != noErr)
       {
-          /* We used to assert on error. Now we try to just stop the stream. */
           goto stop_stream;
       }
 
@@ -2551,8 +2548,7 @@ static OSStatus AudioIOProc( void *inRefCon,
                ERR( err );
             if( err != noErr && err != RING_BUFFER_EMPTY )
             {
-              /* We used to assert on error. Now we try to just stop the stream. */
-              goto stop_stream;
+                goto stop_stream;
             }
 
 
@@ -2577,18 +2573,12 @@ static OSStatus AudioIOProc( void *inRefCon,
       }
    }
 
-   switch( callbackResult )
-   {
-   case paContinue:
-           break;
-   case paComplete:
-   case paAbort:
-           goto stop_stream;
-      break;
-   }
-
-   PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed );
-   return noErr;
+    // Should we return successfully or fall through to stopping the stream?
+    if( callbackResult == paContinue )
+    {
+        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed );
+        return noErr;
+    }
 
 stop_stream:
     stream->state = CALLBACK_STOPPED ;
@@ -2600,7 +2590,6 @@ stop_stream:
     PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed );
     return noErr;
 }
-
 
 /*
     When CloseStream() is called, the multi-api layer ensures that
