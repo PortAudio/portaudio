@@ -33,13 +33,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -51,7 +51,7 @@
 /* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
 #define SAMPLE_RATE  (44100)
 #define FRAMES_PER_BUFFER (1024)
-#define NUM_CHANNELS    (2)
+#define NUM_CHANNELS    (6)
 #define NUM_SECONDS     (15)
 /* #define DITHER_FLAG     (paDitherOff)  */
 #define DITHER_FLAG     (0) /**/
@@ -109,8 +109,8 @@ int main(void)
     char *sampleBlock;
     int i;
     int numBytes;
-    
-    
+
+
     printf("patest_read_write_wire.c\n"); fflush(stdout);
 
     numBytes = FRAMES_PER_BUFFER * NUM_CHANNELS * SAMPLE_SIZE ;
@@ -170,24 +170,6 @@ int main(void)
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;
 
-    CLEAR( sampleBlock );
-/*
-    err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
-    printf("Wire on. Interrupt to stop.\n"); fflush(stdout);
-
-    while( 1 )
-    {
-       err = Pa_WriteStream( stream, sampleBlock, FRAMES_PER_BUFFER );
-       if( err ) goto xrun;
-       err = Pa_ReadStream( stream, sampleBlock, FRAMES_PER_BUFFER );
-       if( err ) goto xrun;
-    }
-    err = Pa_StopStream( stream );
-    if( err != paNoError ) goto error;
-
-    Pa_CloseStream( stream );
-*/
     free( sampleBlock );
 
     Pa_Terminate();
