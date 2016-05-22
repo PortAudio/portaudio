@@ -258,8 +258,8 @@ static void TestFormats( int mode, PaDeviceIndex deviceID, double sampleRate,
                          int numChannels )
 {
     TestAdvance( mode, deviceID, sampleRate, numChannels, paFloat32 );
-//    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt16 );
-//    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt32 );
+    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt16 );
+    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt32 );
     /* TestAdvance( mode, deviceID, sampleRate, numChannels, paInt24 ); */
 }
 
