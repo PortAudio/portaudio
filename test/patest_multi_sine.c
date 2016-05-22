@@ -47,7 +47,7 @@
 #include "portaudio.h"
 
 #define SAMPLE_RATE       (44100)
-#define FRAMES_PER_BUFFER (256)
+#define FRAMES_PER_BUFFER (128)
 #define FREQ_INCR         (300.0 / SAMPLE_RATE)
 #define MAX_CHANNELS      (64)
 

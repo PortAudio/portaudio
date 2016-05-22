@@ -456,9 +456,9 @@ PaError ReadStream( PaStream* stream,
           }
        } while( framesAvailable == 0 );
        framesToTransfer = MIN( framesAvailable, framesRequested );
-       PaUtil_ReadRingBuffer( &blio->inputRingBuffer, (void *)cbuf, framesToTransfer );
-       cbuf += framesToTransfer * blio->inputSampleSizeActual * blio->inChan;
-       framesRequested -= framesToTransfer;
+       framesTransferred = PaUtil_ReadRingBuffer( &blio->inputRingBuffer, (void *)cbuf, framesToTransfer );
+       cbuf += framesTransferred * blio->inputSampleSizeActual * blio->inChan;
+       framesRequested -= framesTransferred;
 
        if( framesToTransfer == framesAvailable ) {
 #ifdef PA_MAC_BLIO_MUTEX
@@ -509,7 +509,6 @@ PaError WriteStream( PaStream* stream,
         ring_buffer_size_t framesToTransfer;
         ring_buffer_size_t framesTransferred;
 
-
        do {
           framesAvailable = PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
 /*
@@ -538,9 +537,9 @@ PaError WriteStream( PaStream* stream,
        } while( framesAvailable == 0 );
 
        framesToTransfer = MIN( framesAvailable, framesRequested );
-       PaUtil_WriteRingBuffer( &blio->outputRingBuffer, (void *)cbuf, framesToTransfer );
-       cbuf += framesToTransfer * blio->outputSampleSizeActual * blio->outChan;
-       framesRequested -= framesToTransfer;
+       framesTransferred = PaUtil_WriteRingBuffer( &blio->outputRingBuffer, (void *)cbuf, framesToTransfer );
+       cbuf += framesTransferred * blio->outputSampleSizeActual * blio->outChan;
+       framesRequested -= framesTransferred;
 
 #ifdef PA_MAC_BLIO_MUTEX
        if( framesToTransfer == framesAvailable ) {

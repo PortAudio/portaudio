@@ -231,7 +231,7 @@ static void TestDevices( int mode )
                                                               88200.0, 96000.0,
                                                -1.0 }; /* Negative terminated list. */
     int numDevices = Pa_GetDeviceCount();
-    for( id=0; id<numDevices; id++ )            /* Iterate through all devices. */
+    for( id=3; id<numDevices; id++ )            /* Iterate through all devices. */
     {
         pdi = Pa_GetDeviceInfo( id );
         /* Try 1 to maxChannels on each device. */
@@ -239,13 +239,13 @@ static void TestDevices( int mode )
         if( maxChannels > MAX_TEST_CHANNELS )
             maxChannels = MAX_TEST_CHANNELS;
         
-        for( jc=1; jc<=maxChannels; jc++ )
+        for( jc=4; jc<=maxChannels; jc++ )
         {
             printf("\n========================================================================\n");
             printf("            Device = %s\n", pdi->name );
             printf("========================================================================\n");
             /* Try each standard sample rate. */
-            for( i=0; standardSampleRates[i] > 0; i++ )
+            for( i=9; standardSampleRates[i] > 0; i++ )
             {
                 TestFormats( mode, (PaDeviceIndex)id, standardSampleRates[i], jc );
             }
@@ -258,8 +258,8 @@ static void TestFormats( int mode, PaDeviceIndex deviceID, double sampleRate,
                          int numChannels )
 {
     TestAdvance( mode, deviceID, sampleRate, numChannels, paFloat32 );
-    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt16 );
-    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt32 );
+//    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt16 );
+//    TestAdvance( mode, deviceID, sampleRate, numChannels, paInt32 );
     /* TestAdvance( mode, deviceID, sampleRate, numChannels, paInt24 ); */
 }
 
