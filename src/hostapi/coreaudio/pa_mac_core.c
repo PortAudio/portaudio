@@ -1921,14 +1921,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         
        /*
         * If input and output devs are different or we are doing SR conversion,
-        * we also need a
-        * ring buffer to store inpt data while waiting for output
-        * data.
+        * we also need a ring buffer to store input data while waiting for
+        * output data.
         */
        if( (stream->outputUnit && (stream->inputUnit != stream->outputUnit))
            || stream->inputSRConverter )
        {
-          /* May want the ringSize ot initial position in
+          /* May want the ringSize or initial position in
              ring buffer to depend somewhat on sample rate change */
 
           void *data;
@@ -1951,7 +1950,15 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
           }
 
           /* now we can initialize the ring buffer */
-          PaUtil_InitializeRingBuffer( &stream->inputRingBuffer, szfl*inputParameters->channelCount, ringSize, data ) ;
+          result = PaUtil_InitializeRingBuffer( &stream->inputRingBuffer, szfl*inputParameters->channelCount, ringSize, data );
+          if( result != 0 )
+          {
+              /* The only reason this should fail is if ringSize is not a power of 2, which we do not anticipate happening. */
+              result = paUnanticipatedHostError;
+              free(data);
+              goto error;
+          }
+
           /* advance the read point a little, so we are reading from the
              middle of the buffer */
           if( stream->outputUnit )
@@ -1973,12 +1980,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                                          stream->outputFramesPerBuffer,
                                          sampleRate );
        result = initializeBlioRingBuffers( &stream->blio,
-              inputParameters?inputParameters->sampleFormat:0 ,
-              outputParameters?outputParameters->sampleFormat:0 ,
-              MAX(stream->inputFramesPerBuffer,stream->outputFramesPerBuffer),
+              inputParameters ? inputParameters->sampleFormat : 0,
+              outputParameters ? outputParameters->sampleFormat : 0,
               ringSize,
-              inputParameters?inputChannelCount:0 ,
-              outputParameters?outputChannelCount:0 ) ;
+              inputParameters ? inputChannelCount : 0,
+              outputParameters ? outputChannelCount : 0 ) ;
        if( result != paNoError )
           goto error;
         
