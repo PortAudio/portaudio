@@ -42,12 +42,18 @@
  @note pa_wasapi currently requires minimum VC 2005, and the latest Vista SDK
 */
 
-#define WIN32_LEAN_AND_MEAN // exclude rare headers
 #include <windows.h>
 #include <stdio.h>
 #include <process.h>
 #include <assert.h>
-#include <mmsystem.h>
+
+// WinRT
+#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+	#define WIN32_WINRT
+	#define INITGUID
+#endif
+
+// WASAPI
 #include <mmreg.h>  // must be before other Wasapi headers
 #if defined(_MSC_VER) && (_MSC_VER >= 1400)
 	#include <Avrt.h>
@@ -61,9 +67,9 @@
 	#undef INITGUID
 #endif
 #ifndef __MWERKS__
-#include <malloc.h>
-#include <memory.h>
-#endif /* __MWERKS__ */
+	#include <malloc.h>
+	#include <memory.h>
+#endif
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -74,10 +80,9 @@
 #include "pa_win_wasapi.h"
 #include "pa_debugprint.h"
 #include "pa_ringbuffer.h"
-
 #include "pa_win_coinitialize.h"
 
-#ifndef NTDDI_VERSION
+#if !defined(NTDDI_VERSION)
  
     #undef WINVER
     #undef _WIN32_WINNT
@@ -125,6 +130,7 @@
         #include <oleidl.h>
         #include <objidl.h>
      #else
+		#ifndef WIN32_WINRT
         typedef struct _BYTE_BLOB
         {
             unsigned long clSize;
@@ -133,6 +139,7 @@
         typedef /* [unique] */  __RPC_unique_pointer BYTE_BLOB *UP_BYTE_BLOB;
         typedef LONGLONG REFERENCE_TIME;
         #define NONAMELESSUNION
+		#endif
     #endif
     
     #ifndef WAVE_FORMAT_IEEE_FLOAT
@@ -159,6 +166,36 @@
     #undef INITGUID
 
 #endif // NTDDI_VERSION
+
+// Missing declarations for WinRT
+#ifdef WIN32_WINRT
+
+	typedef	enum _EDataFlow
+	{	
+		eRender					= 0,
+		eCapture				= ( eRender + 1 ) ,
+		eAll					= ( eCapture + 1 ) ,
+		EDataFlow_enum_count	= ( eAll + 1 )
+	}
+	EDataFlow;
+
+	typedef enum _EndpointFormFactor
+	{	
+		RemoteNetworkDevice			= 0,
+		Speakers					= ( RemoteNetworkDevice + 1 ) ,
+		LineLevel					= ( Speakers + 1 ) ,
+		Headphones					= ( LineLevel + 1 ) ,
+		Microphone					= ( Headphones + 1 ) ,
+		Headset						= ( Microphone + 1 ) ,
+		Handset						= ( Headset + 1 ) ,
+		UnknownDigitalPassthrough	= ( Handset + 1 ) ,
+		SPDIF						= ( UnknownDigitalPassthrough + 1 ) ,
+		HDMI						= ( SPDIF + 1 ) ,
+		UnknownFormFactor			= ( HDMI + 1 ) 
+	} 	
+	EndpointFormFactor;
+
+#endif
 
 #ifndef GUID_SECT
     #define GUID_SECT
@@ -192,6 +229,7 @@ PA_DEFINE_IID(IDeviceTopology,      2A07407E, 6497, 4A18, 97, 87, 32, f7, 9b, d0
 PA_DEFINE_IID(IPart,                AE2DE0E4, 5BCA, 4F2D, aa, 46, 5d, 13, f8, fd, b3, a9);
 // *4509F757-2D46-4637-8E62-CE7DB944F57B*
 PA_DEFINE_IID(IKsJackDescription,   4509F757, 2D46, 4637, 8e, 62, ce, 7d, b9, 44, f5, 7b);
+
 // Media formats:
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_PCM,        0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_ADPCM,      0x00000002, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
@@ -272,13 +310,13 @@ enum { WASAPI_PACKETS_PER_INPUT_BUFFER = 6 };
 typedef void (*MixMonoToStereoF) (void *__to, void *__from, UINT32 count);
 
 // AVRT is the new "multimedia schedulling stuff"
+#ifndef WIN32_WINRT
 typedef BOOL   (WINAPI *FAvRtCreateThreadOrderingGroup)  (PHANDLE,PLARGE_INTEGER,GUID*,PLARGE_INTEGER);
 typedef BOOL   (WINAPI *FAvRtDeleteThreadOrderingGroup)  (HANDLE);
 typedef BOOL   (WINAPI *FAvRtWaitOnThreadOrderingGroup)  (HANDLE);
 typedef HANDLE (WINAPI *FAvSetMmThreadCharacteristics)   (LPCSTR,LPDWORD);
 typedef BOOL   (WINAPI *FAvRevertMmThreadCharacteristics)(HANDLE);
 typedef BOOL   (WINAPI *FAvSetMmThreadPriority)          (HANDLE,AVRT_PRIORITY);
-
 static HMODULE hDInputDLL = 0;
 FAvRtCreateThreadOrderingGroup   pAvRtCreateThreadOrderingGroup = NULL;
 FAvRtDeleteThreadOrderingGroup   pAvRtDeleteThreadOrderingGroup = NULL;
@@ -286,6 +324,7 @@ FAvRtWaitOnThreadOrderingGroup   pAvRtWaitOnThreadOrderingGroup = NULL;
 FAvSetMmThreadCharacteristics    pAvSetMmThreadCharacteristics = NULL;
 FAvRevertMmThreadCharacteristics pAvRevertMmThreadCharacteristics = NULL;
 FAvSetMmThreadPriority           pAvSetMmThreadPriority = NULL;
+#endif
 
 #define _GetProc(fun, type, name)  {                                                        \
                                         fun = (type) GetProcAddress(hDInputDLL,name);       \
@@ -351,16 +390,15 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
 typedef struct PaWasapiDeviceInfo
 {
     // Device
+#ifndef WIN32_WINRT
     IMMDevice *device;
+#endif
 
 	// from GetId
     WCHAR szDeviceID[MAX_STR_LEN];
 
 	// from GetState
     DWORD state;
-
-    // Fields filled from IMMEndpoint'sGetDataFlow
-    EDataFlow flow;
 
     // Fields filled from IAudioDevice (_prior_ to Initialize)
     // from GetDevicePeriod(
@@ -372,6 +410,9 @@ typedef struct PaWasapiDeviceInfo
 
 	// Default format (setup through Control Panel by user)
 	WAVEFORMATEXTENSIBLE DefaultFormat;
+
+    // Fields filled from IMMEndpoint'sGetDataFlow
+    EDataFlow flow;
 
 	// Formfactor
 	EndpointFormFactor formFactor;
@@ -393,7 +434,9 @@ typedef struct
     PaWinUtilComInitializationResult comInitializationResult;
 
     //in case we later need the synch
+#ifndef WIN32_WINRT
     IMMDeviceEnumerator *enumerator;
+#endif
 
     //this is the REAL number of devices, whether they are usefull to PA or not!
     UINT32 deviceCount;
@@ -428,7 +471,9 @@ PaWasapiAudioClientParams;
 typedef struct PaWasapiSubStream
 {
     IAudioClient        *clientParent;
+#ifndef WIN32_WINRT
 	IStream				*clientStream;
+#endif
 	IAudioClient		*clientProc;
 
     WAVEFORMATEXTENSIBLE wavex;
@@ -478,14 +523,18 @@ typedef struct PaWasapiStream
     // input
 	PaWasapiSubStream          in;
     IAudioCaptureClient       *captureClientParent;
+#ifndef WIN32_WINRT
 	IStream                   *captureClientStream;
+#endif
 	IAudioCaptureClient       *captureClient;
     IAudioEndpointVolume      *inVol;
 
 	// output
 	PaWasapiSubStream          out;
     IAudioRenderClient        *renderClientParent;
+#ifndef WIN32_WINRT
 	IStream                   *renderClientStream;
+#endif
 	IAudioRenderClient        *renderClient;
 	IAudioEndpointVolume      *outVol;
 
@@ -812,6 +861,7 @@ static UINT32 GetFramesSleepTimeMicroseconds(UINT32 nFrames, UINT32 nSamplesPerS
 }
 
 // ------------------------------------------------------------------------------------------
+#ifndef WIN32_WINRT
 static BOOL SetupAVRT()
 {
     hDInputDLL = LoadLibraryA("avrt.dll");
@@ -832,18 +882,23 @@ static BOOL SetupAVRT()
 		pAvRevertMmThreadCharacteristics &&
 		pAvSetMmThreadPriority;
 }
+#endif
 
 // ------------------------------------------------------------------------------------------
 static void CloseAVRT()
 {
+#ifndef WIN32_WINRT
 	if (hDInputDLL != NULL)
 		FreeLibrary(hDInputDLL);
 	hDInputDLL = NULL;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
 static BOOL IsWow64()
 {
+#ifndef WIN32_WINRT
+
 	// http://msdn.microsoft.com/en-us/library/ms684139(VS.85).aspx
 
 	typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
@@ -865,6 +920,12 @@ static BOOL IsWow64()
 		return FALSE;
 
     return bIsWow64;
+
+#else
+
+	return FALSE;
+
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
@@ -880,6 +941,7 @@ typedef enum EWindowsVersion
 }
 EWindowsVersion;
 // Alternative way for checking Windows version (allows to check version on Windows 8.1 and up)
+#ifndef WIN32_WINRT
 static BOOL IsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor)
 {
 	typedef ULONGLONG (NTAPI *LPFN_VERSETCONDITIONMASK)(ULONGLONG ConditionMask, DWORD TypeMask, BYTE Condition);
@@ -909,9 +971,11 @@ static BOOL IsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WO
 
 	return (fnVerifyVersionInfo(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR, dwlConditionMask) != FALSE);
 }
+#endif
 // Get Windows version
 static EWindowsVersion GetWindowsVersion()
 {
+#ifndef WIN32_WINRT
 	static EWindowsVersion version = WINDOWS_UNKNOWN;
 
 	if (version == WINDOWS_UNKNOWN)
@@ -996,6 +1060,9 @@ static EWindowsVersion GetWindowsVersion()
 	}
 
 	return version;
+#else
+	return WINDOWS_8_SERVER2012;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1168,20 +1235,198 @@ static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format, EMixerDir d
 }
 
 // ------------------------------------------------------------------------------------------
+#ifdef WIN32_WINRT
+typedef struct _CActivateAudioInterfaceCompletionHandler
+{
+	IActivateAudioInterfaceCompletionHandler parent;
+	ULONG refs;
+	volatile BOOL done;
+	struct
+	{
+		HRESULT hr;
+		IAudioClient *client;
+	}
+	out;
+}
+CActivateAudioInterfaceCompletionHandler;
+
+static HRESULT ( STDMETHODCALLTYPE CActivateAudioInterfaceCompletionHandler_QueryInterface )( 
+    IActivateAudioInterfaceCompletionHandler * This,
+    /* [in] */ REFIID riid,
+    /* [annotation][iid_is][out] */ 
+    _COM_Outptr_  void **ppvObject)
+{
+	CActivateAudioInterfaceCompletionHandler *handler = (CActivateAudioInterfaceCompletionHandler *)This;
+
+	// From MSDN:
+	// "The IAgileObject interface is a marker interface that indicates that an object 
+	//  is free threaded and can be called from any apartment."
+	if (IsEqualIID(riid, &IID_IAgileObject))
+	{
+		handler->parent.lpVtbl->AddRef((IActivateAudioInterfaceCompletionHandler *)handler);
+		(*ppvObject) = handler;
+		return S_OK;
+	}
+
+	return S_FALSE;
+}
+        
+static ULONG ( STDMETHODCALLTYPE CActivateAudioInterfaceCompletionHandler_AddRef )( 
+    IActivateAudioInterfaceCompletionHandler * This)
+{
+	CActivateAudioInterfaceCompletionHandler *handler = (CActivateAudioInterfaceCompletionHandler *)This;
+	return ++ handler->refs;
+}
+        
+static ULONG ( STDMETHODCALLTYPE CActivateAudioInterfaceCompletionHandler_Release )( 
+    IActivateAudioInterfaceCompletionHandler * This)
+{
+	CActivateAudioInterfaceCompletionHandler *handler = (CActivateAudioInterfaceCompletionHandler *)This;
+	if (handler->refs == 0)
+	{
+		PaUtil_FreeMemory(handler->parent.lpVtbl);
+		PaUtil_FreeMemory(handler);
+		return 0;
+	}
+	return -- handler->refs;
+}
+        
+static HRESULT ( STDMETHODCALLTYPE CActivateAudioInterfaceCompletionHandler_ActivateCompleted )( 
+    IActivateAudioInterfaceCompletionHandler * This,
+    /* [annotation][in] */ 
+    _In_  IActivateAudioInterfaceAsyncOperation *activateOperation)
+{
+	CActivateAudioInterfaceCompletionHandler *handler = (CActivateAudioInterfaceCompletionHandler *)This;
+
+    HRESULT hr = S_OK;
+    HRESULT hrActivateResult = S_OK;
+    IUnknown *punkAudioInterface = NULL;
+ 
+    // Check for a successful activation result
+    hr = activateOperation->lpVtbl->GetActivateResult(activateOperation, &hrActivateResult, &punkAudioInterface);
+    if (SUCCEEDED(hr) && SUCCEEDED(hrActivateResult))
+    {
+        // Get the pointer for the Audio Client
+        punkAudioInterface->lpVtbl->QueryInterface(punkAudioInterface, GetAudioClientIID(), &handler->out.client);
+        if (handler->out.client == NULL)
+            hrActivateResult = E_FAIL;
+	}
+	SAFE_RELEASE(punkAudioInterface);
+
+	if (SUCCEEDED(hr))
+		handler->out.hr = hrActivateResult;
+	else
+		handler->out.hr = hr;
+	
+	handler->done = TRUE;
+	return hr;
+}
+
+static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCompletionHandler()
+{
+	CActivateAudioInterfaceCompletionHandler *handler = PaUtil_AllocateMemory(sizeof(CActivateAudioInterfaceCompletionHandler));
+	ZeroMemory(handler, sizeof(*handler));
+	handler->parent.lpVtbl = PaUtil_AllocateMemory(sizeof(*handler->parent.lpVtbl));
+	handler->parent.lpVtbl->QueryInterface    = &CActivateAudioInterfaceCompletionHandler_QueryInterface;
+	handler->parent.lpVtbl->AddRef            = &CActivateAudioInterfaceCompletionHandler_AddRef;
+	handler->parent.lpVtbl->Release           = &CActivateAudioInterfaceCompletionHandler_Release;
+	handler->parent.lpVtbl->ActivateCompleted = &CActivateAudioInterfaceCompletionHandler_ActivateCompleted;
+	return (IActivateAudioInterfaceCompletionHandler *)handler;
+}
+#endif
+
+// ------------------------------------------------------------------------------------------
+#ifdef WIN32_WINRT
+static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo, IAudioClient **client)
+{
+	PaError result = paNoError;
+	HRESULT hr = S_OK;
+	HRESULT activateResult = S_OK;
+	IActivateAudioInterfaceAsyncOperation *asyncOp = NULL;
+	IActivateAudioInterfaceCompletionHandler *handler = CreateActivateAudioInterfaceCompletionHandler();
+	CActivateAudioInterfaceCompletionHandler *ñhandler = (CActivateAudioInterfaceCompletionHandler *)handler;
+	OLECHAR devicePath[64] = { 0 };
+
+	// Get device path in form L"{DEVICE_GUID}"
+	switch (deviceInfo->flow)
+	{
+	case eRender:
+		StringFromGUID2(&DEVINTERFACE_AUDIO_RENDER, devicePath, 63);
+		break;
+	case eCapture:
+		StringFromGUID2(&DEVINTERFACE_AUDIO_CAPTURE, devicePath, 63);
+		break;
+	default:
+		return S_FALSE;
+	}	
+
+	// Async operation will call back to IActivateAudioInterfaceCompletionHandler::ActivateCompleted 
+	// which must be an agile interface implementation
+    hr = ActivateAudioInterfaceAsync(devicePath, GetAudioClientIID(), NULL, handler, &asyncOp);
+    IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
+
+	// Wait in busy loop for async operation to complete
+	while (SUCCEEDED(hr) && !ñhandler->done)
+	{
+		Pa_Sleep(1);
+	}
+
+	(*client) = ñhandler->out.client;
+	hr = ñhandler->out.hr;
+
+error:
+
+	SAFE_RELEASE(asyncOp);
+	SAFE_RELEASE(handler);
+
+    return hr;
+}
+#endif
+
+// ------------------------------------------------------------------------------------------
+static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, IAudioClient **client)
+{
+#ifndef WIN32_WINRT
+	return IMMDevice_Activate(deviceInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)client);
+#else
+	return ActivateAudioInterface_WINRT(deviceInfo, client);
+#endif
+}
+
+// ------------------------------------------------------------------------------------------
+#ifdef WIN32_WINRT
+static DWORD SignalObjectAndWait(
+	_In_ HANDLE hObjectToSignal,
+	_In_ HANDLE hObjectToWaitOn,
+	_In_ DWORD  dwMilliseconds,
+	_In_ BOOL   bAlertable
+)
+{
+	SetEvent(hObjectToSignal);
+	return WaitForSingleObjectEx(hObjectToWaitOn, dwMilliseconds, bAlertable);
+}
+#endif
+
+// ------------------------------------------------------------------------------------------
 PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
     PaError result = paNoError;
     PaWasapiHostApiRepresentation *paWasapi;
     PaDeviceInfo *deviceInfoArray;
     HRESULT hr = S_OK;
+#ifndef WIN32_WINRT
     IMMDeviceCollection* pEndPoints = NULL;
+#endif
 	UINT i;
+	WAVEFORMATEX *mixFormat;
 
+#ifndef WIN32_WINRT
     if (!SetupAVRT())
 	{
         PRINT(("WASAPI: No AVRT! (not VISTA?)"));
         return paNoError;
     }
+#endif
 
     paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory( sizeof(PaWasapiHostApiRepresentation) );
     if (paWasapi == NULL)
@@ -1213,6 +1458,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->info.defaultInputDevice	 = paNoDevice;
     (*hostApi)->info.defaultOutputDevice = paNoDevice;
 
+#ifndef WIN32_WINRT
     paWasapi->enumerator = NULL;
     hr = CoCreateInstance(&pa_CLSID_IMMDeviceEnumerator, NULL, CLSCTX_INPROC_SERVER,
              &pa_IID_IMMDeviceEnumerator, (void **)&paWasapi->enumerator);
@@ -1282,6 +1528,10 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 	// [IF_FAILED_JUMP(hResult, error);]
 	IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
+#else
+	paWasapi->deviceCount = 2;
+#endif
+
     paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_AllocateMemory(sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
     if (paWasapi->devInfo == NULL)
 	{
@@ -1320,6 +1570,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 			PA_DEBUG(("WASAPI: device idx: %02d\n", i));
 			PA_DEBUG(("WASAPI: ---------------\n"));
 
+		#ifndef WIN32_WINRT
             hr = IMMDeviceCollection_Item(pEndPoints, i, &paWasapi->devInfo[i].device);
 			// We need to set the result to a value otherwise we will return paNoError
 			// [IF_FAILED_JUMP(hResult, error);]
@@ -1424,8 +1675,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
 				SAFE_RELEASE(pProperty);
             }
-
-
+			
             // Endpoint data
             {
                 IMMEndpoint *endpoint = NULL;
@@ -1436,18 +1686,23 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                     SAFE_RELEASE(endpoint);
                 }
             }
+		#endif
 
             // Getting a temporary IAudioClient for more fields
             // we make sure NOT to call Initialize yet!
             {
-                IAudioClient *tmpClient = NULL;
+			#ifdef WIN32_WINRT
+				// Set flow as ActivateAudioInterface depends on it and selects corresponding 
+				// direction for the Audio Client
+				paWasapi->devInfo[i].flow = (i == 0 ? eRender : eCapture);
+			#endif
 
-                hr = IMMDevice_Activate(paWasapi->devInfo[i].device, GetAudioClientIID(),
-					CLSCTX_INPROC_SERVER, NULL, (void **)&tmpClient);
-				// We need to set the result to a value otherwise we will return paNoError
-				// [IF_FAILED_JUMP(hResult, error);]
+				// Create temp Audio Client instance to query additional details
+                IAudioClient *tmpClient = NULL;
+                hr = ActivateAudioInterface(&paWasapi->devInfo[i], &tmpClient);
 				IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
+				// Get latency
                 hr = IAudioClient_GetDevicePeriod(tmpClient,
                     &paWasapi->devInfo[i].DefaultDevicePeriod,
                     &paWasapi->devInfo[i].MinimumDevicePeriod);
@@ -1462,10 +1717,42 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 					// ignore error, let continue further without failing with paInternalError
 					hr = S_OK;
 				}
+				
+			#ifdef WIN32_WINRT
+				// Get mix format which will treat as default device format
+				hr = IAudioClient_GetMixFormat(tmpClient, &mixFormat);
+				if (SUCCEEDED(hr))
+				{
+					// Default device
+					if (i == 0)
+						(*hostApi)->info.defaultOutputDevice = (*hostApi)->info.deviceCount;
+					else
+						(*hostApi)->info.defaultInputDevice = (*hostApi)->info.deviceCount;
 
-                //hr = tmpClient->GetMixFormat(&paWasapi->devInfo[i].MixFormat);
+					// State
+					paWasapi->devInfo[i].state = 1; // DEVICE_STATE_ACTIVE
 
-				// Release client
+					// Default format
+					memcpy(&paWasapi->devInfo[i].DefaultFormat, mixFormat, min(sizeof(paWasapi->devInfo[i].DefaultFormat), sizeof(*mixFormat)));
+					CoTaskMemFree(mixFormat);
+
+					// Form-factor
+					paWasapi->devInfo[i].formFactor = UnknownFormFactor;
+
+					// Name
+                    deviceInfo->name = PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1);
+                    if (deviceInfo->name == NULL)
+					{
+						SAFE_RELEASE(tmpClient);
+                        result = paInsufficientMemory;
+                        goto error;
+                    }
+					_snprintf(deviceInfo->name, MAX_STR_LEN - 1, "WASAPI_%s:%d", (i == 0 ? "Output" : "Input"), i);
+					PA_DEBUG(("WASAPI:%d| name[%s]\n", i, deviceInfo->name));
+				}
+			#endif
+
+				// Release tmp client
 				SAFE_RELEASE(tmpClient);
 
 				if (hr != S_OK)
@@ -1479,7 +1766,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 					goto error;
 				}
             }
-
+			
             // we can now fill in portaudio device data
             deviceInfo->maxInputChannels  = 0;
             deviceInfo->maxOutputChannels = 0;
@@ -1532,7 +1819,9 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 	// findout if platform workaround is required
 	paWasapi->useWOW64Workaround = UseWOW64Workaround();
 
+#ifndef WIN32_WINRT
     SAFE_RELEASE(pEndPoints);
+#endif
 
 	PRINT(("WASAPI: initialized ok\n"));
 
@@ -1542,7 +1831,9 @@ error:
 
 	PRINT(("WASAPI: failed %s error[%d|%s]\n", __FUNCTION__, result, Pa_GetErrorText(result)));
 
+#ifndef WIN32_WINRT
     SAFE_RELEASE(pEndPoints);
+#endif
 
 	Terminate((PaUtilHostApiRepresentation *)paWasapi);
 
@@ -1563,12 +1854,16 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
 		return;
 
 	// Release IMMDeviceEnumerator
+#ifndef WIN32_WINRT
     SAFE_RELEASE(paWasapi->enumerator);
+#endif
 
     for (i = 0; i < paWasapi->deviceCount; ++i)
 	{
         PaWasapiDeviceInfo *info = &paWasapi->devInfo[i];
+	#ifndef WIN32_WINRT
         SAFE_RELEASE(info->device);
+	#endif
 
 		//if (info->MixFormat)
         //    CoTaskMemFree(info->MixFormat);
@@ -1830,25 +2125,25 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
 		{
 			switch (params->channelCount)
 			{
-			case 1:  wavex->dwChannelMask = KSAUDIO_SPEAKER_MONO; break;
-			case 2:  wavex->dwChannelMask = KSAUDIO_SPEAKER_STEREO; break;
-			case 3:  wavex->dwChannelMask = KSAUDIO_SPEAKER_STEREO|SPEAKER_LOW_FREQUENCY; break;
-			case 4:  wavex->dwChannelMask = KSAUDIO_SPEAKER_QUAD; break;
-			case 5:  wavex->dwChannelMask = KSAUDIO_SPEAKER_QUAD|SPEAKER_LOW_FREQUENCY; break;
-#ifdef KSAUDIO_SPEAKER_5POINT1_SURROUND
-			case 6:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1_SURROUND; break;
+			case 1:  wavex->dwChannelMask = PAWIN_SPEAKER_MONO; break;
+			case 2:  wavex->dwChannelMask = PAWIN_SPEAKER_STEREO; break;
+			case 3:  wavex->dwChannelMask = PAWIN_SPEAKER_STEREO|SPEAKER_LOW_FREQUENCY; break;
+			case 4:  wavex->dwChannelMask = PAWIN_SPEAKER_QUAD; break;
+			case 5:  wavex->dwChannelMask = PAWIN_SPEAKER_QUAD|SPEAKER_LOW_FREQUENCY; break;
+#ifdef PAWIN_SPEAKER_5POINT1_SURROUND
+			case 6:  wavex->dwChannelMask = PAWIN_SPEAKER_5POINT1_SURROUND; break;
 #else
-			case 6:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1; break;
+			case 6:  wavex->dwChannelMask = PAWIN_SPEAKER_5POINT1; break;
 #endif
-#ifdef KSAUDIO_SPEAKER_5POINT1_SURROUND
-			case 7:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1_SURROUND|SPEAKER_BACK_CENTER; break;
+#ifdef PAWIN_SPEAKER_5POINT1_SURROUND
+			case 7:  wavex->dwChannelMask = PAWIN_SPEAKER_5POINT1_SURROUND|SPEAKER_BACK_CENTER; break;
 #else
-			case 7:  wavex->dwChannelMask = KSAUDIO_SPEAKER_5POINT1|SPEAKER_BACK_CENTER; break;
+			case 7:  wavex->dwChannelMask = PAWIN_SPEAKER_5POINT1|SPEAKER_BACK_CENTER; break;
 #endif	
-#ifdef KSAUDIO_SPEAKER_7POINT1_SURROUND
-			case 8:  wavex->dwChannelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND; break;
+#ifdef PAWIN_SPEAKER_7POINT1_SURROUND
+			case 8:  wavex->dwChannelMask = PAWIN_SPEAKER_7POINT1_SURROUND; break;
 #else
-			case 8:  wavex->dwChannelMask = KSAUDIO_SPEAKER_7POINT1; break;
+			case 8:  wavex->dwChannelMask = PAWIN_SPEAKER_7POINT1; break;
 #endif
 
 			default: wavex->dwChannelMask = 0;
@@ -1869,9 +2164,9 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
     pwfext->Format.nChannels = (WORD)channelCount;
     pwfext->Format.nSamplesPerSec = (DWORD)sampleRate;
     if(channelCount == 1)
-        pwfext->dwChannelMask = KSAUDIO_SPEAKER_DIRECTOUT;
+        pwfext->dwChannelMask = PAWIN_SPEAKER_DIRECTOUT;
     else
-        pwfext->dwChannelMask = KSAUDIO_SPEAKER_STEREO;
+        pwfext->dwChannelMask = PAWIN_SPEAKER_STEREO;
     if(sampleFormat == paFloat32)
     {
         pwfext->Format.nBlockAlign = (WORD)(channelCount * 4);
@@ -2154,8 +2449,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 		if (inputStreamInfo && (inputStreamInfo->flags & paWinWasapiExclusive))
 			shareMode  = AUDCLNT_SHAREMODE_EXCLUSIVE;
 
-		hr = IMMDevice_Activate(paWasapi->devInfo[inputParameters->device].device,
-			GetAudioClientIID(), CLSCTX_INPROC_SERVER, NULL, (void **)&tmpClient);
+		hr = ActivateAudioInterface(&paWasapi->devInfo[inputParameters->device], &tmpClient);
 		if (hr != S_OK)
 		{
 			LogHostError(hr);
@@ -2180,8 +2474,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 		if (outputStreamInfo && (outputStreamInfo->flags & paWinWasapiExclusive))
 			shareMode  = AUDCLNT_SHAREMODE_EXCLUSIVE;
 
-		hr = IMMDevice_Activate(paWasapi->devInfo[outputParameters->device].device,
-			GetAudioClientIID(), CLSCTX_INPROC_SERVER, NULL, (void **)&tmpClient);
+		hr = ActivateAudioInterface(&paWasapi->devInfo[outputParameters->device], &tmpClient);
 		if (hr != S_OK)
 		{
 			LogHostError(hr);
@@ -2281,7 +2574,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	}
 
     // Get the audio client
-    hr = IMMDevice_Activate(pInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)&audioClient);
+    hr = ActivateAudioInterface(pInfo, &audioClient);
 	if (hr != S_OK)
 	{
 		(*pa_error) = paInsufficientMemory;
@@ -2495,7 +2788,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-        hr = IMMDevice_Activate(pInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void**)&audioClient);
+        hr = ActivateAudioInterface(pInfo, &audioClient);
     	if (hr != S_OK)
 		{
 			(*pa_error) = paInsufficientMemory;
@@ -2526,7 +2819,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-        hr = IMMDevice_Activate(pInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void**)&audioClient);
+        hr = ActivateAudioInterface(pInfo, &audioClient);
     	if (hr != S_OK)
 		{
 			(*pa_error) = paInsufficientMemory;
@@ -2566,7 +2859,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-        hr = IMMDevice_Activate(pInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void**)&audioClient);
+        hr = ActivateAudioInterface(pInfo, &audioClient);
     	if (hr != S_OK)
 		{
 			(*pa_error) = paInsufficientMemory;
@@ -3249,6 +3542,7 @@ static PaError CloseStream( PaStream* s )
 // ------------------------------------------------------------------------------------------
 HRESULT UnmarshalSubStreamComPointers(PaWasapiSubStream *substream) 
 {
+#ifndef WIN32_WINRT
 	HRESULT hResult = S_OK;
 	HRESULT hFirstBadResult = S_OK;
 	substream->clientProc = NULL;
@@ -3262,11 +3556,16 @@ HRESULT UnmarshalSubStreamComPointers(PaWasapiSubStream *substream)
 	}
 
 	return hFirstBadResult;
+
+#else
+	return S_OK;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
 HRESULT UnmarshalStreamComPointers(PaWasapiStream *stream) 
 {
+#ifndef WIN32_WINRT
 	HRESULT hResult = S_OK;
 	HRESULT hFirstBadResult = S_OK;
 	stream->captureClient = NULL;
@@ -3311,6 +3610,33 @@ HRESULT UnmarshalStreamComPointers(PaWasapiStream *stream)
 	}
 
 	return hFirstBadResult;
+#else
+	if (stream->in.clientParent != NULL)
+	{
+		stream->in.clientProc = stream->in.clientParent;
+		IAudioClient_AddRef(stream->in.clientParent);
+	}
+
+	if (stream->out.clientParent != NULL)
+	{
+		stream->out.clientProc = stream->out.clientParent;
+		IAudioClient_AddRef(stream->out.clientParent);
+	}
+
+	if (stream->renderClientParent != NULL)
+	{
+		stream->renderClient = stream->renderClientParent;
+		IAudioRenderClient_AddRef(stream->renderClientParent);
+	}
+
+	if (stream->captureClientParent != NULL)
+	{
+		stream->captureClient = stream->captureClientParent;
+		IAudioCaptureClient_AddRef(stream->captureClientParent);
+	}
+
+	return S_OK;
+#endif
 }
 
 // -----------------------------------------------------------------------------------------
@@ -3334,6 +3660,7 @@ void ReleaseUnmarshaledComPointers(PaWasapiStream *stream)
 // ------------------------------------------------------------------------------------------
 HRESULT MarshalSubStreamComPointers(PaWasapiSubStream *substream) 
 {
+#ifndef WIN32_WINRT
 	HRESULT hResult;
 	substream->clientStream = NULL;
 
@@ -3350,11 +3677,15 @@ marshal_sub_error:
 	UnmarshalSubStreamComPointers(substream);
 	ReleaseUnmarshaledSubComPointers(substream);
 	return hResult;
+#else
+	return S_OK;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
 HRESULT MarshalStreamComPointers(PaWasapiStream *stream) 
 {
+#ifndef WIN32_WINRT
 	HRESULT hResult = S_OK;
 	stream->captureClientStream = NULL;
 	stream->in.clientStream = NULL;
@@ -3395,6 +3726,9 @@ marshal_error:
 	UnmarshalStreamComPointers(stream);
 	ReleaseUnmarshaledComPointers(stream);
 	return hResult;
+#else
+	return S_OK;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3743,7 +4077,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
 			{
 				if ((sleep = ThreadIdleScheduler_NextSleep(&sched)) != 0)
 				{
-					Sleep(sleep);
+					Pa_Sleep(sleep);
 					sleep = 0;
 				}
 			}
@@ -4079,6 +4413,7 @@ static void WaspiHostProcessingLoop( void *inputBuffer,  long inputFrames,
 // ------------------------------------------------------------------------------------------
 HANDLE MMCSS_activate(const char *name)
 {
+#ifndef WIN32_WINRT
     DWORD task_idx = 0;
     HANDLE hTask = pAvSetMmThreadCharacteristics(name, &task_idx);
     if (hTask == NULL)
@@ -4100,6 +4435,9 @@ HANDLE MMCSS_activate(const char *name)
     }
 
 	return hTask;
+#else
+	return NULL;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
@@ -4108,10 +4446,12 @@ void MMCSS_deactivate(HANDLE hTask)
 	if (!hTask)
 		return;
 
+#ifndef WIN32_WINRT
 	if (pAvRevertMmThreadCharacteristics(hTask) == FALSE)
 	{
         PRINT(("WASAPI: AvRevertMmThreadCharacteristics failed!\n"));
     }
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
@@ -4161,6 +4501,7 @@ PaError PaWasapi_ThreadPriorityRevert(void *hTask)
 
 PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount)
 {
+#ifndef WIN32_WINRT
 	PaError ret;
 	HRESULT hr = S_OK;
 	PaDeviceIndex index;
@@ -4230,9 +4571,13 @@ error:
 
 	LogHostError(hr);
 	return paNoError;
+#else
+	return paUnanticipatedHostError;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
+#ifndef WIN32_WINRT
 static PaWasapiJackConnectionType ConvertJackConnectionTypeWASAPIToPA(int connType)
 {
 	switch (connType)
@@ -4256,8 +4601,10 @@ static PaWasapiJackConnectionType ConvertJackConnectionTypeWASAPIToPA(int connTy
 	}
 	return eJackConnTypeUnknown;
 }
+#endif
 
 // ------------------------------------------------------------------------------------------
+#ifndef WIN32_WINRT
 static PaWasapiJackGeoLocation ConvertJackGeoLocationWASAPIToPA(int geoLoc)
 {
 	switch (geoLoc)
@@ -4282,8 +4629,10 @@ static PaWasapiJackGeoLocation ConvertJackGeoLocationWASAPIToPA(int geoLoc)
 	}
 	return eJackGeoLocUnk;
 }
+#endif
 
 // ------------------------------------------------------------------------------------------
+#ifndef WIN32_WINRT
 static PaWasapiJackGenLocation ConvertJackGenLocationWASAPIToPA(int genLoc)
 {
 	switch (genLoc)
@@ -4299,8 +4648,10 @@ static PaWasapiJackGenLocation ConvertJackGenLocationWASAPIToPA(int genLoc)
 	}
 	return eJackGenLocPrimaryBox;
 }
+#endif
 
 // ------------------------------------------------------------------------------------------
+#ifndef WIN32_WINRT
 static PaWasapiJackPortConnection ConvertJackPortConnectionWASAPIToPA(int portConn)
 {
 	switch (portConn)
@@ -4312,6 +4663,7 @@ static PaWasapiJackPortConnection ConvertJackPortConnectionWASAPIToPA(int portCo
 	}
 	return eJackPortConnJack;
 }
+#endif
 
 // ------------------------------------------------------------------------------------------
 // Described at:
@@ -4319,6 +4671,7 @@ static PaWasapiJackPortConnection ConvertJackPortConnectionWASAPIToPA(int portCo
 
 PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription)
 {
+#ifndef WIN32_WINRT
 	PaError ret;
 	HRESULT hr = S_OK;
 	PaDeviceIndex index;
@@ -4394,6 +4747,10 @@ error:
 
 	LogHostError(hr);
 	return ret;
+
+#else
+	return paUnanticipatedHostError;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------

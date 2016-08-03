@@ -47,6 +47,37 @@
 #define  WAVE_FORMAT_EXTENSIBLE         0xFFFE
 #endif
 
+
+#if !defined(WAVE_FORMAT_PCM)
+#define WAVE_FORMAT_PCM 1
+typedef struct tWAVEFORMAT 
+{
+    WORD	wFormatTag;
+    WORD	nChannels;
+    DWORD	nSamplesPerSec;
+    DWORD	nAvgBytesPerSec;
+    WORD	nBlockAlign;
+} 
+WAVEFORMAT;
+#endif
+
+
+#if !defined(_WAVEFORMATEX_)
+#define _WAVEFORMATEX_
+typedef struct tWAVEFORMATEX
+{
+	WORD	wFormatTag;
+	WORD	nChannels;
+	DWORD	nSamplesPerSec;
+	DWORD	nAvgBytesPerSec;
+	WORD	nBlockAlign;
+	WORD	wBitsPerSample;
+	WORD	cbSize;
+} 
+WAVEFORMATEX;
+#endif
+
+
 static GUID pawin_ksDataFormatSubtypeGuidBase = 
 	{ (USHORT)(WAVE_FORMAT_PCM), 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 };
 
