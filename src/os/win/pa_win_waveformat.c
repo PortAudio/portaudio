@@ -52,11 +52,11 @@
 #define WAVE_FORMAT_PCM 1
 typedef struct tWAVEFORMAT 
 {
-    WORD	wFormatTag;
-    WORD	nChannels;
-    DWORD	nSamplesPerSec;
-    DWORD	nAvgBytesPerSec;
-    WORD	nBlockAlign;
+    WORD    wFormatTag;
+    WORD    nChannels;
+    DWORD   nSamplesPerSec;
+    DWORD   nAvgBytesPerSec;
+    WORD    nBlockAlign;
 } 
 WAVEFORMAT;
 #endif
@@ -66,13 +66,13 @@ WAVEFORMAT;
 #define _WAVEFORMATEX_
 typedef struct tWAVEFORMATEX
 {
-	WORD	wFormatTag;
-	WORD	nChannels;
-	DWORD	nSamplesPerSec;
-	DWORD	nAvgBytesPerSec;
-	WORD	nBlockAlign;
-	WORD	wBitsPerSample;
-	WORD	cbSize;
+    WORD    wFormatTag;
+    WORD    nChannels;
+    DWORD   nSamplesPerSec;
+    DWORD   nAvgBytesPerSec;
+    WORD    nBlockAlign;
+    WORD    wBitsPerSample;
+    WORD    cbSize;
 } 
 WAVEFORMATEX;
 #endif
