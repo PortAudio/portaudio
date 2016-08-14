@@ -38,6 +38,9 @@
 
 #include <windows.h>
 #include <mmsystem.h>
+#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+    #include <mmreg.h> /* for WAVEFORMATEX */
+#endif
 
 #include "portaudio.h"
 #include "pa_win_waveformat.h"
@@ -45,36 +48,6 @@
 
 #if !defined(WAVE_FORMAT_EXTENSIBLE)
 #define  WAVE_FORMAT_EXTENSIBLE         0xFFFE
-#endif
-
-
-#if !defined(WAVE_FORMAT_PCM)
-#define WAVE_FORMAT_PCM 1
-typedef struct tWAVEFORMAT 
-{
-    WORD    wFormatTag;
-    WORD    nChannels;
-    DWORD   nSamplesPerSec;
-    DWORD   nAvgBytesPerSec;
-    WORD    nBlockAlign;
-} 
-WAVEFORMAT;
-#endif
-
-
-#if !defined(_WAVEFORMATEX_)
-#define _WAVEFORMATEX_
-typedef struct tWAVEFORMATEX
-{
-    WORD    wFormatTag;
-    WORD    nChannels;
-    DWORD   nSamplesPerSec;
-    DWORD   nAvgBytesPerSec;
-    WORD    nBlockAlign;
-    WORD    wBitsPerSample;
-    WORD    cbSize;
-} 
-WAVEFORMATEX;
 #endif
 
 

@@ -1367,7 +1367,7 @@ static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo
 	// Wait in busy loop for async operation to complete
 	while (SUCCEEDED(hr) && !handlerImpl->done)
 	{
-		Pa_Sleep(1);
+		Sleep(1);
 	}
 
 	(*client) = handlerImpl->out.client;
@@ -4084,7 +4084,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
 			{
 				if ((sleep = ThreadIdleScheduler_NextSleep(&sched)) != 0)
 				{
-					Pa_Sleep(sleep);
+					Sleep(sleep);
 					sleep = 0;
 				}
 			}

@@ -149,9 +149,7 @@ double PaUtil_GetTime( void )
     {
 #ifndef UNDER_CE
 	#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
-		struct _timeb tv = { 0 };
-		_ftime_s(&tv);
-		return (double)tv.time + tv.millitm * .001;
+        return GetTickCount64() * .001;
 	#else
         return timeGetTime() * .001;
 	#endif
