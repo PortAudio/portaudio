@@ -1,10 +1,10 @@
 
 /*
- * $Id: pa_hostapi_pulseaudio.c 1668 2011-05-02 17:07:11Z rossb $
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2016 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2016 Sqweek <sqweek@gmail.com>
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
@@ -49,7 +49,8 @@
  it has callbackmode and normal write mode support
 */
 
-#include "pa_hostapi_pulseaudio_block.h"
+#include "pa_linux_pulseaudio_block.h"
+#include <unistd.h>
 
 /*
     As separate stream interfaces are used for blocking and callback
@@ -57,14 +58,14 @@
     for blocking streams.
 */
 
-PaError PulseAudioReadStreamBlock(
+PaError PaPulseAudio_ReadStreamBlock(
     PaStream * s,
     void *buffer,
     unsigned long frames
 )
 {
-    PaPulseAudioStream *l_ptrStream = (PaPulseAudioStream *) s;
-    PaPulseAudioHostApiRepresentation *l_ptrPulseAudioHostApi =
+    PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
+    PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
         l_ptrStream->hostapi;
     PaError l_iRet = 0;
     size_t l_lReadable = 0;
@@ -86,14 +87,14 @@ PaError PulseAudioReadStreamBlock(
 }
 
 
-PaError PulseAudioWriteStreamBlock(
+PaError PaPulseAudio_WriteStreamBlock(
     PaStream * s,
     const void *buffer,
     unsigned long frames
 )
 {
-    PaPulseAudioStream *l_ptrStream = (PaPulseAudioStream *) s;
-    PaPulseAudioHostApiRepresentation *l_ptrPulseAudioHostApi =
+    PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
+    PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
         l_ptrStream->hostapi;
     int l_iRet = 0;
     size_t l_lWritable = 0;
@@ -156,11 +157,11 @@ PaError PulseAudioWriteStreamBlock(
 }
 
 
-signed long PulseAudioGetStreamReadAvailableBlock(
+signed long PaPulseAudio_GetStreamReadAvailableBlock(
     PaStream * s
 )
 {
-    PaPulseAudioStream *l_ptrStream = (PaPulseAudioStream *) s;
+    PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
 
     if (l_ptrStream->inStream == NULL)
     {
@@ -172,12 +173,12 @@ signed long PulseAudioGetStreamReadAvailableBlock(
 }
 
 
-signed long PulseAudioGetStreamWriteAvailableBlock(
+signed long PaPulseAudio_GetStreamWriteAvailableBlock(
     PaStream * s
 )
 {
-    PaPulseAudioStream *l_ptrStream = (PaPulseAudioStream *) s;
-    PaPulseAudioHostApiRepresentation *l_ptrPulseAudioHostApi =
+    PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
+    PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
         l_ptrStream->hostapi;
 
     if (l_ptrStream->outStream == NULL)

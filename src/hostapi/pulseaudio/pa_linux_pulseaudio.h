@@ -1,3 +1,45 @@
+
+/*
+ * PulseAudio host to play natively in Linux based systems without
+ * ALSA emulation
+ *
+ * Copyright (c) 2014-2016 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2016 Sqweek <sqweek@gmail.com>
+ *
+ * Based on the Open Source API proposed by Ross Bencina
+ * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files
+ * (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge,
+ * publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
+ * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * The text above constitutes the entire PortAudio license; however,
+ * the PortAudio community also makes the following non-binding requests:
+ *
+ * Any person wishing to distribute modifications to the Software is
+ * requested to send the modifications to the original developer so that
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
+ * license above.
+ */
+
 #ifndef _PA_HOSTAPI_PULSEAUDIO_H_
 #define _PA_HOSTAPI_PULSEAUDIO_H_
 
@@ -35,6 +77,9 @@ extern "C"
    @todo change this to something more sophisticated */
 #define PULSEAUDIO_TIME_EVENT_USEC 50000
 
+#define PAPULSEAUDIO_MAX_DEVICECOUNT 1024
+#define PAPULSEAUDIO_MAX_DEVICENAME 1024
+
 /* Assuming of 2 seconds of 44100 Hz sample rate with FLOAT (4 bytes) and stereo channels (2 channels).
    You should have pretty good size buffer with this. If output/intput doesn't happens in 2 second we
    have more trouble than this buffer.
@@ -50,8 +95,10 @@ extern "C"
         PaUtilAllocationGroup *allocations;
 
         PaHostApiIndex hostApiIndex;
-        PaDeviceInfo deviceInfoArray[1024];
-        char *pulseaudioDeviceNames[1024];
+        PaDeviceInfo deviceInfoArray[PAPULSEAUDIO_MAX_DEVICECOUNT];
+        char *pulseaudioDeviceNames[PAPULSEAUDIO_MAX_DEVICECOUNT];
+        char pulseaudioDefaultSource[PAPULSEAUDIO_MAX_DEVICENAME + 1];
+        char pulseaudioDefaultSink[PAPULSEAUDIO_MAX_DEVICENAME + 1];
 
         /* PulseAudio stuff goes here */
         pa_threaded_mainloop *mainloop;
@@ -60,16 +107,16 @@ extern "C"
         pa_context_state_t state;
         pa_time_event *timeEvent;
     }
-    PaPulseAudioHostApiRepresentation;
+    PaPulseAudio_HostApiRepresentation;
 
-/* PaPulseAudioStream - a stream data structure specifically for this implementation */
+/* PaPulseAudio_Stream - a stream data structure specifically for this implementation */
 
-    typedef struct PaPulseAudioStream
+    typedef struct PaPulseAudio_Stream
     {
         PaUtilStreamRepresentation streamRepresentation;
         PaUtilCpuLoadMeasurer cpuLoadMeasurer;
         PaUtilBufferProcessor bufferProcessor;
-        PaPulseAudioHostApiRepresentation *hostapi;
+        PaPulseAudio_HostApiRepresentation *hostapi;
 
         PaUnixThread thread;
         unsigned long framesPerHostCallback;
@@ -85,6 +132,7 @@ extern "C"
         pa_buffer_attr bufferAttr;
         int underflows;
         int latency;
+        int outputChannelCount;
 
         int callbackMode;       /* bool: are we running in callback mode? */
         int rtSched;
@@ -93,7 +141,8 @@ extern "C"
         int outputFrameSize;
         int inputFrameSize;
 
-        PaDeviceIndex device;
+        PaDeviceIndex inDevice;
+        PaDeviceIndex outDevice;
 
         void *outBuffer;
         void *inBuffer;
@@ -108,26 +157,26 @@ extern "C"
         volatile sig_atomic_t isStopped;        /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
 
     }
-    PaPulseAudioStream;
+    PaPulseAudio_Stream;
 
     PaError PaPulseAudio_Initialize(
     PaUtilHostApiRepresentation ** hostApi,
     PaHostApiIndex index
     );
 
-    static void Terminate(
+    void Terminate(
     struct PaUtilHostApiRepresentation *hostApi
     );
 
 
-    static PaError IsFormatSupported(
+    PaError IsFormatSupported(
     struct PaUtilHostApiRepresentation *hostApi,
     const PaStreamParameters * inputParameters,
     const PaStreamParameters * outputParameters,
     double sampleRate
     );
 
-    static PaError OpenStream(
+    PaError OpenStream(
     struct PaUtilHostApiRepresentation *hostApi,
     PaStream ** s,
     const PaStreamParameters * inputParameters,
@@ -140,62 +189,67 @@ extern "C"
     );
 
 
-    static PaError IsStreamStopped(
+    PaError IsStreamStopped(
     PaStream * s
     );
-    static PaError IsStreamActive(
+    PaError IsStreamActive(
     PaStream * stream
     );
 
-    static PaTime GetStreamTime(
+    PaTime GetStreamTime(
     PaStream * stream
     );
-    static double GetStreamCpuLoad(
+    double GetStreamCpuLoad(
     PaStream * stream
     );
 
-    PaPulseAudioHostApiRepresentation *PulseAudioNew(
+    PaPulseAudio_HostApiRepresentation *PaPulseAudio_New(
     void
     );
-    void PulseAudioFree(
-    PaPulseAudioHostApiRepresentation * ptr
+    void PaPulseAudio_Free(
+    PaPulseAudio_HostApiRepresentation * ptr
     );
 
-    int PulseAudioCheckConnection(
-    PaPulseAudioHostApiRepresentation * ptr
+    int PaPulseAudio_CheckConnection(
+    PaPulseAudio_HostApiRepresentation * ptr
     );
 
-    static void PulseAudioCheckContextStateCb(
+    void PaPulseAudio_CheckContextStateCb(
     pa_context * c,
     void *userdata
     );
-    void PulseAudioSinkListCb(
+    void PaPulseAudio_ServerInfoCb(
+        pa_context *c,
+        const pa_server_info *i,
+        void *userdata
+    );
+    void PaPulseAudio_SinkListCb(
     pa_context * c,
     const pa_sink_info * l,
     int eol,
     void *userdata
     );
-    void PulseAudioSourceListCb(
+    void PaPulseAudio_SourceListCb(
     pa_context * c,
     const pa_source_info * l,
     int eol,
     void *userdata
     );
 
-    void PulseAudioStreamStateCb(
+    void PaPulseAudio_StreamStateCb(
     pa_stream * s,
     void *userdata
     );
-    void PulseAudioStreamStartedCb(
+    void PaPulseAudio_StreamStartedCb(
     pa_stream * s,
     void *userdata
     );
-    void PulseAudioStreamUnderflowCb(
+    void PaPulseAudio_StreamUnderflowCb(
     pa_stream * s,
     void *userdata
     );
 
-    PaError PulseAudioConvertPortaudioFormatToPulseAudio(
+    PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_(
     PaSampleFormat portaudiosf,
     pa_sample_spec * pulseaudiosf
     );

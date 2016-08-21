@@ -409,10 +409,10 @@ case "${host_os}" in
         if [[ "$have_pulse" = "yes" ] && [ "$with_pulse" != "no" ]] ; then
            DLL_LIBS="$DLL_LIBS $PULSE_LIBS"
            CFLAGS="$CFLAGS $PULSE_CFLAGS"
-           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_hostapi_pulseaudio_cb.o"
-           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_hostapi_pulseaudio_block.o"
-           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_hostapi_pulseaudio.o"
-           dnl INCLUDES="$INCLUDES pa_pulseaudio.h src/hostapi/pulseaudio/pa_hostapi_pulseaudio.h"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.o"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_block.o"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio.o"
+           dnl INCLUDES="$INCLUDES pa_pulseaudio.h src/hostapi/pulseaudio/pa_linux_pulseaudio.h"
            AC_DEFINE(PA_USE_PULSEAUDIO,1)
         fi
 

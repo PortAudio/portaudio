@@ -365,6 +365,29 @@ elseif(UNIX)
       target_compile_definitions(PortAudio PUBLIC PA_USE_AUDIOIO=1)
       set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_AUDIOIO=1")
     endif()
+
+    if(PULSEAUDIO_FOUND)
+      OPTION(PA_USE_PULSEAUDIO "Enable support for PulseAudio" ON)
+    else()
+      OPTION(PA_USE_PULSEAUDIO "Disable support for PulseAudio" OFF)
+    endif()
+
+    if(PA_USE_PULSEAUDIO)
+      find_package(PULSEAUDIO)
+      set(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} ${PULSEAUDIO_INCLUDE_DIRS})
+      set(PA_PULSEAUDIO_SOURCES src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
+                                src/hostapi/pulseaudio/pa_linux_pulseaudio.c
+                                src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
+      source_group("hostapi\\PULSEAUDIO" FILES ${PA_PULSEAUDIO_SOURCES})
+      set(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} src/hostapi/pulseaudio/pa_linux_pulseaudio_block.h
+                                                   src/hostapi/pulseaudio/pa_linux_pulseaudio.h
+                                                   src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.h)
+      set(PA_SOURCES ${PA_SOURCES} ${PA_PULSEAUDIO_SOURCES})
+      set(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} PA_USE_PULSEAUDIO)
+      set(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ${PULSEAUDIO_LIBRARIES})
+      set(PA_PKGCONFIG_LDFLAGS "${PA_PKGCONFIG_LDFLAGS} -lpulseaudio")
+    endif()
+
   endif()
 endif()
 
