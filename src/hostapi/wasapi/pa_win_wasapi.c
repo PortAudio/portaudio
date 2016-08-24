@@ -543,7 +543,7 @@ typedef struct PaWasapiStream
 
 	// must be volatile to avoid race condition on user query while
 	// thread is being started
-    volatile BOOL running;
+    volatile LONG running;
 
     PA_THREAD_ID dwThreadId;
     HANDLE hThread;
@@ -1237,8 +1237,8 @@ static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format, EMixerDir d
 typedef struct PaActivateAudioInterfaceCompletionHandler
 {
 	IActivateAudioInterfaceCompletionHandler parent;
-	ULONG refs;
-	volatile BOOL done;
+	volatile LONG refs;
+	volatile LONG done;
 	struct
 	{
 		HRESULT hr;
@@ -1256,7 +1256,8 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Quer
 	// From MSDN:
 	// "The IAgileObject interface is a marker interface that indicates that an object 
 	//  is free threaded and can be called from any apartment."
-	if (IsEqualIID(riid, &IID_IAgileObject))
+	if (IsEqualIID(riid, &IID_IUnknown) || 
+		IsEqualIID(riid, &IID_IAgileObject))
 	{
 		handler->parent.lpVtbl->AddRef((IActivateAudioInterfaceCompletionHandler *)handler);
 		(*ppvObject) = handler;
@@ -1270,20 +1271,23 @@ static ULONG (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_AddRef
     IActivateAudioInterfaceCompletionHandler *This)
 {
 	PaActivateAudioInterfaceCompletionHandler *handler = (PaActivateAudioInterfaceCompletionHandler *)This;
-	return ++ handler->refs;
+
+	return InterlockedIncrement(&handler->refs);
 }
         
 static ULONG (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Release)( 
     IActivateAudioInterfaceCompletionHandler *This)
 {
 	PaActivateAudioInterfaceCompletionHandler *handler = (PaActivateAudioInterfaceCompletionHandler *)This;
-	if (handler->refs == 0)
+	ULONG refs;
+
+	if ((refs = InterlockedDecrement(&handler->refs)) == 0)
 	{
 		PaUtil_FreeMemory(handler->parent.lpVtbl);
 		PaUtil_FreeMemory(handler);
-		return 0;
 	}
-	return -- handler->refs;
+
+	return refs;
 }
         
 static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_ActivateCompleted)( 
@@ -1311,7 +1315,9 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Acti
 	else
 		handler->out.hr = hr;
 	
-	handler->done = TRUE;
+	// Got client object, stop busy waiting in ActivateAudioInterface_WINRT
+	InterlockedExchange(&handler->done, TRUE);
+
 	return hr;
 }
 
@@ -1324,6 +1330,7 @@ static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCom
 	handler->parent.lpVtbl->AddRef            = &PaActivateAudioInterfaceCompletionHandler_AddRef;
 	handler->parent.lpVtbl->Release           = &PaActivateAudioInterfaceCompletionHandler_Release;
 	handler->parent.lpVtbl->ActivateCompleted = &PaActivateAudioInterfaceCompletionHandler_ActivateCompleted;
+	handler->refs = 1;
 	return (IActivateAudioInterfaceCompletionHandler *)handler;
 }
 #endif
@@ -1360,7 +1367,7 @@ static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
 	// Wait in busy loop for async operation to complete
-	while (SUCCEEDED(hr) && !handlerImpl->done)
+	while (SUCCEEDED(hr) && !InterlockedCompareExchange(&handlerImpl->done, FALSE, FALSE))
 	{
 		Sleep(1);
 	}
@@ -3849,7 +3856,7 @@ static PaError StartStream( PaStream *s )
 		stream->out.clientProc = stream->out.clientParent;
 
 		// Signal: stream running.
-		stream->running = TRUE;
+		InterlockedExchange(&stream->running, TRUE);
 	}
 
     return result;
@@ -3891,7 +3898,8 @@ void _StreamFinish(PaWasapiStream *stream)
 	// Cleanup handles
 	_StreamCleanup(stream);
 
-    stream->running = FALSE;
+	// Notify: not running
+    InterlockedExchange(&stream->running, FALSE);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3904,6 +3912,18 @@ void _StreamCleanup(PaWasapiStream *stream)
 	SAFE_CLOSE(stream->hCloseRequest);
 	SAFE_CLOSE(stream->hBlockingOpStreamRD);
 	SAFE_CLOSE(stream->hBlockingOpStreamWR);
+}
+
+// ------------------------------------------------------------------------------------------
+static BOOL _IsStreamRunning(PaWasapiStream *stream)
+{
+	LONG retv;
+	do 
+	{
+		retv = stream->running;
+	} 
+	while (InterlockedCompareExchange(&stream->running, FALSE, FALSE) != retv);
+	return retv;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3925,13 +3945,13 @@ static PaError AbortStream( PaStream *s )
 // ------------------------------------------------------------------------------------------
 static PaError IsStreamStopped( PaStream *s )
 {
-	return !((PaWasapiStream *)s)->running;
+	return !_IsStreamRunning((PaWasapiStream *)s);
 }
 
 // ------------------------------------------------------------------------------------------
 static PaError IsStreamActive( PaStream *s )
 {
-    return ((PaWasapiStream *)s)->running;
+    return _IsStreamRunning((PaWasapiStream *)s);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3965,7 +3985,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
 	ThreadIdleScheduler sched;
 
 	// validate
-	if (!stream->running)
+	if (!_IsStreamRunning(stream))
 		return paStreamIsStopped;
 	if (stream->captureClient == NULL)
 		return paBadStreamPtr;
@@ -4144,7 +4164,7 @@ static PaError WriteStream( PaStream* s, const void *_buffer, unsigned long fram
 	ThreadIdleScheduler sched;
 
 	// validate
-	if (!stream->running)
+	if (!_IsStreamRunning(stream))
 		return paStreamIsStopped;
 	if (stream->renderClient == NULL)
 		return paBadStreamPtr;
@@ -4258,7 +4278,7 @@ static signed long GetStreamReadAvailable( PaStream* s )
 	UINT32  available = 0;
 
 	// validate
-	if (!stream->running)
+	if (!_IsStreamRunning(stream))
 		return paStreamIsStopped;
 	if (stream->captureClient == NULL)
 		return paBadStreamPtr;
@@ -4284,7 +4304,7 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 	UINT32  available = 0;
 
 	// validate
-	if (!stream->running)
+	if (!_IsStreamRunning(stream))
 		return paStreamIsStopped;
 	if (stream->renderClient == NULL)
 		return paBadStreamPtr;
@@ -5074,7 +5094,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	}
 
 	// Signal: stream running
-	stream->running = TRUE;
+	InterlockedExchange(&stream->running, TRUE);
 
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
@@ -5141,7 +5161,7 @@ thread_end:
 		CoUninitialize();
 
 	// Notify: not running
-	stream->running = FALSE;
+	InterlockedExchange(&stream->running, FALSE);
 
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
@@ -5308,7 +5328,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	}
 
 	// Signal: stream running
-	stream->running = TRUE;
+	InterlockedExchange(&stream->running, TRUE);
 
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
@@ -5663,7 +5683,7 @@ thread_end:
 		CoUninitialize();
 
 	// Notify: not running
-	stream->running = FALSE;
+	InterlockedExchange(&stream->running, FALSE);
 
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
