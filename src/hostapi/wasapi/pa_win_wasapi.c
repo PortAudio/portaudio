@@ -1367,7 +1367,8 @@ static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
 	// Wait in busy loop for async operation to complete
-	while (SUCCEEDED(hr) && !InterlockedCompareExchange(&handlerImpl->done, FALSE, FALSE))
+	// Use Interlocked API here to ensure that ->done variable is read every time through the loop
+	while (SUCCEEDED(hr) && !InterlockedOr(&handlerImpl->done, 0))
 	{
 		Sleep(1);
 	}
