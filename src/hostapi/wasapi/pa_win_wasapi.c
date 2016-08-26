@@ -543,7 +543,7 @@ typedef struct PaWasapiStream
 
 	// must be volatile to avoid race condition on user query while
 	// thread is being started
-    volatile LONG running;
+    volatile BOOL running;
 
     PA_THREAD_ID dwThreadId;
     HANDLE hThread;
@@ -3856,7 +3856,7 @@ static PaError StartStream( PaStream *s )
 		stream->out.clientProc = stream->out.clientParent;
 
 		// Signal: stream running.
-		InterlockedExchange(&stream->running, TRUE);
+		stream->running = TRUE;
 	}
 
     return result;
@@ -3898,8 +3898,7 @@ void _StreamFinish(PaWasapiStream *stream)
 	// Cleanup handles
 	_StreamCleanup(stream);
 
-	// Notify: not running
-    InterlockedExchange(&stream->running, FALSE);
+    stream->running = FALSE;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3912,18 +3911,6 @@ void _StreamCleanup(PaWasapiStream *stream)
 	SAFE_CLOSE(stream->hCloseRequest);
 	SAFE_CLOSE(stream->hBlockingOpStreamRD);
 	SAFE_CLOSE(stream->hBlockingOpStreamWR);
-}
-
-// ------------------------------------------------------------------------------------------
-static BOOL _IsStreamRunning(PaWasapiStream *stream)
-{
-	LONG retv;
-	do 
-	{
-		retv = stream->running;
-	} 
-	while (InterlockedCompareExchange(&stream->running, FALSE, FALSE) != retv);
-	return retv;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3945,13 +3932,13 @@ static PaError AbortStream( PaStream *s )
 // ------------------------------------------------------------------------------------------
 static PaError IsStreamStopped( PaStream *s )
 {
-	return !_IsStreamRunning((PaWasapiStream *)s);
+	return !((PaWasapiStream *)s)->running;
 }
 
 // ------------------------------------------------------------------------------------------
 static PaError IsStreamActive( PaStream *s )
 {
-    return _IsStreamRunning((PaWasapiStream *)s);
+    return ((PaWasapiStream *)s)->running;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3985,7 +3972,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
 	ThreadIdleScheduler sched;
 
 	// validate
-	if (!_IsStreamRunning(stream))
+	if (!stream->running)
 		return paStreamIsStopped;
 	if (stream->captureClient == NULL)
 		return paBadStreamPtr;
@@ -4164,7 +4151,7 @@ static PaError WriteStream( PaStream* s, const void *_buffer, unsigned long fram
 	ThreadIdleScheduler sched;
 
 	// validate
-	if (!_IsStreamRunning(stream))
+	if (!stream->running)
 		return paStreamIsStopped;
 	if (stream->renderClient == NULL)
 		return paBadStreamPtr;
@@ -4278,7 +4265,7 @@ static signed long GetStreamReadAvailable( PaStream* s )
 	UINT32  available = 0;
 
 	// validate
-	if (!_IsStreamRunning(stream))
+	if (!stream->running)
 		return paStreamIsStopped;
 	if (stream->captureClient == NULL)
 		return paBadStreamPtr;
@@ -4304,7 +4291,7 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 	UINT32  available = 0;
 
 	// validate
-	if (!_IsStreamRunning(stream))
+	if (!stream->running)
 		return paStreamIsStopped;
 	if (stream->renderClient == NULL)
 		return paBadStreamPtr;
@@ -5094,7 +5081,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	}
 
 	// Signal: stream running
-	InterlockedExchange(&stream->running, TRUE);
+	stream->running = TRUE;
 
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
@@ -5161,7 +5148,7 @@ thread_end:
 		CoUninitialize();
 
 	// Notify: not running
-	InterlockedExchange(&stream->running, FALSE);
+	stream->running = FALSE;
 
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
@@ -5328,7 +5315,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	}
 
 	// Signal: stream running
-	InterlockedExchange(&stream->running, TRUE);
+	stream->running = TRUE;
 
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
@@ -5683,7 +5670,7 @@ thread_end:
 		CoUninitialize();
 
 	// Notify: not running
-	InterlockedExchange(&stream->running, FALSE);
+	stream->running = FALSE;
 
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
