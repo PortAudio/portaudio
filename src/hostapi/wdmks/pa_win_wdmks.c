@@ -3853,11 +3853,10 @@ PaError PaWinWdm_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
-    /* In preparation for hotplug
     (*hostApi)->ScanDeviceInfos = ScanDeviceInfos;
     (*hostApi)->CommitDeviceInfos = CommitDeviceInfos;
     (*hostApi)->DisposeDeviceInfos = DisposeDeviceInfos;
-    */
+
     PaUtil_InitializeStreamInterface( &wdmHostApi->callbackStreamInterface, CloseStream, StartStream,
         StopStream, AbortStream, IsStreamStopped, IsStreamActive,
         GetStreamTime, GetStreamCpuLoad,

@@ -757,6 +757,9 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->ScanDeviceInfos = 0;
+    (*hostApi)->CommitDeviceInfos = 0;
+    (*hostApi)->DisposeDeviceInfos = 0;
 
     /** If AlsaErrorHandler is to be used, do not forget to unregister callback pointer in
         Terminate function.

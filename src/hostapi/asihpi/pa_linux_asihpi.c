@@ -771,6 +771,9 @@ PaError PaAsiHpi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->ScanDeviceInfos = 0;
+    (*hostApi)->CommitDeviceInfos = 0;
+    (*hostApi)->DisposeDeviceInfos = 0;
 
     PaUtil_InitializeStreamInterface( &hpiHostApi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
