@@ -934,7 +934,7 @@ PaError Pa_CloseStream( PaStream *stream );
  (ie once a call to Pa_StopStream() will not block).
  A stream will become inactive after the stream callback returns non-zero,
  or when Pa_StopStream or Pa_AbortStream is called. For a stream providing audio
- output, if the stream callback returns paComplete, or Pa_StopStream is called,
+ output, if the stream callback returns paComplete, or Pa_StopStream() is called,
  the stream finished callback will not be called until all generated sample data
  has been played.
  
@@ -1132,7 +1132,7 @@ PaError Pa_ReadStream( PaStream* stream,
 
 
 /** Write samples to an output stream. This function doesn't return until the
- entire buffer has been consumed - this may involve waiting for the operating
+ entire buffer has been written - this may involve waiting for the operating
  system to consume the data.
 
  @param stream A pointer to an open stream previously created with Pa_OpenStream.
@@ -1149,9 +1149,9 @@ PaError Pa_ReadStream( PaStream* stream,
  will want to match this parameter to the framesPerBuffer parameter used
  when opening the stream.
 
- @return On success PaNoError will be returned, or paOutputUnderflowed if
- additional output data was inserted after the previous call and before this
- call.
+ @return On success PaNoError will be returned,
+ or paOutputUnderflowed if additional output data was inserted after the
+ previous call and before this call.
 */
 PaError Pa_WriteStream( PaStream* stream,
                         const void *buffer,
