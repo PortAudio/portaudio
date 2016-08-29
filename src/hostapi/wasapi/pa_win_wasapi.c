@@ -1259,12 +1259,12 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Quer
 	if (IsEqualIID(riid, &IID_IUnknown) || 
 		IsEqualIID(riid, &IID_IAgileObject))
 	{
-		handler->parent.lpVtbl->AddRef((IActivateAudioInterfaceCompletionHandler *)handler);
+		IActivateAudioInterfaceCompletionHandler_AddRef((IActivateAudioInterfaceCompletionHandler *)handler);
 		(*ppvObject) = handler;
 		return S_OK;
 	}
 
-	return S_FALSE;
+	return E_NOINTERFACE;
 }
         
 static ULONG (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_AddRef)( 
@@ -1300,11 +1300,11 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Acti
     IUnknown *punkAudioInterface = NULL;
  
     // Check for a successful activation result
-    hr = activateOperation->lpVtbl->GetActivateResult(activateOperation, &hrActivateResult, &punkAudioInterface);
+    hr = IActivateAudioInterfaceAsyncOperation_GetActivateResult(activateOperation, &hrActivateResult, &punkAudioInterface);
     if (SUCCEEDED(hr) && SUCCEEDED(hrActivateResult))
     {
         // Get the pointer for the Audio Client
-        punkAudioInterface->lpVtbl->QueryInterface(punkAudioInterface, GetAudioClientIID(), &handler->out.client);
+        IUnknown_QueryInterface(punkAudioInterface, GetAudioClientIID(), &handler->out.client);
         if (handler->out.client == NULL)
             hrActivateResult = E_FAIL;
 	}
