@@ -338,12 +338,22 @@ typedef struct PaUtilHostApiRepresentation {
 */
 typedef PaError PaUtilHostApiInitializer( PaUtilHostApiRepresentation**, PaHostApiIndex );
 
+/** Associate a PaHostApiTypeId with each host API initialization function.
+
+*/
+typedef struct {
+    PaHostApiTypeId hostApiType;
+    PaUtilHostApiInitializer *initFunction;
+} PaUtilHostApiInitializerEntry;
+
 
 /** paHostApiInitializers is a NULL-terminated array of host API initialization
- functions. These functions are called by pa_front.c to initialize the host APIs
- when the client calls Pa_Initialize(). 
+ entries, each containing an initialization function. The initialization
+ functions are called by pa_front.c to initialize the host APIs when the client
+ calls Pa_Initialize().
  
- The initialization functions are invoked in order.
+ By default initialization functions are invoked in order. The initialization
+ order may be modified by the client using Pa_SelectHostApis().
 
  The first successfully initialized host API that has a default input *or* output 
  device is used as the default PortAudio host API. This is based on the logic that
@@ -353,7 +363,7 @@ typedef PaError PaUtilHostApiInitializer( PaUtilHostApiRepresentation**, PaHostA
  There is a platform specific file that defines paHostApiInitializers for that
  platform, pa_win/pa_win_hostapis.c contains the Win32 definitions for example.
 */
-extern PaUtilHostApiInitializer *paHostApiInitializers[];
+extern PaUtilHostApiInitializerEntry paHostApiInitializers[];
 
 
 #ifdef __cplusplus

@@ -274,6 +274,64 @@ typedef enum PaHostApiTypeId
 } PaHostApiTypeId;
 
 
+/** Select host APIs and their initialization order.
+
+ The selected host APIs take effect the next time that Pa_Initialize() is
+ invoked.
+
+ @param hostApiTypes An array of host API identifiers belonging to the
+ PaHostApiTypeId enumeration.
+
+ @param count The number of elements in the hostApiTypes array. A count of
+ zero causes the default host API selection to be restored.
+
+ @return A PaErrorCode indicating whether the call succeeded or failed.
+
+ The paHostApiNotFound error code indicates that a host API specified by the
+ hostApiTypeIds parameter is not available.
+
+ The paInvalidHostApi error indicates that there was a problem with the
+ hostApiTypes array. E.g. it contained duplicate entries.
+
+ @note The host API initialization order determines default devices.
+
+ @see PaHostApiTypeId
+*/
+PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count );
+
+/** Returns the type ids of the selected host APIs in initialization order.
+
+ @param hostApiTypes (IN/OUT) An array that will be filled with
+ host API identifiers belonging to the PaHostApiTypeId enumeration.
+
+ @param count (OUT) The number of selected host APIs, returned even on error.
+
+ @param countAvailable The number of available elements in the hostApiTypes array.
+
+ @return A PaErrorCode indicating whether the call succeeded or failed.
+
+ The paInsufficientMemory error indicates that countAvailable was not large enough
+ to accommodate the list of selected host APIs. In this case, the needed
+ count is returned in the count parameter.
+
+ @see Pa_SelectHostApis
+*/
+PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
+
+/** Returns the type ids of all available host APIs in initialization order.
+
+ @param hostApiTypes (IN/OUT) An array that will be filled with
+ host API identifiers belonging to the PaHostApiTypeId enumeration.
+
+ @param count (OUT) The number of host APIs, returned even on error.
+
+ @param countAvailable The number of available elements in the hostApiTypes array.
+
+ @see Pa_SelectHostApis
+*/
+PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
+
+
 /** A structure containing information about a particular host API. */
 
 typedef struct PaHostApiInfo

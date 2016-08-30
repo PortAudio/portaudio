@@ -152,7 +152,6 @@ void PaUtil_SetLastHostErrorInfo( PaHostApiTypeId hostApiType, long errorCode,
 }
 
 
-
 static PaUtilHostApiRepresentation **hostApis_ = 0;
 static int hostApisCount_ = 0;
 static int defaultHostApiIndex_ = 0;
@@ -161,17 +160,159 @@ static int deviceCount_ = 0;
 
 PaUtilStreamRepresentation *firstOpenStream_ = NULL;
 
-
 #define PA_IS_INITIALISED_ (initializationCount_ != 0)
 
+/*
+ By default, selectedHostApiTypes_ == NULL and PortAudio initializes all
+ host APIs in the order that they are listed in paHostApiInitializers[].
+
+ If selectedHostApiTypes_ != NULL, then APIs are initialized in the
+ order specified in selectedHostApiTypes_.
+*/
+static PaHostApiTypeId *selectedHostApiTypes_ = NULL;
+static int selectedHostApiCount_ = 0;
 
 static int CountHostApiInitializers( void )
 {
     int result = 0;
 
-    while( paHostApiInitializers[ result ] != 0 )
+    while( paHostApiInitializers[ result ].initFunction != 0 )
         ++result;
     return result;
+}
+
+static const PaUtilHostApiInitializerEntry* FindHostApiInitializerEntry( PaHostApiTypeId hostApiType )
+{
+    int i = 0;
+
+    while( paHostApiInitializers[ i ].initFunction != 0 )
+    {
+        if( paHostApiInitializers[i].hostApiType == hostApiType )
+            return &paHostApiInitializers[i];
+        ++i;
+    }
+
+    return NULL;
+}
+
+static int CountSelectedHostApis()
+{
+    if( selectedHostApiTypes_ == NULL )
+        return CountHostApiInitializers();
+    else
+        return selectedHostApiCount_;
+}
+
+static const PaUtilHostApiInitializerEntry* GetSelectedHostApi( int index )
+{
+    if( selectedHostApiTypes_ == NULL )
+        return &paHostApiInitializers[index];
+    else
+        return FindHostApiInitializerEntry( selectedHostApiTypes_[index] );
+}
+
+PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count )
+{
+    int i, j;
+    PaHostApiTypeId *oldSelectedHostApiTypes = selectedHostApiTypes_;
+    PaHostApiTypeId *newSelectedHostApiTypes = NULL;
+
+    if( count == 0 )
+    {
+        /* revert to default state */
+        if( selectedHostApiTypes_ )
+        {
+            PaUtil_FreeMemory( selectedHostApiTypes_ );
+            selectedHostApiTypes_ = NULL;
+            selectedHostApiCount_ = 0;
+        }
+
+        return paNoError;
+    }
+
+    if( count < 0 )
+        return paInvalidHostApi;
+
+    if( hostApiTypes == NULL )
+        return paInvalidHostApi;
+
+    /* validation:
+        - verify that each hostApiTypes value is available (present in paHostApiInitializers)
+        - verify that hostApiTypes contains no duplicates
+    */
+    for( i=0; i < count; ++i )
+    {
+        if( FindHostApiInitializerEntry( hostApiTypes[i] ) == NULL )
+            return paHostApiNotFound;
+
+        for( j=i+1; j < count; ++j )
+        {
+            if (hostApiTypes[i] == hostApiTypes[j])
+                return paInvalidHostApi;
+        }
+    }
+
+    /* allocate a newSelectedHostApiTypes, copy ids into it */
+
+    newSelectedHostApiTypes = (PaHostApiTypeId*)PaUtil_AllocateMemory(
+            sizeof(PaHostApiTypeId) * count );
+    if( newSelectedHostApiTypes == NULL )
+        return paInsufficientMemory;
+
+    memcpy( newSelectedHostApiTypes, hostApiTypes, count*sizeof(PaHostApiTypeId) );
+
+    /* install new selectedHostApis and free old selectedHostApis_ */
+
+    selectedHostApiTypes_ = newSelectedHostApiTypes;
+    selectedHostApiCount_ = count;
+
+    if( oldSelectedHostApiTypes != NULL )
+    {
+        PaUtil_FreeMemory( oldSelectedHostApiTypes );
+        oldSelectedHostApiTypes = NULL;
+    }
+
+    return paNoError;
+}
+
+PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
+{
+    if( selectedHostApiTypes_ == NULL )
+    {
+        return Pa_GetAvailableHostApis( hostApiTypes, countAvailable, count );
+    }
+    else
+    {
+        *count = selectedHostApiCount_;
+        if( countAvailable >= selectedHostApiCount_ )
+        {
+            memcpy( hostApiTypes, selectedHostApiTypes_, selectedHostApiCount_*sizeof(PaHostApiTypeId) );
+            return paNoError;
+        }
+        else
+        {
+            return paInsufficientMemory;
+        }
+    }
+}
+
+PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
+{
+    int i;
+    int initializerCount = CountHostApiInitializers();
+
+    *count = initializerCount;
+    if( countAvailable >= initializerCount )
+    {
+        for( i=0; i < initializerCount; ++i )
+            hostApiTypes[i] = paHostApiInitializers[i].hostApiType;
+    }
+    else
+    {
+        return paInsufficientMemory;
+    }
+
+    return paNoError;
 }
 
 
@@ -201,8 +342,9 @@ static PaError InitializeHostApis( void )
 {
     PaError result = paNoError;
     int i, initializerCount, baseDeviceIndex;
+    const PaUtilHostApiInitializerEntry *hostApiInitializer;
 
-    initializerCount = CountHostApiInitializers();
+    initializerCount = CountSelectedHostApis();
 
     hostApis_ = (PaUtilHostApiRepresentation**)PaUtil_AllocateMemory(
             sizeof(PaUtilHostApiRepresentation*) * initializerCount );
@@ -223,7 +365,9 @@ static PaError InitializeHostApis( void )
 
         PA_DEBUG(( "before paHostApiInitializers[%d].\n",i));
 
-        result = paHostApiInitializers[i]( &hostApis_[hostApisCount_], hostApisCount_ );
+        hostApiInitializer = GetSelectedHostApi(i);
+        assert( hostApiInitializer != NULL );
+        result = hostApiInitializer->initFunction( &hostApis_[hostApisCount_], hostApisCount_ );
         if( result != paNoError )
             goto error;
 
