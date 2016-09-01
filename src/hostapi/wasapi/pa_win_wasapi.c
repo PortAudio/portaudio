@@ -1241,8 +1241,13 @@ typedef struct PaActivateAudioInterfaceCompletionHandler
 	volatile LONG done;
 	struct
 	{
+		const IID *iid;
+		void **obj;
+	}
+	in;
+	struct
+	{
 		HRESULT hr;
-		IAudioClient *client;
 	}
 	out;
 }
@@ -1303,9 +1308,9 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Acti
     hr = IActivateAudioInterfaceAsyncOperation_GetActivateResult(activateOperation, &hrActivateResult, &punkAudioInterface);
     if (SUCCEEDED(hr) && SUCCEEDED(hrActivateResult))
     {
-        // Get the pointer for the Audio Client
-        IUnknown_QueryInterface(punkAudioInterface, GetAudioClientIID(), &handler->out.client);
-        if (handler->out.client == NULL)
+        // Get pointer to the requested audio interface
+        IUnknown_QueryInterface(punkAudioInterface, handler->in.iid, handler->in.obj);
+        if ((*handler->in.obj) == NULL)
             hrActivateResult = E_FAIL;
 	}
 	SAFE_RELEASE(punkAudioInterface);
@@ -1315,13 +1320,13 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Acti
 	else
 		handler->out.hr = hr;
 	
-	// Got client object, stop busy waiting in ActivateAudioInterface_WINRT
+	// Got client object, stop busy waiting in ActivateAudioInterface
 	InterlockedExchange(&handler->done, TRUE);
 
 	return hr;
 }
 
-static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCompletionHandler()
+static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCompletionHandler(const IID *iid, void **obj)
 {
 	PaActivateAudioInterfaceCompletionHandler *handler = PaUtil_AllocateMemory(sizeof(PaActivateAudioInterfaceCompletionHandler));
 	ZeroMemory(handler, sizeof(*handler));
@@ -1331,20 +1336,22 @@ static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCom
 	handler->parent.lpVtbl->Release           = &PaActivateAudioInterfaceCompletionHandler_Release;
 	handler->parent.lpVtbl->ActivateCompleted = &PaActivateAudioInterfaceCompletionHandler_ActivateCompleted;
 	handler->refs = 1;
+	handler->in.iid = iid;
+	handler->in.obj = obj;
 	return (IActivateAudioInterfaceCompletionHandler *)handler;
 }
 #endif
 
 // ------------------------------------------------------------------------------------------
 #ifdef PA_WINRT
-static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo, IAudioClient **client)
+static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo, const IID *iid, void **obj)
 {
 #define PA_WASAPI_DEVICE_PATH_LEN 64
 	
 	PaError result = paNoError;
 	HRESULT hr = S_OK;
 	IActivateAudioInterfaceAsyncOperation *asyncOp = NULL;
-	IActivateAudioInterfaceCompletionHandler *handler = CreateActivateAudioInterfaceCompletionHandler();
+	IActivateAudioInterfaceCompletionHandler *handler = CreateActivateAudioInterfaceCompletionHandler(iid, obj);
 	PaActivateAudioInterfaceCompletionHandler *handlerImpl = (PaActivateAudioInterfaceCompletionHandler *)handler;
 	OLECHAR devicePath[PA_WASAPI_DEVICE_PATH_LEN] = { 0 };
 
@@ -1363,7 +1370,7 @@ static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo
 
 	// Async operation will call back to IActivateAudioInterfaceCompletionHandler::ActivateCompleted 
 	// which must be an agile interface implementation
-    hr = ActivateAudioInterfaceAsync(devicePath, GetAudioClientIID(), NULL, handler, &asyncOp);
+    hr = ActivateAudioInterfaceAsync(devicePath, iid, NULL, handler, &asyncOp);
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
 	// Wait in busy loop for async operation to complete
@@ -1373,7 +1380,6 @@ static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo
 		Sleep(1);
 	}
 
-	(*client) = handlerImpl->out.client;
 	hr = handlerImpl->out.hr;
 
 error:
@@ -1393,7 +1399,7 @@ static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, IAud
 #ifndef PA_WINRT
 	return IMMDevice_Activate(deviceInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)client);
 #else
-	return ActivateAudioInterface_WINRT(deviceInfo, client);
+	return ActivateAudioInterface_WINRT(deviceInfo, GetAudioClientIID(), (void **)client);
 #endif
 }
 
