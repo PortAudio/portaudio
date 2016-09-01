@@ -242,6 +242,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                            PaStreamFlags streamFlags,
                            PaStreamCallback *streamCallback,
                            void *userData );
+static PaError RefreshDevices( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index );
 static PaError CloseStream( PaStream* stream );
 static PaError StartStream( PaStream *stream );
 static PaError StopStream( PaStream *stream );
@@ -636,6 +637,7 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->RefreshDevices = RefreshDevices;
 
     PaUtil_InitializeStreamInterface( &auhalHostApi->callbackStreamInterface,
                                       CloseStream, StartStream,
@@ -1666,6 +1668,83 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 error:
     CloseStream( stream );
+    return result;
+}
+
+PaError RefreshDevices( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex )
+{
+    PaMacAUHAL *auhalHostApi = (PaMacAUHAL*)hostApi;
+    PaError result = paNoError;
+    PaDeviceInfo *deviceInfoArray;
+    int i;
+
+    VVDBUG(("RefreshDevices(): hostApiIndex=%d\n", hostApiIndex));
+	
+    auhalHostApi->devIds = NULL;
+    auhalHostApi->devCount = 0;
+
+    /* get the info we need about the devices */
+    result = gatherDeviceInfo( auhalHostApi );
+    if( result != paNoError )
+       goto error;
+
+    hostApi->info.defaultInputDevice = paNoDevice;
+    hostApi->info.defaultOutputDevice = paNoDevice;
+    hostApi->info.deviceCount = 0;  
+
+    /* If the device infos already exist, free the old memory */
+    if( hostApi->deviceInfos != NULL )
+    {
+        PaUtil_GroupFreeMemory( auhalHostApi->allocations, hostApi->deviceInfos );
+        hostApi->deviceInfos = NULL;
+    }
+
+    if( auhalHostApi->devCount > 0 )
+    {
+        hostApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+                auhalHostApi->allocations, sizeof(PaDeviceInfo*) * auhalHostApi->devCount);
+        if( !hostApi->deviceInfos )
+        {
+            result = paInsufficientMemory;
+            goto error;
+        }
+
+        /* allocate all device info structs in a contiguous block */
+        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateMemory(
+                auhalHostApi->allocations, sizeof(PaDeviceInfo) * auhalHostApi->devCount );
+        if( !deviceInfoArray )
+        {
+            result = paInsufficientMemory;
+            goto error;
+        }
+
+        for( i=0; i < auhalHostApi->devCount; ++i )
+        {
+            int err;
+            err = InitializeDeviceInfo( auhalHostApi, &deviceInfoArray[i],
+                                      auhalHostApi->devIds[i],
+                                      hostApiIndex );
+            if (err == paNoError)
+            { /* copy some info and set the defaults */
+                hostApi->deviceInfos[hostApi->info.deviceCount] = &deviceInfoArray[i];
+                if (auhalHostApi->devIds[i] == auhalHostApi->defaultIn)
+                    hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
+                if (auhalHostApi->devIds[i] == auhalHostApi->defaultOut)
+                    hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
+                hostApi->info.deviceCount++;
+            }
+            else
+            { /* there was an error. we need to shift the devices down, so we ignore this one */
+                int j;
+                auhalHostApi->devCount--;
+                for( j=i; j<auhalHostApi->devCount; ++j )
+                   auhalHostApi->devIds[j] = auhalHostApi->devIds[j+1];
+                i--;
+            }
+        }
+    }
+
+error:
     return result;
 }
 

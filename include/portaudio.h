@@ -397,6 +397,16 @@ PaDeviceIndex Pa_GetDefaultInputDevice( void );
 */
 PaDeviceIndex Pa_GetDefaultOutputDevice( void );
 
+/** Normally the list of devices is frozen after initialization, until the
+ next time port audio is re-initialized. This provides API stability but
+ has the side effect that hot-pluggable devices such as USB audio headsets
+ might not be up-to-date while the program is running. This method is used
+ to refresh the list of devices within port audio without closing open
+ streams.
+
+ @return an error code which indicates whether the device refresh was successful.
+ */
+PaError Pa_RefreshDevices( void );
 
 /** The type used to represent monotonic time in seconds that can be used
  for syncronisation. The type is used for the outTime argument to the

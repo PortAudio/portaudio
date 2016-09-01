@@ -700,6 +700,54 @@ PaDeviceIndex Pa_GetDefaultOutputDevice( void )
 }
 
 
+PaError Pa_RefreshDevices( void )
+{
+    int i, baseDeviceIndex;
+    PaError result = paNoError;
+
+    PA_LOGAPI_ENTER( "Pa_RefreshDeviceList" );
+    if( !PA_IS_INITIALISED_ )
+        return paNotInitialized;
+
+    baseDeviceIndex = 0;
+    deviceCount_ = 0;
+
+    for( i=0; i < hostApisCount_; ++i )
+    {
+        PaUtilHostApiRepresentation *hostApi = hostApis_[i];
+        if( hostApi->RefreshDevices == NULL )
+        {
+            /* RefreshDevices not yet implemented for this backend. Just
+               assume that the baseDeviceIndex and the deviceCount_ are
+               incremented according to the values in the info */
+            baseDeviceIndex += hostApi->info.deviceCount;
+            deviceCount_ += hostApi->info.deviceCount;
+            continue;
+        }
+
+        PA_DEBUG(( "refreshing device list for host api %d.\n",i));
+
+        if(( result = hostApi->RefreshDevices( hostApi, i )) != paNoError )
+           return result;
+
+        assert( hostApi->info.defaultInputDevice < hostApi->info.deviceCount );
+        assert( hostApi->info.defaultOutputDevice < hostApi->info.deviceCount );
+
+        hostApi->privatePaFrontInfo.baseDeviceIndex = baseDeviceIndex;
+
+        if( hostApi->info.defaultInputDevice != paNoDevice )
+            hostApi->info.defaultInputDevice += baseDeviceIndex;
+
+        if( hostApi->info.defaultOutputDevice != paNoDevice )
+            hostApi->info.defaultOutputDevice += baseDeviceIndex;
+
+        baseDeviceIndex += hostApi->info.deviceCount;
+        deviceCount_ += hostApi->info.deviceCount;
+    }
+
+    return result;
+}
+
 const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceIndex device )
 {
     int hostSpecificDeviceIndex;

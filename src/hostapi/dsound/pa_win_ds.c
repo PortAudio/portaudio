@@ -167,6 +167,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
                                   const PaStreamParameters *inputParameters,
                                   const PaStreamParameters *outputParameters,
                                   double sampleRate );
+static PaError RefreshDevices( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index );
 static PaError CloseStream( PaStream* stream );
 static PaError StartStream( PaStream *stream );
 static PaError StopStream( PaStream *stream );
@@ -1188,6 +1189,7 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->RefreshDevices = RefreshDevices;
 
     PaUtil_InitializeStreamInterface( &winDsHostApi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
@@ -1392,6 +1394,145 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     return paFormatIsSupported;
 }
 
+/***********************************************************************************/
+static PaError RefreshDevices( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex )
+{
+    PaWinDsHostApiRepresentation *winDsHostApi = (PaWinDsHostApiRepresentation*)hostApi;
+    DSDeviceNamesAndGUIDs deviceNamesAndGUIDs;
+    PaWinDsDeviceInfo *deviceInfoArray;
+    int i = 0, deviceCount = 0;
+    char comWasInitialized = winDsHostApi->comWasInitialized;
+    PaError result = paNoError;
+
+    if( !comWasInitialized )
+       return paInternalError;
+
+    /* initialise guid vectors so they can be safely deleted on error */
+    deviceNamesAndGUIDs.winDsHostApi = NULL;
+    deviceNamesAndGUIDs.inputNamesAndGUIDs.items = NULL;
+    deviceNamesAndGUIDs.outputNamesAndGUIDs.items = NULL;
+
+    hostApi->info.deviceCount = 0;
+    hostApi->info.defaultInputDevice = paNoDevice;
+    hostApi->info.defaultOutputDevice = paNoDevice;
+
+    /* DSound - enumerate devices to count them and to gather their GUIDs */
+    result = InitializeDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.inputNamesAndGUIDs, winDsHostApi->allocations );
+    if( result != paNoError )
+        goto error;
+
+    result = InitializeDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.outputNamesAndGUIDs, winDsHostApi->allocations );
+    if( result != paNoError )
+        goto error;
+
+    paWinDsDSoundEntryPoints.DirectSoundCaptureEnumerateA( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.inputNamesAndGUIDs );
+    paWinDsDSoundEntryPoints.DirectSoundEnumerateA( (LPDSENUMCALLBACK)CollectGUIDsProc, (void *)&deviceNamesAndGUIDs.outputNamesAndGUIDs );
+
+    if( deviceNamesAndGUIDs.inputNamesAndGUIDs.enumerationError != paNoError )
+    {
+        result = deviceNamesAndGUIDs.inputNamesAndGUIDs.enumerationError;
+        goto error;
+    }
+
+    if( deviceNamesAndGUIDs.outputNamesAndGUIDs.enumerationError != paNoError )
+    {
+        result = deviceNamesAndGUIDs.outputNamesAndGUIDs.enumerationError;
+        goto error;
+    }
+
+    /* Free any old memory which might be in the device info */
+    if( hostApi->deviceInfos )
+    {
+        PaUtil_GroupFreeMemory( winDsHostApi->allocations, hostApi->deviceInfos );
+        hostApi->deviceInfos = NULL;
+    }
+
+    deviceCount = deviceNamesAndGUIDs.inputNamesAndGUIDs.count + deviceNamesAndGUIDs.outputNamesAndGUIDs.count;
+
+#ifdef PAWIN_USE_WDMKS_DEVICE_INFO
+    if( deviceCount > 0 )
+    {
+        deviceNamesAndGUIDs.winDsHostApi = winDsHostApi;
+        FindDevicePnpInterfaces( &deviceNamesAndGUIDs );
+    }
+#endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
+
+    if( deviceCount > 0 )
+    {
+        /* allocate array for pointers to PaDeviceInfo structs */
+        hostApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+                winDsHostApi->allocations, sizeof(PaDeviceInfo*) * deviceCount );
+        if( !hostApi->deviceInfos )
+        {
+            result = paInsufficientMemory;
+            goto error;
+        }
+
+        /* allocate all PaDeviceInfo structs in a contiguous block */
+        deviceInfoArray = (PaWinDsDeviceInfo*)PaUtil_GroupAllocateMemory(
+                winDsHostApi->allocations, sizeof(PaWinDsDeviceInfo) * deviceCount );
+        if( !deviceInfoArray )
+        {
+            result = paInsufficientMemory;
+            goto error;
+        }
+
+        for( i=0; i < deviceCount; ++i )
+        {
+            PaDeviceInfo *deviceInfo = &deviceInfoArray[i].inheritedDeviceInfo;
+            deviceInfo->structVersion = 2;
+            deviceInfo->hostApi = hostApiIndex;
+            deviceInfo->name = 0;
+            hostApi->deviceInfos[i] = deviceInfo;
+        }
+
+        for( i=0; i < deviceNamesAndGUIDs.inputNamesAndGUIDs.count; ++i )
+        {
+            result = AddInputDeviceInfoFromDirectSoundCapture( winDsHostApi,
+                    deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].name,
+                    deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID,
+                    deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].pnpInterface );
+            if( result != paNoError )
+                goto error;
+        }
+
+        for( i=0; i < deviceNamesAndGUIDs.outputNamesAndGUIDs.count; ++i )
+        {
+            result = AddOutputDeviceInfoFromDirectSound( winDsHostApi,
+                    deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].name,
+                    deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID,
+                    deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].pnpInterface );
+            if( result != paNoError )
+                goto error;
+        }
+    }    
+
+    result = TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.inputNamesAndGUIDs );
+    if( result != paNoError )
+        goto error;
+
+    result = TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.outputNamesAndGUIDs );
+    if( result != paNoError )
+        goto error;
+
+    return result;
+
+error:
+    if( winDsHostApi )
+    {
+        if( winDsHostApi->allocations )
+        {
+            PaUtil_FreeAllAllocations( winDsHostApi->allocations );
+            PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
+        }
+    }
+
+    TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.inputNamesAndGUIDs );
+    TerminateDSDeviceNameAndGUIDVector( &deviceNamesAndGUIDs.outputNamesAndGUIDs );
+
+
+    return result;
+}
 
 /*************************************************************************
 ** Determine minimum number of buffers required for this host based
