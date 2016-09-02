@@ -676,7 +676,7 @@ static GUID pawin_IID_IKsPropertySet =
     property, and the other is using DSPROPERTY_DIRECTSOUNDDEVICE_ENUMERATE.
     I tried both methods and only the second worked. I found two postings on the
     net from people who had the same problem with the first method, so I think the method used here is 
-    more common/likely to work. The probem is that IKsPropertySet_Get returns S_OK
+    more common/likely to work. The problem is that IKsPropertySet_Get returns S_OK
     but the fields of the device description are not filled in.
 
     The mechanism we use works by registering an enumeration callback which is called for 
@@ -993,7 +993,7 @@ static PaError AddOutputDeviceInfoFromDirectSound(
     }
 
     deviceInfo->name = name;
-    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
+    deviceInfo->connectionId = -1; /* initialized by caller */
 
     return result;
 
@@ -1163,7 +1163,7 @@ http://www.winehq.com/hypermail/wine-patches/2003/01/0290.html
     }
 
     deviceInfo->name = name;
-    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
+    deviceInfo->connectionId = -1; /* initialized by caller */
 
     return result;
 
@@ -1390,6 +1390,38 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 }
 
 /***********************************************************************************/
+
+/* used for looking up existing devices to reuse their connectionId */
+static const PaDeviceInfo* FindDeviceInfo(
+        const PaDeviceInfo **deviceInfos, int deviceCount,
+        LPGUID lpGUID, int isInput )
+{
+    int i;
+
+#ifndef NDEBUG
+    if( deviceCount )
+    {
+        assert( deviceInfos != NULL );
+        assert( deviceInfos[0] != NULL );
+    }
+#endif
+
+    for( i = 0; i < deviceCount; ++i )
+    {
+        const PaDeviceInfo *deviceInfo = deviceInfos[i];
+        const PaWinDsDeviceInfo *dsDeviceInfo = (const PaWinDsDeviceInfo*)deviceInfo;
+        if( ((isInput && deviceInfo->maxInputChannels > 0)
+                || (!isInput && deviceInfo->maxOutputChannels > 0))
+            && ((lpGUID == NULL && dsDeviceInfo->lpGUID == NULL)
+                || (lpGUID != NULL && dsDeviceInfo->lpGUID != NULL && (memcmp(lpGUID, dsDeviceInfo->lpGUID, sizeof(GUID)) == 0))))
+        {
+            return deviceInfo;
+        }
+    }
+
+    return NULL;
+}
+
 static void FreeDeviceInfos( PaUtilAllocationGroup *allocations, PaDeviceInfo **deviceInfos )
 {
     if( deviceInfos )
@@ -1507,6 +1539,18 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         for( i = 0 ; i < deviceNamesAndGUIDs.inputNamesAndGUIDs.count ; ++i )
         {
             PaWinDsDeviceInfo *winDsDeviceInfo = (PaWinDsDeviceInfo*)outArgument->deviceInfos[*newDeviceCount];
+            const PaDeviceInfo *currentDeviceInfo = FindDeviceInfo(
+                    hostApi->deviceInfos, hostApi->info.deviceCount,
+                    deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID, /*isInput=*/1 );
+
+            /*
+            FIXME REVIEW
+                - we could also use deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].pnpInterface as parameter to FindDeviceInfo. I'm not sure whether that adds anything
+                - if currentDeviceInfo is non-NULL we could just copy the device info over instead of calling AddInputDeviceInfoFromDirectSoundCapture
+                    => make an assesment about whether any device info is likely to change
+                        - Channel count could change if speaker configuration changes
+                - if we're going to leave it the current way, then move call to FindDeviceInfo to only if AddInputDeviceInfoFromDirectSoundCapture succeeds
+            */
 
             result = AddInputDeviceInfoFromDirectSoundCapture( winDsDeviceInfo,
                     deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].name,
@@ -1514,6 +1558,11 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                     deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].pnpInterface );
             if( result == paNoError )
             {
+                if (currentDeviceInfo)
+                    winDsDeviceInfo->inheritedDeviceInfo.connectionId = currentDeviceInfo->connectionId;
+                else
+                    winDsDeviceInfo->inheritedDeviceInfo.connectionId = PaUtil_MakeDeviceConnectionId();
+
                 if( deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID == NULL )
                     outArgument->defaultInputDevice = *newDeviceCount;
                 (*newDeviceCount)++;
@@ -1524,6 +1573,9 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         for( i = 0 ; i < deviceNamesAndGUIDs.outputNamesAndGUIDs.count ; ++i )
         {
             PaWinDsDeviceInfo *winDsDeviceInfo = (PaWinDsDeviceInfo*)outArgument->deviceInfos[*newDeviceCount];
+            const PaDeviceInfo *currentDeviceInfo = FindDeviceInfo(
+                    hostApi->deviceInfos, hostApi->info.deviceCount,
+                    deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID, /*isInput=*/0 );
 
             result = AddOutputDeviceInfoFromDirectSound( winDsDeviceInfo,
                     deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].name,
@@ -1531,6 +1583,11 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                     deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].pnpInterface );
             if( result == paNoError )
             {
+                if (currentDeviceInfo)
+                    winDsDeviceInfo->inheritedDeviceInfo.connectionId = currentDeviceInfo->connectionId;
+                else
+                    winDsDeviceInfo->inheritedDeviceInfo.connectionId = PaUtil_MakeDeviceConnectionId();
+
                 if( deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID == NULL )
                     outArgument->defaultOutputDevice = *newDeviceCount;
                 (*newDeviceCount)++;
