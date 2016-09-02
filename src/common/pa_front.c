@@ -755,7 +755,7 @@ PaDeviceIndex Pa_GetDefaultOutputDevice( void )
 }
 
 
-PaError Pa_UpdateAvailableDeviceList( void )
+PaError Pa_RefreshDeviceList( void )
 {
     PaError result     = paNoError;
     void **scanResults = NULL;

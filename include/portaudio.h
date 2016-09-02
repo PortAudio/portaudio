@@ -439,19 +439,24 @@ PaDeviceIndex Pa_GetDefaultInputDevice( void );
 */
 PaDeviceIndex Pa_GetDefaultOutputDevice( void );
 
-/** Update the list of available devices to match currently available hardware devices.
+/** Refresh the list devices to match currently available hardware devices.
 
- PortAudio's list of available devices is usually frozen at the time Pa_Initialize() is 
- called. Pa_UpdateAvailableDeviceList() may be called to refresh PortAudio's list
- of available devices at any time while PortAudio is initialized.
+ PortAudio's list of devices is usually frozen when Pa_Initialize() is
+ called. Call Pa_RefreshDeviceList() to refresh PortAudio's device list
+ at any time while PortAudio is initialized.
 
- @note Open streams will not be affected by calls to this function, but
- any previously returned PaDeviceInfo pointers are invalidated once this
- function is called.
+ @return an error code indicating whether the refresh was successful.
 
- @return an error code indicating whether the device refresh was successful.
+ If the function succeeds, future calls to Pa_GetDeviceCount() may return
+ a different count than before, all device indexes may refer to
+ different devices, and any previously returned PaDeviceInfo pointers are
+ invalidated.
+
+ If the function fails, the device list is unchanged.
+
+ @note Open streams will not be affected by calls to this function.
  */
-PaError Pa_UpdateAvailableDeviceList( void );
+PaError Pa_RefreshDeviceList( void );
 
 
 /** The type used to represent monotonic time in seconds. PaTime is 

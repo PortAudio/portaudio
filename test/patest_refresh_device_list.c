@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
         if( getchar() == 'q' )
             break;
 
-        Pa_UpdateAvailableDeviceList();
+        Pa_RefreshDeviceList();
     }
 
     Pa_Terminate();
