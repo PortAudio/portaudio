@@ -891,6 +891,10 @@ static PaDeviceConnectionId nextDeviceConnectionId_ = 1000;
 
 PaDeviceConnectionId PaUtil_MakeDeviceConnectionId( void )
 {
+    /* FIXME: if the counter wraps around we may want to ensure that
+     we are not issuing an ID that belongs to a current device.
+     we need to honor the invariant "no two devices have the same connection id"
+     */
     return nextDeviceConnectionId_++;
 }
 

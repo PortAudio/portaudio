@@ -158,13 +158,11 @@ const char *Pa_GetErrorText( PaError errorCode );
  If Pa_Initialize() returns an error code, Pa_Terminate() should
  NOT be called.
 
- @note The device list returned by Pa_GetDeviceCount() et al. is frozen 
- at the time Pa_Initialize() is called, and not updated dynamically, even if 
- hardware devices (e.g. USB or firewire devices) are connected or disconnected 
- during the course of the program's lifetime. If it is required to re-scan the 
- list of devices, one must call Pa_UpdateAvailableDeviceList() or, completely
- uninitialize PortAudio using Pa_Terminate(), and then reinitialize it by calling
- Pa_Initialize().
+ @note The device list returned by Pa_GetDeviceCount() et al. is frozen
+ when Pa_Initialize() is called. The device list is not automatically updated
+ when hardware devices are connected or disconnected. To refresh the list of devices,
+ either call Pa_RefreshDeviceList() or uninitialize PortAudio using Pa_Terminate(),
+ and then reinitialize it by calling Pa_Initialize().
 
  @return paNoError if successful, otherwise an error code indicating the cause
  of failure.
@@ -549,8 +547,18 @@ typedef unsigned long PaSampleFormat;
 #define paNonInterleaved ((PaSampleFormat) 0x80000000) /**< @see PaSampleFormat */
 
 
-/** A unique stable identifier for the duration of device connection,
- or PA initialize/terminate, whichever is shorter.
+/** An integer id that uniquely identifies a device, so long as the device is
+ plugged in and PortAudio is initialized. Its purpose is to identify (correlate)
+ devices across calls to Pa_RefreshDeviceList().
+
+ Each device reported by Pa_GetDeviceInfo() has a distinct connectionId.
+
+ PortAudio makes a best-effort to ensure that a persistent underlying device
+ has the same connectionId before and after a single call to Pa_RefreshDeviceList().
+
+ If a device is disconnected and later reconnected it may be assigned a new
+ connectionId.
+
  @see Pa_RefreshDeviceList()
 */
 typedef unsigned long PaDeviceConnectionId;
