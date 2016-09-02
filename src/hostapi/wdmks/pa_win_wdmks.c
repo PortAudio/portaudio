@@ -3442,6 +3442,22 @@ static unsigned GetNameIndex(PaNameHashObject* obj, const wchar_t* name, const B
     return 0;
 }
 
+static void FreeHostApiDeviceInfos( PaUtilAllocationGroup *allocations, PaDeviceInfo **deviceInfos, int deviceCount )
+{
+    int i;
+    for (i = 0; i < deviceCount; ++i)
+    {
+        PaWinWdmDeviceInfo* pDevice = (PaWinWdmDeviceInfo*)deviceInfos[i];
+        if (pDevice->filter != 0)
+        {
+            FilterFree(pDevice->filter);
+        }
+    }
+
+    PaUtil_GroupFreeMemory( allocations, deviceInfos[0] ); /* all device info structs are allocated in a block so we can destroy them here */
+    PaUtil_GroupFreeMemory( allocations, deviceInfos );
+}
+
 static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex, void **scanResults, int *newDeviceCount )
 {
     PaWinWdmHostApiRepresentation *wdmHostApi = (PaWinWdmHostApiRepresentation*)hostApi;
@@ -3709,12 +3725,7 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
     /* Free any old memory which might be in the device info */
     if( hostApi->deviceInfos )
     {
-        PaWinWDMScanDeviceInfosResults* localScanResults = (PaWinWDMScanDeviceInfosResults*)PaUtil_GroupAllocateMemory(
-            wdmHostApi->allocations, sizeof(PaWinWDMScanDeviceInfosResults));
-        localScanResults->deviceInfos = hostApi->deviceInfos;
-
-        DisposeDeviceInfos(hostApi, localScanResults, hostApi->info.deviceCount);
-
+        FreeHostApiDeviceInfos( wdmHostApi->allocations, hostApi->deviceInfos, hostApi->info.deviceCount );
         hostApi->deviceInfos = NULL;
     }
 
@@ -3746,7 +3757,7 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
 
 static PaError DisposeDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, void *scanResults, int deviceCount )
 {
-    PaWinWdmHostApiRepresentation *winDsHostApi = (PaWinWdmHostApiRepresentation*)hostApi;
+    PaWinWdmHostApiRepresentation *wdmHostApi = (PaWinWdmHostApiRepresentation*)hostApi;
 
     if( scanResults != NULL )
     {
@@ -3754,21 +3765,10 @@ static PaError DisposeDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, 
 
         if( scanDeviceInfosResults->deviceInfos )
         {
-            int i;
-            for (i = 0; i < deviceCount; ++i)
-            {
-                PaWinWdmDeviceInfo* pDevice = (PaWinWdmDeviceInfo*)scanDeviceInfosResults->deviceInfos[i];
-                if (pDevice->filter != 0)
-                {
-                    FilterFree(pDevice->filter);
-                }
-            }
-
-            PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults->deviceInfos[0] ); /* all device info structs are allocated in a block so we can destroy them here */
-            PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults->deviceInfos );
+            FreeHostApiDeviceInfos( wdmHostApi->allocations, scanDeviceInfosResults->deviceInfos, hostApi->info.deviceCount );
         }
 
-        PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults );
+        PaUtil_GroupFreeMemory( wdmHostApi->allocations, scanDeviceInfosResults );
     }
 
     return paNoError;
@@ -3899,10 +3899,11 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     if( wdmHostApi)
     {
-        PaWinWDMScanDeviceInfosResults* localScanResults = (PaWinWDMScanDeviceInfosResults*)PaUtil_GroupAllocateMemory(
-            wdmHostApi->allocations, sizeof(PaWinWDMScanDeviceInfosResults));
-        localScanResults->deviceInfos = hostApi->deviceInfos;
-        DisposeDeviceInfos(hostApi, localScanResults, hostApi->info.deviceCount);
+        if( hostApi->deviceInfos )
+        {
+            FreeHostApiDeviceInfos( wdmHostApi->allocations, hostApi->deviceInfos, hostApi->info.deviceCount );
+            hostApi->deviceInfos = NULL;
+        }
 
         if( wdmHostApi->allocations )
         {
