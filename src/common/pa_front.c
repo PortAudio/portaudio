@@ -76,13 +76,11 @@
 #include "pa_stream.h"
 #include "pa_trace.h" /* still usefull?*/
 #include "pa_debugprint.h"
+#include "pa_hotplug.h"
 
 #ifndef PA_SVN_REVISION
 #include "pa_svnrevision.h"
 #endif
-
-extern void PaUtil_InitializeHotPlug();
-extern void PaUtil_TerminateHotPlug();
 
 
 /**
@@ -865,6 +863,37 @@ done:
 
     return result;
 }
+
+
+PaError Pa_SetDevicesChangedCallback( void *userData, PaStreamFinishedCallback* devicesChangedCallback )
+{
+    PaUtil_LockHotPlug();
+    devicesChangedCallback_ = devicesChangedCallback;
+    devicesChangedCallbackUserData_ = userData;
+    PaUtil_UnlockHotPlug();
+    return paNoError;
+}
+
+/* Called by platform hotplug implementation whenever a OS audio device change has been detected */
+void PaUtil_DevicesChanged(unsigned state, void* pData)
+{
+    (void)state;
+    (void)pData;
+    PaUtil_LockHotPlug();
+    if (devicesChangedCallback_)
+    {
+        (devicesChangedCallback_)(devicesChangedCallbackUserData_);
+    }
+    PaUtil_UnlockHotPlug();
+}
+
+static PaDeviceConnectionId nextDeviceConnectionId_ = 1000;
+
+PaDeviceConnectionId PaUtil_MakeDeviceConnectionId( void )
+{
+    return nextDeviceConnectionId_++;
+}
+
 
 const PaDeviceInfo* Pa_GetDeviceInfo( PaDeviceIndex device )
 {
@@ -1927,37 +1956,4 @@ PaError Pa_GetSampleSize( PaSampleFormat format )
     PA_LOGAPI_EXIT_PAERROR_OR_T_RESULT( "Pa_GetSampleSize", "int: %d", result );
 
     return (PaError) result;
-}
-
-extern void PaUtil_LockHotPlug();
-extern void PaUtil_UnlockHotPlug();
-
-
-PaError Pa_SetDevicesChangedCallback( void *userData, PaStreamFinishedCallback* devicesChangedCallback )
-{
-    PaUtil_LockHotPlug();
-    devicesChangedCallback_ = devicesChangedCallback;
-    devicesChangedCallbackUserData_ = userData;
-    PaUtil_UnlockHotPlug();
-    return paNoError;
-}
-
-/* Called whenever a OS audio device change has been detected */
-void PaUtil_DevicesChanged(unsigned state, void* pData)
-{
-    (void)state;
-    (void)pData;
-    PaUtil_LockHotPlug();
-    if (devicesChangedCallback_)
-    {
-        (devicesChangedCallback_)(devicesChangedCallbackUserData_);
-    }
-    PaUtil_UnlockHotPlug();
-}
-
-static PaDeviceConnectionId nextDeviceConnectionId_ = 1000;
-
-PaDeviceConnectionId PaUtil_MakeDeviceConnectionId( void )
-{
-    return nextDeviceConnectionId_++;
 }
