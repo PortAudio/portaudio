@@ -1391,6 +1391,20 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 }
 
 /***********************************************************************************/
+static void FreeDeviceInfos( PaUtilAllocationGroup *allocations, PaDeviceInfo **deviceInfos )
+{
+    if( deviceInfos )
+    {
+        if( deviceInfos[0] )
+        {
+            /* all device info structs are allocated in a block so we can destroy them like this */
+            PaUtil_GroupFreeMemory( allocations, deviceInfos[0] );
+        }
+
+        PaUtil_GroupFreeMemory( allocations, deviceInfos );
+    }
+}
+
 static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex, void **scanResults, int *newDeviceCount )
 {
     PaWinDsHostApiRepresentation *winDsHostApi = (PaWinDsHostApiRepresentation*)hostApi;
@@ -1543,15 +1557,7 @@ error:
 
     if( outArgument )
     {
-        if( outArgument->deviceInfos )
-        {
-            if( outArgument->deviceInfos[0] )
-            {
-                PaUtil_GroupFreeMemory( winDsHostApi->allocations, outArgument->deviceInfos[0] );
-            }
-
-            PaUtil_GroupFreeMemory( winDsHostApi->allocations, outArgument->deviceInfos );
-        }
+        FreeDeviceInfos( winDsHostApi->allocations, outArgument->deviceInfos );
     }
     return result;
 }
@@ -1559,8 +1565,6 @@ error:
 static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index, void *scanResults, int deviceCount )
 {
     PaWinDsHostApiRepresentation *winDsHostApi = (PaWinDsHostApiRepresentation*)hostApi;
-    PaError result = paNoError;
-    int i = 0;
 
     hostApi->info.deviceCount = 0;
     hostApi->info.defaultInputDevice = paNoDevice;
@@ -1569,8 +1573,7 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
     /* Free any old memory which might be in the device info */
     if( hostApi->deviceInfos )
     {
-        PaUtil_GroupFreeMemory( winDsHostApi->allocations, hostApi->deviceInfos[0] );
-        PaUtil_GroupFreeMemory( winDsHostApi->allocations, hostApi->deviceInfos );
+        FreeDeviceInfos( winDsHostApi->allocations, hostApi->deviceInfos );
         hostApi->deviceInfos = NULL;
     }
 
@@ -1592,7 +1595,7 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
         PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults );
     }
 
-    return result;
+    return paNoError;
 }
 
 static PaError DisposeDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, void *scanResults, int deviceCount )
@@ -1605,8 +1608,7 @@ static PaError DisposeDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, 
 
         if( scanDeviceInfosResults->deviceInfos )
         {
-            PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults->deviceInfos[0] ); /* all device info structs are allocated in a block so we can destroy them here */
-            PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults->deviceInfos );
+            FreeDeviceInfos( winDsHostApi->allocations, hostApi->deviceInfos );
         }
 
         PaUtil_GroupFreeMemory( winDsHostApi->allocations, scanDeviceInfosResults );
