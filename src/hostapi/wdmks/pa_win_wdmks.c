@@ -3706,10 +3706,6 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
 {
     PaWinWdmHostApiRepresentation *wdmHostApi = (PaWinWdmHostApiRepresentation*)hostApi;
 
-    hostApi->info.deviceCount = 0;
-    hostApi->info.defaultInputDevice = paNoDevice;
-    hostApi->info.defaultOutputDevice = paNoDevice;
-
     /* Free any old memory which might be in the device info */
     if( hostApi->deviceInfos )
     {
@@ -3717,10 +3713,14 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
             wdmHostApi->allocations, sizeof(PaWinWDMScanDeviceInfosResults));
         localScanResults->deviceInfos = hostApi->deviceInfos;
 
-        DisposeDeviceInfos(hostApi, &localScanResults, hostApi->info.deviceCount);
+        DisposeDeviceInfos(hostApi, localScanResults, hostApi->info.deviceCount);
 
         hostApi->deviceInfos = NULL;
     }
+
+    hostApi->info.deviceCount = 0;
+    hostApi->info.defaultInputDevice = paNoDevice;
+    hostApi->info.defaultOutputDevice = paNoDevice;
 
     if( scanResults != NULL )
     {
