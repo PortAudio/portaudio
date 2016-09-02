@@ -326,33 +326,115 @@ typedef struct PaUtilHostApiRepresentation {
                                   const PaStreamParameters *outputParameters,
                                   double sampleRate );
 
-    /**
-     Collect current native device information and compute a new device count.
-     This method should not result in the host API making any changes to its 
-     internal data structures, instead it is the first step in a two-stage commit 
-     process which will be completed only if all host API scans return with no errors.
+    /** ScanDeviceInfos, CommitDeviceInfos, DisposeDeviceInfos are used to refresh the device list.
+    
+      You can think of the caller doing something like:
 
-     Some time later the caller will either (1) pass scanResults and newDeviceCount
-     to CommitDeviceInfos() to complete the transaction, or (2) pass scanResults 
-     and newDeviceCount to DisposeDeviceInfos() to abort the transaction.
+      void *scanResults = 0;
+      int newDeviceCount = 0;
+      if( hostApi->ScanDeviceInfos(hostApi, hostApiIndex, &scanResults, &newDeviceCount) == paNoError )
+      {
+        ... do other stuff ...
+
+        if( ok to commit )
+        {
+            hostApi->CommitDeviceInfos(hostApi, hostApiIndex, scanResults, newDeviceCount);
+        }
+        else
+        {
+            hostApi->DisposeDeviceInfos(hostApi, hostApiIndex, scanResults, newDeviceCount);
+        }
+      }
+
+      NB: ScanDeviceInfos may be called on all host APIs first, prior to pa_front
+      deciding whether to commit or cleanup.
+    */
+
+    /**
+     Scan for current native device information and compute a new device count.
+     Preparation step of a two-stage transaction that updates the active device list.
+
+     @param hostApi The target host API.
+
+     @param index The host API index of the target host API.
+
+     @param scanResults (OUT) Result parameter. Upon success, set to point to an 
+     opaque structure containing collected device information. Ignored on failure.
+
+     @param newDeviceCount (Out) Result parameter. Upon success, set to the 
+     number of discovered devices. Ignored on failure.
+     
+     @return on success returns paNoError, otherwise an error code indicating
+     the cause of the error.
+
+     This function should not make any visible changes to the host API's internal
+     state. In particular, it should not update the active device list, device
+     information or device count.
+
+     If the function returns successfully, the caller will either (1) pass 
+     scanResults and newDeviceCount to CommitDeviceInfos() to complete the 
+     transaction, or (2) pass scanResults  and newDeviceCount to
+     DisposeDeviceInfos() to abort the transaction.
+
+     @note CommitDeviceInfos and DisposeDeviceInfos should not fail, therefore
+     ScanDeviceInfos should perform all necessary preparations, 
+     such as memory allocation, so that CommitDeviceInfos can always execute
+     without failure.
+
+     @see CommitDeviceInfos, DisposeDeviceInfos
      */
-    PaError (*ScanDeviceInfos)( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index, void **scanResults, int *newDeviceCount );
+    PaError (*ScanDeviceInfos)( struct PaUtilHostApiRepresentation *hostApi,
+                                PaHostApiIndex index,
+                                void **scanResults,
+                                int *newDeviceCount );
 
     /**
-     Replace the previous device information with the device information
-     passed in as an argument via scanResults. This is the second/final stage of 
-     the two-stage transaction required for updating the available device information.
-     This function should free any resources associated with the previous device 
-     information.
-     @FIXME: this function should probably not return an error code as it should not be 
-     permitted to fail.
+     Update the active device list with new device information that was
+     returned by ScanDeviceInfos(). This is the final commit step of a two-stage
+     transaction that updates the active device list.
+
+     As this function is not permitted to fail, it should be very simple:
+     swap in new device information and free the old information.
+
+     @param hostApi The target host API.
+
+     @param index The host API index of the target host API.
+
+     @param scanResults An opaque structure containing collected device 
+     information previously returned by ScanDeviceInfos. This is the information
+     that will be installed into the active device list.
+
+     @param newDeviceCount The number of discovered devices previously returned
+     by ScanDeviceInfos. This is the new number of devices in the active device
+     list.
+
+     @note This function is not permitted to fail. It should always return paNoError.
+
+     @see ScanDeviceInfos, DisposeDeviceInfos
      */
-    PaError (*CommitDeviceInfos)( struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index, void *scanResults, int deviceCount );
+    PaError (*CommitDeviceInfos)( struct PaUtilHostApiRepresentation *hostApi, 
+                                  PaHostApiIndex index,
+                                  void *scanResults,
+                                  int deviceCount );
 
     /**
-     Free device information previously returned by ScanDeviceInfos(). This function
-     will be called in cases where the update available device info transaction 
-     failed for some reason.
+     Free device information that was returned by ScanDeviceInfos. This is 
+     used in the cleanup process for a failed two-stage transaction.
+     
+     @param hostApi The target host API.
+
+     @param index The host API index of the target host API.
+
+     @param scanResults An opaque structure containing collected device 
+     information previously returned by ScanDeviceInfos. scanResults will be
+     freed by this function. 
+
+     @param newDeviceCount The number of discovered devices previously returned
+     by ScanDeviceInfos.
+
+     @note This function is not permitted to fail. It should always return paNoError.
+
+     @see CommitDeviceInfos, ScanDeviceInfos
      */
     PaError (*DisposeDeviceInfos)( struct PaUtilHostApiRepresentation *hostApi, void *scanResults, int deviceCount );
 
