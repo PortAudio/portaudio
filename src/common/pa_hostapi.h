@@ -171,6 +171,9 @@ typedef struct PaUtilPrivatePaFrontHostApiInfo {
 }PaUtilPrivatePaFrontHostApiInfo;
 
 
+PaDeviceConnectionId PaUtil_MakeDeviceConnectionId( void );
+
+
 /** The common header for all data structures whose pointers are passed through
  the hostApiSpecificStreamInfo field of the PaStreamParameters structure.
  Note that in order to keep the public PortAudio interface clean, this structure

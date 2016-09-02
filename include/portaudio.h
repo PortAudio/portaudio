@@ -500,7 +500,7 @@ typedef void PaDevicesChangedCallback( void *userData );
 
  @see PaStreamFinishedCallback
 */
-PaError Pa_SetDevicesChangedCallback( void *userData, PaStreamFinishedCallback* devicesChangedCallback );
+PaError Pa_SetDevicesChangedCallback( void *userData, PaDevicesChangedCallback* devicesChangedCallback );
 
 
 /** The type used to represent monotonic time in seconds. PaTime is 
@@ -548,12 +548,20 @@ typedef unsigned long PaSampleFormat;
 
 #define paNonInterleaved ((PaSampleFormat) 0x80000000) /**< @see PaSampleFormat */
 
+
+/** A unique stable identifier for the duration of device connection,
+ or PA initialize/terminate, whichever is shorter.
+ @see Pa_RefreshDeviceList()
+*/
+typedef unsigned long PaDeviceConnectionId;
+
+
 /** A structure providing information and capabilities of PortAudio devices.
  Devices may support input, output or both input and output.
 */
 typedef struct PaDeviceInfo
 {
-    int structVersion;  /* this is struct version 2 */
+    int structVersion;  /* this is struct version 3 */
     const char *name;
     PaHostApiIndex hostApi; /**< note this is a host API index, not a type id*/
     
@@ -568,6 +576,8 @@ typedef struct PaDeviceInfo
     PaTime defaultHighOutputLatency;
 
     double defaultSampleRate;
+
+    PaDeviceConnectionId connectionId; /**< @see PaDeviceConnectionId */
 } PaDeviceInfo;
 
 

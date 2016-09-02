@@ -1189,9 +1189,11 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
         }
     }
 
-    baseDeviceInfo->structVersion = 2;
+    baseDeviceInfo->structVersion = 3;
     baseDeviceInfo->hostApi = alsaApi->hostApiIndex;
     baseDeviceInfo->name = deviceHwInfo->name;
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
+
     devInfo->alsaName = deviceHwInfo->alsaName;
     devInfo->isPlug = deviceHwInfo->isPlug;
 

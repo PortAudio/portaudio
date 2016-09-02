@@ -298,7 +298,7 @@ PaError PaUtil_InitializeDeviceInfo( PaDeviceInfo *deviceInfo, const char *name,
 {
     PaError result = paNoError;
 
-    deviceInfo->structVersion = 2;
+    deviceInfo->structVersion = 3;
     if( allocations )
     {
         size_t len = strlen( name ) + 1;
@@ -316,6 +316,7 @@ PaError PaUtil_InitializeDeviceInfo( PaDeviceInfo *deviceInfo, const char *name,
     deviceInfo->defaultHighInputLatency = defaultHighInputLatency;
     deviceInfo->defaultHighOutputLatency = defaultHighOutputLatency;
     deviceInfo->defaultSampleRate = defaultSampleRate;
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
 error:
     return result;

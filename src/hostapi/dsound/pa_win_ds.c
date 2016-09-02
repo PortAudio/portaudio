@@ -993,6 +993,7 @@ static PaError AddOutputDeviceInfoFromDirectSound(
     }
 
     deviceInfo->name = name;
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
     return result;
 
@@ -1162,7 +1163,8 @@ http://www.winehq.com/hypermail/wine-patches/2003/01/0290.html
     }
 
     deviceInfo->name = name;
-   
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
+
     return result;
 
 error:
@@ -1482,7 +1484,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         for( i = 0 ; i < maximumNewDeviceCount; ++i )
         {
             PaDeviceInfo *deviceInfo  = &deviceInfoArray[i].inheritedDeviceInfo;
-            deviceInfo->structVersion = 2;
+            deviceInfo->structVersion = 3;
             deviceInfo->hostApi       = hostApiIndex;
             deviceInfo->name          = 0;
 

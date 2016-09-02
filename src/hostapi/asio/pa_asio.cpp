@@ -1322,10 +1322,11 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                 PaAsioDeviceInfo *asioDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &asioDeviceInfo->commonDeviceInfo;
 
-                deviceInfo->structVersion = 2;
+                deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
 
                 deviceInfo->name = names[i];
+                deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
                 if( InitPaDeviceInfoFromAsioDriver( asioHostApi, names[i], i, deviceInfo, asioDeviceInfo ) == paNoError )
                 {

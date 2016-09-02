@@ -789,6 +789,8 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     DetectDefaultSampleRate( winMmeDeviceInfo, winMmeInputDeviceId,
             QueryInputWaveFormatEx, deviceInfo->maxInputChannels );
 
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
+
     *success = 1;
     
 error:
@@ -923,6 +925,8 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
 
     DetectDefaultSampleRate( winMmeDeviceInfo, winMmeOutputDeviceId,
             QueryOutputWaveFormatEx, deviceInfo->maxOutputChannels );
+
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
     *success = 1;
     
@@ -1069,7 +1073,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
-                deviceInfo->structVersion = 2;
+                deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
 
                 deviceInfo->maxInputChannels = 0;
@@ -1112,7 +1116,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
-                deviceInfo->structVersion = 2;
+                deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
 
                 deviceInfo->maxInputChannels = 0;

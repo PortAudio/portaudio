@@ -573,7 +573,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
                     strlen(client_names[client_index]) + 1 ), paInsufficientMemory );
         strcpy( (char *)curDevInfo->name, client_names[client_index] );
 
-        curDevInfo->structVersion = 2;
+        curDevInfo->structVersion = 3;
         curDevInfo->hostApi = jackApi->hostApiIndex;
 
         /* JACK is very inflexible: there is one sample rate the whole
@@ -634,6 +634,8 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
             commonApi->info.defaultInputDevice = client_index;
         if( commonApi->info.defaultOutputDevice == paNoDevice && curDevInfo->maxOutputChannels > 0 )
             commonApi->info.defaultOutputDevice = client_index;
+
+        deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
     }
 
 error:

@@ -659,7 +659,7 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
 
     memset(deviceInfo, 0, sizeof(PaDeviceInfo));
 
-    deviceInfo->structVersion = 2;
+    deviceInfo->structVersion = 3;
     deviceInfo->hostApi = hostApiIndex;
   
     /* Get the device name using CFString */
@@ -693,6 +693,7 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
 		CFRelease(nameRef);
 	}
     deviceInfo->name = name;
+    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
     /* Try to get the default sample rate.  Don't fail if we can't get this. */
     propSize = sizeof(Float64);

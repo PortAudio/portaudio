@@ -636,7 +636,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 hpiDevice->streamIndex = j;
                 hpiDevice->streamIsOutput = 0;
                 /* Set common PortAudio device stats */
-                baseDeviceInfo->structVersion = 2;
+                baseDeviceInfo->structVersion = 3;
                 /* Make sure name string is owned by API info structure */
                 sprintf( srcName,
                          "Adapter %d (%4X) - Input Stream %d", i+1, type, j+1 );
@@ -656,6 +656,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 /* HPI interface can actually handle any sampling rate to 1 Hz accuracy,
                 * so this default is as good as any */
                 baseDeviceInfo->defaultSampleRate = 44100;
+                baseDeviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
                 /* Store device in global PortAudio list */
                 hostApi->deviceInfos[deviceIndex++] = (PaDeviceInfo *) hpiDevice;
@@ -678,7 +679,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 hpiDevice->streamIndex = j;
                 hpiDevice->streamIsOutput = 1;
                 /* Set common PortAudio device stats */
-                baseDeviceInfo->structVersion = 2;
+                baseDeviceInfo->structVersion = 3;
                 /* Make sure name string is owned by API info structure */
                 sprintf( srcName,
                          "Adapter %d (%4X) - Output Stream %d", i+1, type, j+1 );
@@ -698,6 +699,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 /* HPI interface can actually handle any sampling rate to 1 Hz accuracy,
                 * so this default is as good as any */
                 baseDeviceInfo->defaultSampleRate = 44100;
+                baseDeviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
                 /* Store device in global PortAudio list */
                 hostApi->deviceInfos[deviceIndex++] = (PaDeviceInfo *) hpiDevice;

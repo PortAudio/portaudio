@@ -3530,7 +3530,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         for( i = 0 ; i < totalDeviceCount; ++i )
         {
             PaDeviceInfo *deviceInfo  = &deviceInfoArray[i].inheritedDeviceInfo;
-            deviceInfo->structVersion = 2;
+            deviceInfo->structVersion = 3;
             deviceInfo->hostApi       = hostApiIndex;
             deviceInfo->name          = 0;
             outArgument->deviceInfos[ i ] = deviceInfo;
@@ -3573,10 +3573,12 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
 
                     wdmDeviceInfo->filter = pFilter;
 
-                    deviceInfo->structVersion = 2;
+                    deviceInfo->structVersion = 3;
                     deviceInfo->hostApi = hostApiIndex;
                     deviceInfo->name = wdmDeviceInfo->compositeName;
                     /* deviceInfo->hostApiSpecificDeviceInfo = &pFilter->devInfo; */
+
+                    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
                     wdmDeviceInfo->pin = pin->pinId;
 

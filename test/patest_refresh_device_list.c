@@ -13,8 +13,9 @@ void printDevices()
         const PaHostApiInfo *hostApiInfo = Pa_GetHostApiInfo( deviceInfo->hostApi );
 
         assert( deviceInfo != 0 );
+        assert( deviceInfo->structVersion >= 3 ); /* should be the case if all APIs have implemented connectionId */
 
-        printf( "%d %s (%s)\n", i, deviceInfo->name, hostApiInfo->name );
+        printf( "%d (conn id: %d) %s (%s)\n", i, deviceInfo->connectionId, deviceInfo->name, hostApiInfo->name );
     }
 }
 

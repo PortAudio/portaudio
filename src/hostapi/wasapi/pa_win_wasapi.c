@@ -1314,7 +1314,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 		{
 			DWORD state				  = 0;
             PaDeviceInfo *deviceInfo  = &deviceInfoArray[i];
-            deviceInfo->structVersion = 2;
+            deviceInfo->structVersion = 3;
             deviceInfo->hostApi       = hostApiIndex;
 
 			PA_DEBUG(("WASAPI: device idx: %02d\n", i));
@@ -1507,6 +1507,8 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 //continue; // do not skip from list, allow to initialize
 				 break;
             }
+
+            deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
 
             (*hostApi)->deviceInfos[i] = deviceInfo;
             ++(*hostApi)->info.deviceCount;

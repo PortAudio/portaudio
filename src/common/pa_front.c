@@ -1955,3 +1955,9 @@ void PaUtil_DevicesChanged(unsigned state, void* pData)
     PaUtil_UnlockHotPlug();
 }
 
+static PaDeviceConnectionId nextDeviceConnectionId_ = 1000;
+
+PaDeviceConnectionId PaUtil_MakeDeviceConnectionId( void )
+{
+    return nextDeviceConnectionId_++;
+}
