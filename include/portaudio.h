@@ -439,7 +439,8 @@ PaDeviceIndex Pa_GetDefaultInputDevice( void );
 */
 PaDeviceIndex Pa_GetDefaultOutputDevice( void );
 
-/** Refresh the list devices to match currently available hardware devices.
+
+/** Refresh the list devices to match currently available native audio devices.
 
  PortAudio's list of devices is usually frozen when Pa_Initialize() is
  called. Call Pa_RefreshDeviceList() to refresh PortAudio's device list
@@ -457,6 +458,49 @@ PaDeviceIndex Pa_GetDefaultOutputDevice( void );
  @note Open streams will not be affected by calls to this function.
  */
 PaError Pa_RefreshDeviceList( void );
+
+
+/** Functions of type PaDevicesChangedCallback are implemented by PortAudio
+ clients. They can be registered with PortAudio using the Pa_SetDevicesChangedCallback
+ function. Once registered they are called when available native audio devices
+ may have changed. For example, when a USB audio device is connected or disconnected.
+
+ When the callback is invoked, there is no change to the devices listed by
+ PortAudio. To update PortAudio's view of the device list, the client
+ must call Pa_RefreshDeviceList(). This must not be done from within
+ the callback.
+
+ The callback may occur on any thread. The client should not call other PortAudio
+ functions from within a PaDevicesChangedCallback. In particular, the client
+ should not directly call Pa_RefreshDeviceList() from within the notification
+ callback. Instead, the client should set an atomic flag, or queue a message to
+ notify a controller thread that would then call Pa_RefreshDeviceList().
+
+ @param userData The userData parameter supplied to Pa_SetDevicesChangedCallback()
+
+ @see Pa_SetDevicesChangedCallback
+*/
+typedef void PaDevicesChangedCallback( void *userData );
+
+
+/** Register a callback function that will be called when native audio devices
+ become available or unavailable. See the description of PaDevicesChangedCallback
+ for further details about when the callback will be called.
+
+ @param userData A client supplied pointer that is passed to the devices changed
+ callback.
+
+ @param devicesChangedCallback a pointer to a function with the same signature
+ as PaDevicesChangedCallback, which will be called when native devices become
+ available or unavailable. Passing NULL for this parameter will un-register a
+ previously registered devices changed callback function.
+
+ @return on success returns paNoError, otherwise an error code indicating the
+ cause of the error.
+
+ @see PaStreamFinishedCallback
+*/
+PaError Pa_SetDevicesChangedCallback( void *userData, PaStreamFinishedCallback* devicesChangedCallback );
 
 
 /** The type used to represent monotonic time in seconds. PaTime is 
@@ -1226,14 +1270,6 @@ PaError Pa_GetSampleSize( PaSampleFormat format );
  musical timing.
 */
 void Pa_Sleep( long msec );
-
-
-/* FIXME: document these and put them with other device functions */
-typedef void PaDevicesChangedCallback( void *userData );
-
-PaError Pa_SetDevicesChangedCallback( void *userData, PaStreamFinishedCallback* devicesChangedCallback ); 
-
-
 
 
 #ifdef __cplusplus
