@@ -203,13 +203,13 @@ int Pa_GetAvailableHostApisCount( void )
 }
 
 
-PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
+PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int arrayCapacity, int *count )
 {
     int i;
     int initializerCount = CountHostApiInitializers();
 
     *count = initializerCount;
-    if( countAvailable >= initializerCount )
+    if( arrayCapacity >= initializerCount )
     {
         for( i=0; i < initializerCount; ++i )
             hostApiTypes[i] = paHostApiInitializers[i].hostApiType;
@@ -311,16 +311,16 @@ PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count )
 }
 
 
-PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
+PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int arrayCapacity, int *count )
 {
     if( selectedHostApiTypes_ == NULL )
     {
-        return Pa_GetAvailableHostApis( hostApiTypes, countAvailable, count );
+        return Pa_GetAvailableHostApis( hostApiTypes, arrayCapacity, count );
     }
     else
     {
         *count = selectedHostApiCount_;
-        if( countAvailable >= selectedHostApiCount_ )
+        if( arrayCapacity >= selectedHostApiCount_ )
         {
             memcpy( hostApiTypes, selectedHostApiTypes_, selectedHostApiCount_*sizeof(PaHostApiTypeId) );
             return paNoError;

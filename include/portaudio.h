@@ -295,12 +295,15 @@ int Pa_GetAvailableHostApisCount( void );
  host APIs to be not installed on the system, and it is possible for
  installed audio APIs to not be supported (compiled in to) PortAudio.
 
- @param hostApiTypes (IN/OUT) An array that will be filled with
- host API identifiers belonging to the PaHostApiTypeId enumeration.
+ @param hostApiTypes (OUT) An array that will be filled with
+ host API identifiers, having values belonging to the PaHostApiTypeId enumeration.
+
+ @param arrayCapacity The number of usable elements in the hostApiTypes array.
+ This value never need by greater than the value returned by
+ Pa_GetAvailableHostApisCount().
 
  @param count (OUT) The number of host APIs, returned even on error.
-
- @param countAvailable The number of available elements in the hostApiTypes array.
+ Upon success, this will be the number of valid elements stored in hostApiTypes.
 
  FIXME REVIEW: Consider a different name for this function, both "available"
  and "supported" are ambiguous between what is available/supported on the
@@ -312,7 +315,7 @@ int Pa_GetAvailableHostApisCount( void );
 
  @see Pa_SelectHostApis
 */
-PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
+PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int arrayCapacity, int *count );
 
 
 /** Select host APIs and their initialization order.
@@ -321,8 +324,10 @@ PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailab
  or after calling Pa_Terminate(). The selected host APIs take effect the
  next time that Pa_Initialize() is invoked.
 
- @param hostApiTypes An array of host API identifiers belonging to the
- PaHostApiTypeId enumeration.
+ @param hostApiTypes An array of host API identifiers, having values belonging 
+ to the PaHostApiTypeId enumeration. The specified host APIs must selected
+ from thosed returned by Pa_GetAvailableHostApis(). For example, it would be an 
+ error to specify a Windows host API while using PortAudio on Mac OS X.
 
  @param count The number of elements in the hostApiTypes array. A count of
  zero causes the default host API selection to be restored.
@@ -346,22 +351,25 @@ PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count );
 
 /** Returns the type ids of the selected host APIs in initialization order.
 
- @param hostApiTypes (IN/OUT) An array that will be filled with
- host API identifiers belonging to the PaHostApiTypeId enumeration.
+ @param hostApiTypes (OUT) An array that will be filled with
+ host API identifiers, having values belonging to the PaHostApiTypeId enumeration.
+
+ @param arrayCapacity The number of usable elements in the hostApiTypes array.
+ This value never need by greater than the value returned by
+ Pa_GetAvailableHostApisCount().
 
  @param count (OUT) The number of selected host APIs, returned even on error.
-
- @param countAvailable The number of available elements in the hostApiTypes array.
+ Upon success, this will be the number of valid elements stored in hostApiTypes.
 
  @return A PaErrorCode indicating whether the call succeeded or failed.
 
- The paInsufficientMemory error indicates that countAvailable was not large enough
+ The paInsufficientMemory error indicates that arrayCapacity was not large enough
  to accommodate the list of selected host APIs. In this case, the needed
  count is returned in the count parameter.
 
  @see Pa_SelectHostApis
 */
-PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
+PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int arrayCapacity, int *count );
 
 
 /** A structure containing information about a particular host API. */
