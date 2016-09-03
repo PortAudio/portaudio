@@ -384,23 +384,90 @@ static PaError CloseHandleWithPaError( HANDLE handle )
 }
 
 /**
- * Sets the <tt>transportType</tt> of a specific <tt>PaDeviceInfo</tt> to a
- * value deduced by examining the other fields of the specified
- * <tt>PaDeviceInfo</tt>. For example, if <tt>name</tt> field matches the
- * regular expression <tt>\(.*USB.*\)</tt>, the <tt>transportType</tt> is set to
- * <tt>USB</tt>.
+ * Sets the <tt>transportType</tt> of a specific <tt>PaDeviceInfo</tt>.
  *
+ * @param winMmeDeviceId
  * @param deviceInfo the <tt>PaDeviceInfo</tt> to set the <tt>transportType</tt>
  * of
  */
-static void SetDeviceInfoTransportType(PaDeviceInfo *deviceInfo)
+static void
+SetDeviceInfoTransportType(UINT winMmeDeviceId, PaDeviceInfo *deviceInfo)
 {
-    const char *s = deviceInfo->name;
+    deviceInfo->transportType = NULL;
 
-    deviceInfo->transportType
-        = (s && (s = strrchr(s,'(')) && (s = strstr(s,"USB")) && strchr(s,')'))
-            ? "USB"
-            : NULL;
+#ifdef PAWIN_USE_WDMKS_DEVICE_INFO
+    if (!(deviceInfo->transportType))
+    {
+        DWORD deviceInterfaceSize;
+        LPWSTR deviceInterface = NULL;
+
+        if (deviceInfo->maxInputChannels > 0)
+        {
+            if (waveInMessage(
+                        (HWAVEIN)winMmeDeviceId,
+                        DRV_QUERYDEVICEINTERFACESIZE,
+                        (DWORD_PTR)&deviceInterfaceSize,
+                        0)
+                    == MMSYSERR_NOERROR)
+            {
+                deviceInterface = PaUtil_AllocateMemory(deviceInterfaceSize);
+                if (deviceInterface
+                        && (waveInMessage(
+                                    (HWAVEIN)winMmeDeviceId,
+                                    DRV_QUERYDEVICEINTERFACE,
+                                    (DWORD_PTR)deviceInterface,
+                                    deviceInterfaceSize)
+                                != MMSYSERR_NOERROR))
+                {
+                    PaUtil_FreeMemory(deviceInterface);
+                    deviceInterface = NULL;
+                }
+            }
+        }
+        else if (deviceInfo->maxOutputChannels > 0)
+        {
+            if (waveOutMessage(
+                        (HWAVEOUT)winMmeDeviceId,
+                        DRV_QUERYDEVICEINTERFACESIZE,
+                        (DWORD_PTR)&deviceInterfaceSize,
+                        0)
+                    == MMSYSERR_NOERROR)
+            {
+                deviceInterface = PaUtil_AllocateMemory(deviceInterfaceSize);
+                if (deviceInterface
+                        && (waveOutMessage(
+                                    (HWAVEOUT)winMmeDeviceId,
+                                    DRV_QUERYDEVICEINTERFACE,
+                                    (DWORD_PTR)deviceInterface,
+                                    deviceInterfaceSize)
+                                != MMSYSERR_NOERROR))
+                {
+                    PaUtil_FreeMemory(deviceInterface);
+                    deviceInterface = NULL;
+                }
+            }
+        }
+        if (deviceInterface)
+        {
+            if (wcsstr(deviceInterface, L"\\usb#")
+                    || wcsstr(deviceInterface, L"\\USB#"))
+                deviceInfo->transportType = "USB";
+            PaUtil_FreeMemory(deviceInterface);
+        }
+    }
+#endif /* #ifdef PAWIN_USE_WDMKS_DEVICE_INFO */
+
+    /*
+     * As a last resort, attempt to make a decision about the transportType
+     * based on the name of the specified deviceInfo.
+     */
+    if (!(deviceInfo->transportType))
+    {
+        const char *s = deviceInfo->name;
+
+        if (s && (s = strrchr(s,'(')) && (s = strstr(s,"USB")) && strchr(s,')'))
+            deviceInfo->transportType = "USB";
+    }
 }
 
 /* PaWinMmeHostApiRepresentation - host api datastructure specific to this implementation */
@@ -755,9 +822,6 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     }
     deviceInfo->name = deviceName;
 
-    /* transportType */
-    SetDeviceInfoTransportType(deviceInfo);
-
     if( wic.wChannels == 0xFFFF || wic.wChannels < 1 || wic.wChannels > 255 ){
         /* For Windows versions using WDM (possibly Windows 98 ME and later)
          * the kernel mixer sits between the application and the driver. As a result,
@@ -782,6 +846,8 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
             QueryWaveInKSFilterMaxChannels( winMmeInputDeviceId, &deviceInfo->maxInputChannels );
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
+    /* transportType */
+    SetDeviceInfoTransportType(winMmeInputDeviceId, deviceInfo);
 
     MMRESULT mmr;
     size_t cbEndpointIdSize;
@@ -932,9 +998,6 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     }
     deviceInfo->name = deviceName;
 
-    /* transportType */
-    SetDeviceInfoTransportType(deviceInfo);
-
     if( woc.wChannels == 0xFFFF || woc.wChannels < 1 || woc.wChannels > 255 ){
         /* For Windows versions using WDM (possibly Windows 98 ME and later)
          * the kernel mixer sits between the application and the driver. As a result,
@@ -960,6 +1023,9 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     if( wdmksDeviceOutputChannelCountIsKnown && !winMmeDeviceInfo->deviceOutputChannelCountIsKnown )
         winMmeDeviceInfo->deviceOutputChannelCountIsKnown = 1;
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
+
+    /* transportType */
+    SetDeviceInfoTransportType(winMmeOutputDeviceId, deviceInfo);
 
     MMRESULT mmr;
     size_t cbEndpointIdSize;
