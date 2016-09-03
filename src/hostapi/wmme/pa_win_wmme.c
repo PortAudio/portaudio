@@ -383,6 +383,25 @@ static PaError CloseHandleWithPaError( HANDLE handle )
     return result;
 }
 
+/**
+ * Sets the <tt>transportType</tt> of a specific <tt>PaDeviceInfo</tt> to a
+ * value deduced by examining the other fields of the specified
+ * <tt>PaDeviceInfo</tt>. For example, if <tt>name</tt> field matches the
+ * regular expression <tt>\(.*USB.*\)</tt>, the <tt>transportType</tt> is set to
+ * <tt>USB</tt>.
+ *
+ * @param deviceInfo the <tt>PaDeviceInfo</tt> to set the <tt>transportType</tt>
+ * of
+ */
+static void SetDeviceInfoTransportType(PaDeviceInfo *deviceInfo)
+{
+    const char *s = deviceInfo->name;
+
+    deviceInfo->transportType
+        = (s && (s = strrchr(s,'(')) && (s = strstr(s,"USB")) && strchr(s,')'))
+            ? "USB"
+            : NULL;
+}
 
 /* PaWinMmeHostApiRepresentation - host api datastructure specific to this implementation */
 
@@ -688,6 +707,12 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     
     *success = 0;
 
+    /* We do not want Microsoft's Sound Mapper because it is a virtual device
+     * and we want the real (hardware) devices only.
+     */
+    if (WAVE_MAPPER == winMmeInputDeviceId)
+        return paNoError;
+
     mmresult = waveInGetDevCaps( winMmeInputDeviceId, &wic, sizeof( WAVEINCAPS ) );
     if( mmresult == MMSYSERR_NOMEM )
     {
@@ -729,6 +754,9 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
         StrTCpyToC( deviceName, wic.szPname  );
     }
     deviceInfo->name = deviceName;
+
+    /* transportType */
+    SetDeviceInfoTransportType(deviceInfo);
 
     if( wic.wChannels == 0xFFFF || wic.wChannels < 1 || wic.wChannels > 255 ){
         /* For Windows versions using WDM (possibly Windows 98 ME and later)
@@ -856,6 +884,12 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
 
     *success = 0;
 
+    /* We do not want Microsoft's Sound Mapper because it is a virtual device
+     * and we want the real (hardware) devices only.
+     */
+    if (WAVE_MAPPER == winMmeOutputDeviceId)
+        return paNoError;
+
     mmresult = waveOutGetDevCaps( winMmeOutputDeviceId, &woc, sizeof( WAVEOUTCAPS ) );
     if( mmresult == MMSYSERR_NOMEM )
     {
@@ -897,6 +931,9 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
         StrTCpyToC( deviceName, woc.szPname  );
     }
     deviceInfo->name = deviceName;
+
+    /* transportType */
+    SetDeviceInfoTransportType(deviceInfo);
 
     if( woc.wChannels == 0xFFFF || woc.wChannels < 1 || woc.wChannels > 255 ){
         /* For Windows versions using WDM (possibly Windows 98 ME and later)

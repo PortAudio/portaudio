@@ -59,8 +59,12 @@
 
 #ifdef __GNUC__
     #include <initguid.h>
-    #define _WIN32_WINNT 0x0501
-    #define WINVER 0x0501
+    #ifndef _WIN32_WINNT
+        #define _WIN32_WINNT 0x0501
+    #endif /* #ifndef _WIN32_WINNT */
+    #ifndef WINVER
+        #define WINVER 0x0501
+    #endif /* #ifndef WINVER */
 #endif
 
 #include <string.h> /* strlen() */
@@ -76,7 +80,7 @@
 #include "pa_debugprint.h"
 
 #include <windows.h>
-#include <winioctl.h>
+/* #include <winioctl.h> MinGW-w64 4.7.1 from TDM-GCC throws multiple redefinition errors. */
 #include <process.h>
 
 #ifdef __GNUC__
