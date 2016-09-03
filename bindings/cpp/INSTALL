@@ -48,7 +48,7 @@ may remove or edit it.
 you want to change it or regenerate `configure' using a newer version
 of `autoconf'.
 
-   The simplest way to compile this package is:
+The simplest way to compile this package is:
 
   1. `cd' to the directory containing the package's source code and type
      `./configure' to configure the package for your system.
@@ -111,7 +111,7 @@ is an example:
 Compiling For Multiple Architectures
 ====================================
 
-   You can compile the package for more than one kind of computer at the
+You can compile the package for more than one kind of computer at the
 same time, by placing the object files for each architecture in their
 own directory.  To do this, you can use GNU `make'.  `cd' to the
 directory where you want the object files and executables to go and run
@@ -141,7 +141,7 @@ using the `lipo' tool if you have problems.
 Installation Names
 ==================
 
-   By default, `make install' installs the package's commands under
+By default, `make install' installs the package's commands under
 `/usr/local/bin', include files under `/usr/local/include', etc.  You
 can specify an installation prefix other than `/usr/local' by giving
 `configure' the option `--prefix=PREFIX', where PREFIX must be an
@@ -196,7 +196,7 @@ Optional Features
 with an extra prefix or suffix on their names by giving `configure' the
 option `--program-prefix=PREFIX' or `--program-suffix=SUFFIX'.
 
-   Some packages pay attention to `--enable-FEATURE' options to
+Some packages pay attention to `--enable-FEATURE' options to
 `configure', where FEATURE indicates an optional part of the package.
 They may also pay attention to `--with-PACKAGE' options, where PACKAGE
 is something like `gnu-as' or `x' (for the X Window System).  The
@@ -292,7 +292,7 @@ A warning: not all `configure' scripts look for a site script.
 Defining Variables
 ==================
 
-   Variables not defined in a site shell script can be set in the
+Variables not defined in a site shell script can be set in the
 environment passed to `configure'.  However, some packages may run
 configure again during the build, and the customized values of these
 variables may be lost.  In order to avoid this problem, you should set

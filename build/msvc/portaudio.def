@@ -35,6 +35,8 @@ Pa_GetStreamReadAvailable           @31
 Pa_GetStreamWriteAvailable          @32
 Pa_GetSampleSize                    @33
 Pa_Sleep                            @34
+Pa_UpdateAvailableDeviceList        @35
+Pa_SetDevicesChangedCallback        @36
 PaAsio_GetAvailableLatencyValues    @50
 PaAsio_ShowControlPanel             @51
 PaUtil_InitializeX86PlainConverters @52

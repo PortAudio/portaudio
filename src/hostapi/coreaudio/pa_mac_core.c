@@ -1340,7 +1340,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 (float) sampleRate,
                 framesPerBuffer ));
     VDBUG( ("Opening Stream.\n") );
-	
+
     /*These first few bits of code are from paSkeleton with few modifications.*/
     if( inputParameters )
     {
@@ -1730,37 +1730,37 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 	pthread_mutex_init( &stream->timingInformationMutex, NULL );
 	stream->timingInformationMutexIsInitialized = 1;
-	
+
 	if( stream->outputUnit ) {
 		UpdateReciprocalOfActualOutputSampleRateFromDeviceProperty( stream );
 		stream->recipricalOfActualOutputSampleRate_ioProcCopy = stream->recipricalOfActualOutputSampleRate;
-		
+
 		AudioDeviceAddPropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyActualSampleRate, 
 									   AudioDevicePropertyActualSampleRateListenerProc, stream );
-									   		
+
 		UpdateOutputLatencySamplesFromDeviceProperty( stream );
 		stream->deviceOutputLatencySamples_ioProcCopy = stream->deviceOutputLatencySamples;
-		
+
 		AudioDeviceAddPropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyLatency, 
 									   AudioDevicePropertyOutputLatencySamplesListenerProc, stream );
-		
+
 	}else{
 		stream->recipricalOfActualOutputSampleRate = 1.;
 		stream->recipricalOfActualOutputSampleRate_ioProcCopy = 0.;
 		stream->deviceOutputLatencySamples_ioProcCopy = 0;
 	}
-	
+
 	if( stream->inputUnit ) {
 		UpdateInputLatencySamplesFromDeviceProperty( stream );
 		stream->deviceInputLatencySamples_ioProcCopy = stream->deviceInputLatencySamples;
-		
+
 		AudioDeviceAddPropertyListener( stream->inputDevice, 0, /* isInput = */ TRUE, kAudioDevicePropertyLatency, 
 									   AudioDevicePropertyInputLatencySamplesListenerProc, stream );
-	}else{
+    } else {
 		stream->deviceInputLatencySamples = 0;
 		stream->deviceInputLatencySamples_ioProcCopy = 0;
-	}
-	
+    }
+
     stream->state = STOPPED;
     stream->xrunFlags = 0;
 
@@ -1862,14 +1862,14 @@ static OSStatus AudioIOProc( void *inRefCon,
       ----------------------------------------------------------------- */
 
 	/* compute PaStreamCallbackTimeInfo */
-	
+
 	if( pthread_mutex_trylock( &stream->timingInformationMutex ) == 0 ){
 		/* snapshot the ioproc copy of timing information */
 		stream->deviceOutputLatencySamples_ioProcCopy = stream->deviceOutputLatencySamples;
 		stream->recipricalOfActualOutputSampleRate_ioProcCopy = stream->recipricalOfActualOutputSampleRate;
 		stream->deviceInputLatencySamples_ioProcCopy = stream->deviceInputLatencySamples;
 		pthread_mutex_unlock( &stream->timingInformationMutex );
-	}
+   }
 	
 	/* For timeInfo.currentTime we could calculate current time backwards from the HAL audio 
 	 output time to give a more accurate impression of the current timeslice but it doesn't 
@@ -1899,7 +1899,7 @@ static OSStatus AudioIOProc( void *inRefCon,
 						- stream->deviceInputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy; // FIXME should be using input sample rate here?
 				timeInfo.outputBufferDacTime = HOST_TIME_TO_PA_TIME(inTimeStamp->mHostTime) 
 						+ stream->deviceOutputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy;
-			}
+   }
 			else /* full duplex with ring-buffer from a separate input AUHAL ioproc */
 			{
 				/* FIXME: review. this computation of inputBufferAdcTime is definitely wrong since it doesn't take the ring buffer latency into account */
@@ -1922,7 +1922,7 @@ static OSStatus AudioIOProc( void *inRefCon,
 				- stream->deviceInputLatencySamples_ioProcCopy * stream->recipricalOfActualOutputSampleRate_ioProcCopy; // FIXME should be using input sample rate here?
 		timeInfo.outputBufferDacTime = 0;
 	}
-	
+
    //printf( "---%g, %g, %g\n", timeInfo.inputBufferAdcTime, timeInfo.currentTime, timeInfo.outputBufferDacTime );
 
    if( isRender && stream->inputUnit == stream->outputUnit
@@ -2261,7 +2261,7 @@ static PaError CloseStream( PaStream* s )
 
     if( stream ) {
 		
-		if( stream->outputUnit ) {
+       if( stream->outputUnit ) {
 			AudioDeviceRemovePropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyActualSampleRate, 
 											  AudioDevicePropertyActualSampleRateListenerProc );
 			AudioDeviceRemovePropertyListener( stream->outputDevice, 0, /* isInput = */ FALSE, kAudioDevicePropertyLatency, 
@@ -2352,7 +2352,7 @@ static PaError StartStream( PaStream *s )
     if( stream->outputUnit && stream->outputUnit != stream->inputUnit ) {
        ERR_WRAP( AudioOutputUnitStart(stream->outputUnit) );
     }
-	
+
     return paNoError;
 #undef ERR_WRAP
 }

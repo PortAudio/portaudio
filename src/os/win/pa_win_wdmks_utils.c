@@ -49,31 +49,31 @@
 #include <winioctl.h>						// MinGW32 does not define this automatically
 #include <ks.h>
 #include <ksmedia.h>
-#include <stdio.h>                          // just for some development printfs
+#include <stdio.h>              // just for some development printfs
 
 #include "portaudio.h"
 #include "pa_util.h"
 #include "pa_win_wdmks_utils.h"
 
 #if !defined(PA_WDMKS_NO_KSGUID_LIB) && !defined(PAWIN_WDMKS_NO_KSGUID_LIB)
-    #if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
-        #pragma comment( lib, "ksguid.lib" )
-    #endif
-    #define pa_KSDATAFORMAT_TYPE_AUDIO            KSDATAFORMAT_TYPE_AUDIO
-    #define pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT    KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
-    #define pa_KSDATAFORMAT_SUBTYPE_PCM           KSDATAFORMAT_SUBTYPE_PCM
-    #define pa_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX  KSDATAFORMAT_SUBTYPE_WAVEFORMATEX
-    #define pa_KSMEDIUMSETID_Standard             KSMEDIUMSETID_Standard
-    #define pa_KSINTERFACESETID_Standard          KSINTERFACESETID_Standard
-    #define pa_KSPROPSETID_Pin                    KSPROPSETID_Pin
+#if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) /* MSC version 6 and above */
+#pragma comment( lib, "ksguid.lib" )
+#endif
+#define pa_KSDATAFORMAT_TYPE_AUDIO            KSDATAFORMAT_TYPE_AUDIO
+#define pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT    KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
+#define pa_KSDATAFORMAT_SUBTYPE_PCM           KSDATAFORMAT_SUBTYPE_PCM
+#define pa_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX  KSDATAFORMAT_SUBTYPE_WAVEFORMATEX
+#define pa_KSMEDIUMSETID_Standard             KSMEDIUMSETID_Standard
+#define pa_KSINTERFACESETID_Standard          KSINTERFACESETID_Standard
+#define pa_KSPROPSETID_Pin                    KSPROPSETID_Pin
 #else
-    static const GUID pa_KSDATAFORMAT_TYPE_AUDIO            = { STATIC_KSDATAFORMAT_TYPE_AUDIO };
-    static const GUID pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT    = { STATIC_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT };
-    static const GUID pa_KSDATAFORMAT_SUBTYPE_PCM           = { STATIC_KSDATAFORMAT_SUBTYPE_PCM };
-    static const GUID pa_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX  = { STATIC_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX };
-    static const GUID pa_KSMEDIUMSETID_Standard             = { STATIC_KSMEDIUMSETID_Standard };
-    static const GUID pa_KSINTERFACESETID_Standard          = { STATIC_KSINTERFACESETID_Standard };
-    static const GUID pa_KSPROPSETID_Pin                    = { STATIC_KSPROPSETID_Pin };
+static const GUID pa_KSDATAFORMAT_TYPE_AUDIO            = { STATIC_KSDATAFORMAT_TYPE_AUDIO };
+static const GUID pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT    = { STATIC_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT };
+static const GUID pa_KSDATAFORMAT_SUBTYPE_PCM           = { STATIC_KSDATAFORMAT_SUBTYPE_PCM };
+static const GUID pa_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX  = { STATIC_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX };
+static const GUID pa_KSMEDIUMSETID_Standard             = { STATIC_KSMEDIUMSETID_Standard };
+static const GUID pa_KSINTERFACESETID_Standard          = { STATIC_KSINTERFACESETID_Standard };
+static const GUID pa_KSPROPSETID_Pin                    = { STATIC_KSPROPSETID_Pin };
 #endif
 
 

@@ -6,7 +6,7 @@
 	@author Phil Burk <philburk@softsynth.com>
 */
 /*
- * $Id$
+ * $Id: patest_out_underflow.c 1661 2011-04-28 18:54:46Z rob_bielik $
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -159,8 +159,8 @@ int main(void)
 
     /* Determine number of sines required to get to 50% */
     do
-    {        
-		Pa_Sleep( 100 );
+    {
+        Pa_Sleep( 100 );
 
         load = Pa_GetStreamCpuLoad( stream );
         printf("sineCount = %d, CPU load = %f\n", data.sineCount, load );
@@ -168,7 +168,7 @@ int main(void)
 		if( load < 0.3 )
 		{
 			data.sineCount += 10;
-		}
+    }
 		else if( load < 0.4 )
 		{
 			data.sineCount += 2;

@@ -4,7 +4,7 @@
 	@author Phil Burk <philburk@softsynth.com>
 */
 /*
- * $Id$
+ * $Id: patest_two_rates.c 1661 2011-04-28 18:54:46Z rob_bielik $
  *
  * Author: Phil Burk  http://www.softsynth.com
  *
@@ -64,11 +64,11 @@ typedef struct
 } paTestData;
 
 /* This routine will be called by the PortAudio engine when audio is needed.
- ** It may called at interrupt level on some machines so don't do anything
- ** that could mess up the system like calling malloc() or free().
- */
+** It may called at interrupt level on some machines so don't do anything
+** that could mess up the system like calling malloc() or free().
+*/
 static int patestCallback( const void *inputBuffer, void *outputBuffer,
-						  unsigned long framesPerBuffer,
+                           unsigned long framesPerBuffer,
 						  const PaStreamCallbackTimeInfo* timeInfo,
 						  PaStreamCallbackFlags statusFlags,
 						  void *userData )
@@ -119,17 +119,17 @@ int main(void)
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = NULL;
 
-    /* Start first stream. **********************/	
+    /* Start first stream. **********************/
     err = Pa_OpenStream(
-						&stream1,
+              &stream1,
 						NULL, /* no input */
 						&outputParameters,
-						SAMPLE_RATE_1,
+              SAMPLE_RATE_1,
 						FRAMES_PER_BUFFER,
-						paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-						patestCallback,
-						&data1 );
-	if( err != paNoError ) goto error;
+              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+              patestCallback,
+              &data1 );
+    if( err != paNoError ) goto error;
 
     err = Pa_StartStream( stream1 );
     if( err != paNoError ) goto error;
@@ -138,14 +138,14 @@ int main(void)
 
     /* Start second stream. **********************/
     err = Pa_OpenStream(
-						&stream2,
+              &stream2,
 						NULL, /* no input */
 						&outputParameters,
-						SAMPLE_RATE_2,
+              SAMPLE_RATE_2,
 						FRAMES_PER_BUFFER,
-						paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-						patestCallback,
-						&data2 );
+              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+              patestCallback,
+              &data2 );
     if( err != paNoError ) goto error;
 
     err = Pa_StartStream( stream2 );

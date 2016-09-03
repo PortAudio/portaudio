@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_converters.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * Portable Audio I/O Library sample conversion mechanism
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -45,7 +45,7 @@
 
  @todo Consider whether functions which dither but don't clip should exist,
  V18 automatically enabled clipping whenever dithering was selected. Perhaps
- we should do the same. 
+ we should do the same.
     see: "require clipping for dithering sample conversion functions?"
     http://www.portaudio.com/trac/ticket/112
 
@@ -1167,8 +1167,8 @@ static void Int24_To_Int16_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    unsigned char *src = (unsigned char*)sourceBuffer;
-    PaInt16 *dest = (PaInt16*)destinationBuffer;
+    unsigned char *src = (unsigned char *)sourceBuffer;
+    PaInt16 *dest = (PaInt16 *)destinationBuffer;
 
     PaInt32 temp, dither;
 
@@ -1189,7 +1189,7 @@ static void Int24_To_Int16_Dither(
         dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
         *dest = (PaInt16) (((temp >> 1) + dither) >> 15);
 
-        src  += sourceStride * 3;
+        src += sourceStride * 3;
         dest += destinationStride;
     }
 }
@@ -1255,7 +1255,7 @@ static void Int24_To_Int8_Dither(
 
         src += sourceStride * 3;
         dest += destinationStride;
-    }
+}
 }
 
 /* -------------------------------------------------------------------------- */

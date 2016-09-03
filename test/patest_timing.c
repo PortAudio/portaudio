@@ -89,7 +89,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
             timeInfo->currentTime,
             timeInfo->outputBufferDacTime );
 
-    printf( "getStreamTime() returns: %g\n", Pa_GetStreamTime(data->stream) - data->start );
+    printf( "getStreamTime() returns: %g\n", Pa_GetStreamTime(data->stream)-data->start );
     
     for( i=0; i<framesPerBuffer; i++ )
     {

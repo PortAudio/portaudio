@@ -162,9 +162,9 @@ func_dirname_and_basename ()
   func_dirname_result=`$ECHO "X${1}" | $Xsed -e "$dirname"`
   if test "X$func_dirname_result" = "X${1}"; then
     func_dirname_result="${3}"
-  else
+else
     func_dirname_result="$func_dirname_result${2}"
-  fi
+fi
   func_basename_result=`$ECHO "X${1}" | $Xsed -e "$basename"`
 }
 
@@ -193,7 +193,7 @@ case $progpath in
      progdir=$func_dirname_result
      progdir=`cd "$progdir" && pwd`
      progpath="$progdir/$progname"
-     ;;
+  ;;
   *)
      save_IFS="$IFS"
      IFS=:
@@ -204,7 +204,7 @@ case $progpath in
      IFS="$save_IFS"
      test -n "$progdir" || progdir=`pwd`
      progpath="$progdir/$progname"
-     ;;
+  ;;
 esac
 
 # Sed substitution that helps us do robust quoting.  It backslashifies
@@ -280,7 +280,7 @@ func_warning ()
 func_fatal_error ()
 {
     func_error ${1+"$@"}
-    exit $EXIT_FAILURE
+  exit $EXIT_FAILURE
 }
 
 # func_fatal_help arg...
@@ -293,7 +293,7 @@ func_fatal_help ()
 }
 help="Try \`$progname --help' for more information."  ## default
 
-
+  
 # func_grep expression filename
 # Check whether EXPRESSION matches any line of FILENAME, without output.
 func_grep ()
@@ -327,7 +327,7 @@ func_mkdir_p ()
 
         # ...otherwise throw away the child directory and loop
         my_directory_path=`$ECHO "X$my_directory_path" | $Xsed -e "$dirname"`
-      done
+  done
       my_dir_list=`$ECHO "X$my_dir_list" | $Xsed -e 's,:*$,,'`
 
       save_mkdir_p_IFS="$IFS"; IFS=':'
@@ -343,7 +343,7 @@ func_mkdir_p ()
       # Bail out if we (or some other process) failed to create a directory.
       test -d "$my_directory_path" || \
         func_fatal_error "Failed to create \`$1'"
-    fi
+fi
 }
 
 
@@ -364,13 +364,13 @@ func_mktempdir ()
       my_tmpdir=`mktemp -d "${my_template}-XXXXXXXX" 2>/dev/null`
 
       if test ! -d "$my_tmpdir"; then
-        # Failing that, at least try and use $RANDOM to avoid a race
-        my_tmpdir="${my_template}-${RANDOM-0}$$"
+	# Failing that, at least try and use $RANDOM to avoid a race
+	my_tmpdir="${my_template}-${RANDOM-0}$$"
 
-        save_mktempdir_umask=`umask`
-        umask 0077
+	save_mktempdir_umask=`umask`
+	umask 0077
         $MKDIR "$my_tmpdir"
-        umask $save_mktempdir_umask
+	umask $save_mktempdir_umask
       fi
 
       # If we're not in dry-run mode, bomb out on failure
@@ -395,7 +395,7 @@ func_quote_for_eval ()
 	func_quote_for_eval_unquoted_result=`$ECHO "X$1" | $Xsed -e "$sed_quote_subst"` ;;
       *)
         func_quote_for_eval_unquoted_result="$1" ;;
-    esac
+      esac
 
     case $func_quote_for_eval_unquoted_result in
       # Double-quote args containing shell metacharacters to delay
@@ -405,7 +405,7 @@ func_quote_for_eval ()
       # in scan sets, so we specify it separately.
       *[\[\~\#\^\&\*\(\)\{\}\|\;\<\>\?\'\ \	]*|*]*|"")
         func_quote_for_eval_result="\"$func_quote_for_eval_unquoted_result\""
-        ;;
+    ;;
       *)
         func_quote_for_eval_result="$func_quote_for_eval_unquoted_result"
     esac
@@ -423,17 +423,17 @@ func_quote_for_expand ()
 	    -e "$double_quote_subst" -e "$sed_double_backslash"` ;;
       *)
         my_arg="$1" ;;
-    esac
+	esac
 
     case $my_arg in
       # Double-quote args containing shell metacharacters to delay
       # word splitting and command substitution for a subsequent eval.
       # Many Bourne shells cannot handle close brackets correctly
       # in scan sets, so we specify it separately.
-      *[\[\~\#\^\&\*\(\)\{\}\|\;\<\>\?\'\ \	]*|*]*|"")
+	      *[\[\~\#\^\&\*\(\)\{\}\|\;\<\>\?\'\ \	]*|*]*|"")
         my_arg="\"$my_arg\""
-        ;;
-    esac
+	      ;;
+	    esac
 
     func_quote_for_expand_result="$my_arg"
 }
@@ -458,7 +458,7 @@ func_show_eval ()
       my_status=$?
       if test "$my_status" -eq 0; then :; else
 	eval "(exit $my_status); $my_fail_exp"
-      fi
+    fi
     fi
 }
 
@@ -480,11 +480,11 @@ func_show_eval_locale ()
     if ${opt_dry_run-false}; then :; else
       eval "$lt_user_locale
 	    $my_cmd"
-      my_status=$?
+    my_status=$?
       eval "$lt_safe_locale"
       if test "$my_status" -eq 0; then :; else
 	eval "(exit $my_status); $my_fail_exp"
-      fi
+    fi
     fi
 }
 
@@ -566,10 +566,10 @@ elif test "X$1" = X--fallback-echo; then
 elif test "X`{ $ECHO '\t'; } 2>/dev/null`" = 'X\t'; then
   # Yippee, $ECHO works!
   :
-else
+	else
   # Restart under the correct shell, and then maybe $ECHO will work.
   exec $SHELL "$progpath" --no-reexec ${1+"$@"}
-fi
+	fi
 
 if test "X$1" = X--fallback-echo; then
   # used as fallback echo
@@ -578,7 +578,7 @@ if test "X$1" = X--fallback-echo; then
 $*
 EOF
   exit $EXIT_SUCCESS
-fi
+  fi
 
 magic="%%%MAGIC variable%%%"
 magic_exe="%%%MAGIC EXE variable%%%"
@@ -688,7 +688,7 @@ func_enable_tag ()
       else
 	func_error "ignoring unknown tag $tagname"
       fi
-      ;;
+    ;;
   esac
 }
 
@@ -733,12 +733,12 @@ func_enable_tag ()
 			func_echo "enabling shell trace mode"
 			opt_debug='set -x'
 			$opt_debug
-			;;
+    ;;
 
       -dlopen)		test "$#" -eq 0 && func_missing_arg "$opt" && break
 			execute_dlfiles="$execute_dlfiles $1"
 			shift
-			;;
+    ;;
 
       --dry-run | -n)	opt_dry_run=:					;;
       --features)       func_features					;;
@@ -759,9 +759,9 @@ func_enable_tag ()
 			  # Catch anything else as an error
 			  *) func_error "invalid argument for $opt"
 			     exit_cmd=exit
-			     break
-			     ;;
-		        esac
+    break
+    ;;
+  esac
 
 			mode="$1"
 			shift
@@ -772,17 +772,17 @@ func_enable_tag ()
 
       --quiet|--silent)	preserve_args="$preserve_args $opt"
 			opt_silent=:
-			;;
+  ;;
 
       --verbose| -v)	preserve_args="$preserve_args $opt"
 			opt_silent=false
-			;;
+  ;;
 
       --tag)		test "$#" -eq 0 && func_missing_arg "$opt" && break
 			preserve_args="$preserve_args $opt $1"
 			func_enable_tag "$1"	# tagname is set here
 			shift
-			;;
+  ;;
 
       # Separate optargs to long options:
       -dlopen=*|--mode=*|--tag=*)
@@ -798,10 +798,10 @@ func_enable_tag ()
       -*)		func_fatal_help "unrecognized option \`$opt'"	;;
 
       *)		nonopt="$opt"
-			break
-			;;
-    esac
-  done
+	   break
+	   ;;
+	esac
+      done
 
 
   case $host in
@@ -833,14 +833,14 @@ $progname: definition of this LT_INIT comes from an older release.
 $progname: You should recreate aclocal.m4 with macros from $PACKAGE $VERSION
 $progname: and run autoconf again.
 _LT_EOF
-      else
+	else
         cat >&2 <<_LT_EOF
 $progname: Version mismatch error.  This is $PACKAGE $VERSION, but the
 $progname: definition of this LT_INIT comes from $PACKAGE $macro_version.
 $progname: You should recreate aclocal.m4 with macros from $PACKAGE $VERSION
 $progname: and run autoconf again.
 _LT_EOF
-      fi
+	fi
     else
       cat >&2 <<_LT_EOF
 $progname: Version mismatch error.  This is $PACKAGE $VERSION, revision $package_revision,
@@ -848,7 +848,7 @@ $progname: but the definition of this LT_INIT comes from revision $macro_revisio
 $progname: You should recreate aclocal.m4 with macros from revision $package_revision
 $progname: of $PACKAGE $VERSION and run autoconf again.
 _LT_EOF
-    fi
+      fi
 
     exit $EXIT_MISMATCH
   fi
@@ -1161,7 +1161,7 @@ func_mode_compile ()
 	  args=$func_stripname_result
 	  lastarg=
 	  save_ifs="$IFS"; IFS=','
-	  for arg in $args; do
+ 	  for arg in $args; do
 	    IFS="$save_ifs"
 	    func_quote_for_eval "$arg"
 	    lastarg="$lastarg $func_quote_for_eval_result"
@@ -1175,7 +1175,7 @@ func_mode_compile ()
 	  continue
 	  ;;
 
-	*)
+	* )
 	  # Accept the current argument as the source file.
 	  # The previous "srcfile" becomes the current argument.
 	  #
@@ -1379,11 +1379,11 @@ compiler."
       if test -n "$output_obj" && test "X$output_obj" != "X$lobj"; then
 	func_show_eval '$MV "$output_obj" "$lobj"' \
 	  'error=$?; $opt_dry_run || $RM $removelist; exit $error'
-      fi
+	fi
 
       # Allow error messages only from the first compilation.
       if test "$suppress_opt" = yes; then
-	suppress_output=' >/dev/null 2>&1'
+        suppress_output=' >/dev/null 2>&1'
       fi
     fi
 
@@ -1675,8 +1675,8 @@ func_mode_execute ()
 	else
 	  if test ! -f "$dir/$dlname"; then
 	    func_fatal_error "cannot find \`$dlname' in \`$dir' or \`$dir/$objdir'"
-	  fi
 	fi
+      fi
 	;;
 
       *.lo)
@@ -1698,7 +1698,7 @@ func_mode_execute ()
       # Now add the directory to shlibpath_var.
       if eval "test -z \"\$$shlibpath_var\""; then
 	eval "$shlibpath_var=\"\$dir\""
-      else
+    else
 	eval "$shlibpath_var=\"\$dir:\$$shlibpath_var\""
       fi
     done
@@ -1724,7 +1724,7 @@ func_mode_execute ()
 	  func_source "$func_ltwrapper_scriptname_result"
 	  # Transform arg to wrapped name.
 	  file="$progdir/$program"
-	fi
+    fi
 	;;
       esac
       # Quote arguments (to preserve shell metacharacters).
@@ -1755,7 +1755,7 @@ func_mode_execute ()
       if test -n "$shlibpath_var"; then
 	eval "\$ECHO \"\$shlibpath_var=\$$shlibpath_var\""
 	$ECHO "export $shlibpath_var"
-      fi
+    fi
       $ECHO "$cmd$args"
       exit $EXIT_SUCCESS
     fi
@@ -1891,7 +1891,7 @@ func_mode_install ()
 	*[\\\ /]cp\ *) ;;
 	*) prev=$arg ;;
 	esac
-	;;
+    ;;
       -g | -m | -o)
 	prev=$arg
 	;;
@@ -2152,7 +2152,7 @@ func_mode_install ()
 	esac
 
 	# Do a test to see if this is really a libtool program.
-	case $host in
+    case $host in
 	*cygwin* | *mingw*)
 	    if func_ltwrapper_executable_p "$file"; then
 	      func_ltwrapper_scriptname "$file"
@@ -4132,7 +4132,7 @@ func_mode_link ()
 	-static-libtool-libs)
 	  if test -z "$pic_flag" && test -n "$link_static_flag"; then
 	    dlopen_self=$dlopen_self_static
-	  fi
+	fi
 	  prefer_static_libs=yes
 	  ;;
 	esac
@@ -4222,7 +4222,7 @@ func_mode_link ()
 	      case "$deplibs " in
 		*" $qarg.ltframework "*) ;;
 		*) deplibs="$deplibs $qarg.ltframework" # this is fixed later
-		   ;;
+	  ;;
 	      esac
 	      ;;
 	  esac
@@ -4318,10 +4318,10 @@ func_mode_link ()
 		  non_pic_object=$xdir$func_lo2o_result
 		  func_append libobjs " $pic_object"
 		  func_append non_pic_objects " $non_pic_object"
-	        else
+		  else
 		  func_fatal_error "\`$arg' is not a valid libtool object"
+		  fi
 		fi
-	      fi
 	    done
 	  else
 	    func_fatal_error "link input file \`$arg' does not exist"
@@ -4584,8 +4584,8 @@ func_mode_link ()
 	    *" $arg "*) ;;
 	    * ) new_inherited_linker_flags="$new_inherited_linker_flags $arg" ;;
 	esac
-	continue
-	;;
+        continue
+        ;;
 
       -multi_module)
 	single_module="${wl}-multi_module"
@@ -4778,7 +4778,7 @@ func_mode_link ()
       -* | +*)
         func_quote_for_eval "$arg"
 	arg="$func_quote_for_eval_result"
-	;;
+	  ;;
 
       *.$objext)
 	# A standard object.
@@ -4862,10 +4862,10 @@ func_mode_link ()
 	    non_pic_object=$xdir$func_lo2o_result
 	    func_append libobjs " $pic_object"
 	    func_append non_pic_objects " $non_pic_object"
-	  else
+	    else
 	    func_fatal_error "\`$arg' is not a valid libtool object"
+	    fi
 	  fi
-	fi
 	;;
 
       *.$libext)
@@ -4898,7 +4898,7 @@ func_mode_link ()
 	# to be aesthetically quoted because they are evaled later.
 	func_quote_for_eval "$arg"
 	arg="$func_quote_for_eval_result"
-	;;
+	  ;;
       esac # arg
 
       # Now actually substitute the argument into the commands.
@@ -5081,7 +5081,7 @@ func_mode_link ()
 		    *" $deplib "*) ;;
 		    * ) new_inherited_linker_flags="$new_inherited_linker_flags $deplib" ;;
 		esac
-	    fi
+	  fi
 	  fi
 	  continue
 	  ;;
@@ -5149,7 +5149,7 @@ func_mode_link ()
 		    continue
 		  fi
 		fi
-		;;
+	        ;;
 	      *) ;;
 	      esac
 	    fi
@@ -5225,21 +5225,21 @@ func_mode_link ()
 	    case " $dlpreconveniencelibs " in
 	    *" $deplib "*) ;;
 	    *)
-	      valid_a_lib=no
-	      case $deplibs_check_method in
-		match_pattern*)
+	    valid_a_lib=no
+	    case $deplibs_check_method in
+	      match_pattern*)
 		  set dummy $deplibs_check_method; shift
 		  match_pattern_regex=`expr "$deplibs_check_method" : "$1 \(.*\)"`
 		  if eval "\$ECHO \"X$deplib\"" 2>/dev/null | $Xsed -e 10q \
 		    | $EGREP "$match_pattern_regex" > /dev/null; then
-		    valid_a_lib=yes
-		  fi
-		;;
-		pass_all)
 		  valid_a_lib=yes
+		fi
 		;;
-	      esac
-	      if test "$valid_a_lib" != yes; then
+	      pass_all)
+		valid_a_lib=yes
+		;;
+            esac
+	    if test "$valid_a_lib" != yes; then
 		$ECHO
 		$ECHO "*** Warning: Trying to link with static lib archive $deplib."
 		$ECHO "*** I have the capability to make that library automatically link in when"
@@ -5247,12 +5247,12 @@ func_mode_link ()
 		$ECHO "*** shared version of the library, which you do not appear to have"
 		$ECHO "*** because the file extensions .$libext of this argument makes me believe"
 		$ECHO "*** that it is just a static archive that I should not use here."
-	      else
+	    else
 		$ECHO
 		$ECHO "*** Warning: Linking the shared library $output against the"
 		$ECHO "*** static library $deplib is not portable!"
-		deplibs="$deplib $deplibs"
-	      fi
+	      deplibs="$deplib $deplibs"
+	    fi
 	      ;;
 	    esac
 	    continue
@@ -5326,7 +5326,7 @@ func_mode_link ()
 	    case " $new_inherited_linker_flags " in
 	      *" $tmp_inherited_linker_flag "*) ;;
 	      *) new_inherited_linker_flags="$new_inherited_linker_flags $tmp_inherited_linker_flag";;
-	    esac
+	esac
 	  done
 	fi
 	dependency_libs=`$ECHO "X $dependency_libs" | $Xsed -e 's% \([^ $]*\).ltframework% -framework \1%g'`
@@ -5351,10 +5351,10 @@ func_mode_link ()
 	    for deplib in $dependency_libs; do
 	      deplibs="$deplib $deplibs"
 	      if $opt_duplicate_deps ; then
-		case "$tmp_libs " in
-		*" $deplib "*) specialdeplibs="$specialdeplibs $deplib" ;;
-		esac
-	      fi
+	        case "$tmp_libs " in
+	        *" $deplib "*) specialdeplibs="$specialdeplibs $deplib" ;;
+	        esac
+              fi
 	      tmp_libs="$tmp_libs $deplib"
 	    done
 	  elif test "$linkmode" != prog && test "$linkmode" != lib; then
@@ -5553,7 +5553,7 @@ func_mode_link ()
 
 	link_static=no # Whether the deplib will be linked statically
 	use_static_libs=$prefer_static_libs
-	if test "$use_static_libs" = built && test "$installed" = yes; then
+	if test "$use_static_libs" = built && test "$installed" = yes ; then
 	  use_static_libs=no
 	fi
 	if test -n "$library_names" &&
@@ -5565,10 +5565,10 @@ func_mode_link ()
 	      need_relink=no
 	    ;;
 	  *)
-	    if test "$installed" = no; then
-	      notinst_deplibs="$notinst_deplibs $lib"
-	      need_relink=yes
-	    fi
+	  if test "$installed" = no; then
+	    notinst_deplibs="$notinst_deplibs $lib"
+	    need_relink=yes
+	  fi
 	    ;;
 	  esac
 	  # This is a shared library
@@ -5685,16 +5685,16 @@ func_mode_link ()
 			 $GREP ": [^:]* bundle" >/dev/null ; then
 		      if test "X$dlopenmodule" != "X$lib"; then
 			$ECHO "*** Warning: lib $linklib is a module, not a shared library"
-			if test -z "$old_library" ; then
+		      if test -z "$old_library" ; then
 			  $ECHO
 			  $ECHO "*** And there doesn't seem to be a static archive available"
 			  $ECHO "*** The link will probably fail, sorry"
-			else
-			  add="$dir/$old_library"
-			fi
+		      else
+		        add="$dir/$old_library"
+		      fi
 		      elif test -n "$old_library"; then
 			add="$dir/$old_library"
-		      fi
+		    fi
 		    fi
 		esac
 	      elif test "$hardcode_minus_L" = no; then
@@ -5782,9 +5782,9 @@ func_mode_link ()
 	    elif test "$hardcode_automatic" = yes; then
 	      if test -n "$inst_prefix_dir" &&
 		 test -f "$inst_prefix_dir$libdir/$linklib" ; then
-		add="$inst_prefix_dir$libdir/$linklib"
+	        add="$inst_prefix_dir$libdir/$linklib"
 	      else
-		add="$libdir/$linklib"
+	        add="$libdir/$linklib"
 	      fi
 	    else
 	      # We cannot seem to hardcode it, guess we'll fake it.
@@ -5927,11 +5927,11 @@ func_mode_link ()
 		      darwin_install_name=`${OTOOL} -L $depdepl | awk '{if (NR == 2) {print $1;exit}}'`
                       if test -z "$darwin_install_name"; then
                           darwin_install_name=`${OTOOL64} -L $depdepl  | awk '{if (NR == 2) {print $1;exit}}'`
-                      fi
+		    fi
 		      compiler_flags="$compiler_flags ${wl}-dylib_file ${wl}${darwin_install_name}:${depdepl}"
 		      linker_flags="$linker_flags -dylib_file ${darwin_install_name}:${depdepl}"
 		      path=
-		    fi
+		  fi
 		  fi
 		  ;;
 		*)
@@ -5946,9 +5946,9 @@ func_mode_link ()
 		    func_warning "\`$deplib' seems to be moved"
 
 		  path="-L$absdir"
-		fi
-		;;
-	      esac
+		    fi
+		  ;;
+		esac
 	      case " $deplibs " in
 	      *" $path "*) ;;
 	      *) deplibs="$path $deplibs" ;;
@@ -6417,7 +6417,7 @@ func_mode_link ()
 	    $output_objdir/$outputname | $output_objdir/$libname.* | $output_objdir/${libname}${release}.*)
 	       if test "X$precious_files_regex" != "X"; then
 		 if $ECHO "$p" | $EGREP -e "$precious_files_regex" >/dev/null 2>&1
-		 then
+	         then
 		   continue
 		 fi
 	       fi
@@ -6428,7 +6428,7 @@ func_mode_link ()
 	done
 	test -n "$removelist" && \
 	  func_show_eval "${RM}r \$removelist"
-      fi
+	fi
 
       # Now set the variables for building old libraries.
       if test "$build_old_libs" = yes && test "$build_libtool_libs" != convenience ; then
@@ -6502,7 +6502,7 @@ func_mode_link ()
 	  *-*-sysv4.2uw2* | *-*-sysv5* | *-*-unixware* | *-*-OpenUNIX*)
 	    # Compiler inserts libc in the correct place for threads to work
 	    ;;
-	  *)
+ 	  *)
 	    # Add libc to deplibs on all other systems if necessary.
 	    if test "$build_libtool_need_lc" = "yes"; then
 	      deplibs="$deplibs -lc"
@@ -6558,7 +6558,7 @@ EOF
 		    i=""
 		    ;;
 		  esac
-		fi
+	        fi
 		if test -n "$i" ; then
 		  libname=`eval "\\$ECHO \"$libname_spec\""`
 		  deplib_matches=`eval "\\$ECHO \"$library_names_spec\""`
@@ -6678,9 +6678,9 @@ EOF
 		      if eval $file_magic_cmd \"\$potlib\" 2>/dev/null |
 			 $SED -e 10q |
 			 $EGREP "$file_magic_regex" > /dev/null; then
-			newdeplibs="$newdeplibs $a_deplib"
-			a_deplib=""
-			break 2
+		        newdeplibs="$newdeplibs $a_deplib"
+		        a_deplib=""
+		        break 2
 		      fi
 		  done
 		done
@@ -7015,11 +7015,11 @@ EOF
 	      len=$func_len_result
 	      if test "$len" -lt "$max_cmd_len" || test "$max_cmd_len" -le -1; then
 		func_show_eval "$cmd" 'exit $?'
-		skipped_export=false
+	        skipped_export=false
 	      else
-		# The command line is too long to execute in one step.
+	        # The command line is too long to execute in one step.
 		func_verbose "using reloadable object file for export list..."
-		skipped_export=:
+	        skipped_export=:
 		# Break out early, otherwise skipped_export may be
 		# set to false by a later but shorter cmd.
 		break
@@ -7055,12 +7055,12 @@ EOF
 
 	tmp_deplibs=
 	for test_deplib in $deplibs; do
-	  case " $convenience " in
-	  *" $test_deplib "*) ;;
-	  *)
-	    tmp_deplibs="$tmp_deplibs $test_deplib"
-	    ;;
-	  esac
+		case " $convenience " in
+		*" $test_deplib "*) ;;
+		*)
+			tmp_deplibs="$tmp_deplibs $test_deplib"
+			;;
+		esac
 	done
 	deplibs="$tmp_deplibs"
 
@@ -7085,7 +7085,7 @@ EOF
 	    test "X$libobjs" = "X " && libobjs=
 	  fi
 	fi
-
+	
 	if test "$thread_safe" = yes && test -n "$thread_safe_flag_spec"; then
 	  eval flag=\"$thread_safe_flag_spec\"
 	  linker_flags="$linker_flags $flag"
@@ -7106,12 +7106,12 @@ EOF
 	    cmds=$module_cmds
 	  fi
 	else
-	  if test -n "$export_symbols" && test -n "$archive_expsym_cmds"; then
-	    eval test_cmds=\"$archive_expsym_cmds\"
-	    cmds=$archive_expsym_cmds
-	  else
-	    eval test_cmds=\"$archive_cmds\"
-	    cmds=$archive_cmds
+	if test -n "$export_symbols" && test -n "$archive_expsym_cmds"; then
+	  eval test_cmds=\"$archive_expsym_cmds\"
+	  cmds=$archive_expsym_cmds
+	else
+	  eval test_cmds=\"$archive_cmds\"
+	  cmds=$archive_cmds
 	  fi
 	fi
 
@@ -7177,47 +7177,47 @@ EOF
 	  else
 	    if test -n "$save_libobjs"; then
 	      func_verbose "creating reloadable object files..."
-	      output=$output_objdir/$output_la-${k}.$objext
+	  output=$output_objdir/$output_la-${k}.$objext
 	      eval test_cmds=\"$reload_cmds\"
 	      func_len " $test_cmds"
 	      len0=$func_len_result
 	      len=$len0
 
-	      # Loop over the list of objects to be linked.
-	      for obj in $save_libobjs
-	      do
+	  # Loop over the list of objects to be linked.
+	  for obj in $save_libobjs
+	  do
 		func_len " $obj"
 		func_arith $len + $func_len_result
 		len=$func_arith_result
-		if test "X$objlist" = X ||
+	    if test "X$objlist" = X ||
 		   test "$len" -lt "$max_cmd_len"; then
 		  func_append objlist " $obj"
-		else
-		  # The command $test_cmds is almost too long, add a
-		  # command to the queue.
-		  if test "$k" -eq 1 ; then
-		    # The first file doesn't have a previous command to add.
-		    eval concat_cmds=\"$reload_cmds $objlist $last_robj\"
-		  else
-		    # All subsequent reloadable object files will link in
-		    # the last one created.
+	    else
+	      # The command $test_cmds is almost too long, add a
+	      # command to the queue.
+	      if test "$k" -eq 1 ; then
+		# The first file doesn't have a previous command to add.
+		eval concat_cmds=\"$reload_cmds $objlist $last_robj\"
+	      else
+		# All subsequent reloadable object files will link in
+		# the last one created.
 		    eval concat_cmds=\"\$concat_cmds~$reload_cmds $objlist $last_robj~\$RM $last_robj\"
-		  fi
-		  last_robj=$output_objdir/$output_la-${k}.$objext
+	      fi
+	      last_robj=$output_objdir/$output_la-${k}.$objext
 		  func_arith $k + 1
 		  k=$func_arith_result
-		  output=$output_objdir/$output_la-${k}.$objext
-		  objlist=$obj
+	      output=$output_objdir/$output_la-${k}.$objext
+	      objlist=$obj
 		  func_len " $last_robj"
 		  func_arith $len0 + $func_len_result
 		  len=$func_arith_result
-		fi
-	      done
-	      # Handle the remaining objects by creating one last
-	      # reloadable object file.  All subsequent reloadable object
-	      # files will link in the last one created.
-	      test -z "$concat_cmds" || concat_cmds=$concat_cmds~
-	      eval concat_cmds=\"\${concat_cmds}$reload_cmds $objlist $last_robj\"
+	    fi
+	  done
+	  # Handle the remaining objects by creating one last
+	  # reloadable object file.  All subsequent reloadable object
+	  # files will link in the last one created.
+	  test -z "$concat_cmds" || concat_cmds=$concat_cmds~
+	  eval concat_cmds=\"\${concat_cmds}$reload_cmds $objlist $last_robj\"
 	      if test -n "$last_robj"; then
 	        eval concat_cmds=\"\${concat_cmds}~\$RM $last_robj\"
 	      fi
@@ -7227,26 +7227,26 @@ EOF
 	      output=
 	    fi
 
-	    if ${skipped_export-false}; then
+	  if ${skipped_export-false}; then
 	      func_verbose "generating symbol list for \`$libname.la'"
-	      export_symbols="$output_objdir/$libname.exp"
+	    export_symbols="$output_objdir/$libname.exp"
 	      $opt_dry_run || $RM $export_symbols
-	      libobjs=$output
-	      # Append the command to create the export file.
+	    libobjs=$output
+	    # Append the command to create the export file.
 	      test -z "$concat_cmds" || concat_cmds=$concat_cmds~
 	      eval concat_cmds=\"\$concat_cmds$export_symbols_cmds\"
 	      if test -n "$last_robj"; then
 		eval concat_cmds=\"\$concat_cmds~\$RM $last_robj\"
-	      fi
+          fi
 	    fi
 
 	    test -n "$save_libobjs" &&
 	      func_verbose "creating a temporary reloadable object file: $output"
 
-	    # Loop through the commands generated above and execute them.
-	    save_ifs="$IFS"; IFS='~'
-	    for cmd in $concat_cmds; do
-	      IFS="$save_ifs"
+	  # Loop through the commands generated above and execute them.
+	  save_ifs="$IFS"; IFS='~'
+	  for cmd in $concat_cmds; do
+	    IFS="$save_ifs"
 	      $opt_silent || {
 		  func_quote_for_expand "$cmd"
 		  eval "func_echo $func_quote_for_expand_result"
@@ -7263,8 +7263,8 @@ EOF
 
 		exit $lt_exit
 	      }
-	    done
-	    IFS="$save_ifs"
+	  done
+	  IFS="$save_ifs"
 
 	    if test -n "$export_symbols_regex" && ${skipped_export-false}; then
 	      func_show_eval '$EGREP -e "$export_symbols_regex" "$export_symbols" > "${export_symbols}T"'
@@ -7313,10 +7313,10 @@ EOF
 	      cmds=$module_cmds
 	    fi
 	  else
-	    if test -n "$export_symbols" && test -n "$archive_expsym_cmds"; then
-	      cmds=$archive_expsym_cmds
-	    else
-	      cmds=$archive_cmds
+	  if test -n "$export_symbols" && test -n "$archive_expsym_cmds"; then
+	    cmds=$archive_expsym_cmds
+	  else
+	    cmds=$archive_cmds
 	    fi
 	  fi
 	fi
@@ -7519,20 +7519,20 @@ EOF
 
       case $host in
       *-*-darwin*)
-	# Don't allow lazy linking, it breaks C++ global constructors
+        # Don't allow lazy linking, it breaks C++ global constructors
 	# But is supposedly fixed on 10.4 or later (yay!).
-	if test "$tagname" = CXX ; then
+        if test "$tagname" = CXX ; then
 	  case ${MACOSX_DEPLOYMENT_TARGET-10.0} in
 	    10.[0123])
-	      compile_command="$compile_command ${wl}-bind_at_load"
-	      finalize_command="$finalize_command ${wl}-bind_at_load"
+        compile_command="$compile_command ${wl}-bind_at_load"
+        finalize_command="$finalize_command ${wl}-bind_at_load"
 	    ;;
 	  esac
-	fi
+        fi
 	# Time to change all our "foo.ltframework" stuff back to "-framework foo"
 	compile_deplibs=`$ECHO "X $compile_deplibs" | $Xsed -e 's% \([^ $]*\).ltframework% -framework \1%g'`
 	finalize_deplibs=`$ECHO "X $finalize_deplibs" | $Xsed -e 's% \([^ $]*\).ltframework% -framework \1%g'`
-	;;
+        ;;
       esac
 
 
@@ -7677,25 +7677,25 @@ EOF
       # template prelinking step
       if test -n "$prelink_cmds"; then
 	func_execute_cmds "$prelink_cmds" 'exit $?'
-      fi
+	    fi
 
       wrappers_required=yes
-      case $host in
-      *cygwin* | *mingw* )
+              case $host in
+              *cygwin* | *mingw* )
         if test "$build_libtool_libs" != yes; then
           wrappers_required=no
         fi
-        ;;
+                ;;
       *cegcc)
         # Disable wrappers for cegcc, we are cross compiling anyway.
         wrappers_required=no
-        ;;
-      *)
+                ;;
+	    * )
         if test "$need_relink" = no || test "$build_libtool_libs" != yes; then
           wrappers_required=no
-        fi
-        ;;
-      esac
+	  fi
+            ;;
+          esac
       if test "$wrappers_required" = no; then
 	# Replace the output file specification.
 	compile_command=`$ECHO "X$compile_command" | $Xsed -e 's%@OUTPUT@%'"$output"'%g'`
@@ -7835,8 +7835,8 @@ EOF
 	    func_dirname_and_basename "$output" "" "."
 	    output_name=$func_basename_result
 	    output_path=$func_dirname_result
-	    cwrappersource="$output_path/$objdir/lt-$output_name.c"
-	    cwrapper="$output_path/$output_name.exe"
+            cwrappersource="$output_path/$objdir/lt-$output_name.c"
+            cwrapper="$output_path/$output_name.exe"
 	    $RM $cwrappersource $cwrapper
 	    trap "$RM $cwrappersource $cwrapper; exit $EXIT_FAILURE" 1 2 15
 
@@ -7849,7 +7849,7 @@ EOF
 	    $opt_dry_run || {
 	      $LTCC $LTCFLAGS -o $cwrapper $cwrappersource
 	      $STRIP $cwrapper
-	    }
+  }
 
 	    # Now, create the wrapper script for func_source use:
 	    func_ltwrapper_scriptname $cwrapper
@@ -7859,11 +7859,11 @@ EOF
 	      # note: this script will not be executed, so do not chmod.
 	      if test "x$build" = "x$host" ; then
 		$cwrapper --lt-dump-script > $func_ltwrapper_scriptname_result
-	      else
+  else
 		func_emit_wrapper no > $func_ltwrapper_scriptname_result
 	      fi
-	    }
-	  ;;
+}
+          ;;
 	  * )
 	    $RM $output
 	    trap "$RM $output; exit $EXIT_FAILURE" 1 2 15
@@ -7892,7 +7892,7 @@ EOF
 	  oldobjs="$old_deplibs $non_pic_objects"
 	  if test "$preload" = yes && test -f "$symfileobj"; then
 	    oldobjs="$oldobjs $symfileobj"
-	  fi
+	fi
 	fi
 	addlibs="$old_convenience"
       fi
@@ -7907,7 +7907,7 @@ EOF
 
       # Do each command in the archive commands.
       if test -n "$old_archive_from_new_cmds" && test "$build_libtool_libs" = yes; then
-	cmds=$old_archive_from_new_cmds
+       cmds=$old_archive_from_new_cmds
       else
 
 	# Add any objects from preloaded convenience libraries
@@ -7933,8 +7933,8 @@ EOF
 	  :
 	else
 	  $ECHO "copying selected object files to avoid basename conflicts..."
-	  gentop="$output_objdir/${outputname}x"
-	  generated="$generated $gentop"
+	    gentop="$output_objdir/${outputname}x"
+	    generated="$generated $gentop"
 	  func_mkdir_p "$gentop"
 	  save_oldobjs=$oldobjs
 	  oldobjs=
@@ -8000,7 +8000,7 @@ EOF
 	      # the above command should be used before it gets too long
 	      oldobjs=$objlist
 	      if test "$obj" = "$last_oldobj" ; then
-		RANLIB=$save_RANLIB
+	        RANLIB=$save_RANLIB
 	      fi
 	      test -z "$concat_cmds" || concat_cmds=$concat_cmds~
 	      eval concat_cmds=\"\${concat_cmds}$old_archive_cmds\"
@@ -8018,7 +8018,7 @@ EOF
 	fi
       fi
       func_execute_cmds "$cmds" 'exit $?'
-    done
+      done
 
     test -n "$generated" && \
       func_show_eval "${RM}r$generated"
@@ -8079,10 +8079,10 @@ EOF
 	      *.la)
 	        func_basename "$lib"
 		name="$func_basename_result"
-		eval libdir=`${SED} -n -e 's/^libdir=\(.*\)$/\1/p' $lib`
+	      eval libdir=`${SED} -n -e 's/^libdir=\(.*\)$/\1/p' $lib`
 		test -z "$libdir" && \
 		  func_fatal_error "\`$lib' is not a valid libtool archive"
-		newdlfiles="$newdlfiles $libdir/$name"
+	      newdlfiles="$newdlfiles $libdir/$name"
 		;;
 	      *) newdlfiles="$newdlfiles $lib" ;;
 	      esac
@@ -8098,10 +8098,10 @@ EOF
 		# the library:
 		func_basename "$lib"
 		name="$func_basename_result"
-		eval libdir=`${SED} -n -e 's/^libdir=\(.*\)$/\1/p' $lib`
+	      eval libdir=`${SED} -n -e 's/^libdir=\(.*\)$/\1/p' $lib`
 		test -z "$libdir" && \
 		  func_fatal_error "\`$lib' is not a valid libtool archive"
-		newdlprefiles="$newdlprefiles $libdir/$name"
+	      newdlprefiles="$newdlprefiles $libdir/$name"
 		;;
 	      esac
 	    done
@@ -8187,7 +8187,7 @@ relink_command=\"$relink_command\""
       ;;
     esac
     exit $EXIT_SUCCESS
-}
+	    }
 
 { test "$mode" = link || test "$mode" = relink; } &&
     func_mode_link ${1+"$@"}
@@ -8274,18 +8274,18 @@ func_mode_uninstall ()
 	    *" $dlname "*) ;;
 	    *) rmfiles="$rmfiles $objdir/$dlname" ;;
 	    esac
-	    test -n "$libdir" && rmfiles="$rmfiles $objdir/$name $objdir/${name}i"
+	     test -n "$libdir" && rmfiles="$rmfiles $objdir/$name $objdir/${name}i"
 	    ;;
 	  uninstall)
 	    if test -n "$library_names"; then
 	      # Do each command in the postuninstall commands.
 	      func_execute_cmds "$postuninstall_cmds" 'test "$rmforce" = yes || exit_status=1'
-	    fi
+		fi
 
 	    if test -n "$old_library"; then
 	      # Do each command in the old_postuninstall commands.
 	      func_execute_cmds "$old_postuninstall_cmds" 'test "$rmforce" = yes || exit_status=1'
-	    fi
+		fi
 	    # FIXME: should reinstall the best remaining shared library.
 	    ;;
 	  esac
@@ -8331,7 +8331,7 @@ func_mode_uninstall ()
 	  if func_ltwrapper_p "$file"; then
 	    if func_ltwrapper_executable_p "$file"; then
 	      func_ltwrapper_scriptname "$file"
-	      relink_command=
+	    relink_command=
 	      func_source $func_ltwrapper_scriptname_result
 	      rmfiles="$rmfiles $func_ltwrapper_scriptname_result"
 	    else

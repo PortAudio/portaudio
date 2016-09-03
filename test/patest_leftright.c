@@ -9,7 +9,7 @@
 	@author Phil Burk <philburk@softsynth.com>
 */
 /*
- * $Id$
+ * $Id: patest_leftright.c 1661 2011-04-28 18:54:46Z rob_bielik $
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
@@ -90,17 +90,17 @@ static int patestCallback( const void *inputBuffer,
     {
 		// Smoothly pan between left and right.
 		if( data->currentBalance < data->targetBalance )
-		{
+        {
 			data->currentBalance += BALANCE_DELTA;
-		}
+        }
 		else if( data->currentBalance > data->targetBalance )
-		{
+        {
 			data->currentBalance -= BALANCE_DELTA;
-		}
+        }
 		// Apply left/right balance.
         *out++ = data->sine[data->left_phase] * (1.0f - data->currentBalance);  /* left */
 		*out++ = data->sine[data->right_phase] * data->currentBalance;  /* right */
-		
+
         data->left_phase += 1;
         if( data->left_phase >= TABLE_SIZE ) data->left_phase -= TABLE_SIZE;
         data->right_phase += 3; /* higher pitch so we can distinguish left and right. */
@@ -118,7 +118,7 @@ int main(void)
     PaStreamParameters outputParameters;
     PaError err;
     paTestData data;
-    int i;    
+    int i;
     printf("Play different tone sine waves that alternate between left and right channel.\n");
     printf("The low tone should be on the left channel.\n");
     
@@ -159,7 +159,7 @@ int main(void)
     
     printf("Play for several seconds.\n");
     for( i=0; i<4; i++ )
-	{
+    {
 		printf("Hear low sound on left side.\n");
 		data.targetBalance = 0.01;
         Pa_Sleep( 1000 );
@@ -167,7 +167,7 @@ int main(void)
 		printf("Hear high sound on right side.\n");
 		data.targetBalance = 0.99;
         Pa_Sleep( 1000 ); 
-	}
+    }
 
     err = Pa_StopStream( stream );
     if( err != paNoError ) goto error;

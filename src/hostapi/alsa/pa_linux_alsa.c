@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_linux_alsa.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
  * ALSA implementation by Joshua Haberman and Arve Knudsen
@@ -2194,7 +2194,7 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
 #ifdef PA_ALSA_USE_OBSOLETE_HOST_BUFFER_CALC
 
     if( framesPerUserBuffer != paFramesPerBufferUnspecified )
-    {
+	{
         /* Preferably the host buffer size should be a multiple of the user buffer size */
 
         if( bufferSize > framesPerUserBuffer )
@@ -2271,7 +2271,7 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
                     else
                     if( alsa_snd_pcm_hw_params_test_period_size( self->pcm, hwParams, framesPerHostBuffer / 2, 0 ) == 0 )
                         framesPerHostBuffer /= 2;
-                }
+	}
             }
             else
             {
@@ -2291,7 +2291,7 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
 #ifdef PA_ALSA_USE_OBSOLETE_HOST_BUFFER_CALC
 
         if( framesPerUserBuffer != paFramesPerBufferUnspecified )
-        {
+    {
             /* Try to get a power-of-two of the user buffer size. */
             framesPerHostBuffer = framesPerUserBuffer;
             if( framesPerHostBuffer < bufferSize )
@@ -2373,9 +2373,9 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
             framesPerHostBuffer = ((minmax_diff == 2) ? max - 1 : max);
         }
 
-		PA_DEBUG(( "%s: device period minimum          = %lu\n", __FUNCTION__, min ));
-		PA_DEBUG(( "%s: device period maximum          = %lu\n", __FUNCTION__, max ));
-		PA_DEBUG(( "%s: host buffer period             = %lu\n", __FUNCTION__, framesPerHostBuffer ));
+		PA_DEBUG(( "%s: device period minimum      = %lu\n", __FUNCTION__, min ));
+		PA_DEBUG(( "%s: device period maximum      = %lu\n", __FUNCTION__, max ));
+		PA_DEBUG(( "%s: host buffer period         = %lu\n", __FUNCTION__, framesPerHostBuffer ));
 		PA_DEBUG(( "%s: host buffer period latency     = %f\n", __FUNCTION__, (double)(framesPerHostBuffer / sampleRate) ));
 
         /* Try setting period size */
@@ -3137,7 +3137,7 @@ error:
         ENSURE_( alsa_snd_pcm_hw_params_get_rate_min( hwParams, &_min, &_dir ), paUnanticipatedHostError );
         ENSURE_( alsa_snd_pcm_hw_params_get_rate_max( hwParams, &_max, &_dir ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: SR min = %d, max = %d, req = %lu\n", __FUNCTION__, _min, _max, approx ));
-    }
+}
 
     goto end;
 }
@@ -4144,7 +4144,7 @@ static void *CallbackThreadFunc( void *userData )
         int xrun = 0;
 
 #ifdef PTHREAD_CANCELED
-		pthread_testcancel();
+        pthread_testcancel();
 #endif
 
         /* @concern StreamStop if the main thread has requested a stop and the stream has not been effectively
@@ -4194,7 +4194,7 @@ static void *CallbackThreadFunc( void *userData )
             xrun = 0;
 
 #ifdef PTHREAD_CANCELED
-           pthread_testcancel();
+            pthread_testcancel();
 #endif
 
             /** @concern Xruns Under/overflows are to be reported to the callback */

@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_win_wmme.c 1663 2011-05-01 13:21:43Z rossb $
  * pa_win_wmme.c
  * Implementation of PortAudio for Windows MultiMedia Extensions (WMME)       
  *                                                                                         
@@ -1087,6 +1087,9 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->ScanDeviceInfos = 0;
+    (*hostApi)->CommitDeviceInfos = 0;
+    (*hostApi)->DisposeDeviceInfos = 0;
 
     PaUtil_InitializeStreamInterface( &winMmeHostApi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
@@ -1805,18 +1808,18 @@ static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostA
         {
             switch(j){
                 case 0:     
-                    /* first, attempt to open the device using WAVEFORMATEXTENSIBLE, 
-                        if this fails we fall back to WAVEFORMATEX */
+                /* first, attempt to open the device using WAVEFORMATEXTENSIBLE, 
+                    if this fails we fall back to WAVEFORMATEX */
 
-                    PaWin_InitializeWaveFormatExtensible( &waveFormat, devices[i].channelCount, 
-                            sampleFormat, waveFormatTag, sampleRate, channelMask );
+                PaWin_InitializeWaveFormatExtensible( &waveFormat, devices[i].channelCount, 
+                        sampleFormat, waveFormatTag, sampleRate, channelMask );
                     break;
-                
-                case 1:
-                    /* retry with WAVEFORMATEX */
 
-                    PaWin_InitializeWaveFormatEx( &waveFormat, devices[i].channelCount, 
-                            sampleFormat, waveFormatTag, sampleRate );
+                case 1:
+                /* retry with WAVEFORMATEX */
+
+                PaWin_InitializeWaveFormatEx( &waveFormat, devices[i].channelCount, 
+                        sampleFormat, waveFormatTag, sampleRate );
                     break;
             }
 

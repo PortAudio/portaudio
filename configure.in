@@ -337,7 +337,7 @@ case "${host_os}" in
            if [[ "$have_libossaudio" = "yes" ]] ; then
                    DLL_LIBS="$DLL_LIBS -lossaudio"
                    LIBS="$LIBS -lossaudio"
-           fi
+           fi      
            AC_DEFINE(PA_USE_OSS)
         fi
 

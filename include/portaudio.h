@@ -1,7 +1,7 @@
 #ifndef PORTAUDIO_H
 #define PORTAUDIO_H
 /*
- * $Id$
+ * $Id: portaudio.h 1670 2011-05-04 16:37:52Z rob_bielik $
  * PortAudio Portable Real-Time Audio Library
  * PortAudio API Header File
  * Latest version available at: http://www.portaudio.com/
@@ -121,8 +121,16 @@ const char *Pa_GetErrorText( PaError errorCode );
  Pairs of calls to Pa_Initialize()/Pa_Terminate() may overlap, and are not 
  required to be fully nested.
 
- Note that if Pa_Initialize() returns an error code, Pa_Terminate() should
+ If Pa_Initialize() returns an error code, Pa_Terminate() should
  NOT be called.
+
+ @note The device list returned by Pa_GetDeviceCount() et al. is frozen 
+ at the time Pa_Initialize() is called, and not updated dynamically, even if 
+ hardware devices (e.g. USB or firewire devices) are connected or disconnected 
+ during the course of the program's lifetime. If it is required to re-scan the 
+ list of devices, one must call Pa_UpdateAvailableDeviceList() or, completely
+ uninitialize PortAudio using Pa_Terminate(), and then reinitialize it by calling
+ Pa_Initialize().
 
  @return paNoError if successful, otherwise an error code indicating the cause
  of failure.
@@ -397,11 +405,25 @@ PaDeviceIndex Pa_GetDefaultInputDevice( void );
 */
 PaDeviceIndex Pa_GetDefaultOutputDevice( void );
 
+/** Update the list of available devices to match currently available hardware devices.
+
+ PortAudio's list of available devices is usually frozen at the time Pa_Initialize() is 
+ called. Pa_UpdateAvailableDeviceList() may be called to refresh PortAudio's list
+ of available devices at any time while PortAudio is initialized.
+
+ @note Open streams will not be affected by calls to this function, but
+ any previously returned PaDeviceInfo pointers are invalidated once this
+ function is called.
+
+ @return an error code indicating whether the device refresh was successful.
+ */
+PaError Pa_UpdateAvailableDeviceList( void );
+
 
 /** The type used to represent monotonic time in seconds. PaTime is 
  used for the fields of the PaStreamCallbackTimeInfo argument to the 
  PaStreamCallback and as the result of Pa_GetStreamTime().
-
+     
  PaTime values have unspecified origin.
      
  @see PaStreamCallback, PaStreamCallbackTimeInfo, Pa_GetStreamTime
@@ -439,7 +461,7 @@ typedef unsigned long PaSampleFormat;
 #define paInt16          ((PaSampleFormat) 0x00000008) /**< @see PaSampleFormat */
 #define paInt8           ((PaSampleFormat) 0x00000010) /**< @see PaSampleFormat */
 #define paUInt8          ((PaSampleFormat) 0x00000020) /**< @see PaSampleFormat */
-#define paCustomFormat   ((PaSampleFormat) 0x00010000) /**< @see PaSampleFormat */
+#define paCustomFormat   ((PaSampleFormat) 0x00010000)/**< @see PaSampleFormat */
 
 #define paNonInterleaved ((PaSampleFormat) 0x80000000) /**< @see PaSampleFormat */
 
@@ -1012,7 +1034,7 @@ const PaStreamInfo* Pa_GetStreamInfo( PaStream *stream );
 /** Returns the current time in seconds for a stream according to the same clock used
  to generate callback PaStreamCallbackTimeInfo timestamps. The time values are
  monotonically increasing and have unspecified origin. 
- 
+                                        
  Pa_GetStreamTime returns valid time values for the entire life of the stream,
  from when the stream is opened until it is closed. Starting and stopping the stream
  does not affect the passage of time returned by Pa_GetStreamTime.
@@ -1140,6 +1162,13 @@ PaError Pa_GetSampleSize( PaSampleFormat format );
  musical timing.
 */
 void Pa_Sleep( long msec );
+
+
+
+typedef void PaDevicesChangedCallback( void *userData );
+
+PaError Pa_SetDevicesChangedCallback( void *userData, PaStreamFinishedCallback* devicesChangedCallback ); 
+
 
 
 
