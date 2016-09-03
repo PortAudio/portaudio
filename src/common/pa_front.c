@@ -217,6 +217,11 @@ PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count )
     PaHostApiTypeId *oldSelectedHostApiTypes = selectedHostApiTypes_;
     PaHostApiTypeId *newSelectedHostApiTypes = NULL;
 
+    if( PA_IS_INITIALISED_ )
+    {
+        return paIsInitialized;
+    }
+
     if( count == 0 )
     {
         /* revert to default state */

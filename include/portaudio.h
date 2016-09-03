@@ -134,7 +134,8 @@ typedef enum PaErrorCode
     paCanNotReadFromAnOutputOnlyStream,
     paCanNotWriteToAnInputOnlyStream,
     paIncompatibleStreamHostApi,
-    paBadBufferPtr
+    paBadBufferPtr,
+    paIsInitialized
 } PaErrorCode;
 
 
@@ -276,8 +277,9 @@ typedef enum PaHostApiTypeId
 
 /** Select host APIs and their initialization order.
 
- The selected host APIs take effect the next time that Pa_Initialize() is
- invoked.
+ This function may only be called prior to calling Pa_Initialize()
+ or after calling Pa_Terminate(). The selected host APIs take effect the
+ next time that Pa_Initialize() is invoked.
 
  @param hostApiTypes An array of host API identifiers belonging to the
  PaHostApiTypeId enumeration.
