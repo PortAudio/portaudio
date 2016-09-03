@@ -11341,7 +11341,7 @@ case "${host_os}" in
         fi
         SHARED_FLAGS="$LIBS -dynamiclib $mac_arches $mac_sysroot $mac_version_min"
         CFLAGS="-std=c99 $CFLAGS $mac_arches $mac_sysroot $mac_version_min"
-        OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o"
+        OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o  src/os/mac_osx/pa_osx_hotplug.o"
         PADLL="libportaudio.dylib"
         ;;
 
@@ -11373,7 +11373,7 @@ case "${host_os}" in
 
         if [ "x$with_wdmks" = "xyes" ]; then
             DXDIR="$with_dxdir"
-            add_objects src/hostapi/wdmks/pa_win_wdmks.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o
+            add_objects src/hostapi/wdmks/pa_win_wdmks.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_wdmks_utils.o
             LIBS="-lwinmm -lm -luuid -lsetupapi -lole32"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lm -L$DXDIR/lib -luuid -lsetupapi -lole32"
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
@@ -11610,7 +11610,7 @@ fi
         if [ "$have_alsa" = "yes" ] && [ "$with_alsa" != "no" ] ; then
            DLL_LIBS="$DLL_LIBS -lasound"
            LIBS="$LIBS -lasound"
-           OTHER_OBJS="$OTHER_OBJS src/hostapi/alsa/pa_linux_alsa.o"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/alsa/pa_linux_alsa.o src/os/unix/pa_linux_hotplug.o"
            INCLUDES="$INCLUDES pa_linux_alsa.h"
            $as_echo "#define PA_USE_ALSA 1" >>confdefs.h
 

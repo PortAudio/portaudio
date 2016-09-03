@@ -668,6 +668,15 @@ typedef struct PaAlsaDeviceInfo
 }
 PaAlsaDeviceInfo;
 
+/* used for tranferring device infos during scanning / rescanning */
+typedef struct PaLinuxScanDeviceInfosResults
+{
+    PaDeviceInfo **deviceInfos;
+    PaDeviceIndex defaultInputDevice;
+    PaDeviceIndex defaultOutputDevice;
+    int deviceCount;
+} PaLinuxScanDeviceInfosResults;
+
 /* prototypes for functions declared in this file */
 
 static void Terminate( struct PaUtilHostApiRepresentation *hostApi );
@@ -692,9 +701,16 @@ static PaError IsStreamStopped( PaStream *s );
 static PaError IsStreamActive( PaStream *stream );
 static PaTime GetStreamTime( PaStream *stream );
 static double GetStreamCpuLoad( PaStream* stream );
-static PaError BuildDeviceList( PaAlsaHostApiRepresentation *hostApi );
+static PaError BuildDeviceList( PaAlsaHostApiRepresentation *hostApi, void** scanResults, int* deviceCount );
 static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwParams, double sampleRate );
 static int GetExactSampleRate( snd_pcm_hw_params_t *hwParams, double *sampleRate );
+
+static PaError ScanDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index,
+        void **newDeviceInfos, int *newDeviceCount );
+static PaError CommitDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index,
+        void *deviceInfos, int deviceCount);
+static PaError DisposeDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, void *deviceInfos,
+        int deviceCount );
 
 /* Callback prototypes */
 static void *CallbackThreadFunc( void *userData );
@@ -722,6 +738,8 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 {
     PaError result = paNoError;
     PaAlsaHostApiRepresentation *alsaHostApi = NULL;
+    void* scanResults = NULL;
+    int deviceCount = 0;
 
     /* Try loading Alsa library. */
     if (!PaAlsa_LoadLibrary())
@@ -733,20 +751,29 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     alsaHostApi->hostApiIndex = hostApiIndex;
 
     *hostApi = (PaUtilHostApiRepresentation*)alsaHostApi;
+    (*hostApi)->deviceInfos = NULL;
     (*hostApi)->info.structVersion = 1;
     (*hostApi)->info.type = paALSA;
     (*hostApi)->info.name = "ALSA";
 
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->ScanDeviceInfos = ScanDeviceInfos;
+    (*hostApi)->CommitDeviceInfos = CommitDeviceInfos;
+    (*hostApi)->DisposeDeviceInfos = DisposeDeviceInfos;
 
     /** If AlsaErrorHandler is to be used, do not forget to unregister callback pointer in
         Terminate function.
     */
     /*ENSURE_( snd_lib_error_set_handler(AlsaErrorHandler), paUnanticipatedHostError );*/
 
-    PA_ENSURE( BuildDeviceList( alsaHostApi ) );
+    ScanDeviceInfos(&alsaHostApi->baseHostApiRep, hostApiIndex, &scanResults,
+              &deviceCount);
+    CommitDeviceInfos(&alsaHostApi->baseHostApiRep, hostApiIndex, scanResults, deviceCount);
 
     PaUtil_InitializeStreamInterface( &alsaHostApi->callbackStreamInterface,
                                       CloseStream, StartStream,
@@ -802,7 +829,11 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     }
 
     PaUtil_FreeMemory( alsaHostApi );
-    alsa_snd_config_update_free_global();
+// damencho, removed fo compability with pulseaudio versions before 0.9.16
+// segfault application:
+// bugtrack alsa: 0002124: snd_config_update_free_global kills applications using user space alsa plugins
+//    snd_config_update_free_global();
+//    alsa_snd_config_update_free_global();
 
     /* Close Alsa library. */
     PaAlsa_CloseLibrary();
@@ -1075,7 +1106,7 @@ static int OpenPcm( snd_pcm_t **pcmp, const char *name, snd_pcm_stream_t stream,
 }
 
 static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* deviceName, int blocking,
-        PaAlsaDeviceInfo* devInfo, int* devIdx )
+        PaAlsaDeviceInfo* devInfo, int* devIdx, PaLinuxScanDeviceInfosResults* out )
 {
     PaError result = 0;
     PaDeviceInfo *baseDeviceInfo = &devInfo->baseDeviceInfo;
@@ -1128,20 +1159,20 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
     if( baseDeviceInfo->maxInputChannels > 0 || baseDeviceInfo->maxOutputChannels > 0 )
     {
         /* Make device default if there isn't already one or it is the ALSA "default" device */
-        if( (baseApi->info.defaultInputDevice == paNoDevice || !strcmp(deviceName->alsaName,
+        if( (out->defaultInputDevice == paNoDevice || !strcmp(deviceName->alsaName,
                         "default" )) && baseDeviceInfo->maxInputChannels > 0 )
         {
-            baseApi->info.defaultInputDevice = *devIdx;
+            out->defaultInputDevice = *devIdx;
             PA_DEBUG(("Default input device: %s\n", deviceName->name));
         }
-        if( (baseApi->info.defaultOutputDevice == paNoDevice || !strcmp(deviceName->alsaName,
+        if( (out->defaultOutputDevice == paNoDevice || !strcmp(deviceName->alsaName,
                         "default" )) && baseDeviceInfo->maxOutputChannels > 0 )
         {
-            baseApi->info.defaultOutputDevice = *devIdx;
+            out->defaultOutputDevice = *devIdx;
             PA_DEBUG(("Default output device: %s\n", deviceName->name));
         }
         PA_DEBUG(("%s: Adding device %s: %d\n", __FUNCTION__, deviceName->name, *devIdx));
-        baseApi->deviceInfos[*devIdx] = (PaDeviceInfo *) devInfo;
+        out->deviceInfos[*devIdx] = (PaDeviceInfo *) devInfo;
         (*devIdx) += 1;
     }
     else
@@ -1154,9 +1185,10 @@ end:
 }
 
 /* Build PaDeviceInfo list, ignore devices for which we cannot determine capabilities (possibly busy, sigh) */
-static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
+static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi, void** scanResults, int* count)
 {
     PaUtilHostApiRepresentation *baseApi = &alsaApi->baseHostApiRep;
+    PaLinuxScanDeviceInfosResults *outArgument = NULL;
     PaAlsaDeviceInfo *deviceInfoArray;
     int cardIdx = -1, devIdx = 0;
     snd_ctl_card_info_t *cardInfo;
@@ -1171,13 +1203,11 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
 #ifdef PA_ENABLE_DEBUG_OUTPUT
     PaTime startTime = PaUtil_GetTime();
 #endif
+    PaLinuxScanDeviceInfosResults* out = NULL;
 
     if( getenv( "PA_ALSA_INITIALIZE_BLOCK" ) && atoi( getenv( "PA_ALSA_INITIALIZE_BLOCK" ) ) )
         blocking = 0;
 
-    /* These two will be set to the first working input and output device, respectively */
-    baseApi->info.defaultInputDevice = paNoDevice;
-    baseApi->info.defaultOutputDevice = paNoDevice;
 
     /* Gather info about hw devices
 
@@ -1341,8 +1371,14 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
     else
         PA_DEBUG(( "%s: Iterating over ALSA plugins failed: %s\n", __FUNCTION__, alsa_snd_strerror( res ) ));
 
+    out = (PaLinuxScanDeviceInfosResults *) PaUtil_GroupAllocateMemory(
+                            alsaApi->allocations, sizeof(PaLinuxScanDeviceInfosResults) );
+
+    out->defaultInputDevice = paNoDevice;
+    out->defaultOutputDevice = paNoDevice;
+
     /* allocate deviceInfo memory based on the number of devices */
-    PA_UNLESS( baseApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+    PA_UNLESS( out->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
             alsaApi->allocations, sizeof(PaDeviceInfo*) * (numDeviceNames) ), paInsufficientMemory );
 
     /* allocate all device info structs in a contiguous block */
@@ -1367,7 +1403,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
             continue;
         }
 
-        PA_ENSURE( FillInDevInfo( alsaApi, hwInfo, blocking, devInfo, &devIdx ) );
+        PA_ENSURE( FillInDevInfo( alsaApi, hwInfo, blocking, devInfo, &devIdx, out ) );
     }
     assert( devIdx < numDeviceNames );
     /* Now inspect 'dmix' and 'default' plugins */
@@ -1381,11 +1417,13 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
         }
 
         PA_ENSURE( FillInDevInfo( alsaApi, hwInfo, blocking, devInfo,
-                    &devIdx ) );
+                    &devIdx, out ) );
     }
     free( hwDevInfos );
 
-    baseApi->info.deviceCount = devIdx;   /* Number of successfully queried devices */
+    out->deviceCount = devIdx;   /* Number of successfully queried devices */
+    *scanResults = out;
+    *count = out->deviceCount;
 
 #ifdef PA_ENABLE_DEBUG_OUTPUT
     PA_DEBUG(( "%s: Building device list took %f seconds\n", __FUNCTION__, PaUtil_GetTime() - startTime ));
@@ -2037,7 +2075,7 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
 
     ENSURE_( alsa_snd_pcm_sw_params_set_avail_min( self->pcm, swParams, self->framesPerBuffer ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_sw_params_set_xfer_align( self->pcm, swParams, 1 ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_sw_params_set_tstamp_mode( self->pcm, swParams, SND_PCM_TSTAMP_ENABLE ), paUnanticipatedHostError );
+    ENSURE_( alsa_snd_pcm_sw_params_set_tstamp_mode( self->pcm, swParams, SND_PCM_TSTAMP_MMAP ), paUnanticipatedHostError );
 
     /* Set the parameters! */
     ENSURE_( alsa_snd_pcm_sw_params( self->pcm, swParams ), paUnanticipatedHostError );
@@ -3544,8 +3582,19 @@ static PaError PaAlsaStreamComponent_GetAvailableFrames( PaAlsaStreamComponent *
     snd_pcm_sframes_t framesAvail = alsa_snd_pcm_avail_update( self->pcm );
     *xrunOccurred = 0;
 
-    if( -EPIPE == framesAvail )
-    {
+    /* Get pcm_state and check for xrun condition. On playback I often see
+     * xrun but avail_update does not return -EPIPE but framesAvail larger
+     * than bufferSize. In case of xrun status set xrun flag, leave framesize 
+     * as reported by avail_update, will be fixed below. In case avail_update
+     * returns -EPIPE process as usual.  wd-xxx
+     */
+    snd_pcm_state_t state = snd_pcm_state( self->pcm );  /* wd-xxx */
+    if (state == SND_PCM_STATE_XRUN) {
+        // printf("xrun, fav %d\n", framesAvail); fflush(stdout);  // DEBUG-WD
+        *xrunOccurred = 1;
+    }
+    if( -EPIPE == framesAvail) {
+        // printf("xrun-1, fav %d\n", framesAvail); fflush(stdout);  // DEBUG-WD
         *xrunOccurred = 1;
         framesAvail = 0;
     }
@@ -3554,6 +3603,11 @@ static PaError PaAlsaStreamComponent_GetAvailableFrames( PaAlsaStreamComponent *
         ENSURE_( framesAvail, paUnanticipatedHostError );
     }
 
+    /* Fix frames avail, should not be bigger than bufferSize wd-xxx */
+    if (framesAvail > self->bufferSize) {
+        // printf("xrun-2, fav %d\n", framesAvail); fflush(stdout);  // DEBUG-WD
+        framesAvail = self->bufferSize;
+    }
     *numFrames = framesAvail;
 
 error:
@@ -3602,6 +3656,13 @@ static PaError PaAlsaStreamComponent_EndPolling( PaAlsaStreamComponent* self, st
             self->ready = 1;
 
         *shouldPoll = 0;
+    }
+    else
+    {
+        // not actually used
+        unsigned long framesAvail = 0;
+        // now check for xrun
+        PaAlsaStreamComponent_GetAvailableFrames(self, &framesAvail, xrun );
     }
 
 error:
@@ -3693,6 +3754,10 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
                     framesAvail, &xrun ) );
         if( xrun )
         {
+            if(*framesAvail == 0)
+            {
+                result = paInternalError;
+            }
             goto end;
         }
 
@@ -3740,6 +3805,7 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
                 Pa_Sleep( 1 ); /* avoid hot loop */
                 continue;
             }
+            result = paInternalError;
 
             /* TODO: Add macro for checking system calls */
             PA_ENSURE( paInternalError );
@@ -3769,6 +3835,7 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
 				xrun = 1; /* try recovering device */
 
                 PA_DEBUG(( "%s: poll timed out\n", __FUNCTION__, timeouts ));
+                result = paTimedOut;
                 goto end;/*PA_ENSURE( paTimedOut );*/
             }
         }
@@ -4326,9 +4393,24 @@ static PaError ReadStream( PaStream* s, void *buffer, unsigned long frames )
     while( frames > 0 )
     {
         int xrun = 0;
-        PA_ENSURE( PaAlsaStream_WaitForFrames( stream, &framesAvail, &xrun ) );
-        framesGot = PA_MIN( framesAvail, frames );
+	PA_ENSURE( PaAlsaStream_WaitForFrames( stream, &framesAvail, &xrun ) );
+	/*
+	 * In case of overrun WaitForFrames leaves the capture stream in STATE_PREPARED
+	 * most of the time. handleXrun() restarts the ALSA stream only in case 
+	 * snd_pcm_recover() fails, which usually does not happen. 
+	 * Here we start the pcm stream again and go for another try. Another
+	 * option is: set result to paOverrun and return to caller. Then
+	 * the caller needs to call ReadStream again. This takes more time and
+	 * we lose even more frames.
+	 */
+	if (xrun) { /* wd-xxx */
+	  if( snd_pcm_state( stream->capture.pcm ) == SND_PCM_STATE_PREPARED ) {
+	      ENSURE_( snd_pcm_start( stream->capture.pcm ), paUnanticipatedHostError );
+	  }
+	  continue;
+	}
 
+        framesGot = PA_MIN( framesAvail, frames );
         PA_ENSURE( PaAlsaStream_SetUpBuffers( stream, &framesGot, &xrun ) );
         if( framesGot > 0 )
         {
@@ -4546,3 +4628,75 @@ PaError PaAlsa_SetRetriesBusy( int retries )
     busyRetries_ = retries;
     return paNoError;
 }
+
+static PaError ScanDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex,
+        void **scanResults, int *newDeviceCount)
+{
+    PaAlsaHostApiRepresentation* alsaHostApi = (PaAlsaHostApiRepresentation*)hostApi;
+    PaError result = paNoError;
+    PA_ENSURE(BuildDeviceList( alsaHostApi, scanResults, newDeviceCount ));
+
+    return paNoError;
+
+error:
+    return result;
+}
+
+static PaError CommitDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index,
+        void *scanResults, int deviceCount)
+{
+    PaAlsaHostApiRepresentation* alsaHostApi = (PaAlsaHostApiRepresentation*)hostApi;
+    PaError result = paNoError;
+
+    /* These two will be set to the first working input and output device, respectively */
+    hostApi->info.defaultInputDevice = paNoDevice;
+    hostApi->info.defaultOutputDevice = paNoDevice;
+
+    /* Free any old memory which might be in the device info */
+    if( hostApi->deviceInfos )
+    {
+        /* all device info structs are allocated in a block so we can destroy them here */
+        PaUtil_GroupFreeMemory( alsaHostApi->allocations, hostApi->deviceInfos[0] );
+        PaUtil_GroupFreeMemory( alsaHostApi->allocations, hostApi->deviceInfos );
+        hostApi->deviceInfos = NULL;
+    }
+
+    if( scanResults != NULL )
+    {
+        PaLinuxScanDeviceInfosResults *scanDeviceInfosResults = ( PaLinuxScanDeviceInfosResults * ) scanResults;
+
+        if( deviceCount > 0 )
+        {
+            /* use the array allocated in ScanDeviceInfos() as our deviceInfos */
+            hostApi->deviceInfos = scanDeviceInfosResults->deviceInfos;
+            hostApi->info.defaultInputDevice = scanDeviceInfosResults->defaultInputDevice;
+            hostApi->info.defaultOutputDevice = scanDeviceInfosResults->defaultOutputDevice;
+            hostApi->info.deviceCount = deviceCount;
+        }
+
+        PaUtil_GroupFreeMemory( alsaHostApi->allocations, scanDeviceInfosResults );
+    }
+
+    return result;    
+}
+
+static PaError DisposeDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, void *scanResults, int deviceCount)
+{
+    PaAlsaHostApiRepresentation *alsaHostApi = (PaAlsaHostApiRepresentation*)hostApi;
+
+    if( scanResults != NULL )
+    {
+        PaLinuxScanDeviceInfosResults *scanDeviceInfosResults = ( PaLinuxScanDeviceInfosResults * ) scanResults;
+        if( scanDeviceInfosResults->deviceInfos )
+        {
+            /* all device info structs are allocated in a block so we can destroy them here */
+            PaUtil_GroupFreeMemory( alsaHostApi->allocations, scanDeviceInfosResults->deviceInfos[0] );
+            PaUtil_GroupFreeMemory( alsaHostApi->allocations, scanDeviceInfosResults->deviceInfos );
+        }
+
+        PaUtil_GroupFreeMemory(alsaHostApi->allocations, scanDeviceInfosResults );
+    }
+
+    return paNoError;
+}
+

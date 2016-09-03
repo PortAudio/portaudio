@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_win_hostapis.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * Portable Audio I/O Library Windows initialization table
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -81,7 +81,7 @@ PaUtilHostApiInitializer *paHostApiInitializers[] =
 #endif
 
 #if PA_USE_WDMKS
-        PaWinWdm_Initialize,
+       //PaWinWdm_Initialize,
 #endif
 
 #if PA_USE_SKELETON

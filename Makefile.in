@@ -107,6 +107,7 @@ TESTS = \
 	bin/patest_wire \
 	bin/patest_write_sine \
 	bin/patest_write_sine_nonint \
+	bin/patest_update_available_device_list \
 	bin/pa_devs \
 	bin/pa_fuzz \
 	bin/pa_minlat
@@ -146,6 +147,7 @@ SRC_DIRS = \
 	src/hostapi/wdmks \
 	src/hostapi/wmme \
 	src/os/unix \
+	src/os/mac_osx \
 	src/os/win
 
 SUBDIRS =

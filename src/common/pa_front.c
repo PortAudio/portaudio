@@ -737,13 +737,12 @@ PaError Pa_UpdateAvailableDeviceList( void )
     for( i = 0 ; i < paInternalInfo_.hostApisCount_ ; ++i )
     {
         PaUtilHostApiRepresentation *hostApi = paInternalInfo_.hostApis_[i];
+        PA_DEBUG(( "Scanning new device list for host api %d.\n",i));
         if( hostApi->ScanDeviceInfos == NULL )
             continue;
 
-        PA_DEBUG(( "Scanning new device list for host api %d.\n",i));
         if( hostApi->ScanDeviceInfos( hostApi, i, &scanResults[ i ], &deviceCounts[ i ] ) != paNoError )
             break;
-
     }
 
     /* Check the result of the scan operation */

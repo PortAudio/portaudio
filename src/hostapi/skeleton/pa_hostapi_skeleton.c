@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_hostapi_skeleton.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * Portable Audio I/O Library skeleton implementation
  * demonstrates how to use the common functions to implement support
  * for a host API
@@ -206,9 +206,15 @@ PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
         }
     }
 
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
 
     PaUtil_InitializeStreamInterface( &skeletonHostApi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,

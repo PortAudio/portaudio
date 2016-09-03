@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_unix_oss.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
  * OSS implementation by:
@@ -256,6 +256,9 @@ PaError PaOSS_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
 
     PA_ENSURE( BuildDeviceList( ossHostApi ) );
 

@@ -80,6 +80,27 @@ extern "C"
 /* prototypes for functions declared in this file */
 
 PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+static PaError ScanDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index,
+    void **newDeviceInfos, int *newDeviceCount );
+static PaError CommitDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index,
+    void *deviceInfos, int deviceCount);
+static PaError DisposeDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, void *deviceInfos, 
+    int deviceCount );
+
+/* structures */
+
+/* used for tranferring device infos during scanning / rescanning */
+typedef struct PaMacScanDeviceInfosResults
+{
+    PaDeviceInfo **deviceInfos;
+    PaDeviceIndex defaultInputDevice;
+    PaDeviceIndex defaultOutputDevice;
+
+    AudioDeviceID* devIds;
+    int devCount;
+    AudioDeviceID devInputDevice;
+    AudioDeviceID devOutputDevice;
+} PaMacScanDeviceInfosResults;
 
 /*
  * Function declared in pa_mac_core.h. Sets up a PaMacCoreStreamInfoStruct
@@ -132,7 +153,6 @@ const char *PaMacCore_GetChannelName( int device, int channelIndex, bool input )
       return NULL;
    PaMacAUHAL *macCoreHostApi = (PaMacAUHAL*)hostApi;
    AudioDeviceID hostApiDevice = macCoreHostApi->devIds[device];
-
    UInt32 size = 0;
 
    error = AudioDeviceGetPropertyInfo( hostApiDevice,
@@ -311,46 +331,57 @@ static void startStopCallback(
 }
 
 
-/*currently, this is only used in initialization, but it might be modified
-  to be used when the list of devices changes.*/
-static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
+//static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
+static PaError gatherDeviceInfo(PaMacAUHAL* auhalHostApi, void** scanResults, int* count)
 {
-    UInt32 size;
-    UInt32 propsize;
-    VVDBUG(("gatherDeviceInfo()\n"));
-    /* -- free any previous allocations -- */
-    if( auhalHostApi->devIds )
-        PaUtil_GroupFreeMemory(auhalHostApi->allocations, auhalHostApi->devIds);
-    auhalHostApi->devIds = NULL;
+    UInt32 propsize = 0;
+    UInt32 size = sizeof(AudioDeviceID);
+    PaMacScanDeviceInfosResults *outArgument = NULL;
+    PaError result = paNoError;
 
+    VVDBUG(("gatherDeviceInfo()\n"));
     /* -- figure out how many devices there are -- */
     AudioHardwareGetPropertyInfo( kAudioHardwarePropertyDevices,
                                   &propsize,
                                   NULL );
-    auhalHostApi->devCount = propsize / sizeof( AudioDeviceID );
+    *count = (propsize / sizeof(AudioDeviceID));
 
-    VDBUG( ( "Found %ld device(s).\n", auhalHostApi->devCount ) );
+    VDBUG( ( "Found %ld device(s).\n", *count ) );
+
+    if(*count == 0)
+        return paNoError;
+
+    /* Allocate the out param for all the info we need */
+    outArgument = (PaMacScanDeviceInfosResults *) PaUtil_GroupAllocateMemory(
+                    auhalHostApi->allocations, sizeof(PaMacScanDeviceInfosResults) );
+
+    if( !outArgument )
+    {
+        result = paInsufficientMemory;
+        return result;
+    }
+
+    outArgument->devCount = *count;
 
     /* -- copy the device IDs -- */
-    auhalHostApi->devIds = (AudioDeviceID *)PaUtil_GroupAllocateMemory(
+    outArgument->devIds = (AudioDeviceID *)PaUtil_GroupAllocateMemory(
                              auhalHostApi->allocations,
                              propsize );
-    if( !auhalHostApi->devIds )
+    if( !outArgument->devIds )
         return paInsufficientMemory;
     AudioHardwareGetProperty( kAudioHardwarePropertyDevices,
                                   &propsize,
-                                  auhalHostApi->devIds );
+                                  outArgument->devIds );
 #ifdef MAC_CORE_VERBOSE_DEBUG
     {
        int i;
-       for( i=0; i<auhalHostApi->devCount; ++i )
-          printf( "Device %d\t: %ld\n", i, auhalHostApi->devIds[i] );
+       for( i=0; i<outArgument->devCount; ++i )
+          printf( "Device %d\t: %ld\n", i, outArgument->devIds[i] );
     }
 #endif
 
-    size = sizeof(AudioDeviceID);
-    auhalHostApi->defaultIn  = kAudioDeviceUnknown;
-    auhalHostApi->defaultOut = kAudioDeviceUnknown;
+    outArgument->devInputDevice  = kAudioDeviceUnknown;
+    outArgument->devOutputDevice = kAudioDeviceUnknown;
 
     /* determine the default device. */
     /* I am not sure how these calls to AudioHardwareGetProperty()
@@ -358,42 +389,44 @@ static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
        device as the default. */
     if( 0 != AudioHardwareGetProperty(kAudioHardwarePropertyDefaultInputDevice,
                      &size,
-                     &auhalHostApi->defaultIn) ) {
+                     &outArgument->devInputDevice) ) {
        int i;
-       auhalHostApi->defaultIn  = kAudioDeviceUnknown;
+       outArgument->devInputDevice = kAudioDeviceUnknown;
        VDBUG(("Failed to get default input device from OS."));
        VDBUG((" I will substitute the first available input Device."));
-       for( i=0; i<auhalHostApi->devCount; ++i ) {
+       
+       for( i=0; i< outArgument->devCount; ++i ) {
           PaDeviceInfo devInfo;
           if( 0 != GetChannelInfo( auhalHostApi, &devInfo,
-                                   auhalHostApi->devIds[i], TRUE ) )
+                                   outArgument->devIds[i], TRUE ) )
              if( devInfo.maxInputChannels ) {
-                auhalHostApi->defaultIn = auhalHostApi->devIds[i];
+                outArgument->devInputDevice = outArgument->devIds[i];
                 break;
              }
        }
     }   
     if( 0 != AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice,
                      &size,
-                     &auhalHostApi->defaultOut) ) {
+                     &outArgument->devOutputDevice) ) {
        int i;
-       auhalHostApi->defaultIn  = kAudioDeviceUnknown;
+       outArgument->devOutputDevice  = kAudioDeviceUnknown;
        VDBUG(("Failed to get default output device from OS."));
        VDBUG((" I will substitute the first available output Device."));
-       for( i=0; i<auhalHostApi->devCount; ++i ) {
+       for( i=0; i<outArgument->devCount; ++i ) {
           PaDeviceInfo devInfo;
           if( 0 != GetChannelInfo( auhalHostApi, &devInfo,
-                                   auhalHostApi->devIds[i], FALSE ) )
+                                   outArgument->devIds[i], FALSE ) )
              if( devInfo.maxOutputChannels ) {
-                auhalHostApi->defaultOut = auhalHostApi->devIds[i];
+                outArgument->devOutputDevice = outArgument->devIds[i];
                 break;
              }
        }
     }   
 
-    VDBUG( ( "Default in : %ld\n", auhalHostApi->defaultIn  ) );
-    VDBUG( ( "Default out: %ld\n", auhalHostApi->defaultOut ) );
+    VDBUG( ( "Default in : %ld\n", outArgument->devInputDevice ) );
+    VDBUG( ( "Default out: %ld\n", outArgument->devOutputDevice ) );
 
+    *scanResults = outArgument;
     return paNoError;
 }
 
@@ -402,9 +435,9 @@ static PaError GetChannelInfo( PaMacAUHAL *auhalHostApi,
                                AudioDeviceID macCoreDeviceId,
                                int isInput)
 {
-    UInt32 propSize;
+    UInt32 propSize = 0;
     PaError err = paNoError;
-    UInt32 i;
+    UInt32 i = 0;
     int numChannels = 0;
     AudioBufferList *buflist = NULL;
     UInt32 frameLatency;
@@ -528,10 +561,10 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
 PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
     PaError result = paNoError;
-    int i;
     PaMacAUHAL *auhalHostApi = NULL;
-    PaDeviceInfo *deviceInfoArray;
     int unixErr;
+    void* scanResults = NULL;
+    int deviceCount = 0;
 
     VVDBUG(("PaMacCore_Initialize(): hostApiIndex=%d\n", hostApiIndex));
 	
@@ -572,65 +605,29 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
     auhalHostApi->devIds = NULL;
     auhalHostApi->devCount = 0;
 
-    /* get the info we need about the devices */
-    result = gatherDeviceInfo( auhalHostApi );
-    if( result != paNoError )
-       goto error;
-
     *hostApi = &auhalHostApi->inheritedHostApiRep;
     (*hostApi)->info.structVersion = 1;
     (*hostApi)->info.type = paCoreAudio;
     (*hostApi)->info.name = "Core Audio";
-
+    
+    (*hostApi)->deviceInfos = NULL;
+    
     (*hostApi)->info.defaultInputDevice = paNoDevice;
     (*hostApi)->info.defaultOutputDevice = paNoDevice;
-
     (*hostApi)->info.deviceCount = 0;  
 
-    if( auhalHostApi->devCount > 0 )
-    {
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
-                auhalHostApi->allocations, sizeof(PaDeviceInfo*) * auhalHostApi->devCount);
-        if( !(*hostApi)->deviceInfos )
-        {
-            result = paInsufficientMemory;
-            goto error;
-        }
+    (*hostApi)->ScanDeviceInfos = ScanDeviceInfos;
+    (*hostApi)->CommitDeviceInfos = CommitDeviceInfos;
+    (*hostApi)->DisposeDeviceInfos = DisposeDeviceInfos;
 
-        /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateMemory(
-                auhalHostApi->allocations, sizeof(PaDeviceInfo) * auhalHostApi->devCount );
-        if( !deviceInfoArray )
-        {
-            result = paInsufficientMemory;
-            goto error;
-        }
+    result = ScanDeviceInfos(&auhalHostApi->inheritedHostApiRep, hostApiIndex, &scanResults,
+        &deviceCount);
 
-        for( i=0; i < auhalHostApi->devCount; ++i )
-        {
-            int err;
-            err = InitializeDeviceInfo( auhalHostApi, &deviceInfoArray[i],
-                                      auhalHostApi->devIds[i],
-                                      hostApiIndex );
-            if (err == paNoError)
-            { /* copy some info and set the defaults */
-                (*hostApi)->deviceInfos[(*hostApi)->info.deviceCount] = &deviceInfoArray[i];
-                if (auhalHostApi->devIds[i] == auhalHostApi->defaultIn)
-                    (*hostApi)->info.defaultInputDevice = (*hostApi)->info.deviceCount;
-                if (auhalHostApi->devIds[i] == auhalHostApi->defaultOut)
-                    (*hostApi)->info.defaultOutputDevice = (*hostApi)->info.deviceCount;
-                (*hostApi)->info.deviceCount++;
-            }
-            else
-            { /* there was an error. we need to shift the devices down, so we ignore this one */
-                int j;
-                auhalHostApi->devCount--;
-                for( j=i; j<auhalHostApi->devCount; ++j )
-                   auhalHostApi->devIds[j] = auhalHostApi->devIds[j+1];
-                i--;
-            }
-        }
-    }
+    if(result != paNoError)
+        goto error;
+       
+    /* FIXME for now we ignore the result of CommitDeviceInfos(), it should probably be an atomic non-failing operation */
+    CommitDeviceInfos( &auhalHostApi->inheritedHostApiRep, hostApiIndex, scanResults, deviceCount );
 
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
@@ -2468,3 +2465,148 @@ static double GetStreamCpuLoad( PaStream* s )
 
     return PaUtil_GetCpuLoad( &stream->cpuLoadMeasurer );
 }
+
+static PaError ScanDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex, 
+    void **scanResults, int *newDeviceCount)
+{
+    PaMacAUHAL* auhalHostApi = (PaMacAUHAL*)hostApi;
+    PaDeviceInfo *deviceInfoArray = NULL;
+    PaError result = paNoError;
+    int i = 0;
+    PaMacScanDeviceInfosResults* out = NULL;
+    
+    /* get the info we need about the devices */
+    result = gatherDeviceInfo( auhalHostApi, scanResults, newDeviceCount );
+
+    if( result != paNoError )
+        return result;
+
+    out = (PaMacScanDeviceInfosResults*)*scanResults;
+
+    if( out->devCount > 0 )
+    {
+        int count = 0;
+        
+        /* allocate array for pointers to PaDeviceInfo structs */
+        out->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+                auhalHostApi->allocations, sizeof(PaDeviceInfo*) * out->devCount);
+        if( !out->deviceInfos )
+        {
+            result = paInsufficientMemory;
+            return result;
+        }
+
+        /* allocate all device info structs in a contiguous block */
+        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateMemory(
+                auhalHostApi->allocations, sizeof(PaDeviceInfo) * out->devCount );
+        if( !deviceInfoArray )
+        {
+            result = paInsufficientMemory;
+            return result;
+        }
+
+        for( i=0; i < out->devCount; ++i )
+        {
+            int err;
+            err = InitializeDeviceInfo( auhalHostApi, &deviceInfoArray[i],
+                                      out->devIds[i],
+                                      hostApiIndex );
+            if (err == paNoError)
+            { 
+                /* copy some info and set the defaults */
+                out->deviceInfos[count] = &deviceInfoArray[i];
+
+                if (out->devIds[i] == out->devInputDevice)
+                {
+                    out->defaultInputDevice = count;
+                }
+                if (out->devIds[i] == out->devOutputDevice)
+                {
+                    out->defaultOutputDevice = count;
+                }
+                count++;
+            }
+            else
+            {
+                /* there was an error. we need to shift the devices down, so we ignore this one */
+                int j;
+                out->devCount--;
+                for( j=i; j<out->devCount; ++j )
+                   out->devIds[j] = out->devIds[j+1];
+                i--;
+            }
+        }
+    }
+    *newDeviceCount = out->devCount;
+
+    return paNoError;
+}
+
+static PaError CommitDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, PaHostApiIndex index,
+    void *scanResults, int deviceCount)
+{
+    PaMacAUHAL* auhalHostApi = (PaMacAUHAL*)hostApi;
+    PaError result = paNoError;
+
+    hostApi->info.deviceCount = 0;
+    hostApi->info.defaultInputDevice = paNoDevice;
+    hostApi->info.defaultOutputDevice = paNoDevice;
+
+    /* -- free any previous allocations -- */
+    if( auhalHostApi->devIds )
+    {
+        PaUtil_GroupFreeMemory(auhalHostApi->allocations, auhalHostApi->devIds);
+    }
+    auhalHostApi->devIds = NULL;
+
+    /* Free any old memory which might be in the device info */
+    if( hostApi->deviceInfos )
+    {
+        PaUtil_GroupFreeMemory( auhalHostApi->allocations, hostApi->deviceInfos[0] );
+        PaUtil_GroupFreeMemory( auhalHostApi->allocations, hostApi->deviceInfos );
+        hostApi->deviceInfos = NULL;
+    }
+
+    if( scanResults != NULL )
+    {
+        PaMacScanDeviceInfosResults *scanDeviceInfosResults = ( PaMacScanDeviceInfosResults * ) scanResults;
+
+        if( deviceCount > 0 )
+        {
+            /* use the array allocated in ScanDeviceInfos() as our deviceInfos */
+            hostApi->deviceInfos = scanDeviceInfosResults->deviceInfos;
+            hostApi->info.defaultInputDevice = scanDeviceInfosResults->defaultInputDevice;
+            hostApi->info.defaultOutputDevice = scanDeviceInfosResults->defaultOutputDevice;
+            hostApi->info.deviceCount = deviceCount;
+            auhalHostApi->devIds = scanDeviceInfosResults->devIds;
+            auhalHostApi->devCount = scanDeviceInfosResults->devCount;
+            auhalHostApi->defaultIn = scanDeviceInfosResults->devInputDevice;
+            auhalHostApi->defaultOut = scanDeviceInfosResults->devOutputDevice;
+        }
+
+        PaUtil_GroupFreeMemory( auhalHostApi->allocations, scanDeviceInfosResults );
+    }
+
+    return result;
+}
+
+static PaError DisposeDeviceInfos(struct PaUtilHostApiRepresentation *hostApi, void *scanResults, int deviceCount)
+{
+    PaMacAUHAL *auhalHostApi = (PaMacAUHAL*)hostApi;
+
+    if( scanResults != NULL )
+    {
+        PaMacScanDeviceInfosResults *scanDeviceInfosResults = ( PaMacScanDeviceInfosResults * ) scanResults;
+        if( scanDeviceInfosResults->deviceInfos )
+        {
+            /* all device info structs are allocated in a block so we can destroy them here */
+            PaUtil_GroupFreeMemory( auhalHostApi->allocations, scanDeviceInfosResults->deviceInfos[0] );
+            PaUtil_GroupFreeMemory( auhalHostApi->allocations, scanDeviceInfosResults->deviceInfos );
+        }
+
+        PaUtil_GroupFreeMemory(auhalHostApi->allocations, scanDeviceInfosResults );
+    }
+
+    return paNoError;
+}
+

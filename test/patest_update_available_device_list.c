@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "portaudio.h"
 
@@ -33,9 +34,10 @@ int main(int argc, char* argv[])
 
     for(;;){
         printDevices();
-
+        
         printf( "press [enter] to update the device list. or q + [enter] to quit.\n" );
-        if( getchar() == 'q' )
+        char ch = getchar();
+        if( ch == 'q' )
             break;
     
         Pa_UpdateAvailableDeviceList();

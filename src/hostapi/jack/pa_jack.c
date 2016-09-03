@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_jack.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
  * JACK Implementation by Joshua Haberman
@@ -749,6 +749,9 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
 
     /* Register functions */
 
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
@@ -1181,7 +1184,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             minimum_buffer_frames = jackHostApi->jack_buffer_size * 3;
 
         /* setup blocking API data structures (FIXME: can fail) */
-        BlockingBegin( stream, minimum_buffer_frames );
+	BlockingBegin( stream, minimum_buffer_frames );
 
         /* install our own callback for the blocking API */
         streamCallback = BlockingCallback;

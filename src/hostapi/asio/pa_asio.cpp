@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_asio.cpp 1661 2011-04-28 18:54:46Z rob_bielik $
  * Portable Audio I/O Library for ASIO Drivers
  *
  * Author: Stephane Letz
@@ -1315,6 +1315,9 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     }
 
 
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;

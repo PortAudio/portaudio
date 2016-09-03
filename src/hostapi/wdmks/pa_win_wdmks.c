@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: pa_win_wdmks.c 1661 2011-04-28 18:54:46Z rob_bielik $
  * PortAudio Windows WDM-KS interface
  *
  * Author: Andrew Baldwin
@@ -1885,6 +1885,9 @@ PaError PaWinWdm_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     (*hostApi)->info.deviceCount = deviceCount;
 
+    (*hostApi)->ScanDeviceInfos = NULL;
+    (*hostApi)->CommitDeviceInfos = NULL;
+    (*hostApi)->DisposeDeviceInfos = NULL;
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;

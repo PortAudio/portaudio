@@ -186,6 +186,8 @@ static LRESULT CALLBACK PaMsgWinProcW(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 {
                     PA_DEBUG(("Device inserted : %S\n", ptr->dbcc_name));
                     InsertDeviceIntoCache(pInfo, ptr->dbcc_name);
+                    /* yield some seconds because added device may not be completely configured */
+                    Sleep(2000);
                     PaUtil_DevicesChanged(1, ptr->dbcc_name);
                 }
             }
@@ -202,6 +204,7 @@ static LRESULT CALLBACK PaMsgWinProcW(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 if (RemoveDeviceFromCache(pInfo, ptr->dbcc_name))
                 {
                     PA_DEBUG(("Device removed  : %S\n", ptr->dbcc_name));
+                    Sleep(2000);
                     PaUtil_DevicesChanged(2, ptr->dbcc_name);
                 }
             }
