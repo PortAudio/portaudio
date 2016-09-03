@@ -180,7 +180,7 @@
 #define PA_MME_WIN_NT_DEFAULT_LATENCY_      (PA_MME_WIN_9X_DEFAULT_LATENCY_ * 2)
 #define PA_MME_WIN_WDM_DEFAULT_LATENCY_     (PA_MME_WIN_9X_DEFAULT_LATENCY_)
 
-
+#define PA_MME_MAX_TIMEOUT_MSEC_        (2000)
 #define PA_MME_MIN_TIMEOUT_MSEC_        (1000)
 
 static const char constInputMapperSuffix_[] = " - Input";
@@ -1421,10 +1421,42 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
 
         for( i = 0 ; i < maximumPossibleDeviceCount; ++i )
         {
-            PaDeviceInfo *deviceInfo  = &deviceInfoArray[i].inheritedDeviceInfo;
-            deviceInfo->structVersion = 3;
-            deviceInfo->hostApi       = hostApiIndex;
-            deviceInfo->name          = 0;
+            PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[i];
+            PaDeviceInfo *deviceInfo  = &wmmeDeviceInfo->inheritedDeviceInfo;
+
+            deviceInfo->structVersion     = 3;
+            deviceInfo->hostApi           = hostApiIndex;
+            deviceInfo->name              = 0;
+            /*
+             * The fields maxInputChannels and maxOutputChannels used to be
+             * initialized in each of the loops bellow to the effect of the
+             * second loop overwriting/throwing away the results of the first
+             * loop. In order to resolve the described issue, the initialization
+             * of the two fields in question has been moved here.
+             */
+            deviceInfo->maxInputChannels  = 0;
+            deviceInfo->maxOutputChannels = 0;
+            /*
+             * The fields defaultLowInputLatency, defaultLowOutputLatency,
+             * defaultHighInputLatency and defaultHighOutputLatency used to be
+             * initialized in each of the loops bellow. For the sake of clarity,
+             * their initialization has been moved here.
+             */
+            deviceInfo->defaultLowInputLatency = defaultLowLatency;
+            deviceInfo->defaultLowOutputLatency = defaultLowLatency;
+            deviceInfo->defaultHighInputLatency = defaultHighLatency;
+            deviceInfo->defaultHighOutputLatency = defaultHighLatency;
+
+            /*
+             * The fields deviceInputChannelCountIsKnown and
+             * deviceOutputChannelCountIsKnown used to be initialized in each of
+             * the loops bellow to the effect of the second loop
+             * overwriting/throwing away the results of the first loop. In order
+             * to resolve the described issue, the initialization of the two
+             * fields in question has been moved here.
+             */
+            wmmeDeviceInfo->deviceInputChannelCountIsKnown  = 0;
+            wmmeDeviceInfo->deviceOutputChannelCountIsKnown = 0;
 
             outArgument->deviceInfos[ i ] = deviceInfo;
         }
@@ -1441,18 +1473,6 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = (PaWinMmeDeviceInfo*)outArgument->deviceInfos[*newDeviceCount];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
-                deviceInfo->structVersion = 3;
-                deviceInfo->hostApi = hostApiIndex;
-
-                deviceInfo->maxInputChannels = 0;
-                wmmeDeviceInfo->deviceInputChannelCountIsKnown = 1;
-                deviceInfo->maxOutputChannels = 0;
-                wmmeDeviceInfo->deviceOutputChannelCountIsKnown = 1;
-
-                deviceInfo->defaultLowInputLatency = defaultLowLatency;
-                deviceInfo->defaultLowOutputLatency = defaultLowLatency;
-                deviceInfo->defaultHighInputLatency = defaultHighLatency;
-                deviceInfo->defaultHighOutputLatency = defaultHighLatency;
 
                 result = InitializeInputDeviceInfo( winMmeHostApi, wmmeDeviceInfo,
                         winMmeDeviceId, &deviceInfoInitializationSucceeded );
@@ -1489,18 +1509,6 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = (PaWinMmeDeviceInfo*)outArgument->deviceInfos[*newDeviceCount];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
-                deviceInfo->structVersion = 3;
-                deviceInfo->hostApi = hostApiIndex;
-
-                deviceInfo->maxInputChannels = 0;
-                wmmeDeviceInfo->deviceInputChannelCountIsKnown = 1;
-                deviceInfo->maxOutputChannels = 0;
-                wmmeDeviceInfo->deviceOutputChannelCountIsKnown = 1;
-
-                deviceInfo->defaultLowInputLatency = defaultLowLatency;
-                deviceInfo->defaultLowOutputLatency = defaultLowLatency;
-                deviceInfo->defaultHighInputLatency = defaultHighLatency;
-                deviceInfo->defaultHighOutputLatency = defaultHighLatency; 
 
                 result = InitializeOutputDeviceInfo( winMmeHostApi, wmmeDeviceInfo,
                         winMmeDeviceId, &deviceInfoInitializationSucceeded );
@@ -3682,7 +3690,7 @@ static PaError StopStream( PaStream *s )
 {
     PaError result = paNoError;
     PaWinMmeStream *stream = (PaWinMmeStream*)s;
-    int timeout;
+    DWORD timeout;
     DWORD waitResult;
     MMRESULT mmresult;
     signed int hostOutputBufferIndex;
@@ -3703,7 +3711,7 @@ static PaError StopStream( PaStream *s )
         stream->stopProcessing = 1;
 
         /* Calculate timeOut longer than longest time it could take to return all buffers. */
-        timeout = (int)(stream->allBuffersDurationMs * 1.5);
+        timeout = (DWORD)(stream->allBuffersDurationMs * 1.5);
         if( timeout < PA_MME_MIN_TIMEOUT_MSEC_ )
             timeout = PA_MME_MIN_TIMEOUT_MSEC_;
 
@@ -3732,6 +3740,12 @@ static PaError StopStream( PaStream *s )
 
         if( PA_IS_OUTPUT_STREAM_(stream) )
         {
+            /* If WaitForSingleObject starts repetitively and consecutively
+               returning WAIT_TIMEOUT, do eventually give up. Otherwise, the
+               method may never return.
+            */
+            DWORD totalTimeout;
+
             if( stream->output.framesUsedInCurrentBuffer > 0 )
             {
                 /* there are still unqueued frames in the current buffer, so flush them */
@@ -3772,6 +3786,7 @@ static PaError StopStream( PaStream *s )
                 timeout = PA_MME_MIN_TIMEOUT_MSEC_;
 
             waitCount = 0;
+            totalTimeout = 0;
             while( !NoBuffersAreQueued( &stream->output ) && waitCount <= stream->output.bufferCount )
             {
                 /* wait for MME to signal that a buffer is available */
@@ -3782,8 +3797,19 @@ static PaError StopStream( PaStream *s )
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* keep waiting */
+                    /* Keep waiting. However, testing has shown that it is
+                       possible to unplug a device and to wait here forever. In
+                       order to prevent such a scenario, do eventually given up.
+                    */
+                    totalTimeout += timeout;
+                    if( PA_MME_MAX_TIMEOUT_MSEC_ <= totalTimeout)
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }
+                else
+                    totalTimeout = 0;
 
                 ++waitCount;
             }
@@ -3959,6 +3985,12 @@ static PaError ReadStream( PaStream* s,
     
     if( PA_IS_INPUT_STREAM_(stream) )
     {
+        /* If WaitForSingleObject starts repetitively and consecutively
+           returning WAIT_TIMEOUT, do eventually give up in order to allow the
+           caller to handle such cases.
+        */
+        DWORD totalTimeout = 0;
+
         /* make a local copy of the user buffer pointer(s). this is necessary
             because PaUtil_CopyInput() advances these pointers every time
             it is called.
@@ -3979,6 +4011,8 @@ static PaError ReadStream( PaStream* s,
         do{
             if( CurrentInputBuffersAreDone( stream ) )
             {
+                totalTimeout = 0;
+
                 if( NoBuffersAreQueued( &stream->input ) )
                 {
                     /** @todo REVIEW: consider what to do if the input overflows.
@@ -4032,9 +4066,17 @@ static PaError ReadStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
+                    /* If a timeout is encountered, continue. However, testing
+                       has shown that it is possible to unplug a device and to
+                       wait here forever. In order to allow the caller to handle
+                       such cases of repeated timeouts, do eventually given up.
                     */
+                    totalTimeout += timeout;
+                    if( PA_MME_MAX_TIMEOUT_MSEC_ <= totalTimeout)
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }         
             }
         }while( framesRead < frames );
@@ -4065,6 +4107,12 @@ static PaError WriteStream( PaStream* s,
         
     if( PA_IS_OUTPUT_STREAM_(stream) )
     {
+        /* If WaitForSingleObject starts repetitively and consecutively
+           returning WAIT_TIMEOUT, do eventually give up in order to allow the
+           caller to handle such cases.
+        */
+        DWORD totalTimeout = 0;
+
         /* make a local copy of the user buffer pointer(s). this is necessary
             because PaUtil_CopyOutput() advances these pointers every time
             it is called.
@@ -4085,6 +4133,8 @@ static PaError WriteStream( PaStream* s,
         do{
             if( CurrentOutputBuffersAreDone( stream ) )
             {
+                totalTimeout = 0;
+
                 if( NoBuffersAreQueued( &stream->output ) )
                 {
                     /** @todo REVIEW: consider what to do if the output
@@ -4140,9 +4190,17 @@ static PaError WriteStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
+                    /* If a timeout is encountered, continue. However, testing
+                       has shown that it is possible to unplug a device and to
+                       wait here forever. In order to allow the caller to handle
+                       such cases of repeated timeouts, do eventually given up.
                     */
+                    totalTimeout += timeout;
+                    if( PA_MME_MAX_TIMEOUT_MSEC_ <= totalTimeout)
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }             
             }        
         }while( framesWritten < frames );
