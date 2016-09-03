@@ -67,6 +67,8 @@
 #include <string.h> /* strlen(), memcmp() etc. */
 #include <libkern/OSAtomic.h>
 
+#include <CoreFoundation/CFString.h>
+
 #include "pa_mac_core.h"
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
@@ -521,8 +523,110 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
 
     memset(deviceInfo, 0, sizeof(deviceInfo));
 
-    deviceInfo->structVersion = 2;
+    deviceInfo->structVersion = 3;
     deviceInfo->hostApi = hostApiIndex;
+
+    // target device UID property
+    unsigned long deviceUID = 0;
+
+    AudioObjectPropertyAddress addr;
+    addr.mSelector = kAudioDevicePropertyDeviceUID;
+    addr.mScope = kAudioObjectPropertyScopeGlobal;
+    addr.mElement = kAudioObjectPropertyElementMaster;
+
+    CFStringRef deviceUIDString;
+    propSize = sizeof(deviceUIDString);
+    err = ERR(AudioObjectGetPropertyData(
+            macCoreDeviceId,
+            &addr,
+            0,
+            NULL,
+            &propSize,
+            &deviceUIDString));
+    if (err)
+        return err;
+
+    CFIndex deviceUIDLength = CFStringGetLength(deviceUIDString) + 1;
+    char *ASCIIDeviceUID
+        = PaUtil_GroupAllocateMemory(auhalHostApi->allocations,deviceUIDLength);
+    if ( !ASCIIDeviceUID )
+        return paInsufficientMemory;
+
+    deviceInfo->deviceUID = NULL;
+    if(CFStringGetCString (
+            deviceUIDString,
+            ASCIIDeviceUID,
+            deviceUIDLength,
+            kCFStringEncodingASCII))
+    {
+        deviceInfo->deviceUID = ASCIIDeviceUID;
+    }
+
+    // target device transport type property
+    addr.mSelector = kAudioDevicePropertyTransportType;
+    addr.mScope = kAudioObjectPropertyScopeGlobal;
+    addr.mElement = kAudioObjectPropertyElementMaster;
+
+    unsigned int transportType = 0;
+    propSize = sizeof(transportType);
+    err = ERR(AudioObjectGetPropertyData(
+            macCoreDeviceId,
+            &addr,
+            0,
+            NULL,
+            &propSize,
+            &transportType));
+    if (err)
+        return err;
+
+    switch(transportType)
+    {
+        case kAudioDeviceTransportTypeAggregate:
+            deviceInfo->transportType = "Aggregate";
+            break;
+        case kAudioDeviceTransportTypeAirPlay:
+            deviceInfo->transportType = "AirPlay";
+            break;
+        case kAudioDeviceTransportTypeAutoAggregate:
+            deviceInfo->transportType = "Auto aggregate";
+            break;
+        case kAudioDeviceTransportTypeAVB:
+            deviceInfo->transportType = "AVB";
+            break;
+        case kAudioDeviceTransportTypeBluetooth:
+            deviceInfo->transportType = "Bluetooth";
+            break;
+        case kAudioDeviceTransportTypeBuiltIn:
+            deviceInfo->transportType = "Built-in";
+            break;
+        case kAudioDeviceTransportTypeDisplayPort:
+            deviceInfo->transportType = "DisplayPort";
+            break;
+        case kAudioDeviceTransportTypeFireWire:
+            deviceInfo->transportType = "FireWire";
+            break;
+        case kAudioDeviceTransportTypeHDMI:
+            deviceInfo->transportType = "HDMI";
+            break;
+        case kAudioDeviceTransportTypePCI:
+            deviceInfo->transportType = "PCI";
+            break;
+        case kAudioDeviceTransportTypeThunderbolt:
+            deviceInfo->transportType = "Thunderbolt";
+            break;
+        case kAudioDeviceTransportTypeUnknown:
+            deviceInfo->transportType = "Unknown";
+            break;
+        case kAudioDeviceTransportTypeUSB:
+            deviceInfo->transportType = "USB";
+            break;
+        case kAudioDeviceTransportTypeVirtual:
+            deviceInfo->transportType = "Virtual";
+            break;
+        default:
+            deviceInfo->transportType = NULL;
+            break;
+    }
 
     /* Get the device name.  Fail if we can't get it. */
     err = ERR(AudioDeviceGetPropertyInfo(macCoreDeviceId, 0, 0, kAudioDevicePropertyDeviceName, &propSize, NULL));

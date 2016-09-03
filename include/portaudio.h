@@ -470,7 +470,7 @@ typedef unsigned long PaSampleFormat;
 */
 typedef struct PaDeviceInfo
 {
-    int structVersion;  /* this is struct version 2 */
+    int structVersion;  /* this is struct version 3 */
     const char *name;
     PaHostApiIndex hostApi; /* note this is a host API index, not a type id*/
     
@@ -485,6 +485,11 @@ typedef struct PaDeviceInfo
     PaTime defaultHighOutputLatency;
 
     double defaultSampleRate;
+    
+    /*The transport type used by this device: USB, BuiltIn, Bluetooth, etc.*/
+    const char *transportType;
+    /*The unique identifier of this device (persistent across boots).*/
+    const char *deviceUID;
 } PaDeviceInfo;
 
 
