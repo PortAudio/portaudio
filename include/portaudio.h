@@ -293,9 +293,11 @@ typedef enum PaHostApiTypeId
  hostApiTypeIds parameter is not available.
 
  The paInvalidHostApi error indicates that there was a problem with the
- hostApiTypes array. E.g. it contained duplicate entries.
+ hostApiTypes array. E.g. it contained invalid or duplicate entries.
 
  @note The host API initialization order determines default devices.
+ There is no predictable relationship between the order that host APIs appear
+ in hostApiTypes, and their hostApiIndexes assigned by Pa_Initialize().
 
  @see PaHostApiTypeId
 */
