@@ -415,6 +415,10 @@ PaError ReadStream( PaStream* stream,
     while( frames > 0 ) {
        long avail;
        long toRead;
+       // If PaUtil_GetRingBufferReadAvailable starts repetitively and
+       // consecutively returning that there is no data available, do eventually
+       // give up in order to allow the caller to handle such cases. 
+       long totalTimeout = 0;
        do {
           avail = PaUtil_GetRingBufferReadAvailable( &blio->inputRingBuffer );
 /*
@@ -438,6 +442,16 @@ PaError ReadStream( PaStream* stream,
                 return ret;
 #else
              Pa_Sleep( PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL );
+
+             // If a timeout is encountered, continue.  However, testing has
+             // shown that it is possible to unplug a device and to wait here
+             // forever. In order to allow the caller to handle such cases of
+             // repeated timeouts, do eventually given up. 
+             totalTimeout += PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL; 
+             if( PA_COREAUDIO_MAX_TIMEOUT_MSEC_ <= totalTimeout) 
+             {
+                 return paTimedOut;
+             } 
 #endif
           }
        } while( avail == 0 );
@@ -491,6 +505,10 @@ PaError WriteStream( PaStream* stream,
     while( frames > 0 ) {
        long avail = 0;
        long toWrite;
+       // If PaUtil_GetRingBufferWriteAvailable starts repetitively and
+       // consecutively returning that there is no data available, do eventually
+       // give up in order to allow the caller to handle such cases. 
+       long totalTimeout = 0;
 
        do {
           avail = PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
@@ -515,6 +533,16 @@ PaError WriteStream( PaStream* stream,
                 return ret;
 #else
              Pa_Sleep( PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL );
+
+             // If a timeout is encountered, continue.  However, testing has
+             // shown that it is possible to unplug a device and to wait here
+             // forever. In order to allow the caller to handle such cases of
+             // repeated timeouts, do eventually given up. 
+             totalTimeout += PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL; 
+             if( PA_COREAUDIO_MAX_TIMEOUT_MSEC_ <= totalTimeout) 
+             {
+                 return paTimedOut;
+             } 
 #endif
           }
        } while( avail == 0 );
@@ -561,13 +589,30 @@ PaError WriteStream( PaStream* stream,
 void waitUntilBlioWriteBufferIsFlushed( PaMacBlio *blio )
 {
     if( blio->outputRingBuffer.buffer ) {
+       // If PaUtil_GetRingBufferWriteAvailable starts repetitively and
+       // consecutively returning that there is no data available, do eventually
+       // give up in order to allow the caller to handle such cases. 
+       long totalTimeout = 0;
        long avail = PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
        while( avail != blio->outputRingBuffer.bufferSize ) {
           if( avail == 0 )
+          {
              Pa_Sleep( PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL );
+
+             // If a timeout is encountered, continue.  However, testing has
+             // shown that it is possible to unplug a device and to wait here
+             // forever. In order to allow the caller to handle such cases of
+             // repeated timeouts, do eventually given up. 
+             totalTimeout += PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL; 
+             if( PA_COREAUDIO_MIN_TIMEOUT_MSEC_ <= totalTimeout) 
+             {
+                 return paTimedOut;
+             } 
+          }
           avail = PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
        }
     }
+    return paNoError;
 }
 
 
