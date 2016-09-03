@@ -275,6 +275,46 @@ typedef enum PaHostApiTypeId
 } PaHostApiTypeId;
 
 
+/** Returns the number of compiled-in host APIs in this build of PortAudio.
+
+ The returned value is large enough that it can be used to dimension
+ arrays passed to Pa_GetAvailableHostApis and Pa_GetSelectedHostApis.
+
+ FIXME REVIEW The "Available" name should match whatever is chosen for
+ Pa_GetAvailableHostApis
+
+ @see Pa_GetAvailableHostApis, Pa_GetSelectedHostApis
+*/
+int Pa_GetAvailableHostApisCount( void );
+
+
+/** Returns the type ids of all compiled-in host APIs in initialization order.
+
+ Note that the compiled-in host APIs are not necessarily those that are
+ installed on the system. It is possible for compiled-in dynamically loaded
+ host APIs to be not installed on the system, and it is possible for
+ installed audio APIs to not be supported (compiled in to) PortAudio.
+
+ @param hostApiTypes (IN/OUT) An array that will be filled with
+ host API identifiers belonging to the PaHostApiTypeId enumeration.
+
+ @param count (OUT) The number of host APIs, returned even on error.
+
+ @param countAvailable The number of available elements in the hostApiTypes array.
+
+ FIXME REVIEW: Consider a different name for this function, both "available"
+ and "supported" are ambiguous between what is available/supported on the
+ target platform and what is compiled into PA. Keep in mind that
+ Pa_IsFormatSupported refers to formats supported by a device.
+ Proposals:
+ GetConfiguredHostApis, GetCompiledHostApis
+ NOTE: also fix name oPa_GetAvailableHostApisCount
+
+ @see Pa_SelectHostApis
+*/
+PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
+
+
 /** Select host APIs and their initialization order.
 
  This function may only be called prior to calling Pa_Initialize()
@@ -303,6 +343,7 @@ typedef enum PaHostApiTypeId
 */
 PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count );
 
+
 /** Returns the type ids of the selected host APIs in initialization order.
 
  @param hostApiTypes (IN/OUT) An array that will be filled with
@@ -321,29 +362,6 @@ PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count );
  @see Pa_SelectHostApis
 */
 PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
-
-/** Returns the type ids of all compiled-in host APIs in initialization order.
-
- Note that the compiled-in host APIs are not necessarily those that are
- installed on the target system.
-
- @param hostApiTypes (IN/OUT) An array that will be filled with
- host API identifiers belonging to the PaHostApiTypeId enumeration.
-
- @param count (OUT) The number of host APIs, returned even on error.
-
- @param countAvailable The number of available elements in the hostApiTypes array.
-
- FIXME REVIEW: Consider a different name for this function, both "available"
- and "supported" are ambiguous between what is available/supported on the
- target platform and what is compiled into PA. Keep in mind that
- Pa_IsFormatSupported refers to formats supported by a device.
- Proposals:
- GetConfiguredHostApis, GetCompiledHostApis
-
- @see Pa_SelectHostApis
-*/
-PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count );
 
 
 /** A structure containing information about a particular host API. */

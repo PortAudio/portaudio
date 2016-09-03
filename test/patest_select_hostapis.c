@@ -42,6 +42,8 @@
  */
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
+
 #include "portaudio.h"
 
 /*******************************************************************/
@@ -50,13 +52,19 @@ int main(void)
 {
     int i, j, k;
     int availableHostApiCount, scratchHostApiCount;
-#define MAX_HOST_API_COUNT 100
-    PaHostApiTypeId availableHostApis[MAX_HOST_API_COUNT];
-    PaHostApiTypeId scratchHostApis[MAX_HOST_API_COUNT];
+    int maxHostApiCount;
+    PaHostApiTypeId *availableHostApis;
+    PaHostApiTypeId *scratchHostApis;
     PaError err;
 
+    maxHostApiCount = Pa_GetAvailableHostApisCount();
+    availableHostApis = (PaHostApiTypeId*)malloc( sizeof(PaHostApiTypeId) * maxHostApiCount );
+    assert( availableHostApis != NULL );
+    scratchHostApis = (PaHostApiTypeId*)malloc( sizeof(PaHostApiTypeId) * maxHostApiCount );
+    assert( scratchHostApis != NULL );
+
     availableHostApiCount = 0;
-    err = Pa_GetAvailableHostApis( availableHostApis, MAX_HOST_API_COUNT, &availableHostApiCount );
+    err = Pa_GetAvailableHostApis( availableHostApis, maxHostApiCount, &availableHostApiCount );
     assert( err == paNoError );
     assert( availableHostApiCount > 0 );
 
@@ -83,7 +91,7 @@ int main(void)
         assert( err == paNoError );
 
         /* read back and verify selected apis*/
-        err = Pa_GetSelectedHostApis( scratchHostApis, MAX_HOST_API_COUNT, &scratchHostApiCount );
+        err = Pa_GetSelectedHostApis( scratchHostApis, maxHostApiCount, &scratchHostApiCount );
         assert( err == paNoError );
         assert( scratchHostApiCount == 1 );
         assert( scratchHostApis[0] == hostApiType );
@@ -112,7 +120,7 @@ int main(void)
         assert( err == paNoError );
 
         /* read back and verify selected apis*/
-        err = Pa_GetSelectedHostApis( scratchHostApis, MAX_HOST_API_COUNT, &scratchHostApiCount );
+        err = Pa_GetSelectedHostApis( scratchHostApis, maxHostApiCount, &scratchHostApiCount );
         assert( err == paNoError );
         assert( scratchHostApiCount == i );
         for( j = 0; j < i; ++j )
@@ -145,4 +153,7 @@ int main(void)
 
         Pa_Terminate();
     }
+
+    free(availableHostApis);
+    free(scratchHostApis);
 }

@@ -181,6 +181,7 @@ static int CountHostApiInitializers( void )
     return result;
 }
 
+
 static const PaUtilHostApiInitializerEntry* FindHostApiInitializerEntry( PaHostApiTypeId hostApiType )
 {
     int i = 0;
@@ -195,6 +196,33 @@ static const PaUtilHostApiInitializerEntry* FindHostApiInitializerEntry( PaHostA
     return NULL;
 }
 
+
+int Pa_GetAvailableHostApisCount( void )
+{
+    return CountHostApiInitializers();
+}
+
+
+PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
+{
+    int i;
+    int initializerCount = CountHostApiInitializers();
+
+    *count = initializerCount;
+    if( countAvailable >= initializerCount )
+    {
+        for( i=0; i < initializerCount; ++i )
+            hostApiTypes[i] = paHostApiInitializers[i].hostApiType;
+    }
+    else
+    {
+        return paInsufficientMemory;
+    }
+
+    return paNoError;
+}
+
+
 static int CountSelectedHostApis()
 {
     if( selectedHostApiTypes_ == NULL )
@@ -203,6 +231,7 @@ static int CountSelectedHostApis()
         return selectedHostApiCount_;
 }
 
+
 static const PaUtilHostApiInitializerEntry* GetSelectedHostApi( int index )
 {
     if( selectedHostApiTypes_ == NULL )
@@ -210,6 +239,7 @@ static const PaUtilHostApiInitializerEntry* GetSelectedHostApi( int index )
     else
         return FindHostApiInitializerEntry( selectedHostApiTypes_[index] );
 }
+
 
 PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count )
 {
@@ -280,6 +310,7 @@ PaError Pa_SelectHostApis( const PaHostApiTypeId *hostApiTypes, int count )
     return paNoError;
 }
 
+
 PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
 {
     if( selectedHostApiTypes_ == NULL )
@@ -299,25 +330,6 @@ PaError Pa_GetSelectedHostApis( PaHostApiTypeId *hostApiTypes, int countAvailabl
             return paInsufficientMemory;
         }
     }
-}
-
-PaError Pa_GetAvailableHostApis( PaHostApiTypeId *hostApiTypes, int countAvailable, int *count )
-{
-    int i;
-    int initializerCount = CountHostApiInitializers();
-
-    *count = initializerCount;
-    if( countAvailable >= initializerCount )
-    {
-        for( i=0; i < initializerCount; ++i )
-            hostApiTypes[i] = paHostApiInitializers[i].hostApiType;
-    }
-    else
-    {
-        return paInsufficientMemory;
-    }
-
-    return paNoError;
 }
 
 
