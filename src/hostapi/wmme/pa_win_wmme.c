@@ -153,6 +153,9 @@
 
 #define PA_MME_USE_HIGH_DEFAULT_LATENCY_    (0)  /* For debugging glitches. */
 
+#define DRV_QUERYFUNCTIONINSTANCEID     (DRV_RESERVED + 17)
+#define DRV_QUERYFUNCTIONINSTANCEIDSIZE (DRV_RESERVED + 18)
+
 #if PA_MME_USE_HIGH_DEFAULT_LATENCY_
  #define PA_MME_WIN_9X_DEFAULT_LATENCY_                     (0.4)
  #define PA_MME_MIN_HOST_OUTPUT_BUFFER_COUNT_               (4)
@@ -665,6 +668,7 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
 {
     PaError result = paNoError;
     char *deviceName; /* non-const ptr */
+    char *deviceUID;
     MMRESULT mmresult;
     WAVEINCAPS wic;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
@@ -737,6 +741,49 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
             QueryWaveInKSFilterMaxChannels( winMmeInputDeviceId, &deviceInfo->maxInputChannels );
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
+
+    MMRESULT mmr;
+    size_t cbEndpointIdSize;
+    // Get the size (including the terminating null) of
+    // the endpoint ID string of the waveOut device.
+    mmr = waveInMessage(
+        winMmeInputDeviceId,
+        DRV_QUERYFUNCTIONINSTANCEIDSIZE,
+        (DWORD_PTR)&cbEndpointIdSize, NULL);
+
+    if (mmr == MMSYSERR_NOERROR)  // do sizes match?
+    {
+        WCHAR *pstrEndpointId = NULL;
+        pstrEndpointId = (WCHAR *)PaUtil_GroupAllocateMemory(winMmeHostApi->allocations, cbEndpointIdSize);
+
+        // Get the endpoint ID string for this waveOut device.
+        mmr = waveInMessage(
+            winMmeInputDeviceId,
+            DRV_QUERYFUNCTIONINSTANCEID,
+            (DWORD_PTR)pstrEndpointId,
+            cbEndpointIdSize);
+
+        if (mmr == MMSYSERR_NOERROR)
+        {
+            deviceUID = (char *)PaUtil_GroupAllocateMemory(winMmeHostApi->allocations, wcslen(pstrEndpointId));
+            if( !deviceUID )
+            {
+                result = paInsufficientMemory;
+                goto error;
+            }
+            wcstombs(deviceUID, pstrEndpointId, sizeof(deviceUID));
+            WideCharToMultiByte( CP_ACP, WC_COMPOSITECHECK | WC_DEFAULTCHAR,\
+                    pstrEndpointId, -1, deviceUID, wcslen(pstrEndpointId), NULL, NULL );
+            deviceInfo->deviceUID = deviceUID;
+        }
+        /*else
+        {
+            char mmeErrorText[ MAXERRORLENGTH ];
+            waveOutGetErrorText( mmr, mmeErrorText, MAXERRORLENGTH );  
+            PA_DEBUG(("Error %i: %s\n", mmr ,mmeErrorText));
+        }*/
+    }
+
     winMmeDeviceInfo->dwFormats = wic.dwFormats;
 
     DetectDefaultSampleRate( winMmeDeviceInfo, winMmeInputDeviceId,
@@ -788,6 +835,7 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
 {
     PaError result = paNoError;
     char *deviceName; /* non-const ptr */
+    char *deviceUID;
     MMRESULT mmresult;
     WAVEOUTCAPS woc;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
@@ -863,6 +911,49 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
         winMmeDeviceInfo->deviceOutputChannelCountIsKnown = 1;
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
+    MMRESULT mmr;
+    size_t cbEndpointIdSize;
+    // Get the size (including the terminating null) of
+    // the endpoint ID string of the waveOut device.
+    mmr = waveOutMessage(
+        winMmeOutputDeviceId,
+        DRV_QUERYFUNCTIONINSTANCEIDSIZE,
+        (DWORD_PTR)&cbEndpointIdSize, NULL);
+
+    if (mmr == MMSYSERR_NOERROR)  // do sizes match?
+    {
+        WCHAR *pstrEndpointId = NULL;
+        pstrEndpointId = (WCHAR *)PaUtil_GroupAllocateMemory(winMmeHostApi->allocations, cbEndpointIdSize);
+
+        // Get the endpoint ID string for this waveOut device.
+        mmr = waveOutMessage(
+            winMmeOutputDeviceId,
+            DRV_QUERYFUNCTIONINSTANCEID,
+            (DWORD_PTR)pstrEndpointId,
+            cbEndpointIdSize);
+
+        if (mmr == MMSYSERR_NOERROR)
+        {
+            deviceUID = (char *)PaUtil_GroupAllocateMemory(winMmeHostApi->allocations, wcslen(pstrEndpointId));
+            if( !deviceUID )
+            {
+                result = paInsufficientMemory;
+                goto error;
+            }
+            wcstombs(deviceUID, pstrEndpointId, sizeof(deviceUID));
+
+            WideCharToMultiByte( CP_ACP, WC_COMPOSITECHECK | WC_DEFAULTCHAR,\
+                    pstrEndpointId, -1, deviceUID, wcslen(pstrEndpointId), NULL, NULL );
+            deviceInfo->deviceUID = deviceUID;
+        }
+        /*else
+        {
+            char mmeErrorText[ MAXERRORLENGTH ];
+            waveOutGetErrorText( mmr, mmeErrorText, MAXERRORLENGTH );  
+            PA_DEBUG(("Error %i: %s\n", mmr ,mmeErrorText));
+        }*/
+    }
+
     winMmeDeviceInfo->dwFormats = woc.dwFormats;
 
     DetectDefaultSampleRate( winMmeDeviceInfo, winMmeOutputDeviceId,
@@ -930,7 +1021,6 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     (*hostApi)->info.type = paMME;
     (*hostApi)->info.name = "MME";
 
-    
     /* initialise device counts and default devices under the assumption that
         there are no devices. These values are incremented below if and when
         devices are successfully initialized.
@@ -953,6 +1043,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     preferredDeviceStatusFlags = 0;
     waveOutPreferredDevice = -1;
+
     waveOutMessage( (HWAVEOUT)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
 
     maximumPossibleDeviceCount = 0;
@@ -1001,7 +1092,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
-                deviceInfo->structVersion = 2;
+                deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
 
                 deviceInfo->maxInputChannels = 0;
@@ -1044,7 +1135,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
-                deviceInfo->structVersion = 2;
+                deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
 
                 deviceInfo->maxInputChannels = 0;

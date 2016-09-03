@@ -517,11 +517,10 @@ static GUID pawin_IID_IKsPropertySet =
 static void FindDevicePnpInterfaces( DSDeviceNamesAndGUIDs *deviceNamesAndGUIDs )
 {
     IClassFactory *pClassFactory;
-   
     if( paWinDsDSoundEntryPoints.DllGetClassObject(&pawin_CLSID_DirectSoundPrivate, &IID_IClassFactory, (PVOID *) &pClassFactory) == S_OK ){
         IKsPropertySet *pPropertySet;
         if( pClassFactory->lpVtbl->CreateInstance( pClassFactory, NULL, &pawin_IID_IKsPropertySet, (PVOID *) &pPropertySet) == S_OK ){
-            
+
             DSPROPERTY_DIRECTSOUNDDEVICE_ENUMERATE_W_DATA data;
             ULONG bytesReturned;
 
@@ -595,7 +594,7 @@ static double defaultSampleRateSearchOrder_[] =
 ** The device will not be added to the device list if any errors are encountered.
 */
 static PaError AddOutputDeviceInfoFromDirectSound(
-        PaWinDsDeviceInfo *winDsDeviceInfo, char *name, LPGUID lpGUID, char *pnpInterface )
+        PaWinDsDeviceInfo *winDsDeviceInfo, char *name, LPGUID lpGUID, char *pnpInterface, PaUtilAllocationGroup *allocations )
 {
     PaDeviceInfo                 *deviceInfo = &winDsDeviceInfo->inheritedDeviceInfo;
     HRESULT                       hr;
@@ -805,6 +804,17 @@ static PaError AddOutputDeviceInfoFromDirectSound(
     }
     else
     {
+        // target device UID property
+        WCHAR duid[39];
+        char *deviceUID;
+        deviceUID = (char *)PaUtil_GroupAllocateMemory(allocations, 39);
+
+        StringFromGUID2(&(*lpGUID), (LPOLESTR) &duid, 39);
+        wcstombs(deviceUID, duid, sizeof(deviceUID));
+        WideCharToMultiByte( CP_ACP, WC_COMPOSITECHECK | WC_DEFAULTCHAR,\
+                    duid, -1, deviceUID, 39, NULL, NULL );
+        deviceInfo->deviceUID = deviceUID;
+
         memcpy( &winDsDeviceInfo->guid, lpGUID, sizeof(GUID) );
         winDsDeviceInfo->lpGUID = &winDsDeviceInfo->guid;
     }
@@ -829,7 +839,7 @@ error:
 ** The device will not be added to the device list if any errors are encountered.
 */
 static PaError AddInputDeviceInfoFromDirectSoundCapture(
-        PaWinDsDeviceInfo *winDsDeviceInfo, char *name, LPGUID lpGUID, char *pnpInterface )
+        PaWinDsDeviceInfo *winDsDeviceInfo, char *name, LPGUID lpGUID, char *pnpInterface, PaUtilAllocationGroup *allocations )
 {
     PaDeviceInfo                 *deviceInfo = &winDsDeviceInfo->inheritedDeviceInfo;
     HRESULT                       hr;
@@ -962,6 +972,17 @@ http://www.winehq.com/hypermail/wine-patches/2003/01/0290.html
     }
     else
     {
+        // target device UID property
+        WCHAR duid[39];
+        char *deviceUID;
+        deviceUID = (char *)PaUtil_GroupAllocateMemory(allocations, 39);
+
+        StringFromGUID2(&(*lpGUID), (LPOLESTR) &duid, 39);
+        wcstombs(deviceUID, duid, sizeof(deviceUID));
+        WideCharToMultiByte( CP_ACP, WC_COMPOSITECHECK | WC_DEFAULTCHAR,\
+                    duid, -1, deviceUID, 39, NULL, NULL );
+        deviceInfo->deviceUID = deviceUID;
+
         winDsDeviceInfo->lpGUID = &winDsDeviceInfo->guid;
         memcpy( &winDsDeviceInfo->guid, lpGUID, sizeof(GUID) );
     }
@@ -1066,9 +1087,11 @@ error:
             PaUtil_FreeAllAllocations( winDsHostApi->allocations );
             PaUtil_DestroyAllocationGroup( winDsHostApi->allocations );
         }
-                
+
         PaUtil_FreeMemory( winDsHostApi );
     }
+
+
 
     if( comWasInitialized )
         CoUninitialize();
@@ -1256,7 +1279,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
     DSDeviceNamesAndGUIDs deviceNamesAndGUIDs;
     int i = 0;
     int maximumNewDeviceCount = 0;
-    
+
     /* Check preconditions */
     if( !comWasInitialized || scanResults == NULL || newDeviceCount == NULL )
        return paInternalError;
@@ -1340,7 +1363,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         for( i = 0 ; i < maximumNewDeviceCount; ++i )
         {
             PaDeviceInfo *deviceInfo  = &deviceInfoArray[i].inheritedDeviceInfo;
-            deviceInfo->structVersion = 2;
+            deviceInfo->structVersion = 3;
             deviceInfo->hostApi       = hostApiIndex;
             deviceInfo->name          = 0;
 
@@ -1354,7 +1377,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             result = AddInputDeviceInfoFromDirectSoundCapture( winDsDeviceInfo,
                     deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].name,
                     deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID,
-                    deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].pnpInterface );
+                    deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].pnpInterface,
+                    winDsHostApi->allocations );
             if( result == paNoError )
             {
                 if( deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID == NULL )
@@ -1371,7 +1395,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             result = AddOutputDeviceInfoFromDirectSound( winDsDeviceInfo,
                     deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].name,
                     deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID,
-                    deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].pnpInterface );
+                    deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].pnpInterface,
+                    winDsHostApi->allocations );
             if( result == paNoError )
             {
                 if( deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID == NULL )

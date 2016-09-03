@@ -11359,7 +11359,7 @@ case "${host_os}" in
             DLL_LIBS="${DLL_LIBS} -lwinmm -lm -L$DXDIR/lib -ldsound -lole32"
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
-            CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/win -I$DXDIR/include -UPA_USE_DS -DPA_USE_DS=1"
+            CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/win -I$DXDIR/include -UPA_USE_DS -DPA_USE_DS=1 -DPAWIN_USE_WDMKS_DEVICE_INFO"
         fi
 
         if [ "x$with_asio" = "xyes" ]; then
@@ -11385,7 +11385,7 @@ case "${host_os}" in
             add_objects src/hostapi/wmme/pa_win_wmme.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_waveformat.o
             LIBS="-lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm"
-            CFLAGS="$CFLAGS -I\$(top_srcdir)/src/common -UPA_USE_WMME -DPA_USE_WMME=1"
+            CFLAGS="$CFLAGS -I\$(top_srcdir)/src/common -UPA_USE_WMME -DPA_USE_WMME=1 -DPAWIN_USE_WDMKS_DEVICE_INFO"
         fi
 
         if [ "x$with_wasapi" = "xyes" ]; then
