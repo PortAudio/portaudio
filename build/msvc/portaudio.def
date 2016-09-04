@@ -35,6 +35,10 @@ Pa_GetStreamReadAvailable           @31
 Pa_GetStreamWriteAvailable          @32
 Pa_GetSampleSize                    @33
 Pa_Sleep                            @34
+Pa_GetAvailableHostApisCount        @35
+Pa_GetAvailableHostApis             @36
+Pa_SelectHostApis                   @37
+Pa_GetSelectedHostApis              @38
 PaAsio_GetAvailableBufferSizes      @50
 PaAsio_ShowControlPanel             @51
 PaUtil_InitializeX86PlainConverters @52
