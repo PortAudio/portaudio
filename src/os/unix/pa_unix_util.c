@@ -280,7 +280,7 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
     memset( self, 0, sizeof (PaUnixThread) );
     PaUnixMutex_Initialize( &self->mtx );
     PA_ASSERT_CALL( pthread_condattr_init( &cattr ), 0 );
-#if defined(CLOCK_MONOTONIC) && !defined(__APPLE__)
+#if defined(CLOCK_MONOTONIC) && !defined(__APPLE__) && (!defined(__ANDROID__) || __ANDROID_API__ >= 21)
     PA_ASSERT_CALL( pthread_condattr_setclock( &cattr, CLOCK_MONOTONIC ), 0 );
 #endif
     PA_ASSERT_CALL( pthread_cond_init( &self->cond, &cattr), 0 );

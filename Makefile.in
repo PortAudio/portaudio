@@ -44,7 +44,7 @@ PALIB = libportaudio.la
 PAINC = include/portaudio.h
 
 PA_LDFLAGS = $(LDFLAGS) $(SHARED_FLAGS) -rpath $(libdir) -no-undefined \
-	     -export-symbols-regex "(Pa|PaMacCore|PaJack|PaAlsa|PaAsio|PaOSS|PaWasapi|PaWasapiWinrt|PaWinMME)_.*" \
+	     -export-symbols-regex "(Pa|PaMacCore|PaJack|PaAlsa|PaAsio|PaOSS|PaWasapi|PaWasapiWinrt|PaWinMME|PaOpenSLES)_.*" \
 	     -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE)
 
 COMMON_OBJS = \
@@ -150,6 +150,7 @@ SRC_DIRS = \
 	src/hostapi/wasapi \
 	src/hostapi/wdmks \
 	src/hostapi/wmme \
+	src/hostapi/opensles \
 	src/os/unix \
 	src/os/win
 
