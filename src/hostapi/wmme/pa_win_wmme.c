@@ -2901,7 +2901,7 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
         waitResult = WaitForMultipleObjects( eventCount, events, FALSE /* wait all = FALSE */, timeout );
         if( waitResult == WAIT_FAILED )
         {
-            result = paUnanticipatedHostError;
+            result = (DWORD)paUnanticipatedHostError;
             /** @todo FIXME/REVIEW: can't return host error info from an asyncronous thread. see http://www.portaudio.com/trac/ticket/143 */
             done = 1;
         }
