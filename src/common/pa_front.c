@@ -77,8 +77,8 @@
 #include "pa_trace.h" /* still usefull?*/
 #include "pa_debugprint.h"
 
-#ifndef PA_SVN_REVISION
-#include "pa_svnrevision.h"
+#ifndef PA_GIT_REVISION
+#include "pa_gitrevision.h"
 #endif
 
 /**
@@ -110,7 +110,7 @@
 #define TOSTRING(x) STRINGIFY(x)
 
 #define PA_VERSION_STRING_ TOSTRING(paVersionMajor) "." TOSTRING(paVersionMinor) "." TOSTRING(paVersionSubMinor)
-#define PA_VERSION_TEXT_   "PortAudio V" PA_VERSION_STRING_ "-devel, revision " TOSTRING(PA_SVN_REVISION)
+#define PA_VERSION_TEXT_   "PortAudio V" PA_VERSION_STRING_ "-devel, revision " TOSTRING(PA_GIT_REVISION)
 
 int Pa_GetVersion( void )
 {
@@ -126,7 +126,7 @@ static PaVersionInfo versionInfo_ = {
     /*.versionMajor =*/ paVersionMajor,
     /*.versionMinor =*/ paVersionMinor,
     /*.versionSubMinor =*/ paVersionSubMinor,
-    /*.versionControlRevision =*/ TOSTRING(PA_SVN_REVISION),
+    /*.versionControlRevision =*/ TOSTRING(PA_GIT_REVISION),
     /*.versionText =*/ PA_VERSION_TEXT_
 };
 
