@@ -1019,14 +1019,14 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     winMmeHostApi->outputDeviceCount = 0;
 
     preferredDeviceStatusFlags = 0;
-    waveInPreferredDevice = -1;
+    waveInPreferredDevice = WAVE_MAPPER;
     if( waveInMessage( (HWAVEIN)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveInPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags ) != MMSYSERR_NOERROR )
-        waveInPreferredDevice = -1;
+        waveInPreferredDevice = WAVE_MAPPER;
 
     preferredDeviceStatusFlags = 0;
-    waveOutPreferredDevice = -1;
+    waveOutPreferredDevice = WAVE_MAPPER;
     if( waveOutMessage( (HWAVEOUT)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags ) != MMSYSERR_NOERROR )
-        waveOutPreferredDevice = -1;
+        waveOutPreferredDevice = WAVE_MAPPER;
 
     maximumPossibleDeviceCount = 0;
 
