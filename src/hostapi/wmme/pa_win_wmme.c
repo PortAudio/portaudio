@@ -1027,6 +1027,10 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
        with ids matching wave{In, Out}PreferredDevice. If such devices are not
        encountered during enumeration, the first device enumerated for each of
        {input, output} will be selected as the PA default device.
+
+       Note that if PAWIN_WMME_NO_WAVE_MAPPER is defined, the WAVE_MAPPER
+       devices will never be enumerated, and will never be made a PA
+       default device, irrespective of the wave{In, Out}PreferredDevice values.
     */
     preferredDeviceStatusFlags = 0;
     waveInPreferredDevice = WAVE_MAPPER;
@@ -1040,14 +1044,19 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     maximumPossibleDeviceCount = 0;
 
+#ifdef PAWIN_WMME_NO_WAVE_MAPPER
+    #define PAWIN_WMME_POSSIBLE_WAVE_MAPPER_COUNT_ 0
+#else
+    #define PAWIN_WMME_POSSIBLE_WAVE_MAPPER_COUNT_ 1
+#endif
+
     inputDeviceCount = waveInGetNumDevs();
     if( inputDeviceCount > 0 )
-        maximumPossibleDeviceCount += inputDeviceCount + 1;	/* assume there is a WAVE_MAPPER */
+        maximumPossibleDeviceCount += inputDeviceCount + PAWIN_WMME_POSSIBLE_WAVE_MAPPER_COUNT_;
 
     outputDeviceCount = waveOutGetNumDevs();
     if( outputDeviceCount > 0 )
-        maximumPossibleDeviceCount += outputDeviceCount + 1;	/* assume there is a WAVE_MAPPER */
-
+        maximumPossibleDeviceCount += outputDeviceCount + PAWIN_WMME_POSSIBLE_WAVE_MAPPER_COUNT_;
 
     if( maximumPossibleDeviceCount > 0 ){
 
@@ -1079,9 +1088,14 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         GetDefaultLatencies( &defaultLowLatency, &defaultHighLatency );
 
         if( inputDeviceCount > 0 ){
-            /* -1 is the WAVE_MAPPER */
+#ifdef PAWIN_WMME_NO_WAVE_MAPPER
+            for( i = 0; i < inputDeviceCount; ++i ){
+                UINT winMmeDeviceId = (UINT)i;
+#else
+            /* -1 enumerates the WAVE_MAPPER */
             for( i = -1; i < inputDeviceCount; ++i ){
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
+#endif
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
                 deviceInfo->structVersion = 3;
@@ -1122,9 +1136,14 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         }
 
         if( outputDeviceCount > 0 ){
-            /* -1 is the WAVE_MAPPER */
+#ifdef PAWIN_WMME_NO_WAVE_MAPPER
+            for( i = 0; i < outputDeviceCount; ++i ){
+                UINT winMmeDeviceId = (UINT)i;
+#else
+            /* -1 enumerates the WAVE_MAPPER */
             for( i = -1; i < outputDeviceCount; ++i ){
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
+#endif
                 PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ (*hostApi)->info.deviceCount ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
                 deviceInfo->structVersion = 3;
