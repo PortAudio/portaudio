@@ -326,7 +326,7 @@ void PaUtil_TerminateHotPlug()
             PostMessage(s_handler->hWnd, WM_QUIT, 0, 0);
             if (WaitForSingleObject(s_handler->hMsgThread, 1000) == WAIT_TIMEOUT)
             {
-                TerminateThread(s_handler->hMsgThread, -1);
+                TerminateThread(s_handler->hMsgThread, (DWORD)-1);
             }
         }
         DeleteCriticalSection(&s_handler->lock);
