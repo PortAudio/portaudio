@@ -672,11 +672,11 @@ static void DetectDefaultSampleRate( PaWinMmeDeviceInfo *winMmeDeviceInfo, int w
 
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static int QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels )
+static char QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels )
 {
     void *devicePath;
     DWORD devicePathSize;
-    int result = 0;
+    char result = 0;
 
     if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
             (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
