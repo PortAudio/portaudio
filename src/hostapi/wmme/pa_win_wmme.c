@@ -1821,7 +1821,6 @@ static void InitializeSingleDirectionHandlesAndBuffers( PaWinMmeSingleDirectionH
 static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostApi,
         PaWinMmeSingleDirectionHandlesAndBuffers *handlesAndBuffers,
         unsigned long winMmeSpecificFlags,
-        unsigned long bytesPerHostSample,
         double sampleRate, PaWinMmeDeviceAndChannelCount *devices,
         unsigned int deviceCount, PaWinWaveFormatChannelMask channelMask, int isInput );
 static PaError TerminateWaveHandles( PaWinMmeSingleDirectionHandlesAndBuffers *handlesAndBuffers, int isInput, int currentlyProcessingAnError );
@@ -1846,7 +1845,6 @@ static void InitializeSingleDirectionHandlesAndBuffers( PaWinMmeSingleDirectionH
 static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostApi,
         PaWinMmeSingleDirectionHandlesAndBuffers *handlesAndBuffers,
         unsigned long winMmeSpecificFlags,
-        unsigned long bytesPerHostSample,
         double sampleRate, PaWinMmeDeviceAndChannelCount *devices,
         unsigned int deviceCount, PaWinWaveFormatChannelMask channelMask, int isInput )
 {
@@ -2600,8 +2598,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( inputParameters )
     {
         result = InitializeWaveHandles( winMmeHostApi, &stream->input,
-                winMmeSpecificInputFlags,
-                stream->bufferProcessor.bytesPerHostInputSample, sampleRate,
+                winMmeSpecificInputFlags, sampleRate,
                 inputDevices, inputDeviceCount, inputChannelMask, 1 /* isInput */ );
         if( result != paNoError ) goto error;
     }
@@ -2609,8 +2606,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( outputParameters )
     {
         result = InitializeWaveHandles( winMmeHostApi, &stream->output,
-                winMmeSpecificOutputFlags,
-                stream->bufferProcessor.bytesPerHostOutputSample, sampleRate,
+                winMmeSpecificOutputFlags, sampleRate,
                 outputDevices, outputDeviceCount, outputChannelMask, 0 /* isInput */ );
         if( result != paNoError ) goto error;
     }
