@@ -2368,7 +2368,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     unsigned long hostInputBufferCount;
     unsigned long framesPerHostOutputBuffer;
     unsigned long hostOutputBufferCount;
-    unsigned long framesPerBufferProcessorCall;
+    unsigned long framesPerBufferProcessorCall = 0;
     PaWinMmeDeviceAndChannelCount *inputDevices = 0;  /* contains all devices and channel counts as local host api ids, even when PaWinMmeUseMultipleDevices is not used */
     unsigned long winMmeSpecificInputFlags = 0;
     unsigned long inputDeviceCount = 0;            
