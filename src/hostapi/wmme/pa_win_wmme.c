@@ -1018,6 +1018,16 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     winMmeHostApi->inputDeviceCount = 0;
     winMmeHostApi->outputDeviceCount = 0;
 
+    /* Default device determination:
+       Here we query for the system preferred input and output devices using
+       DRVM_MAPPER_PREFERRED_GET; on error fall back to WAVE_MAPPER. Preferred
+       devices are stored in wave{In, Out}PreferredDevice.
+
+       When enumerating devices, set PA default devices to the MME devices
+       with ids matching wave{In, Out}PreferredDevice. If such devices are not
+       encountered during enumeration, the first device enumerated for each of
+       {input, output} will be selected as the PA default device.
+    */
     preferredDeviceStatusFlags = 0;
     waveInPreferredDevice = WAVE_MAPPER;
     if( waveInMessage( (HWAVEIN)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveInPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags ) != MMSYSERR_NOERROR )
