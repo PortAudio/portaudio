@@ -1496,6 +1496,11 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             goto error;
         }
 
+        outArgument->defaultInputDevice = paNoDevice;
+        outArgument->defaultOutputDevice = paNoDevice;
+        outArgument->inputDeviceCount = 0;
+        outArgument->outputDeviceCount = 0;
+
         GetDefaultLatencies( &defaultLowLatency, &defaultHighLatency );
 
         if( inputDeviceCount > 0 ){
@@ -1643,6 +1648,8 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
     hostApi->info.deviceCount = 0;
     hostApi->info.defaultInputDevice = paNoDevice;
     hostApi->info.defaultOutputDevice = paNoDevice;
+    winMmeHostApi->inputDeviceCount = 0;
+    winMmeHostApi->outputDeviceCount = 0;
 
     if( scanResults != NULL )
     {
@@ -1652,10 +1659,9 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
         {
             /* use the array allocated in ScanDeviceInfos() as our deviceInfos */
             hostApi->deviceInfos = scanDeviceInfosResults->deviceInfos;
+            hostApi->info.deviceCount = deviceCount;
             hostApi->info.defaultInputDevice = scanDeviceInfosResults->defaultInputDevice;
             hostApi->info.defaultOutputDevice = scanDeviceInfosResults->defaultOutputDevice;
-            hostApi->info.deviceCount = deviceCount;
-
             winMmeHostApi->inputDeviceCount  = scanDeviceInfosResults->inputDeviceCount;
             winMmeHostApi->outputDeviceCount  = scanDeviceInfosResults->outputDeviceCount;
         }
