@@ -315,7 +315,8 @@ typedef struct PaWinDsStream
 
 } PaWinDsStream;
 
-typedef struct PaWinDsScanDeviceInfosResults{ /* used for tranferring device infos during scanning / rescanning */
+typedef struct PaWinDsScanDeviceInfosResults
+{
     PaDeviceInfo **deviceInfos;
     PaDeviceIndex defaultInputDevice;
     PaDeviceIndex defaultOutputDevice;
@@ -1615,6 +1616,8 @@ error:
     {
         FreeDeviceInfos( winDsHostApi->allocations, outArgument->deviceInfos );
     }
+    *newDeviceCount = 0;
+
     return result;
 }
 
