@@ -445,6 +445,9 @@ typedef struct
 {
     PaDeviceInfo inheritedDeviceInfo;
     UINT winWmmeDeviceId; /*<< Windows MME device id for this device */
+    LPWSTR deviceInterfaceName; /*<< A null-terminated Unicode string containing the device-interface name returned by DRV_QUERYDEVICEINTERFACE.
+                                   see: https://msdn.microsoft.com/en-us/library/windows/hardware/ff536363(v=vs.85).aspx
+                                   We use this for connectionId impl because it works on Windows XP (DRV_QUERYFUNCTIONINSTANCEID is supported only on Vista and later) */
     DWORD dwFormats; /**<< standard formats bitmask from the WAVEINCAPS and WAVEOUTCAPS structures */
     char deviceInputChannelCountIsKnown; /**<< if the system returns 0xFFFF then we don't really know the number of supported channels (1=>known, 0=>unknown)*/
     char deviceOutputChannelCountIsKnown; /**<< if the system returns 0xFFFF then we don't really know the number of supported channels (1=>known, 0=>unknown)*/
@@ -678,45 +681,45 @@ static void DetectDefaultSampleRate( PaWinMmeDeviceInfo *winMmeDeviceInfo, int w
 }
 
 
-#ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static char QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels )
+/* On error, *resultInterfaceName will be NULL */
+static PaError QueryInputDeviceInterfaceName( PaUtilAllocationGroup *allocations, UINT waveInDeviceId, LPWSTR *resultInterfaceName )
 {
-    void *devicePath;
-    DWORD devicePathSize;
-    char result = 0;
+    LPWSTR resultString = NULL;
+    DWORD stringSize = 0;
 
-    if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
-            (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
-        return 0;
+    *resultInterfaceName = NULL;
 
-    devicePath = PaUtil_AllocateMemory( devicePathSize );
-    if( !devicePath )
-        return 0;
+    if( waveInMessage( (HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
+            (DWORD_PTR)&stringSize, 0 ) != MMSYSERR_NOERROR )
+        return paUnanticipatedHostError;
 
-    /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path, although this is undocumented */
-    if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACE,
-            (DWORD_PTR)devicePath, devicePathSize ) == MMSYSERR_NOERROR )
+    if( stringSize == 0 )
+        return paNoError;
+
+    resultString = (LPWSTR)PaUtil_GroupAllocateMemory( allocations, stringSize );
+    if( !resultString )
+        return paInsufficientMemory;
+
+    if( waveInMessage( (HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACE,
+            (DWORD_PTR)resultString, stringSize ) == MMSYSERR_NOERROR )
     {
-        int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( devicePath, /* isInput= */ 1  );
-        if( count > 0 )
-        {
-            *maxChannels = count;
-            result = 1;
-        }
+       *resultInterfaceName = resultString;
+       return paNoError;
     }
-
-    PaUtil_FreeMemory( devicePath );
-
-    return result;
+    else
+    {
+        PaUtil_GroupFreeMemory( allocations, resultString );
+        return paUnanticipatedHostError;
+    }
 }
-#endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
 
 static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeHostApi,
         PaWinMmeDeviceInfo *winMmeDeviceInfo, UINT winMmeInputDeviceId, int *success )
 {
     PaError result = paNoError;
-    char *deviceName; /* non-const ptr */
+    char *deviceName = NULL; /* non-const ptr */
+    LPWSTR deviceInterfaceName = NULL;
     MMRESULT mmresult;
     WAVEINCAPS wic;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
@@ -772,6 +775,10 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     }
     deviceInfo->name = deviceName;
 
+    QueryInputDeviceInterfaceName( winMmeHostApi->allocations,
+            winMmeInputDeviceId, &deviceInterfaceName );
+    winMmeDeviceInfo->deviceInterfaceName = deviceInterfaceName;
+
     if( wic.wChannels == 0xFFFF || wic.wChannels < 1 || wic.wChannels > 255 ){
         /* For Windows versions using WDM (possibly Windows 98 ME and later)
          * the kernel mixer sits between the application and the driver. As a result,
@@ -792,8 +799,17 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     }
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-    winMmeDeviceInfo->deviceInputChannelCountIsKnown = 
-            QueryWaveInKSFilterMaxChannels( winMmeInputDeviceId, &deviceInfo->maxInputChannels );
+    if( deviceInterfaceName != NULL )
+    {
+        /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path
+           that we can use with WDM/KS, although this seems to be undocumented */
+        int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( deviceInterfaceName, /* isInput= */ 1  );
+        if( count > 0 )
+        {
+            deviceInfo->maxInputChannels = count;
+            winMmeDeviceInfo->deviceInputChannelCountIsKnown = 1;
+        }
+    }
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
     winMmeDeviceInfo->dwFormats = wic.dwFormats;
@@ -802,62 +818,60 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
             QueryInputWaveFormatEx, deviceInfo->maxInputChannels );
 
     winMmeDeviceInfo->winWmmeDeviceId = winMmeInputDeviceId;
-
-    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
-
-    *success = 1;
     
+    *success = 1;
+    return result;
+
 error:
+    PaUtil_GroupFreeMemory( winMmeHostApi->allocations, deviceName );
+    PaUtil_GroupFreeMemory( winMmeHostApi->allocations, deviceInterfaceName );
     return result;
 }
 
 
-#ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static int QueryWaveOutKSFilterMaxChannels( int waveOutDeviceId, int *maxChannels )
+/* resultInterfaceName will be NULL if there's an error  */
+static PaError QueryOutputDeviceInterfaceName( PaUtilAllocationGroup *allocations, UINT waveOutDeviceId, LPWSTR *resultInterfaceName )
 {
-    void *devicePath;
-    DWORD devicePathSize;
-    int result = 0;
+    LPWSTR resultString = NULL;
+    DWORD stringSize = 0;
 
-    if( waveOutMessage((HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
-            (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
-        return 0;
+    *resultInterfaceName = NULL;
 
-    devicePath = PaUtil_AllocateMemory( devicePathSize );
-    if( !devicePath )
-        return 0;
+    if( waveOutMessage( (HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
+            (DWORD_PTR)&stringSize, 0 ) != MMSYSERR_NOERROR )
+        return paInternalError;
 
-    /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path, although this is undocumented */
-    if( waveOutMessage((HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACE,
-            (DWORD_PTR)devicePath, devicePathSize ) == MMSYSERR_NOERROR )
+    if( stringSize == 0 )
+        return paNoError;
+
+    resultString = (LPWSTR)PaUtil_GroupAllocateMemory( allocations, stringSize );
+    if( !resultString )
+        return paInsufficientMemory;
+
+    if( waveOutMessage( (HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACE,
+            (DWORD_PTR)resultString, stringSize ) == MMSYSERR_NOERROR )
     {
-        int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( devicePath, /* isInput= */ 0  );
-        if( count > 0 )
-        {
-            *maxChannels = count;
-            result = 1;
-        }
+       *resultInterfaceName = resultString;
+       return paNoError;
     }
-
-    PaUtil_FreeMemory( devicePath );
-
-    return result;
+    else
+    {
+        PaUtil_GroupFreeMemory( allocations, resultString );
+        return paInternalError;
+    }
 }
-#endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
 
 static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeHostApi,
         PaWinMmeDeviceInfo *winMmeDeviceInfo, UINT winMmeOutputDeviceId, int *success )
 {
     PaError result = paNoError;
-    char *deviceName; /* non-const ptr */
+    char *deviceName = NULL; /* non-const ptr */
+    LPWSTR deviceInterfaceName = NULL;
     MMRESULT mmresult;
     WAVEOUTCAPS woc;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
     size_t len;
-#ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-    int wdmksDeviceOutputChannelCountIsKnown;
-#endif
 
     *success = 0;
 
@@ -909,6 +923,10 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     }
     deviceInfo->name = deviceName;
 
+    QueryOutputDeviceInterfaceName( winMmeHostApi->allocations,
+            winMmeOutputDeviceId, &deviceInterfaceName );
+    winMmeDeviceInfo->deviceInterfaceName = deviceInterfaceName;
+
     if( woc.wChannels == 0xFFFF || woc.wChannels < 1 || woc.wChannels > 255 ){
         /* For Windows versions using WDM (possibly Windows 98 ME and later)
          * the kernel mixer sits between the application and the driver. As a result,
@@ -929,10 +947,17 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     }
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-    wdmksDeviceOutputChannelCountIsKnown = QueryWaveOutKSFilterMaxChannels( 
-            winMmeOutputDeviceId, &deviceInfo->maxOutputChannels );
-    if( wdmksDeviceOutputChannelCountIsKnown && !winMmeDeviceInfo->deviceOutputChannelCountIsKnown )
-        winMmeDeviceInfo->deviceOutputChannelCountIsKnown = 1;
+    if( deviceInterfaceName != NULL )
+    {
+        /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path
+           that we can use with WDM/KS, although this seems to be undocumented */
+        int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( deviceInterfaceName, /* isInput= */ 0  );
+        if( count > 0 )
+        {
+            deviceInfo->maxOutputChannels = count;
+            winMmeDeviceInfo->deviceOutputChannelCountIsKnown = 1;
+        }
+    }
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
 
     winMmeDeviceInfo->dwFormats = woc.dwFormats;
@@ -942,11 +967,12 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
 
     winMmeDeviceInfo->winWmmeDeviceId = winMmeOutputDeviceId;
 
-    deviceInfo->connectionId = PaUtil_MakeDeviceConnectionId();
-
     *success = 1;
-    
+    return result;
+
 error:
+    PaUtil_GroupFreeMemory( winMmeHostApi->allocations, deviceName );
+    PaUtil_GroupFreeMemory( winMmeHostApi->allocations, deviceInterfaceName );
     return result;
 }
 
@@ -1274,14 +1300,101 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     return paFormatIsSupported;
 }
 
-/**************************************************************************************************************************/
+/***********************************************************************************/
 
-static void FreeDeviceInfos( PaUtilAllocationGroup *allocations, PaDeviceInfo **deviceInfos )
+static const PaDeviceInfo* FindDeviceByConnectionId(
+        const PaDeviceInfo **deviceInfos, int deviceCount, PaDeviceConnectionId connectionId )
+{
+    int i;
+
+#ifndef NDEBUG
+    if( deviceCount )
+    {
+        assert( deviceInfos != NULL );
+        assert( deviceInfos[0] != NULL );
+    }
+#endif
+
+    for( i = 0; i < deviceCount; ++i )
+    {
+        const PaDeviceInfo *deviceInfo = deviceInfos[i];
+        if( deviceInfo->connectionId == connectionId )
+            return deviceInfo;
+    }
+
+    return NULL;
+}
+
+/* used for looking up existing devices to reuse their connectionId */
+static const PaDeviceInfo* FindDeviceInfoByInterfaceName(
+        const PaDeviceInfo **deviceInfos, int deviceCount,
+        LPCWSTR deviceInterfaceName, int isInput )
+{
+    int i;
+
+#ifndef NDEBUG
+    if( deviceCount )
+    {
+        assert( deviceInfos != NULL );
+        assert( deviceInfos[0] != NULL );
+    }
+#endif
+
+    for( i = 0; i < deviceCount; ++i )
+    {
+        const PaDeviceInfo *deviceInfo = deviceInfos[i];
+        const PaWinMmeDeviceInfo *wmmeDeviceInfo = (const PaWinMmeDeviceInfo*)deviceInfo;
+        if( ((isInput && deviceInfo->maxInputChannels > 0)
+                || (!isInput && deviceInfo->maxOutputChannels > 0))
+            &&
+            /* require both interface names to be non-NULL, because they can be NULL due to errors. */
+            (deviceInterfaceName != NULL && wmmeDeviceInfo->deviceInterfaceName != NULL
+                && (wcscmp(deviceInterfaceName, wmmeDeviceInfo->deviceInterfaceName) == 0)) )
+        {
+            return deviceInfo;
+        }
+    }
+
+    return NULL;
+}
+
+/* correlate or allocate device connection id */
+static PaDeviceConnectionId AssignDeviceConnectionId(
+        const PaDeviceInfo **activeDeviceInfos, int activeDeviceCount,
+        const PaDeviceInfo **newDeviceInfos, int newDeviceCount,
+        LPCWSTR deviceInterfaceName, int isInput )
+{
+    const PaDeviceInfo *currentDeviceInfo;
+
+    currentDeviceInfo = FindDeviceInfoByInterfaceName(
+            activeDeviceInfos, activeDeviceCount, /* search active device list for deviceInterfaceName */
+            deviceInterfaceName, isInput );
+
+    if( currentDeviceInfo && FindDeviceByConnectionId(
+            newDeviceInfos, newDeviceCount, /* search new device list connectionId */
+            currentDeviceInfo->connectionId ) == NULL )
+    {
+        /* deviceInterfaceName matches, and its connectionId hasn't already been reused */
+        return currentDeviceInfo->connectionId;
+    }
+
+    return PaUtil_MakeDeviceConnectionId();
+}
+
+
+static void FreeDeviceInfos( PaUtilAllocationGroup *allocations, PaDeviceInfo **deviceInfos, int deviceCount )
 {
     if( deviceInfos )
     {
         if( deviceInfos[0] )
         {
+            int i;
+            for( i = 0; i < deviceCount; ++i )
+            {
+                PaWinMmeDeviceInfo *wmmeDeviceInfo = (PaWinMmeDeviceInfo*)deviceInfos[ i ];
+                PaUtil_GroupFreeMemory( allocations, wmmeDeviceInfo->deviceInterfaceName );
+            }
+
             /* all device info structs are allocated in a block so we can destroy them like this */
             PaUtil_GroupFreeMemory( allocations, deviceInfos[0] );
         }
@@ -1416,6 +1529,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                               /* N.B. Prior WMME versions failed scanning with an error here. */
 
                 if( deviceInfoInitializationSucceeded ){
+                    /* NOTE: wmmeDeviceInfo->deviceInterfaceName is now allocated and would need to be freed on error. */
+
                     if( outArgument->defaultInputDevice == paNoDevice )
                     {
                         /* if there is currently no default device, use the first one available */
@@ -1426,6 +1541,11 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                         /* set the default device to the system preferred device */
                         outArgument->defaultInputDevice = *newDeviceCount;
                     }
+
+                    deviceInfo->connectionId = AssignDeviceConnectionId(
+                            hostApi->deviceInfos, hostApi->info.deviceCount,
+                            outArgument->deviceInfos, *newDeviceCount,
+                            wmmeDeviceInfo->deviceInterfaceName, /* isInput= */ 1 );
 
                     outArgument->deviceInfos[ *newDeviceCount ] = deviceInfo;
                     outArgument->inputDeviceCount++;
@@ -1465,6 +1585,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                               /* N.B. Prior WMME versions failed scanning with an error here. */
 
                 if( deviceInfoInitializationSucceeded ){
+                    /* NOTE: wmmeDeviceInfo->deviceInterfaceName is now allocated and would need to be freed on error. */
+
                     if( outArgument->defaultOutputDevice == paNoDevice )
                     {
                         /* if there is currently no default device, use the first one available */
@@ -1476,6 +1598,11 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                         /* set the default device to the system preferred device */
                         outArgument->defaultOutputDevice = *newDeviceCount;
                     }
+
+                    deviceInfo->connectionId = AssignDeviceConnectionId(
+                            hostApi->deviceInfos, hostApi->info.deviceCount,
+                            outArgument->deviceInfos, *newDeviceCount,
+                            wmmeDeviceInfo->deviceInterfaceName, /* isInput= */ 0 );
 
                     outArgument->deviceInfos[ *newDeviceCount ] = deviceInfo;
                     outArgument->outputDeviceCount++;
@@ -1493,8 +1620,10 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
 error:
     if( outArgument )
     {
-        FreeDeviceInfos( winMmeHostApi->allocations, outArgument->deviceInfos );
+        FreeDeviceInfos( winMmeHostApi->allocations, outArgument->deviceInfos, *newDeviceCount );
     }
+    *newDeviceCount = 0;
+
     return result;
 }
 
@@ -1505,16 +1634,15 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
 
     (void)index;  /* unused parameter */
 
-    hostApi->info.deviceCount = 0;
-    hostApi->info.defaultInputDevice = paNoDevice;
-    hostApi->info.defaultOutputDevice = paNoDevice;
-
     /* Free any old memory which might be in the device info */
     if( hostApi->deviceInfos )
     {
-        FreeDeviceInfos( winMmeHostApi->allocations, hostApi->deviceInfos );
+        FreeDeviceInfos( winMmeHostApi->allocations, hostApi->deviceInfos, hostApi->info.deviceCount );
         hostApi->deviceInfos = NULL;
     }
+    hostApi->info.deviceCount = 0;
+    hostApi->info.defaultInputDevice = paNoDevice;
+    hostApi->info.defaultOutputDevice = paNoDevice;
 
     if( scanResults != NULL )
     {
@@ -1550,7 +1678,7 @@ static PaError DisposeDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, 
 
         if( scanDeviceInfosResults->deviceInfos )
         {
-            FreeDeviceInfos( winMmeHostApi->allocations, hostApi->deviceInfos );
+            FreeDeviceInfos( winMmeHostApi->allocations, hostApi->deviceInfos, deviceCount );
         }
 
         PaUtil_GroupFreeMemory( winMmeHostApi->allocations, scanDeviceInfosResults );
@@ -1559,7 +1687,7 @@ static PaError DisposeDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, 
     return paNoError;
 }
 
-/**************************************************************************************************************************/
+/***********************************************************************************/
 
 static unsigned long ComputeHostBufferCountForFixedBufferSizeFrames(
         unsigned long suggestedLatencyFrames,
