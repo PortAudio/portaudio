@@ -4080,9 +4080,19 @@ static PaError ReadStream( PaStream* s,
     unsigned long framesProcessed;
     signed int hostInputBufferIndex;
     DWORD waitResult;
-    DWORD timeout = (unsigned long)(stream->allBuffersDurationMs * 0.5);
     unsigned int channel, i;
     
+    /* timeout variables. see StopStream for a discussion. */
+    DWORD totalTimeoutMs = (DWORD)(stream->allBuffersDurationMs * 1.5);
+    /* poll every 1.5 buffer durations. */
+    DWORD timeoutMs = (DWORD)((1.5 * stream->allBuffersDurationMs) / stream->output.bufferCount) + 1;
+    /* for a total of maxWaitCount iterations, duration: maxWaitCount*timeoutMs = 1.5 * stream->allBuffersDurationMs */
+    unsigned int maxWaitCount = stream->output.bufferCount;
+
+    unsigned int waitCount;
+    DWORD waitStartTime = 0;
+    DWORD elapsedMs;
+
     if( PA_IS_INPUT_STREAM_(stream) )
     {
         /* make a local copy of the user buffer pointer(s). this is necessary
@@ -4102,9 +4112,13 @@ static PaError ReadStream( PaStream* s,
                 ((void**)userBuffer)[i] = ((void**)buffer)[i];
         }
         
+        waitCount = 0;
+
         do{
             if( CurrentInputBuffersAreDone( stream ) )
             {
+                waitCount = 0;
+
                 if( NoBuffersAreQueued( &stream->input ) )
                 {
                     /** @todo REVIEW: consider what to do if the input overflows.
@@ -4149,8 +4163,13 @@ static PaError ReadStream( PaStream* s,
                 framesRead += framesProcessed;      
 
             }else{
+
+                if( waitCount == 0 )
+                    waitStartTime = GetTickCount();
+                ++waitCount;
+
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->input.bufferEvent, timeout );
+                waitResult = WaitForSingleObject( stream->input.bufferEvent, timeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     result = paUnanticipatedHostError;
@@ -4158,10 +4177,25 @@ static PaError ReadStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
-                    */
-                }         
+                    /*
+                        Repeated timeouts with no forward progress on done buffers
+                        has been reported to happen after disconnecting a device (Jitsi).
+
+                        Limit the number and duration of waits, then time out.
+                     */
+                    if( waitCount >= maxWaitCount )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
+
+                    elapsedMs = GetTickCount() - waitStartTime;
+                    if( elapsedMs >= totalTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
+                }
             }
         }while( framesRead < frames );
     }
@@ -4185,10 +4219,19 @@ static PaError WriteStream( PaStream* s,
     unsigned long framesProcessed;
     signed int hostOutputBufferIndex;
     DWORD waitResult;
-    DWORD timeout = (unsigned long)(stream->allBuffersDurationMs * 0.5);
     unsigned int channel, i;
 
-        
+    /* timeout variables. see StopStream for a discussion. */
+    DWORD totalTimeoutMs = (DWORD)(stream->allBuffersDurationMs * 1.5);
+    /* poll every 1.5 buffer durations. */
+    DWORD timeoutMs = (DWORD)((1.5 * stream->allBuffersDurationMs) / stream->output.bufferCount) + 1;
+    /* for a total of maxWaitCount iterations, duration: maxWaitCount*timeoutMs = 1.5 * stream->allBuffersDurationMs */
+    unsigned int maxWaitCount = stream->output.bufferCount;
+
+    unsigned int waitCount;
+    DWORD waitStartTime = 0;
+    DWORD elapsedMs;
+
     if( PA_IS_OUTPUT_STREAM_(stream) )
     {
         /* make a local copy of the user buffer pointer(s). this is necessary
@@ -4208,9 +4251,13 @@ static PaError WriteStream( PaStream* s,
                 ((const void**)userBuffer)[i] = ((const void**)buffer)[i];
         }
 
+        waitCount = 0;
+
         do{
             if( CurrentOutputBuffersAreDone( stream ) )
             {
+                waitCount = 0;
+
                 if( NoBuffersAreQueued( &stream->output ) )
                 {
                     /** @todo REVIEW: consider what to do if the output
@@ -4257,8 +4304,12 @@ static PaError WriteStream( PaStream* s,
             }
             else
             {
+                if( waitCount == 0 )
+                    waitStartTime = GetTickCount();
+                ++waitCount;
+
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeout );
+                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     result = paUnanticipatedHostError;
@@ -4266,9 +4317,24 @@ static PaError WriteStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
-                    */
+                    /*
+                        Repeated timeouts with no forward progress on done buffers
+                        has been reported to happen after disconnecting a device (Jitsi).
+
+                        Limit the number and duration of waits, then time out.
+                     */
+                    if( waitCount >= maxWaitCount )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
+
+                    elapsedMs = GetTickCount() - waitStartTime;
+                    if( elapsedMs >= totalTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }             
             }        
         }while( framesWritten < frames );
