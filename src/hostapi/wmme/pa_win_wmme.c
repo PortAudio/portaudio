@@ -1058,6 +1058,8 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     /* Ignore the result of CommitDeviceInfos(), it is a non-failing operation */
     CommitDeviceInfos( &winMmeHostApi->inheritedHostApiRep, hostApiIndex, scanResults, deviceCount );
 
+    InitializeDefaultDeviceIdsFromEnv( winMmeHostApi ); /* uses the active device list. must be called after CommitDeviceInfos */
+
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
@@ -1616,8 +1618,6 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             }
         }
     }
-
-    InitializeDefaultDeviceIdsFromEnv( winMmeHostApi );
 
     *scanResults = outArgument;
     return result;
