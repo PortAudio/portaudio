@@ -56,51 +56,27 @@
 #define FRAMES_PER_BUFFER  (64)
 #define MAX_CHANNELS        (8)
 
+#define INPUT_CHANNELS      (1) /* 1 so it works with headset mic */
+#define OUTPUT_CHANNELS     (2)
+
 typedef struct
 {
     short sine[TABLE_SIZE];
     long phases[MAX_CHANNELS];
     long numChannels;
-    long sampsToGo;
 }
 paTestData;
 
-
-static int inputCallback( const void *inputBuffer, void *outputBuffer,
+static void generateSine( short *out,
                           unsigned long framesPerBuffer,
-                          const PaStreamCallbackTimeInfo* timeInfo,
-                          PaStreamCallbackFlags statusFlags,
-                          void *userData )
+                          paTestData *data )
 {
-    paTestData *data = (paTestData*)userData;
-    int finished = 0;
-    (void) inputBuffer; /* Prevent "unused variable" warnings. */
-    (void) outputBuffer; /* Prevent "unused variable" warnings. */
-
-    data->sampsToGo -= framesPerBuffer;
-    if (data->sampsToGo <= 0)
-    {
-        data->sampsToGo = 0;
-        finished = 1;
-    }
-    return finished;
-}
-
-static int outputCallback( const void *inputBuffer, void *outputBuffer,
-                            unsigned long framesPerBuffer,
-                            const PaStreamCallbackTimeInfo* timeInfo,
-                            PaStreamCallbackFlags statusFlags,
-                            void *userData )
-{
-    paTestData *data = (paTestData*)userData;
-    short *out = (short*)outputBuffer;
     unsigned int i;
-    int finished = 0;
-    (void) inputBuffer; /* Prevent "unused variable" warnings. */
+    int channelIndex;
 
     for( i=0; i<framesPerBuffer; i++ )
     {
-        for (int channelIndex = 0; channelIndex < data->numChannels; channelIndex++)
+        for (channelIndex = 0; channelIndex < data->numChannels; channelIndex++)
         {
             int phase = data->phases[channelIndex];
             *out++ = data->sine[phase];
@@ -109,7 +85,6 @@ static int outputCallback( const void *inputBuffer, void *outputBuffer,
             data->phases[channelIndex] = phase;
         }
     }
-    return finished;
 }
 
 /*******************************************************************/
@@ -127,6 +102,9 @@ int main(int argc, char **args)
     int totalSamps;
     int inputDevice = -1;
     int outputDevice = -1;
+    int sampsToGo;
+    short inputBuffer[INPUT_CHANNELS * FRAMES_PER_BUFFER];
+    short outputBuffer[OUTPUT_CHANNELS * FRAMES_PER_BUFFER];
 
     printf("Test unplugging a USB device.\n");
 
@@ -144,8 +122,9 @@ int main(int argc, char **args)
     {
         data.sine[i] = (short) (32767.0 * sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. ));
     }
-    data.numChannels = 2;
-    data.sampsToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
+    data.numChannels = OUTPUT_CHANNELS;
+
+    sampsToGo = totalSamps =  NUM_SECONDS * SAMPLE_RATE; /* Play for a few seconds. */
 
 
     err = Pa_Initialize();
@@ -171,7 +150,7 @@ int main(int argc, char **args)
         goto error;
     }
 
-    inputParameters.channelCount = 1;
+    inputParameters.channelCount = INPUT_CHANNELS;
     inputParameters.sampleFormat = paInt16;
     deviceInfo = Pa_GetDeviceInfo( inputParameters.device );
     if( deviceInfo == NULL )
@@ -188,11 +167,11 @@ int main(int argc, char **args)
                 SAMPLE_RATE,
                 FRAMES_PER_BUFFER,
                 0,
-                inputCallback,
+                NULL,
                 &data );
     if( err != paNoError ) goto error;
 
-    outputParameters.channelCount = 2;
+    outputParameters.channelCount = OUTPUT_CHANNELS;
     outputParameters.sampleFormat = paInt16;
     deviceInfo = Pa_GetDeviceInfo( outputParameters.device );
     if( deviceInfo == NULL )
@@ -209,7 +188,7 @@ int main(int argc, char **args)
                 SAMPLE_RATE,
                 FRAMES_PER_BUFFER,
                 (paClipOff | paDitherOff),
-                outputCallback,
+                NULL,
                 &data );
     if( err != paNoError ) goto error;
 
@@ -221,17 +200,57 @@ int main(int argc, char **args)
     printf("When you hear sound, unplug the USB device.\n");
     do
     {
-        Pa_Sleep(500);
-        printf("Frames remaining = %d\n", data.sampsToGo);
+        signed long available;
+        available = Pa_GetStreamReadAvailable(inputStream);
+        while( available > 0 ) {
+            if( available > FRAMES_PER_BUFFER )
+                available = FRAMES_PER_BUFFER;
+
+            err = Pa_ReadStream( inputStream, inputBuffer, available ); /* reading <= available means don't block */
+            if( err != paNoError ) goto done; /* Move on to stopping stream */
+
+            sampsToGo -= available;
+
+            available = Pa_GetStreamReadAvailable(inputStream);
+        }
+
+        available = Pa_GetStreamWriteAvailable(outputStream);
+        while( available > 0 ) {
+            if( available > FRAMES_PER_BUFFER )
+                available = FRAMES_PER_BUFFER;
+
+            generateSine( outputBuffer, available, &data );
+            err = Pa_WriteStream( outputStream, outputBuffer, available ); /* reading <= available means don't block */
+            if( err != paNoError ) goto done; /* Move on to stopping stream */
+
+            available = Pa_GetStreamWriteAvailable(outputStream);
+        }
+
+        Pa_Sleep(1);
+
+        printf("Frames remaining = %d\n", sampsToGo);
         printf("Pa_IsStreamActive(inputStream) = %d\n", Pa_IsStreamActive(inputStream));
         printf("Pa_IsStreamActive(outputStream) = %d\n", Pa_IsStreamActive(outputStream));
-    } while( Pa_IsStreamActive(inputStream) && Pa_IsStreamActive(outputStream) );
+    } while( Pa_IsStreamActive(inputStream) && Pa_IsStreamActive(outputStream) && sampsToGo > 0 );
+done:
 
 #if 1
+    printf("Stopping input stream...\n");
     err = Pa_StopStream( inputStream );
     if( err != paNoError ) goto error;
     printf("Input stream stopped OK.\n");
+
+    printf("Stopping output stream...\n");
     err = Pa_StopStream( outputStream );
+    if( err != paNoError ) goto error;
+    printf("Output stream stopped OK.\n");
+#endif
+
+#if 0
+    err = Pa_AbortStream( inputStream );
+    if( err != paNoError ) goto error;
+    printf("Input stream stopped OK.\n");
+    err = Pa_AbortStream( outputStream );
     if( err != paNoError ) goto error;
     printf("Output stream stopped OK.\n");
 #endif

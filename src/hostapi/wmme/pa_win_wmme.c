@@ -3768,11 +3768,13 @@ static PaError StopStream( PaStream *s )
 {
     PaError result = paNoError;
     PaWinMmeStream *stream = (PaWinMmeStream*)s;
-    int timeout;
+    DWORD timeoutMs, totalTimeoutMs;
+    DWORD waitStartTime, elapsedMs;
     DWORD waitResult;
     MMRESULT mmresult;
     signed int hostOutputBufferIndex;
-    unsigned int channel, waitCount, i;                  
+    unsigned int channel, waitCount, i;
+    unsigned int maxWaitCount;
     
     /** @todo
         REVIEW: the error checking in this function needs review. the basic
@@ -3785,23 +3787,26 @@ static PaError StopStream( PaStream *s )
     {
         /* callback stream */
 
+        /* First-chance timeout is for draining the the buffer cleanly. Use a time longer than to total buffers duration. */
+        timeoutMs = (DWORD)(stream->allBuffersDurationMs * 1.5) + 1;
+
         /* Tell processing thread to stop generating more data and to let current data play out. */
         stream->stopProcessing = 1;
 
-        /* Calculate timeOut longer than longest time it could take to return all buffers. */
-        timeout = (int)(stream->allBuffersDurationMs * 1.5);
-        if( timeout < PA_MME_MIN_TIMEOUT_MSEC_ )
-            timeout = PA_MME_MIN_TIMEOUT_MSEC_;
-
         PA_DEBUG(("WinMME StopStream: waiting for background thread.\n"));
 
-        waitResult = WaitForSingleObject( stream->processingThread, timeout );
+        waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
         if( waitResult == WAIT_TIMEOUT )
         {
             /* try to abort */
+
+            /* Last-chance timeout results in no more than PA_MME_MIN_TIMEOUT_MSEC_ of additional waiting. */
+            if( timeoutMs > PA_MME_MIN_TIMEOUT_MSEC_ )
+                timeoutMs = PA_MME_MIN_TIMEOUT_MSEC_;
+
             stream->abortProcessing = 1;
             SetEvent( stream->abortEvent );
-            waitResult = WaitForSingleObject( stream->processingThread, timeout );
+            waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
             if( waitResult == WAIT_TIMEOUT )
             {
                 PA_DEBUG(("WinMME StopStream: timed out while waiting for background thread to finish.\n"));
@@ -3853,22 +3858,57 @@ static PaError StopStream( PaStream *s )
             }
             
 
-            timeout = (stream->allBuffersDurationMs / stream->output.bufferCount) + 1;
-            if( timeout < PA_MME_MIN_TIMEOUT_MSEC_ )
-                timeout = PA_MME_MIN_TIMEOUT_MSEC_;
+            /*
+                The purpose of the following wait/poll loop is to wait for
+                the output to play out (all queued buffers to be returned).
+                We expect all queued buffers to be returned to us within
+                allBuffersDurationMs (plus some margin to avoid cutting off
+                the tail).
 
+                When functioning as intended, WaitForSingleObject will wake
+                after each buffer completes, taking at most bufferCount
+                loop iterations. We're done when NoBuffersAreQueued() returns true.
+
+                When not functioning as intended, we want to bound the
+                duration of the wait, but also poll frequently enough to
+                pick up an early-exit from NoBuffersAreQueued.
+
+                Two mechanisms are used to ensure that this loop does not hang:
+
+                 - The total elapsed wait time is limited to totalTimeoutMs.
+                 - The loop is limited to maxWaitCount iterations, and the
+                   timeout for each iteration equals totalTimeoutMs/maxWaitCount.
+
+                This combination should cover cases where the timers or
+                timeout times are unreliable (e.g. if WFSO takes longer
+                than timeoutMs to return).
+             */
+
+            totalTimeoutMs = (DWORD)(1.5 * stream->allBuffersDurationMs);
+
+            /* poll every 1.5 buffer durations. */
+            timeoutMs = (DWORD)((1.5 * stream->allBuffersDurationMs) / stream->output.bufferCount) + 1;
+            /* for a total of maxWaitCount iterations, duration: maxWaitCount*timeoutMs = 1.5 * stream->allBuffersDurationMs */
+            maxWaitCount = stream->output.bufferCount;
+
+            waitStartTime = GetTickCount();
             waitCount = 0;
-            while( !NoBuffersAreQueued( &stream->output ) && waitCount <= stream->output.bufferCount )
+            while( !NoBuffersAreQueued( &stream->output ) && waitCount <= maxWaitCount )
             {
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeout );
+                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     break;
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* keep waiting */
+                    elapsedMs = GetTickCount() - waitStartTime;
+                    if( elapsedMs >= totalTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }
 
                 ++waitCount;
