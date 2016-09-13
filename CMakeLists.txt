@@ -37,6 +37,8 @@ IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
   ENDIF(WIN32 AND MSVC)
 ENDIF()
 
+SET(PA_PKGCONFIG_VERSION 19)
+
 # Most of the code from this point onwards is related to populating the
 # following variables:
 #   PA_PUBLIC_INCLUDES - This contains the list of public PortAudio header
@@ -352,7 +354,7 @@ TARGET_INCLUDE_DIRECTORIES(portaudio_static PRIVATE ${PA_PRIVATE_INCLUDE_PATHS})
 TARGET_INCLUDE_DIRECTORIES(portaudio_static PUBLIC include)
 TARGET_LINK_LIBRARIES(portaudio_static ${PA_LIBRARY_DEPENDENCIES})
 
-IF(WIN32)
+IF(WIN32 AND MSVC)
   OPTION(PA_CONFIG_LIB_OUTPUT_PATH "Make sure that output paths are kept neat" OFF)
   IF(CMAKE_CL_64)
     SET(TARGET_POSTFIX x64)
