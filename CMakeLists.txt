@@ -110,21 +110,26 @@ SET(PA_SOURCES ${PA_COMMON_SOURCES} ${PA_SKELETON_SOURCES})
 SET(PA_PRIVATE_INCLUDE_PATHS src/common ${CMAKE_CURRENT_BINARY_DIR})
 
 IF(WIN32)
-  IF(MSVC)
-    SET(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} _CRT_SECURE_NO_WARNINGS)
-  ENDIF(MSVC)
+  SET(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} _CRT_SECURE_NO_WARNINGS)
 
   SET(PA_PLATFORM_SOURCES 
     src/os/win/pa_win_hostapis.c
     src/os/win/pa_win_util.c
     src/os/win/pa_win_waveformat.c
     src/os/win/pa_win_wdmks_utils.c
-    src/os/win/pa_win_coinitialize.c
-    src/os/win/pa_x86_plain_converters.c)
+    src/os/win/pa_win_coinitialize.c)
   SET(PA_PLATFORM_INCLUDES
     src/os/win/pa_win_coinitialize.h
-    src/os/win/pa_win_wdmks_utils.h
-    src/os/win/pa_x86_plain_converters.h)
+    src/os/win/pa_win_wdmks_utils.h)
+
+  IF(MSVC)
+    SET(PA_PLATFORM_SOURCES ${PA_PLATFORM_SOURCES} src/os/win/pa_x86_plain_converters.c)
+    SET(PA_PLATFORM_INCLUDES ${PA_PLATFORM_INCLUDES} src/os/win/pa_x86_plain_converters.h)
+  ELSE()
+    SET(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} _WIN32_WINNT=0x0501 WINVER=0x0501)
+    SET(DEF_EXCLUDE_X86_PLAIN_CONVERTERS ";")
+  ENDIF(MSVC)
+
   SOURCE_GROUP("os\\win" FILES ${PA_PLATFORM_SOURCES} ${PA_PLATFORM_INCLUDES})
   SET(PA_SOURCES ${PA_SOURCES} ${PA_PLATFORM_SOURCES})
   SET(PA_PRIVATE_INCLUDES ${PA_PRIVATE_INCLUDES} ${PA_PLATFORM_INCLUDES})
@@ -142,13 +147,14 @@ IF(WIN32)
     SET(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} ${ASIOSDK_ROOT_DIR}/common)
     SET(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} ${ASIOSDK_ROOT_DIR}/host)
     SET(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} ${ASIOSDK_ROOT_DIR}/host/pc)
-    SET(PA_ASIO_SOURCES src/hostapi/asio/pa_asio.cpp)
+    SET(PA_ASIO_SOURCES src/hostapi/asio/pa_asio.cpp src/hostapi/asio/iasiothiscallresolver.cpp)
     SET(PA_ASIOSDK_SOURCES ${ASIOSDK_ROOT_DIR}/common/asio.cpp ${ASIOSDK_ROOT_DIR}/host/pc/asiolist.cpp ${ASIOSDK_ROOT_DIR}/host/asiodrivers.cpp)
     SOURCE_GROUP("hostapi\\ASIO" FILES ${PA_ASIO_SOURCES})
     SOURCE_GROUP("hostapi\\ASIO\\ASIOSDK" FILES ${PA_ASIOSDK_SOURCES})
     SET(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} include/pa_asio.h)
     SET(PA_SOURCES ${PA_SOURCES} ${PA_ASIO_SOURCES})
     SET(PA_NON_UNICODE_SOURCES ${PA_NON_UNICODE_SOURCES} ${PA_ASIOSDK_SOURCES})
+    SET(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} winmm ole32 uuid)
   ELSE()
     # Set variables for DEF file expansion
     SET(DEF_EXCLUDE_ASIO_SYMBOLS ";")
@@ -189,12 +195,21 @@ IF(WIN32)
     SET(PA_SOURCES ${PA_SOURCES} ${PA_WMME_SOURCES})
   ENDIF(PA_USE_WMME)
 
-  OPTION(PA_USE_WASAPI "Enable support for WASAPI" ON)
+  IF(MSVS)
+    OPTION(PA_USE_WASAPI "Enable support for WASAPI" ON)
+  ELSE()
+    # I was unable to get WASAPI to compile outside of Visual Studio. If
+    # anyone can figure out how to make this work with MinGW, please fix me.
+    SET(PA_USE_WASAPI OFF)
+  ENDIF()
   IF(PA_USE_WASAPI)
     SET(PA_WASAPI_SOURCES src/hostapi/wasapi/pa_win_wasapi.c)
     SOURCE_GROUP("hostapi\\wasapi" FILES ${PA_WASAPI_SOURCES})
     SET(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} include/pa_win_wasapi.h)
     SET(PA_SOURCES ${PA_SOURCES} ${PA_WASAPI_SOURCES})
+    IF(NOT MSVC)
+      SET(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} src/hostapi/wasapi/mingw-include)
+    ENDIF()
   ELSE()
     SET(DEF_EXCLUDE_WASAPI_SYMBOLS ";")
   ENDIF(PA_USE_WASAPI)

@@ -78,7 +78,6 @@
 #include "pa_win_coinitialize.h"
 
 #ifndef NTDDI_VERSION
- 
     #undef WINVER
     #undef _WIN32_WINNT
     #define WINVER       0x0600 // VISTA
