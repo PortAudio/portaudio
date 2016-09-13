@@ -389,7 +389,7 @@ ELSE()
     INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION include)
     INSTALL(TARGETS portaudio DESTINATION lib)
   ENDIF(NOT PA_OUTPUT_OSX_FRAMEWORK)
-ENDIF(WIN32)
+ENDIF()
 
 # Prepared for inclusion of test files
 OPTION(PA_BUILD_TESTS "Include test projects" OFF)
