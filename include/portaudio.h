@@ -158,11 +158,13 @@ const char *Pa_GetErrorText( PaError errorCode );
  If Pa_Initialize() returns an error code, Pa_Terminate() should
  NOT be called.
 
- @note The device list returned by Pa_GetDeviceCount() et al. is frozen
- when Pa_Initialize() is called. The device list is not automatically updated
- when hardware devices are connected or disconnected. To refresh the list of devices,
- either call Pa_RefreshDeviceList() or uninitialize PortAudio using Pa_Terminate(),
- and then reinitialize it by calling Pa_Initialize().
+ @note The device list returned by Pa_GetDeviceCount() et al, default devices,
+ and the default host API are all frozen when Pa_Initialize() is called. The
+ device list is not automatically updated when hardware devices are connected or
+ disconnected. To refresh the list of devices, and default devices, either call
+ Pa_RefreshDeviceList() or uninitialize PortAudio using Pa_Terminate(),
+ and then reinitialize it by calling Pa_Initialize(). To register a callback
+ when native devices or defaults change, call Pa_SetDevicesChangedCallback().
 
  @return paNoError if successful, otherwise an error code indicating the cause
  of failure.
