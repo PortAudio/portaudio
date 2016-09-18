@@ -438,7 +438,8 @@ PaDeviceIndex Pa_GetDefaultInputDevice( void );
 PaDeviceIndex Pa_GetDefaultOutputDevice( void );
 
 
-/** Refresh the list devices to match currently available native audio devices.
+/** Refresh PortAudio's list of devices to reflect currently available
+ native audio devices. Also refreshes default devices and default host API.
 
  PortAudio's list of devices is usually frozen when Pa_Initialize() is
  called. Call Pa_RefreshDeviceList() to refresh PortAudio's device list
@@ -449,9 +450,12 @@ PaDeviceIndex Pa_GetDefaultOutputDevice( void );
  If the function succeeds, future calls to Pa_GetDeviceCount() may return
  a different count than before, all device indexes may refer to
  different devices, and any previously returned PaDeviceInfo pointers are
- invalidated.
+ invalidated. Default devices reflected by PaHostApiInfo.defaultInputDevice,
+ PaHostApiInfo.defaultOutputDevice and global defaults returned by
+ Pa_GetDefaultHostApi(), Pa_GetDefaultInputDevice() and
+ Pa_GetDefaultOutputDevice() may changed.
 
- If the function fails, the device list is unchanged.
+ If the function fails, the device list and defaults are unchanged.
 
  @note Open streams will not be affected by calls to this function.
  */
@@ -460,8 +464,10 @@ PaError Pa_RefreshDeviceList( void );
 
 /** Functions of type PaDevicesChangedCallback are implemented by PortAudio
  clients. They can be registered with PortAudio using the Pa_SetDevicesChangedCallback
- function. Once registered they are called when available native audio devices
- may have changed. For example, when a USB audio device is connected or disconnected.
+ function. Once registered, a callback is invoked whenever available native audio
+ devices may have changed. For example, when a USB audio device is connected or
+ disconnected. The callback is also invoked whenever the native default device
+ selection changes.
 
  When the callback is invoked, there is no change to the devices listed by
  PortAudio. To update PortAudio's view of the device list, the client
@@ -482,21 +488,23 @@ typedef void PaDevicesChangedCallback( void *userData );
 
 
 /** Register a callback function that will be called when native audio devices
- become available or unavailable. See the description of PaDevicesChangedCallback
- for further details about when the callback will be called.
+ become available or unavailable, and when native default devices change.
+ See the description of PaDevicesChangedCallback for further details about
+ when the callback will be called.
 
  @param userData A client supplied pointer that is passed to the devices changed
  callback.
 
- @param devicesChangedCallback a pointer to a function with the same signature
- as PaDevicesChangedCallback, which will be called when native devices become
- available or unavailable. Passing NULL for this parameter will un-register a
- previously registered devices changed callback function.
+ @param devicesChangedCallback a pointer to a callback function with the same
+ signature as PaDevicesChangedCallback. Passing NULL for this parameter will
+ un-register a previously registered callback function.
 
  @return on success returns paNoError, otherwise an error code indicating the
  cause of the error.
 
- @see PaStreamFinishedCallback
+ @note Only one function pointer may be registered at a time.
+
+ @see PaDevicesChangedCallback
 */
 PaError Pa_SetDevicesChangedCallback( void *userData, PaDevicesChangedCallback* devicesChangedCallback );
 
