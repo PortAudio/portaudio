@@ -1564,7 +1564,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                 else
                     winDsDeviceInfo->inheritedDeviceInfo.connectionId = PaUtil_MakeDeviceConnectionId();
 
-                if( deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID == NULL )
+                if( deviceNamesAndGUIDs.inputNamesAndGUIDs.items[i].lpGUID == NULL ) /* "Primary Sound Capture Driver" */
                     outArgument->defaultInputDevice = *newDeviceCount;
                 (*newDeviceCount)++;
             }
@@ -1589,7 +1589,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                 else
                     winDsDeviceInfo->inheritedDeviceInfo.connectionId = PaUtil_MakeDeviceConnectionId();
 
-                if( deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID == NULL )
+                if( deviceNamesAndGUIDs.outputNamesAndGUIDs.items[i].lpGUID == NULL ) /* "Primary Sound Driver" */
                     outArgument->defaultOutputDevice = *newDeviceCount;
                 (*newDeviceCount)++;
             }
