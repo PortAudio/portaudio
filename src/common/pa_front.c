@@ -814,6 +814,7 @@ PaError Pa_RefreshDeviceList( void )
 
     /* Phase 2: Commit the scan changes to each back-end */
 
+    defaultHostApiIndex_ = -1; /* indicates that we haven't determined the default host API yet */
     baseDeviceIndex = 0;
     deviceCount_ = 0;
     for( i = 0 ; i < hostApisCount_ ; ++i )
@@ -840,6 +841,16 @@ PaError Pa_RefreshDeviceList( void )
         assert( hostApi->info.defaultInputDevice < hostApi->info.deviceCount );
         assert( hostApi->info.defaultOutputDevice < hostApi->info.deviceCount );
 
+        /* the first successfully initialized host API with a default input *or*
+            output device is used as the default host API.
+        */
+        if( (defaultHostApiIndex_ == -1) &&
+                ( hostApi->info.defaultInputDevice != paNoDevice
+                    || hostApi->info.defaultOutputDevice != paNoDevice ) )
+        {
+            defaultHostApiIndex_ = i;
+        }
+
         hostApi->privatePaFrontInfo.baseDeviceIndex = baseDeviceIndex;
 
         if( hostApi->info.defaultInputDevice != paNoDevice )
@@ -851,6 +862,10 @@ PaError Pa_RefreshDeviceList( void )
         baseDeviceIndex += hostApi->info.deviceCount;
         deviceCount_ += hostApi->info.deviceCount;
     }
+
+    /* if no host APIs have devices, the default host API is the first initialized host API */
+    if( defaultHostApiIndex_ == -1 )
+        defaultHostApiIndex_ = 0;
 
 done:
 
