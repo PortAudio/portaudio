@@ -1413,6 +1413,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
     int inputDeviceCount, outputDeviceCount;
     int maximumPossibleDeviceCount;
     PaWinMmeDeviceInfo *deviceInfoArray;
+    int initializedInfosCount;
     int deviceInfoInitializationSucceeded;
     PaTime defaultLowLatency, defaultHighLatency;
     DWORD waveInPreferredDevice, waveOutPreferredDevice;
@@ -1452,6 +1453,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
     if( waveOutMessage( (HWAVEOUT)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET,
             (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags ) != MMSYSERR_NOERROR )
         waveOutPreferredDevice = WAVE_MAPPER;
+
+    initializedInfosCount = 0; /* incremented after successfully appending to deviceInfoArray */
 
     maximumPossibleDeviceCount = 0;
 
@@ -1514,7 +1517,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             for( i = -1; i < inputDeviceCount; ++i ){
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
 #endif
-                PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ *newDeviceCount ];
+                int deviceIndex = initializedInfosCount; /* host-api local index. append at end of deviceInfoArray */
+                PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ deviceIndex ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
                 deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
@@ -1541,22 +1545,23 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                     if( outArgument->defaultInputDevice == paNoDevice )
                     {
                         /* if there is currently no default device, use the first one available */
-                        outArgument->defaultInputDevice = *newDeviceCount;
+                        outArgument->defaultInputDevice = deviceIndex;
                     }
                     else if( winMmeDeviceId == waveInPreferredDevice )
                     {
                         /* set the default device to the system preferred device */
-                        outArgument->defaultInputDevice = *newDeviceCount;
+                        outArgument->defaultInputDevice = deviceIndex;
                     }
 
                     deviceInfo->connectionId = AssignDeviceConnectionId(
                             hostApi->deviceInfos, hostApi->info.deviceCount,
-                            outArgument->deviceInfos, *newDeviceCount,
+                            outArgument->deviceInfos, initializedInfosCount,
                             wmmeDeviceInfo->deviceInterfaceName, /* isInput= */ 1 );
 
-                    outArgument->deviceInfos[ *newDeviceCount ] = deviceInfo;
+                    outArgument->deviceInfos[ deviceIndex ] = deviceInfo;
+
                     outArgument->inputDeviceCount++;
-                    (*newDeviceCount)++;
+                    initializedInfosCount++;
                 }
             }
         }
@@ -1570,7 +1575,8 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             for( i = -1; i < outputDeviceCount; ++i ){
                 UINT winMmeDeviceId = (UINT)((i==-1) ? WAVE_MAPPER : i);
 #endif
-                PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ *newDeviceCount ];
+                int deviceIndex = initializedInfosCount; /* host-api local index. append at end of deviceInfoArray */
+                PaWinMmeDeviceInfo *wmmeDeviceInfo = &deviceInfoArray[ deviceIndex ];
                 PaDeviceInfo *deviceInfo = &wmmeDeviceInfo->inheritedDeviceInfo;
                 deviceInfo->structVersion = 3;
                 deviceInfo->hostApi = hostApiIndex;
@@ -1597,37 +1603,38 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                     if( outArgument->defaultOutputDevice == paNoDevice )
                     {
                         /* if there is currently no default device, use the first one available */
-                        outArgument->defaultOutputDevice = *newDeviceCount;
+                        outArgument->defaultOutputDevice = deviceIndex;
 
                     }
                     else if( winMmeDeviceId == waveOutPreferredDevice )
                     {
                         /* set the default device to the system preferred device */
-                        outArgument->defaultOutputDevice = *newDeviceCount;
+                        outArgument->defaultOutputDevice = deviceIndex;
                     }
 
                     deviceInfo->connectionId = AssignDeviceConnectionId(
                             hostApi->deviceInfos, hostApi->info.deviceCount,
-                            outArgument->deviceInfos, *newDeviceCount,
+                            outArgument->deviceInfos, initializedInfosCount,
                             wmmeDeviceInfo->deviceInterfaceName, /* isInput= */ 0 );
 
-                    outArgument->deviceInfos[ *newDeviceCount ] = deviceInfo;
+                    outArgument->deviceInfos[ deviceIndex ] = deviceInfo;
+
                     outArgument->outputDeviceCount++;
-                    (*newDeviceCount)++;
+                    initializedInfosCount++;
                 }
             }
         }
     }
 
+    *newDeviceCount = initializedInfosCount;
     *scanResults = outArgument;
     return result;
 
 error:
     if( outArgument )
     {
-        FreeDeviceInfos( winMmeHostApi->allocations, outArgument->deviceInfos, *newDeviceCount );
+        FreeDeviceInfos( winMmeHostApi->allocations, outArgument->deviceInfos, initializedInfosCount );
     }
-    *newDeviceCount = 0;
 
     return result;
 }
