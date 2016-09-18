@@ -15,7 +15,7 @@ void printDevices()
         assert( deviceInfo != 0 );
         assert( deviceInfo->structVersion >= 3 ); /* should be the case if all APIs have implemented connectionId */
 
-        printf( "%d (conn id: %d) %s (%s)\n", i, deviceInfo->connectionId, deviceInfo->name, hostApiInfo->name );
+        printf( "%d (conn id: %lu) %s (%s)\n", i, deviceInfo->connectionId, deviceInfo->name, hostApiInfo->name );
     }
 }
 
@@ -26,7 +26,8 @@ static void devicesChangedCallback(void* p)
     printf( "Portaudio device list have changed!\n" );
 }
 
-int main(int argc, char* argv[])
+int main(void);
+int main(void)
 {
     Pa_Initialize();
 
