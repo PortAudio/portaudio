@@ -2790,7 +2790,7 @@ static PaError StopStream( PaStream *s )
     stream->state = STOPPING;
 
     VDBUG( ("Waiting for BLIO.\n") );
-    paErr = waitUntilBlioWriteBufferIsEmpty( &stream->blio, stream->sampleRate );
+    paErr = waitUntilBlioWriteBufferIsEmpty( &stream->blio, stream->sampleRate, stream->outputFramesPerBuffer );
     VDBUG( ( "waitUntilBlioWriteBufferIsEmpty returned %d\n", paErr ) );
 
     return FinishStoppingStream( stream );

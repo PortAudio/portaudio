@@ -50,7 +50,7 @@
 #include "portaudio.h"
 
 #define SAMPLE_RATE         (44100)
-#define FRAMES_PER_BUFFER   (4096)
+#define FRAMES_PER_BUFFER   (2048)
 
 static float s_buffer[FRAMES_PER_BUFFER][2]; /* stereo output buffer */
 
@@ -75,10 +75,11 @@ void *stop_thread_proc(void *arg)
     PaTime time;
     for (int i = 0; i < 20; i++)
     {
+        /* ILLEGAL unsynchronised call to PA, see comment above */
         time = Pa_GetStreamTime( stream );
         printf("Stream time = %f\n", time);
         fflush(stdout);
-        Pa_Sleep(100);
+        usleep(100 * 1000);
     }
     printf("Call Pa_StopStream()\n");
     fflush(stdout);

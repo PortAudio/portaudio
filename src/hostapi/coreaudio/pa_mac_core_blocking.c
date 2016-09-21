@@ -587,26 +587,35 @@ PaError WriteStream( PaStream* stream,
 /*
  * Wait until the data in the buffer has finished playing.
  */
-PaError waitUntilBlioWriteBufferIsEmpty( PaMacBlio *blio, double sampleRate )
+PaError waitUntilBlioWriteBufferIsEmpty( PaMacBlio *blio, double sampleRate,
+                                        size_t framesPerBuffer )
 {
     PaError result = paNoError;
     if( blio->outputRingBuffer.buffer ) {
-        int timeout = 5; // don't wait forever
-        ring_buffer_size_t framesInBuffer = PaUtil_GetRingBufferReadAvailable( &blio->outputRingBuffer );
-        while( framesInBuffer > 0 && timeout-- > 0 ) {
-            long msecEstimated = 1 + (long)( 1000.0 * framesInBuffer / sampleRate);
-            VDBUG(( "waitUntilBlioWriteBufferIsFlushed: framesInBuffer = %d, msecEstimated = %ld\n", framesInBuffer, msecEstimated ));
-            Pa_Sleep( msecEstimated );
-            framesInBuffer = PaUtil_GetRingBufferReadAvailable( &blio->outputRingBuffer );
+        ring_buffer_size_t framesLeft = PaUtil_GetRingBufferReadAvailable( &blio->outputRingBuffer );
+
+        /* Calculate when we should give up waiting. To be safe wait for two extra periods. */
+        PaTime now = PaUtil_GetTime();
+        PaTime startTime = now;
+        PaTime timeoutTime = startTime + (framesLeft + (2 * framesPerBuffer)) / sampleRate;
+
+        long msecPerBuffer = 1 + (long)( 1000.0 * framesPerBuffer / sampleRate);
+        while( framesLeft > 0 && now < timeoutTime ) {
+            VDBUG(( "waitUntilBlioWriteBufferIsFlushed: framesLeft = %d, framesPerBuffer = %ld\n",
+                  framesLeft, framesPerBuffer ));
+            Pa_Sleep( msecPerBuffer );
+            framesLeft = PaUtil_GetRingBufferReadAvailable( &blio->outputRingBuffer );
+            now = PaUtil_GetTime();
         }
-        if( framesInBuffer > 0 )
+
+        if( framesLeft > 0 )
         {
+            VDBUG(( "waitUntilBlioWriteBufferIsFlushed: TIMED OUT - framesLeft = %d\n", framesLeft ));
             result = paTimedOut;
         }
     }
     return result;
 }
-
 
 signed long GetStreamReadAvailable( PaStream* stream )
 {

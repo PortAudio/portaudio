@@ -128,6 +128,7 @@ int BlioCallback(
         PaStreamCallbackFlags statusFlags,
         void *userData );
 
-PaError waitUntilBlioWriteBufferIsEmpty( PaMacBlio *blio, double sampleRate );
+PaError waitUntilBlioWriteBufferIsEmpty( PaMacBlio *blio, double sampleRate,
+                                        size_t framesPerBuffer );
 
 #endif /*PA_MAC_CORE_BLOCKING_H_*/
