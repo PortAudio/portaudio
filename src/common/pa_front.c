@@ -97,7 +97,7 @@
  * This is incremented when we make backwards-compatible bug fixes.
  * Or it is set to zero when paVersionMinor changes.
  */
-#define paVersionSubMinor   0
+#define paVersionSubMinor   1
 
 /**
  * This is a combination of paVersionMajor, paVersionMinor and paVersionSubMinor.
