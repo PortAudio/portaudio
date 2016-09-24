@@ -455,7 +455,7 @@ PaError ReadStream( PaStream* stream,
 #endif
           }
        } while( framesAvailable == 0 );
-       framesToTransfer = MIN( framesAvailable, framesRequested );
+       framesToTransfer = (ring_buffer_size_t) MIN( framesAvailable, framesRequested );
        framesTransferred = PaUtil_ReadRingBuffer( &blio->inputRingBuffer, (void *)cbuf, framesToTransfer );
        cbuf += framesTransferred * blio->inputSampleSizeActual * blio->inChan;
        framesRequested -= framesTransferred;
@@ -499,12 +499,13 @@ PaError WriteStream( PaStream* stream,
                             const void *buffer,
                             unsigned long framesRequested )
 {
-    PaMacBlio *blio = & ((PaMacCoreStream*)stream) -> blio;
+    PaMacCoreStream *macStream = (PaMacCoreStream*)stream;
+    PaMacBlio *blio = &macStream->blio;
     char *cbuf = (char *) buffer;
     PaError ret = paNoError;
     VVDBUG(("WriteStream()\n"));
 
-    while( framesRequested > 0 ) {
+    while( framesRequested > 0 && macStream->state != STOPPING ) {
         ring_buffer_size_t framesAvailable;
         ring_buffer_size_t framesToTransfer;
         ring_buffer_size_t framesTransferred;
@@ -534,7 +535,12 @@ PaError WriteStream( PaStream* stream,
              Pa_Sleep( PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL );
 #endif
           }
-       } while( framesAvailable == 0 );
+       } while( framesAvailable == 0 && macStream->state != STOPPING );
+
+       if( macStream->state == STOPPING )
+       {
+           break;
+       }
 
        framesToTransfer = MIN( framesAvailable, framesRequested );
        framesTransferred = PaUtil_WriteRingBuffer( &blio->outputRingBuffer, (void *)cbuf, framesToTransfer );
@@ -559,36 +565,58 @@ PaError WriteStream( PaStream* stream,
 #endif
     }
 
-    /*   Report either paNoError or paOutputUnderflowed. */
-    /*   may also want to report other errors, but this is non-standard. */
-    /* FIXME should not clobber ret, use if(blio->statusFlags & paInputOverflow) */
-    ret = blio->statusFlags & paOutputUnderflow;
+    if ( macStream->state == STOPPING )
+    {
+        ret = paInternalError;
+    }
+    else if (ret == paNoError )
+    {
+        /*   Test for underflow. */
+        ret = blio->statusFlags & paOutputUnderflow;
 
-    /* report underflow only once: */
-    if( ret ) {
-      OSAtomicAnd32( (uint32_t)(~paOutputUnderflow), &blio->statusFlags );
-      ret = paOutputUnderflowed;
+        /* report underflow only once: */
+        if( ret )
+        {
+            OSAtomicAnd32( (uint32_t)(~paOutputUnderflow), &blio->statusFlags );
+            ret = paOutputUnderflowed;
+        }
     }
 
     return ret;
 }
 
 /*
- *
+ * Wait until the data in the buffer has finished playing.
  */
-void waitUntilBlioWriteBufferIsFlushed( PaMacBlio *blio )
+PaError waitUntilBlioWriteBufferIsEmpty( PaMacBlio *blio, double sampleRate,
+                                        size_t framesPerBuffer )
 {
+    PaError result = paNoError;
     if( blio->outputRingBuffer.buffer ) {
-        /* FIXME loop until PaUtil_GetRingBufferReadAvailable==0 */
-       ring_buffer_size_t framesAvailable = PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
-       while( framesAvailable != blio->outputRingBuffer.bufferSize ) {
-          if( framesAvailable == 0 )
-             Pa_Sleep( PA_MAC_BLIO_BUSY_WAIT_SLEEP_INTERVAL );
-          framesAvailable = PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
-       }
-    }
-}
+        ring_buffer_size_t framesLeft = PaUtil_GetRingBufferReadAvailable( &blio->outputRingBuffer );
 
+        /* Calculate when we should give up waiting. To be safe wait for two extra periods. */
+        PaTime now = PaUtil_GetTime();
+        PaTime startTime = now;
+        PaTime timeoutTime = startTime + (framesLeft + (2 * framesPerBuffer)) / sampleRate;
+
+        long msecPerBuffer = 1 + (long)( 1000.0 * framesPerBuffer / sampleRate);
+        while( framesLeft > 0 && now < timeoutTime ) {
+            VDBUG(( "waitUntilBlioWriteBufferIsFlushed: framesLeft = %d, framesPerBuffer = %ld\n",
+                  framesLeft, framesPerBuffer ));
+            Pa_Sleep( msecPerBuffer );
+            framesLeft = PaUtil_GetRingBufferReadAvailable( &blio->outputRingBuffer );
+            now = PaUtil_GetTime();
+        }
+
+        if( framesLeft > 0 )
+        {
+            VDBUG(( "waitUntilBlioWriteBufferIsFlushed: TIMED OUT - framesLeft = %d\n", framesLeft ));
+            result = paTimedOut;
+        }
+    }
+    return result;
+}
 
 signed long GetStreamReadAvailable( PaStream* stream )
 {

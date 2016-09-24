@@ -2724,18 +2724,10 @@ static ComponentResult BlockWhileAudioUnitIsRunning( AudioUnit audioUnit, AudioU
     return noErr;
 }
 
-static PaError StopStream( PaStream *s )
+static PaError FinishStoppingStream( PaMacCoreStream *stream )
 {
-    PaMacCoreStream *stream = (PaMacCoreStream*)s;
     OSStatus result = noErr;
     PaError paErr;
-    VVDBUG(("StopStream()\n"));
-
-    VDBUG( ("Waiting for BLIO.\n") );
-    waitUntilBlioWriteBufferIsFlushed( &stream->blio );
-    VDBUG( ( "Stopping stream.\n" ) );
-
-    stream->state = STOPPING;
 
 #define ERR_WRAP(mac_err) do { result = mac_err ; if ( result != noErr ) return ERR(result) ; } while(0)
     /* -- stop and reset -- */
@@ -2787,12 +2779,34 @@ static PaError StopStream( PaStream *s )
 #undef ERR_WRAP
 }
 
+/* Block until buffer is empty then stop the stream. */
+static PaError StopStream( PaStream *s )
+{
+    PaError paErr;
+    PaMacCoreStream *stream = (PaMacCoreStream*)s;
+    VVDBUG(("StopStream()\n"));
+
+    /* Tell WriteStream to stop filling the buffer. */
+    stream->state = STOPPING;
+
+    if( stream->userOutChan > 0 ) /* Does this stream do output? */
+    {
+        size_t maxHostFrames = MAX( stream->inputFramesPerBuffer, stream->outputFramesPerBuffer );
+        VDBUG( ("Waiting for write buffer to be drained.\n") );
+        paErr = waitUntilBlioWriteBufferIsEmpty( &stream->blio, stream->sampleRate,
+                                                maxHostFrames );
+        VDBUG( ( "waitUntilBlioWriteBufferIsEmpty returned %d\n", paErr ) );
+    }
+    return FinishStoppingStream( stream );
+}
+
+/* Immediately stop the stream. */
 static PaError AbortStream( PaStream *s )
 {
-    VVDBUG(("AbortStream()->StopStream()\n"));
-    VDBUG( ( "Aborting stream.\n" ) );
-    /* We have nothing faster than StopStream. */
-    return StopStream(s);
+    PaMacCoreStream *stream = (PaMacCoreStream*)s;
+    VDBUG( ( "AbortStream()\n" ) );
+    stream->state = STOPPING;
+    return FinishStoppingStream( stream );
 }
 
 
