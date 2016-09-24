@@ -91,13 +91,13 @@
  * This is incremented when we add functionality in a backwards-compatible manner.
  * Or it is set to zero when paVersionMajor is incremented.
  */
-#define paVersionMinor      5
+#define paVersionMinor      6
 
 /**
  * This is incremented when we make backwards-compatible bug fixes.
  * Or it is set to zero when paVersionMinor changes.
  */
-#define paVersionSubMinor   1
+#define paVersionSubMinor   0
 
 /**
  * This is a combination of paVersionMajor, paVersionMinor and paVersionSubMinor.
