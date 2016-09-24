@@ -43,6 +43,7 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <math.h>
 #include <memory.h>
 /* pthread may only be available on Mac and Linux. */

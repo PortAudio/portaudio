@@ -500,7 +500,7 @@ PaError WriteStream( PaStream* stream,
                             unsigned long framesRequested )
 {
     PaMacCoreStream *macStream = (PaMacCoreStream*)stream;
-    PaMacBlio *blio = & macStream -> blio;
+    PaMacBlio *blio = &macStream->blio;
     char *cbuf = (char *) buffer;
     PaError ret = paNoError;
     VVDBUG(("WriteStream()\n"));
@@ -575,9 +575,10 @@ PaError WriteStream( PaStream* stream,
         ret = blio->statusFlags & paOutputUnderflow;
 
         /* report underflow only once: */
-        if( ret ) {
-          OSAtomicAnd32( (uint32_t)(~paOutputUnderflow), &blio->statusFlags );
-          ret = paOutputUnderflowed;
+        if( ret )
+        {
+            OSAtomicAnd32( (uint32_t)(~paOutputUnderflow), &blio->statusFlags );
+            ret = paOutputUnderflowed;
         }
     }
 

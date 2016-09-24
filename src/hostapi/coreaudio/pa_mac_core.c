@@ -2789,12 +2789,12 @@ static PaError StopStream( PaStream *s )
     /* Tell WriteStream to stop filling the buffer. */
     stream->state = STOPPING;
 
-    if (stream->userOutChan > 0) /* Does this stream do output? */
+    if( stream->userOutChan > 0 ) /* Does this stream do output? */
     {
-        size_t maxHostFrames = MAX(stream->inputFramesPerBuffer, stream->outputFramesPerBuffer)
+        size_t maxHostFrames = MAX( stream->inputFramesPerBuffer, stream->outputFramesPerBuffer );
         VDBUG( ("Waiting for write buffer to be drained.\n") );
         paErr = waitUntilBlioWriteBufferIsEmpty( &stream->blio, stream->sampleRate,
-                                                maxHostFrames);
+                                                maxHostFrames );
         VDBUG( ( "waitUntilBlioWriteBufferIsEmpty returned %d\n", paErr ) );
     }
     return FinishStoppingStream( stream );
