@@ -202,11 +202,13 @@ typedef struct PaWasapiJackDescription
 PaWasapiJackDescription;
 
 
-/* Stream category.
+/** Stream category.
    Note:
     - values are equal to WASAPI AUDIO_STREAM_CATEGORY enum
     - supported since Windows 8.0, noop on earler versions
     - values 1,2 are deprecated on Windows 10 and not included into enumeration
+
+ @version Available as of 19.6.0
 */
 typedef enum PaWasapiStreamCategory
 {
@@ -224,10 +226,12 @@ typedef enum PaWasapiStreamCategory
 PaWasapiStreamCategory;
 
 
-/* Stream option.
+/** Stream option.
    Note:
     - values are equal to WASAPI AUDCLNT_STREAMOPTIONS enum
     - supported since Windows 8.1, noop on earler versions
+
+ @version Available as of 19.6.0
 */
 typedef enum PaWasapiStreamOption
 {
@@ -247,7 +251,7 @@ typedef struct PaWasapiStreamInfo
 
     unsigned long flags;            /**< collection of PaWasapiFlags */
 
-    /* Support for WAVEFORMATEXTENSIBLE channel masks. If flags contains
+    /** Support for WAVEFORMATEXTENSIBLE channel masks. If flags contains
        paWinWasapiUseChannelMask this allows you to specify which speakers 
        to address in a multichannel stream. Constants for channelMask
        are specified in pa_win_waveformat.h. Will be used only if 
@@ -255,7 +259,7 @@ typedef struct PaWasapiStreamInfo
     */
     PaWinWaveFormatChannelMask channelMask;
 
-    /* Delivers raw data to callback obtained from GetBuffer() methods skipping 
+    /** Delivers raw data to callback obtained from GetBuffer() methods skipping
        internal PortAudio processing inventory completely. userData parameter will 
        be the same that was passed to Pa_OpenStream method. Will be used only if 
        paWinWasapiRedirectHostProcessor flag is specified.
@@ -263,7 +267,7 @@ typedef struct PaWasapiStreamInfo
     PaWasapiHostProcessorCallback hostProcessorOutput;
     PaWasapiHostProcessorCallback hostProcessorInput;
 
-    /* Specifies thread priority explicitly. Will be used only if paWinWasapiThreadPriority flag
+    /** Specifies thread priority explicitly. Will be used only if paWinWasapiThreadPriority flag
        is specified.
 
        Please note, if Input/Output streams are opened simultaniously (Full-Duplex mode)
@@ -272,10 +276,16 @@ typedef struct PaWasapiStreamInfo
     */
     PaWasapiThreadPriority threadPriority;
 
-    /* Stream category. */
+    /** Stream category.
+     @see PaWasapiStreamCategory
+     @version Available as of 19.6.0
+    */
     PaWasapiStreamCategory streamCategory;
 
-    /* Stream option. */
+    /** Stream option.
+     @see PaWasapiStreamOption
+     @version Available as of 19.6.0
+    */
     PaWasapiStreamOption streamOption;
 } 
 PaWasapiStreamInfo;
