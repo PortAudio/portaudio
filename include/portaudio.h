@@ -51,51 +51,68 @@ extern "C"
 #endif /* __cplusplus */
 
 /** Retrieve the release number of the currently running PortAudio build.
- * For example, for version "19.5.1" this will return 0x00130501.
- */
+ For example, for version "19.5.1" this will return 0x00130501.
+
+ @see paMakeVersionNumber
+*/
 int Pa_GetVersion( void );
 
 /** Retrieve a textual description of the current PortAudio build,
- * e.g. "PortAudio V19.5.0-devel, revision 1952M".
- * The format of the text may change in the future. Do not try to parse the
- * returned string.
- * @deprecated use PaVersionInfo() instead
- */
+ e.g. "PortAudio V19.5.0-devel, revision 1952M".
+ The format of the text may change in the future. Do not try to parse the
+ returned string.
+
+ @deprecated As of 19.5.0, use Pa_GetVersionInfo()->versionText instead.
+*/
 const char* Pa_GetVersionText( void );
 
 /**
- * Generate a packed integer version number in the same format used
- * by Pa_GetVersion(). Use this to compare a specified version number with 
- * the currently running version. For example:
- *
- * if( Pa_GetVersion() < paMakeVersionNumber(19,5,1) ) {}
- */
+ Generate a packed integer version number in the same format used
+ by Pa_GetVersion(). Use this to compare a specified version number with
+ the currently running version. For example:
+
+ @code
+     if( Pa_GetVersion() < paMakeVersionNumber(19,5,1) ) {}
+ @endcode
+
+ @see Pa_GetVersion, Pa_GetVersionInfo
+ @version Available as of 19.5.0.
+*/
 #define paMakeVersionNumber(major, minor, subminor) \
     (((major)&0xFF)<<16 | ((minor)&0xFF)<<8 | ((subminor)&0xFF))
 
 
 /**
- * A structure containing the components of the version numbers.
- */
+ A structure containing PortAudio API version information.
+ @see Pa_GetVersionInfo, paMakeVersionNumber
+ @version Available as of 19.5.0.
+*/
 typedef struct PaVersionInfo {
     int versionMajor;
     int versionMinor;
     int versionSubMinor;
     /**
-     * This is currently the Git revision hash but may change in the future.
-     * The versionControlRevision is updated by running a script before compiling the library.
-     * If the update does not occur, this value may refer to an earlier revision.
-     */
+     This is currently the Git revision hash but may change in the future.
+     The versionControlRevision is updated by running a script before compiling the library.
+     If the update does not occur, this value may refer to an earlier revision.
+    */
     const char *versionControlRevision;
     /** Version as a string, for example "PortAudio V19.5.0-devel, revision 1952M" */
     const char *versionText;
 } PaVersionInfo;
     
-/**
- * The structure that this points to is statically allocated.
- * Do not attempt to free it or modify it.
- */
+/** Retrieve version information for the currently running PortAudio build.
+ @return A pointer to an immutable PaVersionInfo structure.
+
+ @note This function can be called at any time. It does not require PortAudio
+ to be initialized. The structure pointed to is statically allocated. Do not
+ attempt to free it or modify it.
+
+ @see PaVersionInfo, paMakeVersionNumber
+ @version Available as of 19.5.0.
+*/
 const PaVersionInfo* Pa_GetVersionInfo();
+
 
 /** Error codes returned by PortAudio functions.
  Note that with the exception of paNoError, all PaErrorCodes are negative.
