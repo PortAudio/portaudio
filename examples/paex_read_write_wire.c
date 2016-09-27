@@ -95,6 +95,7 @@ int main(void)
     char *sampleBlock = NULL;
     int i;
     int numBytes;
+    int numChannels;
 
     printf("patest_read_write_wire.c\n"); fflush(stdout);
     printf("sizeof(int) = %lu\n", sizeof(int)); fflush(stdout);
@@ -117,7 +118,7 @@ int main(void)
     printf( "     LL: %g s\n", outputInfo->defaultLowOutputLatency );
     printf( "     HL: %g s\n", outputInfo->defaultHighOutputLatency );
 
-    int numChannels = inputInfo->maxInputChannels < outputInfo->maxOutputChannels
+    numChannels = inputInfo->maxInputChannels < outputInfo->maxOutputChannels
             ? inputInfo->maxInputChannels : outputInfo->maxOutputChannels;
     printf( "Num channels = %d.\n", numChannels );
 
