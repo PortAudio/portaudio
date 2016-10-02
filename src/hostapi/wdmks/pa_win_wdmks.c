@@ -94,7 +94,9 @@ of a device for the duration of active stream using those devices
 #endif
 
 #include <windows.h>
+#ifndef __GNUC__ /* Fix for ticket #257: MinGW-w64: Inclusion of <winioctl.h> triggers multiple redefinition errors. */
 #include <winioctl.h>
+#endif
 #include <process.h>
 
 #include <math.h>
