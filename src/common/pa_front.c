@@ -390,7 +390,8 @@ PaError Pa_Terminate( void )
 
     if( PA_IS_INITIALISED_ )
     {
-        if( --initializationCount_ == 0 )
+        // leave initializationCount_>0 so that Pa_CloseStream() can execute
+        if( initializationCount_ == 1 )
         {
             CloseOpenStreams();
 
@@ -398,6 +399,7 @@ PaError Pa_Terminate( void )
 
             PaUtil_DumpTraceMessages();
         }
+        --initializationCount_;
         result = paNoError;
     }
     else
