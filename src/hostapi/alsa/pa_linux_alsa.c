@@ -3236,14 +3236,20 @@ static PaError AlsaRestart( PaAlsaStream *stream )
 {
     PaError result = paNoError;
 
-    PA_ENSURE( PaUnixMutex_Lock( &stream->stateMtx ) );
+    /* If in callback mode, the only thread calling this function
+     * should be the callback thread, in which case there's no need
+      * to lock the mutex. */
+    if( !stream->callbackMode )
+        PA_ENSURE( PaUnixMutex_Lock( &stream->stateMtx ) );
+
     PA_ENSURE( AlsaStop( stream, 0 ) );
     PA_ENSURE( AlsaStart( stream, 0 ) );
 
     PA_DEBUG(( "%s: Restarted audio\n", __FUNCTION__ ));
 
 error:
-    PA_ENSURE( PaUnixMutex_Unlock( &stream->stateMtx ) );
+    if( !stream->callbackMode )
+        PA_ENSURE( PaUnixMutex_Unlock( &stream->stateMtx ) );
 
     return result;
 }
@@ -4224,9 +4230,18 @@ static void *CallbackThreadFunc( void *userData )
     else
     {
         PA_ENSURE( PaUnixThread_PrepareNotify( &stream->thread ) );
+#ifdef PTHREAD_CANCELED
+        /* Need to re-disable cancelability because of PaUnixMutex_* calls. */
+        pthread_testcancel();
+        pthread_setcancelstate( PTHREAD_CANCEL_DISABLE, NULL );
+#endif
         /* Buffer will be zeroed */
         PA_ENSURE( AlsaStart( stream, 0 ) );
         PA_ENSURE( PaUnixThread_NotifyParent( &stream->thread ) );
+#ifdef PTHREAD_CANCELED
+        pthread_testcancel();
+        pthread_setcancelstate( PTHREAD_CANCEL_DISABLE, NULL );
+#endif
 
         streamStarted = 1;
     }
