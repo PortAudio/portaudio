@@ -904,6 +904,9 @@ static PaError AddOutputDeviceInfoFromDirectSound(
                             case DSSPEAKER_STEREO:           count = 2; break;
                             case DSSPEAKER_SURROUND:         count = 4; break;
                             case DSSPEAKER_5POINT1:          count = 6; break;
+#ifndef DSSPEAKER_7POINT1
+#define DSSPEAKER_7POINT1 0x00000007
+#endif
                             case DSSPEAKER_7POINT1:          count = 8; break;
 #ifndef DSSPEAKER_7POINT1_SURROUND
 #define DSSPEAKER_7POINT1_SURROUND 0x00000008
@@ -2136,7 +2139,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
         else
         {
-            CalculateBufferSettings( &stream->hostBufferSizeFrames, &pollingPeriodFrames,
+            CalculateBufferSettings( (unsigned long*)&stream->hostBufferSizeFrames, &pollingPeriodFrames,
                     /* isFullDuplex = */ (inputParameters && outputParameters),
                     suggestedInputLatencyFrames,
                     suggestedOutputLatencyFrames, 
