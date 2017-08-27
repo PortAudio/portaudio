@@ -399,7 +399,7 @@ case "${host_os}" in
         SHARED_FLAGS=""
         ;;
 
-  linux-androideabi* )
+  linux-android* )
         dnl Android configuration, this is separate because we don't need to link pthread explicitly
         CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix"
 
