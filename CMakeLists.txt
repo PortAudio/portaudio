@@ -278,6 +278,16 @@ elseif(UNIX)
     target_compile_definitions(PortAudio PRIVATE PA_USE_COREAUDIO=1)
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
+  elseif(ANDROID)
+      find_package(OpenSLES)
+      cmake_dependent_option(OPENSLES "Enable support for OpenSLES" ON OPENSLES_FOUND OFF)
+
+      if(OPENSLES)
+        target_link_libraries(PortAudio PRIVATE "${OPENSLES_LIBRARIES}")
+        set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_opensles.h)
+        target_sources(PortAudio PRIVATE src/hostapi/opensles/pa_opensles.c)
+        target_compile_definitions(PortAudio PRIVATE PA_USE_OPENSLES=1)
+      endif()
   else()
     # Some BSDs have a reimplementation of alsalib, so do not explicitly check for Linux.
     find_package(ALSA)
