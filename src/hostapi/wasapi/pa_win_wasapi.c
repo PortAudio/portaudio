@@ -213,6 +213,8 @@
 PA_DEFINE_IID(IAudioClient,         1cb9ad4c, dbfa, 4c32, b1, 78, c2, f5, 68, a7, 03, b2);
 // "726778CD-F60A-4EDA-82DE-E47610CD78AA"
 PA_DEFINE_IID(IAudioClient2,        726778cd, f60a, 4eda, 82, de, e4, 76, 10, cd, 78, aa);
+// "7ED4EE07-8E67-4CD4-8C1A-2B7A5987AD42"
+PA_DEFINE_IID(IAudioClient3,        7ed4ee07, 8e67, 4cd4, 8c, 1a, 2b, 7a, 59, 87, ad, 42);
 // "1BE09788-6894-4089-8586-9A2A6C265AC5"
 PA_DEFINE_IID(IMMEndpoint,          1be09788, 6894, 4089, 85, 86, 9a, 2a, 6c, 26, 5a, c5);
 // "A95664D2-9614-4F35-A746-DE8DB63617E6"
@@ -1059,7 +1061,11 @@ static EWindowsVersion GetWindowsVersion()
 
 	return version;
 #else
-	return WINDOWS_8_SERVER2012;
+	#if (_WIN32_WINNT >= _WIN32_WINNT_WIN10)
+		return WINDOWS_10_SERVER2016;
+	#else
+		return WINDOWS_8_SERVER2012;
+	#endif
 #endif
 }
 
@@ -1091,17 +1097,11 @@ static const IID *GetAudioClientIID()
 	if (cli_iid == NULL)
 	{
 		UINT32 cli_version = GetAudioClientVersion();
-		if (cli_version <= 1)
+		switch (cli_version)
 		{
-			cli_iid = &pa_IID_IAudioClient;
-		}
-		else
-		{
-			switch (cli_version)
-			{
-			case 3:  cli_iid = &pa_IID_IAudioClient2; cli_version = 2; break; // use IAudioClient2 for Windows 10+ until IAudioClient3 functions are required
-			default: cli_iid = &pa_IID_IAudioClient2; cli_version = 2; break;
-			}
+		case 3:  cli_iid = &pa_IID_IAudioClient3; break;
+		case 2:  cli_iid = &pa_IID_IAudioClient2; break;
+		default: cli_iid = &pa_IID_IAudioClient;  break;
 		}
 
 		PRINT(("WASAPI: IAudioClient version = %d\n", cli_version));
@@ -1405,11 +1405,14 @@ static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, IAud
 
 // ------------------------------------------------------------------------------------------
 #ifdef PA_WINRT
+// Windows 10 SDK 10.0.15063.0 has SignalObjectAndWait defined again (unlike in 10.0.14393.0 and lower)
+#if !defined(WDK_NTDDI_VERSION) || (WDK_NTDDI_VERSION < NTDDI_WIN10_RS2) 
 static DWORD SignalObjectAndWait(HANDLE hObjectToSignal, HANDLE hObjectToWaitOn, DWORD dwMilliseconds, BOOL bAlertable)
 {
 	SetEvent(hObjectToSignal);
 	return WaitForSingleObjectEx(hObjectToWaitOn, dwMilliseconds, bAlertable);
 }
+#endif
 #endif
 
 // ------------------------------------------------------------------------------------------
