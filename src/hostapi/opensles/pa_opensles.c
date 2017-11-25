@@ -690,10 +690,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( (streamFlags & paPlatformSpecificFlags) != 0 )
         return paInvalidFlag;
 
-    if( framesPerBuffer == paFramesPerBufferUnspecified )
-        framesPerHostBuffer = (unsigned long) (outputParameters->suggestedLatency * sampleRate);
-    else
+    if( framesPerBuffer == paFramesPerBufferUnspecified ) {
+        if( outputParameters ) {
+            framesPerHostBuffer = (unsigned long) (outputParameters->suggestedLatency * sampleRate);
+        }
+        else {
+            framesPerHostBuffer = (unsigned long) (inputParameters->suggestedLatency * sampleRate);
+        }
+    }
+    else {
         framesPerHostBuffer = framesPerBuffer;
+    }
 
     stream = (OpenslesStream*)PaUtil_AllocateMemory( sizeof(OpenslesStream) );
 
@@ -876,10 +883,10 @@ static PaError InitializeInputStream( PaOpenslesHostApiRepresentation *openslesH
                                            SL_DEFAULTDEVICEID_AUDIOINPUT, NULL};
     SLDataSource audioSrc = {&inputLocator, NULL};
 
-    SLDataFormat_PCM  formatPcm = { SL_DATAFORMAT_PCM, stream->bufferProcessor.outputChannelCount,
+    SLDataFormat_PCM  formatPcm = { SL_DATAFORMAT_PCM, stream->bufferProcessor.inputChannelCount,
                                     sampleRate * 1000.0, SL_PCMSAMPLEFORMAT_FIXED_16,
                                     SL_PCMSAMPLEFORMAT_FIXED_16,
-                                    channelMasks[stream->bufferProcessor.outputChannelCount - 1],
+                                    channelMasks[stream->bufferProcessor.inputChannelCount - 1],
                                     SL_BYTEORDER_LITTLEENDIAN };
 
     SLDataLocator_AndroidSimpleBufferQueue inputBQLocator = { SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
