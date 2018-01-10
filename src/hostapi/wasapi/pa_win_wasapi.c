@@ -639,6 +639,9 @@ static HRESULT __LogHostError(HRESULT res, const char *func, const char *file, i
 		text = "UNKNOWN ERROR";
     }
 	PRINT(("WASAPI ERROR HRESULT: 0x%X : %s\n [FUNCTION: %s FILE: %s {LINE: %d}]\n", res, text, func, file, line));
+#ifndef PA_ENABLE_DEBUG_OUTPUT
+	(void)func; (void)file; (void)line;
+#endif
 	PA_SKELETON_SET_LAST_HOST_ERROR(res, text);
 	return res;
 }
@@ -649,7 +652,11 @@ static PaError __LogPaError(PaError err, const char *func, const char *file, int
 {
 	if (err == paNoError)
 		return err;
+
 	PRINT(("WASAPI ERROR PAERROR: %i : %s\n [FUNCTION: %s FILE: %s {LINE: %d}]\n", err, Pa_GetErrorText(err), func, file, line));
+#ifndef PA_ENABLE_DEBUG_OUTPUT
+	(void)func; (void)file; (void)line;
+#endif
 	return err;
 }
 
@@ -1344,7 +1351,7 @@ static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCom
 
 // ------------------------------------------------------------------------------------------
 #ifdef PA_WINRT
-static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo, const IID *iid, void **obj)
+static HRESULT ActivateAudioInterface_WINRT(EDataFlow flow, const IID *iid, void **obj)
 {
 #define PA_WASAPI_DEVICE_PATH_LEN 64
 	
@@ -1356,7 +1363,7 @@ static HRESULT ActivateAudioInterface_WINRT(const PaWasapiDeviceInfo *deviceInfo
 	OLECHAR devicePath[PA_WASAPI_DEVICE_PATH_LEN] = { 0 };
 
 	// Get device path in form L"{DEVICE_GUID}"
-	switch (deviceInfo->flow)
+	switch (flow)
 	{
 	case eRender:
 		StringFromGUID2(&DEVINTERFACE_AUDIO_RENDER, devicePath, PA_WASAPI_DEVICE_PATH_LEN - 1);
@@ -1399,7 +1406,7 @@ static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, IAud
 #ifndef PA_WINRT
 	return IMMDevice_Activate(deviceInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)client);
 #else
-	return ActivateAudioInterface_WINRT(deviceInfo, GetAudioClientIID(), (void **)client);
+	return ActivateAudioInterface_WINRT(deviceInfo->flow, GetAudioClientIID(), (void **)client);
 #endif
 }
 
@@ -1428,6 +1435,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 #else
 	WAVEFORMATEX *mixFormat;
 #endif
+	IAudioClient *tmpClient;
 
 #ifndef PA_WINRT
     if (!SetupAVRT())
@@ -1538,7 +1546,17 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 	IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
 #else
-	paWasapi->deviceCount = 2;
+	// Determine number of available devices by activating AudioClient for render and capture data flows
+	if (!FAILED(ActivateAudioInterface_WINRT(eRender, GetAudioClientIID(), &tmpClient)))
+	{
+		paWasapi->deviceCount++;
+		SAFE_RELEASE(tmpClient);
+	}
+	if (!FAILED(ActivateAudioInterface_WINRT(eCapture, GetAudioClientIID(), &tmpClient)))
+	{
+		paWasapi->deviceCount++;
+		SAFE_RELEASE(tmpClient);
+	}
 #endif
 
     paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_AllocateMemory(sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
@@ -1547,8 +1565,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         result = paInsufficientMemory;
         goto error;
     }
-	for (i = 0; i < paWasapi->deviceCount; ++i)
-		memset(&paWasapi->devInfo[i], 0, sizeof(PaWasapiDeviceInfo));
+    memset(paWasapi->devInfo, 0, sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
 
     if (paWasapi->deviceCount > 0)
     {
@@ -1706,7 +1723,6 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 			#endif
 
 				// Create temp Audio Client instance to query additional details
-                IAudioClient *tmpClient = NULL;
                 hr = ActivateAudioInterface(&paWasapi->devInfo[i], &tmpClient);
 				// We need to set the result to a value otherwise we will return paNoError
 				// [IF_FAILED_JUMP(hResult, error);]
