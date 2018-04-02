@@ -292,10 +292,10 @@ PaWasapiStreamInfo;
 
 
 /** Update device list. 
-    This function will be available if PA_WASAPI_MAX_CONST_DEVICE_COUNT is defined with maximum 
-    constant WASAPI device count (defined by default with value 32). 
-    If PA_WASAPI_MAX_CONST_DEVICE_COUNT is set to 0 during compile time the implementation will not
-    define PaWasapi_UpdateDeviceList() and thus updating device list can only be possible by calling
+    This function is available if PA_WASAPI_MAX_CONST_DEVICE_COUNT is defined during compile time 
+    with maximum constant WASAPI device count (recommended value - 32). 
+    If PA_WASAPI_MAX_CONST_DEVICE_COUNT is set to 0 (or not defined) during compile time the implementation 
+    will not define PaWasapi_UpdateDeviceList() and thus updating device list can only be possible by calling
     Pa_Terminate() and then Pa_Initialize().
 
  @return Error code indicating success or failure.
