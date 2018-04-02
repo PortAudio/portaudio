@@ -50,7 +50,7 @@
 // Max device count (if defined) causes max constant device count in the device list that
 // enables PaWasapi_UpdateDeviceList() API and makes it possible to update WASAPI list dynamically
 #ifndef PA_WASAPI_MAX_CONST_DEVICE_COUNT
-	#define PA_WASAPI_MAX_CONST_DEVICE_COUNT 32
+	#define PA_WASAPI_MAX_CONST_DEVICE_COUNT 0 // Force basic behavior by defining 0 if not defined by user
 #endif
 
 // WinRT
