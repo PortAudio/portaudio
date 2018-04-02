@@ -47,6 +47,12 @@
 #include <process.h>
 #include <assert.h>
 
+// Max device count (if defined) causes max constant device count in the device list that
+// enables PaWasapi_UpdateDeviceList() API and makes it possible to update WASAPI list dynamically
+#ifndef PA_WASAPI_MAX_CONST_DEVICE_COUNT
+	#define PA_WASAPI_MAX_CONST_DEVICE_COUNT 32
+#endif
+
 // WinRT
 #if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
 	#define PA_WINRT
@@ -431,11 +437,6 @@ typedef struct
     /* implementation specific data goes here */
 
     PaWinUtilComInitializationResult comInitializationResult;
-
-    //in case we later need the synch
-#ifndef PA_WINRT
-    IMMDeviceEnumerator *enumerator;
-#endif
 
     //this is the REAL number of devices, whether they are usefull to PA or not!
     UINT32 deviceCount;
@@ -1423,62 +1424,28 @@ static DWORD SignalObjectAndWait(HANDLE hObjectToSignal, HANDLE hObjectToWaitOn,
 #endif
 
 // ------------------------------------------------------------------------------------------
-PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
+static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostApiIndex hostApiIndex)
 {
+	PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaError result = paNoError;
-    PaWasapiHostApiRepresentation *paWasapi;
     PaDeviceInfo *deviceInfoArray;
     HRESULT hr = S_OK;
 	UINT i;
 #ifndef PA_WINRT
     IMMDeviceCollection* pEndPoints = NULL;
+	IMMDeviceEnumerator *pEnumerator = NULL;
 #else
 	WAVEFORMATEX *mixFormat;
 #endif
 	IAudioClient *tmpClient;
 
-#ifndef PA_WINRT
-    if (!SetupAVRT())
-	{
-        PRINT(("WASAPI: No AVRT! (not VISTA?)"));
-        return paNoError;
-    }
-#endif
-
-    paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory( sizeof(PaWasapiHostApiRepresentation) );
-    if (paWasapi == NULL)
-	{
-        result = paInsufficientMemory;
-        goto error;
-    }
-	
-    memset( paWasapi, 0, sizeof(PaWasapiHostApiRepresentation) ); /* ensure all fields are zeroed. especially paWasapi->allocations */
-
-    result = PaWinUtil_CoInitialize( paWASAPI, &paWasapi->comInitializationResult );
-    if( result != paNoError )
-    {
-        goto error;
-    }
-
-    paWasapi->allocations = PaUtil_CreateAllocationGroup();
-    if (paWasapi->allocations == NULL)
-	{
-        result = paInsufficientMemory;
-        goto error;
-    }
-
-    *hostApi                             = &paWasapi->inheritedHostApiRep;
-    (*hostApi)->info.structVersion		 = 1;
-    (*hostApi)->info.type				 = paWASAPI;
-    (*hostApi)->info.name				 = "Windows WASAPI";
-    (*hostApi)->info.deviceCount		 = 0;
-    (*hostApi)->info.defaultInputDevice	 = paNoDevice;
-    (*hostApi)->info.defaultOutputDevice = paNoDevice;
+	// Make sure device list empty
+	if ((paWasapi->deviceCount != 0) || (hostApi->info.deviceCount != 0))
+		return paInternalError;
 
 #ifndef PA_WINRT
-    paWasapi->enumerator = NULL;
     hr = CoCreateInstance(&pa_CLSID_IMMDeviceEnumerator, NULL, CLSCTX_INPROC_SERVER,
-             &pa_IID_IMMDeviceEnumerator, (void **)&paWasapi->enumerator);
+             &pa_IID_IMMDeviceEnumerator, (void **)&pEnumerator);
     
 	// We need to set the result to a value otherwise we will return paNoError
 	// [IF_FAILED_JUMP(hResult, error);]
@@ -1488,7 +1455,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     {
         {
             IMMDevice *defaultRenderer = NULL;
-            hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(paWasapi->enumerator, eRender, eMultimedia, &defaultRenderer);
+            hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(pEnumerator, eRender, eMultimedia, &defaultRenderer);
             if (hr != S_OK)
 			{
 				if (hr != E_NOTFOUND) {
@@ -1512,7 +1479,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
         {
             IMMDevice *defaultCapturer = NULL;
-            hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(paWasapi->enumerator, eCapture, eMultimedia, &defaultCapturer);
+            hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(pEnumerator, eCapture, eMultimedia, &defaultCapturer);
             if (hr != S_OK)
 			{
 				if (hr != E_NOTFOUND) {
@@ -1535,7 +1502,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         }
     }
 
-    hr = IMMDeviceEnumerator_EnumAudioEndpoints(paWasapi->enumerator, eAll, DEVICE_STATE_ACTIVE, &pEndPoints);
+    hr = IMMDeviceEnumerator_EnumAudioEndpoints(pEnumerator, eAll, DEVICE_STATE_ACTIVE, &pEndPoints);
 	// We need to set the result to a value otherwise we will return paNoError
 	// [IF_FAILED_JUMP(hResult, error);]
 	IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
@@ -1569,9 +1536,15 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     if (paWasapi->deviceCount > 0)
     {
-        (*hostApi)->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateMemory(
-                paWasapi->allocations, sizeof(PaDeviceInfo *) * paWasapi->deviceCount);
-        if ((*hostApi)->deviceInfos == NULL)
+		UINT32 deviceCount = paWasapi->deviceCount;
+	#if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
+		if (deviceCount < PA_WASAPI_MAX_CONST_DEVICE_COUNT)
+			deviceCount = PA_WASAPI_MAX_CONST_DEVICE_COUNT;
+	#endif
+
+        hostApi->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateMemory(
+                paWasapi->allocations, sizeof(PaDeviceInfo *) * deviceCount);
+        if (hostApi->deviceInfos == NULL)
 		{
             result = paInsufficientMemory;
             goto error;
@@ -1579,12 +1552,13 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
         /* allocate all device info structs in a contiguous block */
         deviceInfoArray = (PaDeviceInfo *)PaUtil_GroupAllocateMemory(
-                paWasapi->allocations, sizeof(PaDeviceInfo) * paWasapi->deviceCount);
+                paWasapi->allocations, sizeof(PaDeviceInfo) * deviceCount);
         if (deviceInfoArray == NULL)
 		{
             result = paInsufficientMemory;
             goto error;
         }
+		memset(deviceInfoArray, 0, sizeof(PaDeviceInfo) * deviceCount);
 
         for (i = 0; i < paWasapi->deviceCount; ++i)
 		{
@@ -1613,11 +1587,11 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
                 if (lstrcmpW(paWasapi->devInfo[i].szDeviceID, paWasapi->defaultCapturer) == 0)
 				{// we found the default input!
-                    (*hostApi)->info.defaultInputDevice = (*hostApi)->info.deviceCount;
+                    hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
                 }
                 if (lstrcmpW(paWasapi->devInfo[i].szDeviceID, paWasapi->defaultRenderer) == 0)
 				{// we found the default output!
-                    (*hostApi)->info.defaultOutputDevice = (*hostApi)->info.deviceCount;
+                    hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
                 }
             }
 
@@ -1640,25 +1614,21 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
                 // "Friendly" Name
                 {
-					char *deviceName;
                     PROPVARIANT value;
                     PropVariantInit(&value);
                     hr = IPropertyStore_GetValue(pProperty, &PKEY_Device_FriendlyName, &value);
 					// We need to set the result to a value otherwise we will return paNoError
 					// [IF_FAILED_JUMP(hResult, error);]
 					IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
-                    deviceInfo->name = NULL;
-                    deviceName = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1);
-                    if (deviceName == NULL)
+                    if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1)) == NULL)
 					{
                         result = paInsufficientMemory;
                         goto error;
                     }
 					if (value.pwszVal)
-						WideCharToMultiByte(CP_UTF8, 0, value.pwszVal, (int)wcslen(value.pwszVal), deviceName, MAX_STR_LEN - 1, 0, 0);
+						WideCharToMultiByte(CP_UTF8, 0, value.pwszVal, (int)wcslen(value.pwszVal), (char *)deviceInfo->name, MAX_STR_LEN - 1, 0, 0);
 					else
-						_snprintf(deviceName, MAX_STR_LEN - 1, "baddev%d", i);
-                    deviceInfo->name = deviceName;
+						_snprintf((char *)deviceInfo->name, MAX_STR_LEN - 1, "baddev%d", i);
                     PropVariantClear(&value);
 					PA_DEBUG(("WASAPI:%d| name[%s]\n", i, deviceInfo->name));
                 }
@@ -1751,9 +1721,9 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 				{
 					// Default device
 					if (i == 0)
-						(*hostApi)->info.defaultOutputDevice = (*hostApi)->info.deviceCount;
+						hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
 					else
-						(*hostApi)->info.defaultInputDevice = (*hostApi)->info.deviceCount;
+						hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
 
 					// State
 					paWasapi->devInfo[i].state = DEVICE_STATE_ACTIVE;
@@ -1766,8 +1736,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 					paWasapi->devInfo[i].formFactor = UnknownFormFactor;
 
 					// Name
-                    deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1);
-                    if (deviceInfo->name == NULL)
+                    if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1)) == NULL)
 					{
 						SAFE_RELEASE(tmpClient);
                         result = paInsufficientMemory;
@@ -1821,14 +1790,109 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 				 break;
             }
 
-            (*hostApi)->deviceInfos[i] = deviceInfo;
-            ++(*hostApi)->info.deviceCount;
+            hostApi->deviceInfos[i] = deviceInfo;
+            ++hostApi->info.deviceCount;
         }
+
+	#if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
+		if (hostApi->info.deviceCount < PA_WASAPI_MAX_CONST_DEVICE_COUNT)
+		{		
+			for (i = hostApi->info.deviceCount; i < PA_WASAPI_MAX_CONST_DEVICE_COUNT; ++i)
+			{
+				PaDeviceInfo *deviceInfo  = &deviceInfoArray[i];
+				deviceInfo->structVersion = 2;
+				deviceInfo->hostApi       = hostApiIndex;
+
+                if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, 1)) == NULL)
+				{
+                    result = paInsufficientMemory;
+                    goto error;
+                }
+				((char *)deviceInfo->name)[0] = 0;
+
+				hostApi->deviceInfos[i] = deviceInfo;
+				++hostApi->info.deviceCount;
+			}
+		}
+	#endif
     }
 
-    (*hostApi)->Terminate = Terminate;
-    (*hostApi)->OpenStream = OpenStream;
-    (*hostApi)->IsFormatSupported = IsFormatSupported;
+#ifndef PA_WINRT
+    SAFE_RELEASE(pEndPoints);
+	SAFE_RELEASE(pEnumerator);
+#endif
+
+	PRINT(("WASAPI: device list created ok\n"));
+
+    return paNoError;
+
+error:
+
+	PRINT(("WASAPI: failed %s error[%d|%s]\n", __FUNCTION__, result, Pa_GetErrorText(result)));
+
+#ifndef PA_WINRT
+    SAFE_RELEASE(pEndPoints);
+	SAFE_RELEASE(pEnumerator);
+#endif
+	
+	// Safety if error was not set so that we do not think initialize was a success
+	if (result == paNoError)
+		result = paInternalError;
+
+    return result;
+}
+
+// ------------------------------------------------------------------------------------------
+PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
+{
+    PaError result = paInternalError;
+    PaWasapiHostApiRepresentation *paWasapi;
+
+#ifndef PA_WINRT
+    if (!SetupAVRT())
+	{
+        PRINT(("WASAPI: No AVRT! (not VISTA?)"));
+        return paNoError;
+    }
+#endif
+
+    paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory(sizeof(PaWasapiHostApiRepresentation));
+    if (paWasapi == NULL)
+	{
+        result = paInsufficientMemory;
+        goto error;
+    }	
+    memset(paWasapi, 0, sizeof(PaWasapiHostApiRepresentation)); /* ensure all fields are zeroed. especially paWasapi->allocations */
+
+    result = PaWinUtil_CoInitialize(paWASAPI, &paWasapi->comInitializationResult);
+    if (result != paNoError)
+        goto error;
+
+    paWasapi->allocations = PaUtil_CreateAllocationGroup();
+    if (paWasapi->allocations == NULL)
+	{
+        result = paInsufficientMemory;
+        goto error;
+    }
+
+	// Fill basic interface info
+    *hostApi                             = &paWasapi->inheritedHostApiRep;
+    (*hostApi)->info.structVersion		 = 1;
+    (*hostApi)->info.type				 = paWASAPI;
+    (*hostApi)->info.name				 = "Windows WASAPI";
+    (*hostApi)->info.deviceCount		 = 0;
+    (*hostApi)->info.defaultInputDevice	 = paNoDevice;
+    (*hostApi)->info.defaultOutputDevice = paNoDevice;
+	(*hostApi)->Terminate                = Terminate;
+    (*hostApi)->OpenStream               = OpenStream;
+    (*hostApi)->IsFormatSupported        = IsFormatSupported;
+
+	// Fill the device list
+	if ((result = CreateDeviceList(paWasapi, hostApiIndex)) != paNoError)
+		goto error;
+
+	// Detect if platform workaround is required
+	paWasapi->useWOW64Workaround = UseWOW64Workaround();
 
     PaUtil_InitializeStreamInterface( &paWasapi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
@@ -1841,14 +1905,6 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
                                       GetStreamTime, PaUtil_DummyGetCpuLoad,
                                       ReadStream, WriteStream, GetStreamReadAvailable, GetStreamWriteAvailable );
 
-
-	// findout if platform workaround is required
-	paWasapi->useWOW64Workaround = UseWOW64Workaround();
-
-#ifndef PA_WINRT
-    SAFE_RELEASE(pEndPoints);
-#endif
-
 	PRINT(("WASAPI: initialized ok\n"));
 
     return paNoError;
@@ -1857,46 +1913,38 @@ error:
 
 	PRINT(("WASAPI: failed %s error[%d|%s]\n", __FUNCTION__, result, Pa_GetErrorText(result)));
 
-#ifndef PA_WINRT
-    SAFE_RELEASE(pEndPoints);
-#endif
-
 	Terminate((PaUtilHostApiRepresentation *)paWasapi);
-
-	// Safety if error was not set so that we do not think initialize was a success
-	if (result == paNoError) {
-		result = paInternalError;
-	}
 
     return result;
 }
 
 // ------------------------------------------------------------------------------------------
-static void Terminate( PaUtilHostApiRepresentation *hostApi )
+static void ReleaseWasapiDeviceInfoList( PaWasapiHostApiRepresentation *paWasapi )
 {
-	UINT i;
-    PaWasapiHostApiRepresentation *paWasapi = (PaWasapiHostApiRepresentation*)hostApi;
-	if (paWasapi == NULL)
-		return;
-
-	// Release IMMDeviceEnumerator
-#ifndef PA_WINRT
-    SAFE_RELEASE(paWasapi->enumerator);
-#endif
+	UINT32 i;
 
 	// Release device info bound objects and device info itself
     for (i = 0; i < paWasapi->deviceCount; ++i)
 	{
-        PaWasapiDeviceInfo *info = &paWasapi->devInfo[i];
 	#ifndef PA_WINRT
-        SAFE_RELEASE(info->device);
-	#else
-		(void)info;
+        SAFE_RELEASE(paWasapi->devInfo[i].device);
 	#endif
     }
     PaUtil_FreeMemory(paWasapi->devInfo);
 
-    if (paWasapi->allocations)
+	paWasapi->deviceCount = 0;
+}
+
+// ------------------------------------------------------------------------------------------
+static void Terminate( PaUtilHostApiRepresentation *hostApi )
+{
+    PaWasapiHostApiRepresentation *paWasapi = (PaWasapiHostApiRepresentation*)hostApi;
+	if (paWasapi == NULL)
+		return;
+
+	ReleaseWasapiDeviceInfoList(paWasapi);
+
+    if (paWasapi->allocations != NULL)
 	{
         PaUtil_FreeAllAllocations(paWasapi->allocations);
         PaUtil_DestroyAllocationGroup(paWasapi->allocations);
@@ -1925,6 +1973,52 @@ static PaWasapiHostApiRepresentation *_GetHostApi(PaError *_error)
 	}
 	return (PaWasapiHostApiRepresentation *)pApi;
 }
+
+// ------------------------------------------------------------------------------------------
+static PaError UpdateDeviceList()
+{
+	int i;
+	PaError ret;
+	PaWasapiHostApiRepresentation *paWasapi;
+	PaUtilHostApiRepresentation *hostApi;
+
+	// Get API
+	hostApi = (PaUtilHostApiRepresentation *)(paWasapi = _GetHostApi(&ret));
+	if (paWasapi == NULL)
+		return ret;
+
+	// Release WASAPI internal device info list
+	ReleaseWasapiDeviceInfoList(paWasapi);
+
+	// Release external device info list
+	if (hostApi->deviceInfos != NULL)
+	{
+		for (i = 0; i < hostApi->info.deviceCount; ++i)
+		{
+			PaUtil_GroupFreeMemory(paWasapi->allocations, (void *)hostApi->deviceInfos[i]->name);
+		}
+		PaUtil_GroupFreeMemory(paWasapi->allocations, hostApi->deviceInfos[0]);
+		PaUtil_GroupFreeMemory(paWasapi->allocations, hostApi->deviceInfos);
+
+		hostApi->info.deviceCount = 0;
+		hostApi->info.defaultInputDevice = paNoDevice;
+		hostApi->info.defaultOutputDevice = paNoDevice;
+	}
+
+	// Fill possibly updated device list
+	if ((ret = CreateDeviceList(paWasapi, Pa_HostApiTypeIdToHostApiIndex(paWASAPI))) != paNoError)
+		return ret;
+
+	return paNoError;
+}
+
+// ------------------------------------------------------------------------------------------
+#if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
+PaError PaWasapi_UpdateDeviceList()
+{
+	return UpdateDeviceList();
+}
+#endif
 
 // ------------------------------------------------------------------------------------------
 int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice )

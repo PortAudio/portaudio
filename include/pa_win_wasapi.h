@@ -291,6 +291,18 @@ typedef struct PaWasapiStreamInfo
 PaWasapiStreamInfo;
 
 
+/** Update device list. 
+    This function will be available if PA_WASAPI_MAX_CONST_DEVICE_COUNT is defined with maximum 
+    constant WASAPI device count (defined by default with value 32). 
+    If PA_WASAPI_MAX_CONST_DEVICE_COUNT is set to 0 during compile time the implementation will not
+    define PaWasapi_UpdateDeviceList() and thus updating device list can only be possible by calling
+    Pa_Terminate() and then Pa_Initialize().
+
+ @return Error code indicating success or failure.
+*/
+PaError PaWasapi_UpdateDeviceList();
+
+
 /** Returns default sound format for device. Format is represented by PaWinWaveFormat or 
     WAVEFORMATEXTENSIBLE structure.
 
@@ -356,6 +368,7 @@ PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *nInput
 /** Get number of jacks associated with a WASAPI device.  Use this method to determine if
     there are any jacks associated with the provided WASAPI device.  Not all audio devices
     will support this capability.  This is valid for both input and output devices.
+
  @param  nDevice  device index.
  @param  jcount   Number of jacks is returned in this variable
  @return Error code indicating success or failure
@@ -369,6 +382,7 @@ PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount);
     number of jacks associated with device.  If jcount is greater than zero, then
     each jack from 0 to jcount can be queried with this function to get the jack
     description.
+
  @param  nDevice  device index.
  @param  jindex   Which jack to return information
  @param  KSJACK_DESCRIPTION This structure filled in on success.
