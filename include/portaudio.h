@@ -111,7 +111,7 @@ typedef struct PaVersionInfo {
  @see PaVersionInfo, paMakeVersionNumber
  @version Available as of 19.5.0.
 */
-const PaVersionInfo* Pa_GetVersionInfo();
+const PaVersionInfo* Pa_GetVersionInfo( void );
 
 
 /** Error codes returned by PortAudio functions.

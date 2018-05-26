@@ -130,7 +130,7 @@ static PaVersionInfo versionInfo_ = {
     /*.versionText =*/ PA_VERSION_TEXT_
 };
 
-const PaVersionInfo* Pa_GetVersionInfo()
+const PaVersionInfo* Pa_GetVersionInfo( void )
 {
     return &versionInfo_;
 }
