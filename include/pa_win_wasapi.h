@@ -291,6 +291,17 @@ typedef struct PaWasapiStreamInfo
 PaWasapiStreamInfo;
 
 
+/** Returns pointer to WASAPI's IAudioClient object of the stream.
+
+ @param pStream Pointer to PaStream.
+ @param pAudioClient Pointer to pointer of IAudioClient.
+ @param bOutput TRUE (1) for output stream, FALSE (0) for input stream.
+
+ @return Error code indicating success or failure.
+*/
+PaError PaWasapi_GetAudioClient( PaStream *pStream, void **pAudioClient, int bOutput );
+
+
 /** Update device list. 
     This function is available if PA_WASAPI_MAX_CONST_DEVICE_COUNT is defined during compile time 
     with maximum constant WASAPI device count (recommended value - 32). 
@@ -374,7 +385,7 @@ PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *nInput
  @return Error code indicating success or failure
  @see PaWasapi_GetJackDescription
  */
-PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount);
+PaError PaWasapi_GetJackCount( PaDeviceIndex nDevice, int *jcount );
 
 
 /** Get the jack description associated with a WASAPI device and jack number
@@ -389,7 +400,7 @@ PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount);
  @return Error code indicating success or failure
  @see PaWasapi_GetJackCount
  */
-PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription);
+PaError PaWasapi_GetJackDescription( PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription );
 
 
 /*
