@@ -988,29 +988,57 @@ static EWindowsVersion GetWindowsVersion()
 
 	if (version == WINDOWS_UNKNOWN)
 	{
-		DWORD dwVersion = 0;
-		DWORD dwMajorVersion = 0;
-		DWORD dwMinorVersion = 0;
-		DWORD dwBuild = 0;
+		DWORD dwMajorVersion = 0xFFFFFFFFU, dwMinorVersion = 0, dwBuild = 0;
+		
+		// RTL_OSVERSIONINFOW equals OSVERSIONINFOW but it is missing inb MinGW winnt.h header, 
+		// thus use OSVERSIONINFOW for greater portability
+		typedef NTSTATUS (WINAPI *LPFN_RTLGETVERSION)(POSVERSIONINFOW lpVersionInformation);
+		LPFN_RTLGETVERSION fnRtlGetVersion;
 
-		typedef DWORD (WINAPI *LPFN_GETVERSION)(VOID);
-		LPFN_GETVERSION fnGetVersion;
+		#define NTSTATUS_SUCCESS ((NTSTATUS)0x00000000L)
 
-		fnGetVersion = (LPFN_GETVERSION)GetProcAddress(GetModuleHandleA("kernel32"), "GetVersion");
-		if (fnGetVersion != NULL)
+		// RtlGetVersion must be able to provide true Windows version (Windows 10 may be reported as Windows 8
+		// by GetVersion API)
+		if ((fnRtlGetVersion = (LPFN_RTLGETVERSION)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion")) != NULL)
 		{
-			PRINT(("WASAPI: getting Windows version with GetVersion()\n"));
+			OSVERSIONINFOW ver = { sizeof(OSVERSIONINFOW), 0, 0, 0, {0} };
 
-			dwVersion = fnGetVersion();
+			PRINT(("WASAPI: getting Windows version with RtlGetVersion()\n"));
 
-			// Get the Windows version
-			dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
-			dwMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
+			if (fnRtlGetVersion(&ver) == NTSTATUS_SUCCESS)
+			{
+				dwMajorVersion = ver.dwMajorVersion;
+				dwMinorVersion = ver.dwMinorVersion;
+				dwBuild        = ver.dwBuildNumber;
+			}
+		}
 
-			// Get the build number
-			if (dwVersion < 0x80000000)
-				dwBuild = (DWORD)(HIWORD(dwVersion));
+		#undef NTSTATUS_SUCCESS
 
+		// fallback to GetVersion if RtlGetVersion is missing
+		if (dwMajorVersion == 0xFFFFFFFFU)
+		{
+			typedef DWORD (WINAPI *LPFN_GETVERSION)(VOID);
+			LPFN_GETVERSION fnGetVersion;
+
+			if ((fnGetVersion = (LPFN_GETVERSION)GetProcAddress(GetModuleHandleA("kernel32"), "GetVersion")) != NULL)
+			{
+				DWORD dwVersion;
+
+				PRINT(("WASAPI: getting Windows version with GetVersion()\n"));
+
+				dwVersion = fnGetVersion();
+
+				dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
+				dwMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
+
+				if (dwVersion < 0x80000000)
+					dwBuild = (DWORD)(HIWORD(dwVersion));
+			}
+		}
+
+		if (dwMajorVersion != 0xFFFFFFFFU)
+		{
 			switch (dwMajorVersion)
 			{
 			case 0:
@@ -1042,6 +1070,7 @@ static EWindowsVersion GetWindowsVersion()
 				break;
 			}
 		}
+		// fallback to VerifyVersionInfo if RtlGetVersion and GetVersion are missing
 		else
 		{
 			PRINT(("WASAPI: getting Windows version with VerifyVersionInfo()\n"));
@@ -4881,6 +4910,21 @@ error:
 	(void)pJackDescription;
 	return paUnanticipatedHostError;
 #endif
+}
+
+// ------------------------------------------------------------------------------------------
+PaError PaWasapi_GetAudioClient(PaStream *pStream, void **pAudioClient, int bOutput)
+{
+	if (pAudioClient == NULL)
+		return paUnanticipatedHostError;
+
+    PaWasapiStream *stream = (PaWasapiStream *)pStream;
+	if (stream == NULL)
+		return paBadStreamPtr;
+
+	(*pAudioClient) = (bOutput == TRUE ? stream->out.clientParent : stream->in.clientParent);
+
+	return paNoError;
 }
 
 // ------------------------------------------------------------------------------------------
