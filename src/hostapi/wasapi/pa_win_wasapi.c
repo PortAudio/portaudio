@@ -4915,12 +4915,12 @@ error:
 // ------------------------------------------------------------------------------------------
 PaError PaWasapi_GetAudioClient(PaStream *pStream, void **pAudioClient, int bOutput)
 {
-	if (pAudioClient == NULL)
-		return paUnanticipatedHostError;
-
-    PaWasapiStream *stream = (PaWasapiStream *)pStream;
+	PaWasapiStream *stream = (PaWasapiStream *)pStream;
 	if (stream == NULL)
 		return paBadStreamPtr;
+
+	if (pAudioClient == NULL)
+		return paUnanticipatedHostError;
 
 	(*pAudioClient) = (bOutput == TRUE ? stream->out.clientParent : stream->in.clientParent);
 
