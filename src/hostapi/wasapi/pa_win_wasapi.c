@@ -2462,7 +2462,7 @@ static PaError GetClosestFormat(IAudioClient *client, double sampleRate, const P
 	WAVEFORMATEX *sharedClosestMatch = NULL;
 	HRESULT hr                       = !S_OK;
 	PaStreamParameters params        = (*_params);
-	const BOOL explicitFormat        = ((streamInfo->flags & paWinWasapiExplicitSampleFormat) == paWinWasapiExplicitSampleFormat);
+	const BOOL explicitFormat        = (streamInfo != NULL) && ((streamInfo->flags & paWinWasapiExplicitSampleFormat) == paWinWasapiExplicitSampleFormat);
 	(void)output;
 
 	/* It was not noticed that 24-bit Input producing no output while device accepts this format.
