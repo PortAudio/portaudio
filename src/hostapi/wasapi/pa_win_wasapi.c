@@ -2973,9 +2973,10 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		&pSub->wavex.Format,
         NULL);
 	
-	// Check if buffer size is the one we requested in Exclusive mode, for UAC1 USB DACs WASAPI allocates internal
-	// buffer equal to 8 times of pSub->period that has to be corrected in order to match the requested latency
-	if ((hr == S_OK) && (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE))
+	// [Output only] Check if buffer size is the one we requested in Exclusive mode, for UAC1 USB DACs WASAPI 
+	// allocates internal buffer equal to 8 times of pSub->period that has to be corrected in order to match 
+	// the requested latency
+	if (output && (hr == S_OK) && (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE))
 	{
 		UINT32 maxBufferSize = 0;
 
