@@ -1282,7 +1282,7 @@ static void _MixMonoToStereo_2TO1_32_L(void *__to, const void *__from, UINT32 co
 static void _MixMonoToStereo_2TO1_32f_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(float); }
 
 // ------------------------------------------------------------------------------------------
-static MixMonoToStereoF _GetMonoToStereoMixer(PaSampleFormat format, EMixDirection dir)
+static MixMonoToStereoF GetMonoToStereoMixer(PaSampleFormat format, EMixDirection dir)
 {
 	switch (dir)
 	{
@@ -2695,7 +2695,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 }
 
 // ------------------------------------------------------------------------------------------
-static PaUint32 PaUtil_GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTime suggestedLatency, double sampleRate, PaUint32 TimerJitterMs)
+static PaUint32 _GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTime suggestedLatency, double sampleRate, PaUint32 TimerJitterMs)
 {
 	PaUint32 frames = userFramesPerBuffer + max( userFramesPerBuffer, (PaUint32)(suggestedLatency * sampleRate) );
     frames += (PaUint32)((sampleRate * 0.001) * TimerJitterMs);
@@ -2803,7 +2803,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		}*/
 
 		// select mixer
-		pSub->monoMixer = _GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
+		pSub->monoMixer = GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
 		if (pSub->monoMixer == NULL)
 		{
 			(*pa_error) = paInvalidChannelCount;
@@ -2820,7 +2820,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	if ((pSub->shareMode != AUDCLNT_SHAREMODE_EXCLUSIVE) &&
 		(!pSub->streamFlags || ((pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
 	{
-		framesPerLatency = PaUtil_GetFramesPerHostBuffer(userFramesPerBuffer,
+		framesPerLatency = _GetFramesPerHostBuffer(userFramesPerBuffer,
 			params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
 			(pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
 	}
@@ -2836,7 +2836,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		overall = MakeHnsPeriod(framesPerLatency, pSub->wavex.Format.nSamplesPerSec);
 		if ((overall >= (106667*2)/*21.33ms*/) || ((INT32)(params->suggestedLatency*100000.0) != 0/*0.01 msec granularity*/))
 		{
-			framesPerLatency = PaUtil_GetFramesPerHostBuffer(userFramesPerBuffer,
+			framesPerLatency = _GetFramesPerHostBuffer(userFramesPerBuffer,
 				params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
 				(streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
 
@@ -3140,7 +3140,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 			}*/
 
 			// Select mixer
-			pSub->monoMixer = _GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
+			pSub->monoMixer = GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
 			if (pSub->monoMixer == NULL)
 			{
 				(*pa_error) = paInvalidChannelCount;
@@ -4878,7 +4878,7 @@ error:
 
 // ------------------------------------------------------------------------------------------
 #ifndef PA_WINRT
-static PaWasapiJackConnectionType ConvertJackConnectionTypeWASAPIToPA(int connType)
+static PaWasapiJackConnectionType _ConvertJackConnectionTypeWASAPIToPA(int connType)
 {
 	switch (connType)
 	{
@@ -4905,7 +4905,7 @@ static PaWasapiJackConnectionType ConvertJackConnectionTypeWASAPIToPA(int connTy
 
 // ------------------------------------------------------------------------------------------
 #ifndef PA_WINRT
-static PaWasapiJackGeoLocation ConvertJackGeoLocationWASAPIToPA(int geoLoc)
+static PaWasapiJackGeoLocation _ConvertJackGeoLocationWASAPIToPA(int geoLoc)
 {
 	switch (geoLoc)
 	{
@@ -4933,7 +4933,7 @@ static PaWasapiJackGeoLocation ConvertJackGeoLocationWASAPIToPA(int geoLoc)
 
 // ------------------------------------------------------------------------------------------
 #ifndef PA_WINRT
-static PaWasapiJackGenLocation ConvertJackGenLocationWASAPIToPA(int genLoc)
+static PaWasapiJackGenLocation _ConvertJackGenLocationWASAPIToPA(int genLoc)
 {
 	switch (genLoc)
 	{
@@ -4952,7 +4952,7 @@ static PaWasapiJackGenLocation ConvertJackGenLocationWASAPIToPA(int genLoc)
 
 // ------------------------------------------------------------------------------------------
 #ifndef PA_WINRT
-static PaWasapiJackPortConnection ConvertJackPortConnectionWASAPIToPA(int portConn)
+static PaWasapiJackPortConnection _ConvertJackPortConnectionWASAPIToPA(int portConn)
 {
 	switch (portConn)
 	{
@@ -5028,11 +5028,11 @@ PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJ
 	// Convert WASAPI values to PA format.
 	pJackDescription->channelMapping = jack.ChannelMapping;
 	pJackDescription->color          = jack.Color;
-	pJackDescription->connectionType = ConvertJackConnectionTypeWASAPIToPA(jack.ConnectionType);
-	pJackDescription->genLocation    = ConvertJackGenLocationWASAPIToPA(jack.GenLocation);
-	pJackDescription->geoLocation    = ConvertJackGeoLocationWASAPIToPA(jack.GeoLocation);
+	pJackDescription->connectionType = _ConvertJackConnectionTypeWASAPIToPA(jack.ConnectionType);
+	pJackDescription->genLocation    = _ConvertJackGenLocationWASAPIToPA(jack.GenLocation);
+	pJackDescription->geoLocation    = _ConvertJackGeoLocationWASAPIToPA(jack.GeoLocation);
 	pJackDescription->isConnected    = jack.IsConnected;
-	pJackDescription->portConnection = ConvertJackPortConnectionWASAPIToPA(jack.PortConnection);
+	pJackDescription->portConnection = _ConvertJackPortConnectionWASAPIToPA(jack.PortConnection);
 
 	// Ok.
 	ret = paNoError;
@@ -5221,7 +5221,7 @@ static HRESULT ProcessOutputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor
 }
 
 // ------------------------------------------------------------------------------------------
-HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor)
+static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *processor)
 {
 	HRESULT hr = S_OK;
 	UINT32 frames;
@@ -5268,7 +5268,7 @@ HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor *proces
 			if (mono_frames_size > stream->in.monoBufferSize)
 			{
 				stream->in.monoBuffer = PaWasapi_ReallocateMemory(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
-				if (stream->out.monoBuffer == NULL)
+				if (stream->in.monoBuffer == NULL)
 				{
 					hr = E_OUTOFMEMORY;
 					LogHostError(hr);
