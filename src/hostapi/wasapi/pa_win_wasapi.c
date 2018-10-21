@@ -592,7 +592,7 @@ static HRESULT UnmarshalStreamComPointers(PaWasapiStream *stream);
 static void ReleaseUnmarshaledSubComPointers(PaWasapiSubStream *substream);
 static void ReleaseUnmarshaledComPointers(PaWasapiStream *stream);
 
-// Local stream methods
+// Local methods
 static void _StreamOnStop(PaWasapiStream *stream);
 static void _StreamFinish(PaWasapiStream *stream);
 static void _StreamCleanup(PaWasapiStream *stream);
@@ -600,6 +600,7 @@ static HRESULT _PollGetOutputFramesAvailable(PaWasapiStream *stream, UINT32 *ava
 static HRESULT _PollGetInputFramesAvailable(PaWasapiStream *stream, UINT32 *available);
 static void *PaWasapi_ReallocateMemory(void *prev, size_t size);
 static void PaWasapi_FreeMemory(void *ptr);
+static PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext);
 
 // Local statics
 
@@ -1268,27 +1269,88 @@ EMixDirection;
 // ------------------------------------------------------------------------------------------
 static void _MixMonoToStereo_1TO2_8(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(BYTE); }
 static void _MixMonoToStereo_1TO2_16(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(short); }
-static void _MixMonoToStereo_1TO2_24(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(int); /* !!! int24 data is contained in 32-bit containers*/ }
+static void _MixMonoToStereo_1TO2_8_24(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(int); /* !!! int24 data is contained in 32-bit containers*/ }
 static void _MixMonoToStereo_1TO2_32(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(int); }
 static void _MixMonoToStereo_1TO2_32f(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_1_TO_2(float); }
+static void _MixMonoToStereo_1TO2_24(void *__to, const void *__from, UINT32 count) 
+{
+	const UCHAR * __restrict from = (const UCHAR *)__from;
+	UCHAR * __restrict to = (UCHAR *)__to;
+	const UCHAR * __restrict end = to + (count * (2 * 3));
+
+	while (to != end)
+	{
+		to[0] = to[3] = from[0];
+		to[1] = to[4] = from[1];
+		to[2] = to[5] = from[2];
+
+		from += 3;
+		to += (2 * 3);
+	}
+}
 
 // ------------------------------------------------------------------------------------------
 static void _MixMonoToStereo_2TO1_8(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_INT32(BYTE); }
 static void _MixMonoToStereo_2TO1_16(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_INT32(short); }
-static void _MixMonoToStereo_2TO1_24(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_INT32(int); /* !!! int24 data is contained in 32-bit containers*/ }
+static void _MixMonoToStereo_2TO1_8_24(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_INT32(int); /* !!! int24 data is contained in 32-bit containers*/ }
 static void _MixMonoToStereo_2TO1_32(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_INT64(int); }
 static void _MixMonoToStereo_2TO1_32f(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_FLT32(float); }
+static void _MixMonoToStereo_2TO1_24(void *__to, const void *__from, UINT32 count) 
+{
+	const UCHAR * __restrict from = (const UCHAR *)__from;
+	UCHAR * __restrict to = (UCHAR *)__to;
+	const UCHAR * __restrict end = to + (count * 3);
+	PaInt32 tempL, tempR, tempM;
+
+	while (to != end)
+	{
+        tempL = (((PaInt32)from[0]) << 8);  
+        tempL = tempL | (((PaInt32)from[1]) << 16);
+        tempL = tempL | (((PaInt32)from[2]) << 24);
+
+        tempR = (((PaInt32)from[3]) << 8);  
+        tempR = tempR | (((PaInt32)from[4]) << 16);
+        tempR = tempR | (((PaInt32)from[5]) << 24);
+
+		tempM = (tempL + tempR) >> 1;
+
+		to[0] = (UCHAR)(tempM >> 8);
+		to[1] = (UCHAR)(tempM >> 16);
+		to[2] = (UCHAR)(tempM >> 24);
+
+		from += (2 * 3);
+		to += 3;
+	}
+}
 
 // ------------------------------------------------------------------------------------------
 static void _MixMonoToStereo_2TO1_8_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(BYTE); }
 static void _MixMonoToStereo_2TO1_16_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(short); }
-static void _MixMonoToStereo_2TO1_24_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(int); /* !!! int24 data is contained in 32-bit containers*/ }
+static void _MixMonoToStereo_2TO1_8_24_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(int); /* !!! int24 data is contained in 32-bit containers*/ }
 static void _MixMonoToStereo_2TO1_32_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(int); }
 static void _MixMonoToStereo_2TO1_32f_L(void *__to, const void *__from, UINT32 count) { _WASAPI_MONO_TO_STEREO_MIXER_2_TO_1_L(float); }
+static void _MixMonoToStereo_2TO1_24_L(void *__to, const void *__from, UINT32 count) 
+{
+	const UCHAR * __restrict from = (const UCHAR *)__from;
+	UCHAR * __restrict to = (UCHAR *)__to;
+	const UCHAR * __restrict end = to + (count * 3);
+
+	while (to != end)
+	{
+		to[0] = from[0];
+		to[1] = from[1];
+		to[2] = from[2];
+
+		from += (2 * 3);
+		to += 3;
+	}
+}
 
 // ------------------------------------------------------------------------------------------
-static MixMonoToStereoF GetMonoToStereoMixer(PaSampleFormat format, EMixDirection dir)
+static MixMonoToStereoF GetMonoToStereoMixer(const WAVEFORMATEXTENSIBLE *fmtext, EMixDirection dir)
 {
+	PaSampleFormat format = WaveToPaFormat(fmtext);
+	
 	switch (dir)
 	{
 	case MIX_DIR__1TO2:
@@ -1296,7 +1358,7 @@ static MixMonoToStereoF GetMonoToStereoMixer(PaSampleFormat format, EMixDirectio
 		{
 		case paUInt8:	return _MixMonoToStereo_1TO2_8;
 		case paInt16:	return _MixMonoToStereo_1TO2_16;
-		case paInt24:	return _MixMonoToStereo_1TO2_24;
+		case paInt24:	return (fmtext->Format.wBitsPerSample == 32 ? _MixMonoToStereo_1TO2_8_24 : _MixMonoToStereo_1TO2_24);
 		case paInt32:	return _MixMonoToStereo_1TO2_32;
 		case paFloat32: return _MixMonoToStereo_1TO2_32f;
 		}
@@ -1307,7 +1369,7 @@ static MixMonoToStereoF GetMonoToStereoMixer(PaSampleFormat format, EMixDirectio
 		{
 		case paUInt8:	return _MixMonoToStereo_2TO1_8;
 		case paInt16:	return _MixMonoToStereo_2TO1_16;
-		case paInt24:	return _MixMonoToStereo_2TO1_24;
+		case paInt24:	return (fmtext->Format.wBitsPerSample == 32 ? _MixMonoToStereo_2TO1_8_24 : _MixMonoToStereo_2TO1_24);
 		case paInt32:	return _MixMonoToStereo_2TO1_32;
 		case paFloat32: return _MixMonoToStereo_2TO1_32f;
 		}
@@ -1318,7 +1380,7 @@ static MixMonoToStereoF GetMonoToStereoMixer(PaSampleFormat format, EMixDirectio
 		{
 		case paUInt8:	return _MixMonoToStereo_2TO1_8_L;
 		case paInt16:	return _MixMonoToStereo_2TO1_16_L;
-		case paInt24:	return _MixMonoToStereo_2TO1_24_L;
+		case paInt24:	return (fmtext->Format.wBitsPerSample == 32 ? _MixMonoToStereo_2TO1_8_24_L : _MixMonoToStereo_2TO1_24_L);
 		case paInt32:	return _MixMonoToStereo_2TO1_32_L;
 		case paFloat32: return _MixMonoToStereo_2TO1_32f_L;
 		}
@@ -2259,27 +2321,27 @@ static void LogWAVEFORMATEXTENSIBLE(const WAVEFORMATEXTENSIBLE *in)
 }
 
 // ------------------------------------------------------------------------------------------
-static PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *in)
+PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
 {
-    const WAVEFORMATEX *old = (WAVEFORMATEX *)in;
+    const WAVEFORMATEX *fmt = (WAVEFORMATEX *)fmtext;
 
-    switch (old->wFormatTag)
+    switch (fmt->wFormatTag)
 	{
     case WAVE_FORMAT_EXTENSIBLE: {
-        if (IsEqualGUID(&in->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
+        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
 		{
-            if (in->Samples.wValidBitsPerSample == 32)
+            if (fmtext->Samples.wValidBitsPerSample == 32)
                 return paFloat32;
         }
         else
-		if (IsEqualGUID(&in->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_PCM))
+		if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_PCM))
 		{
-            switch (old->wBitsPerSample)
+            switch (fmt->wBitsPerSample)
 			{
-                case 32: return paInt32;
-                case 24: return paInt24;
-                case  8: return paUInt8;
-                case 16: return paInt16;
+			case 32: return paInt32;
+            case 24: return paInt24;
+            case 16: return paInt16;
+			case  8: return paUInt8;
             }
         }
 		break; }
@@ -2288,12 +2350,12 @@ static PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *in)
 		return paFloat32;
 
     case WAVE_FORMAT_PCM: {
-        switch (old->wBitsPerSample)
+        switch (fmt->wBitsPerSample)
 		{
-            case 32: return paInt32;
-            case 24: return paInt24;
-            case  8: return paUInt8;
-            case 16: return paInt16;
+        case 32: return paInt32;
+        case 24: return paInt24;
+        case 16: return paInt16;
+        case  8: return paUInt8;
         }
 		break; }
     }
@@ -2808,7 +2870,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		}*/
 
 		// select mixer
-		pSub->monoMixer = GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
+		pSub->monoMixer = GetMonoToStereoMixer(&pSub->wavex, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
 		if (pSub->monoMixer == NULL)
 		{
 			(*pa_error) = paInvalidChannelCount;
@@ -3145,7 +3207,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 			}*/
 
 			// Select mixer
-			pSub->monoMixer = GetMonoToStereoMixer(WaveToPaFormat(&pSub->wavex), (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
+			pSub->monoMixer = GetMonoToStereoMixer(&pSub->wavex, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
 			if (pSub->monoMixer == NULL)
 			{
 				(*pa_error) = paInvalidChannelCount;
