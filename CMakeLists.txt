@@ -11,13 +11,16 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 # been imported by some other CMakeLists.txt), we don't want to trump over
 # the top of that project's global settings.
 IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
+  PROJECT(portaudio)
+
+  # CMAKE_CONFIGURATION_TYPES only exists for multi-config generators (like
+  # Visual Studio or Xcode). For these projects, we won't define
+  # CMAKE_BUILD_TYPE as it does not make sense.
   IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     MESSAGE(STATUS "Setting CMAKE_BUILD_TYPE type to 'Debug' as none was specified.")
     SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
     SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
   ENDIF()
-
-  PROJECT(portaudio)
 
   SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -37,7 +40,9 @@ IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
   ENDIF()
 ENDIF()
 
-SET(PA_PKGCONFIG_VERSION 19)
+SET(PA_VERSION 19)
+SET(PA_PKGCONFIG_VERSION ${PA_VERSION})
+SET(PA_SOVERSION "${PA_VERSION}.0")
 
 # Most of the code from this point onwards is related to populating the
 # following variables:
@@ -172,7 +177,12 @@ IF(WIN32)
     OPTION(PA_USE_DS "Enable support for DirectSound" OFF)
   ENDIF()
   IF(PA_USE_DS)
-    OPTION(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE "Use DirectSound full duplex create" ON)
+    IF(MINGW)
+      MESSAGE(STATUS "DirectSound support will be built with DSound provided by MinGW.")
+      OPTION(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE "Use DirectSound full duplex create" OFF)
+    ELSE(MINGW)
+      OPTION(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE "Use DirectSound full duplex create" ON)
+    ENDIF(MINGW)
     MARK_AS_ADVANCED(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE)
     IF(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE)
       SET(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE)
@@ -186,10 +196,8 @@ IF(WIN32)
     SET(PA_SOURCES ${PA_SOURCES} ${PA_DS_SOURCES})
 
     # If we use DirectSound, we need this for the library to be found (if not in VS project settings)
-    IF(DXSDK_FOUND)
-      SET(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ${DXSDK_DSOUND_LIBRARY})
-    ENDIF()
-  ENDIF()
+    SET(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ${DXSDK_DSOUND_LIBRARY})
+  ENDIF(PA_USE_DS)
 
   OPTION(PA_USE_WMME "Enable support for MME" ON)
   IF(PA_USE_WMME)
@@ -200,22 +208,16 @@ IF(WIN32)
     SET(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ole32 uuid)
   ENDIF()
 
-  IF(MSVC)
-    OPTION(PA_USE_WASAPI "Enable support for WASAPI" ON)
-  ELSE()
-    # I was unable to get WASAPI to compile outside of Visual Studio. If
-    # anyone can figure out how to make this work with MinGW, please fix me.
-    SET(PA_USE_WASAPI OFF)
-  ENDIF()
+  # MinGW versions below 4.93, especially non MinGW-w64 distributions may
+  # break in the wasapi build. If an older MinGW version is required, WASAPI-
+  # support needs to be disabled.
+  OPTION(PA_USE_WASAPI "Enable support for WASAPI" ON)
   IF(PA_USE_WASAPI)
     SET(PA_WASAPI_SOURCES src/hostapi/wasapi/pa_win_wasapi.c)
     SOURCE_GROUP("hostapi\\wasapi" FILES ${PA_WASAPI_SOURCES})
     SET(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} include/pa_win_wasapi.h)
     SET(PA_SOURCES ${PA_SOURCES} ${PA_WASAPI_SOURCES})
     SET(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ole32 uuid)
-    IF(NOT MSVC)
-      SET(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} src/hostapi/wasapi/mingw-include)
-    ENDIF()
   ELSE()
     SET(DEF_EXCLUDE_WASAPI_SYMBOLS ";")
   ENDIF()
@@ -345,17 +347,48 @@ ELSE()
   SET(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} PA_LITTLE_ENDIAN)
 ENDIF()
 
-ADD_LIBRARY(portaudio SHARED ${PA_INCLUDES} ${PA_COMMON_INCLUDES} ${PA_SOURCES} ${PA_NON_UNICODE_SOURCES} ${PA_EXTRA_SHARED_SOURCES})
-SET_PROPERTY(TARGET portaudio APPEND_STRING PROPERTY COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS})
-TARGET_INCLUDE_DIRECTORIES(portaudio PRIVATE ${PA_PRIVATE_INCLUDE_PATHS})
-TARGET_INCLUDE_DIRECTORIES(portaudio PUBLIC include)
-TARGET_LINK_LIBRARIES(portaudio ${PA_LIBRARY_DEPENDENCIES})
+OPTION(PA_BUILD_STATIC "Build static library" ON)
+OPTION(PA_BUILD_SHARED "Build shared/dynamic library" ON)
 
-ADD_LIBRARY(portaudio_static STATIC ${PA_INCLUDES} ${PA_COMMON_INCLUDES} ${PA_SOURCES} ${PA_NON_UNICODE_SOURCES})
-SET_PROPERTY(TARGET portaudio_static APPEND_STRING PROPERTY COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS})
-TARGET_INCLUDE_DIRECTORIES(portaudio_static PRIVATE ${PA_PRIVATE_INCLUDE_PATHS})
-TARGET_INCLUDE_DIRECTORIES(portaudio_static PUBLIC include)
-TARGET_LINK_LIBRARIES(portaudio_static ${PA_LIBRARY_DEPENDENCIES})
+IF(MSVC)
+  OPTION(PA_LIBNAME_ADD_SUFFIX "Add suffix _static to static library name" ON)
+ELSE()
+  OPTION(PA_LIBNAME_ADD_SUFFIX "Add suffix _static to static library name" OFF)
+ENDIF()
+
+# MSVC: if PA_LIBNAME_ADD_SUFFIX is not used, and both static and shared libraries are
+# built, one, of import- and static libraries, will overwrite the other. In
+# embedded builds this is not an issue as they will only build the configuration
+# used in the host application.
+MARK_AS_ADVANCED(PA_LIBNAME_ADD_SUFFIX)
+IF(MSVC AND PA_BUILD_STATIC AND PA_BUILD_SHARED AND NOT PA_LIBNAME_ADD_SUFFIX)
+  MESSAGE(WARNING "Building both shared and static libraries, and avoiding the suffix _static will lead to a name conflict")
+  SET(PA_LIBNAME_ADD_SUFFIX ON CACHE BOOL "Forcing use of suffix _static to avoid name conflict between static and import library" FORCE)
+  MESSAGE(WARNING "PA_LIBNAME_ADD_SUFFIX was set to ON")
+ENDIF()
+
+SET(PA_TARGETS "")
+
+IF(PA_BUILD_SHARED)
+  LIST(APPEND PA_TARGETS portaudio)
+  ADD_LIBRARY(portaudio SHARED ${PA_INCLUDES} ${PA_COMMON_INCLUDES} ${PA_SOURCES} ${PA_NON_UNICODE_SOURCES} ${PA_EXTRA_SHARED_SOURCES})
+  SET_PROPERTY(TARGET portaudio APPEND_STRING PROPERTY COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS})
+  TARGET_INCLUDE_DIRECTORIES(portaudio PRIVATE ${PA_PRIVATE_INCLUDE_PATHS})
+  TARGET_INCLUDE_DIRECTORIES(portaudio PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+  TARGET_LINK_LIBRARIES(portaudio ${PA_LIBRARY_DEPENDENCIES})
+ENDIF()
+
+IF(PA_BUILD_STATIC)
+  LIST(APPEND PA_TARGETS portaudio_static)
+  ADD_LIBRARY(portaudio_static STATIC ${PA_INCLUDES} ${PA_COMMON_INCLUDES} ${PA_SOURCES} ${PA_NON_UNICODE_SOURCES})
+  SET_PROPERTY(TARGET portaudio_static APPEND_STRING PROPERTY COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS})
+  TARGET_INCLUDE_DIRECTORIES(portaudio_static PRIVATE ${PA_PRIVATE_INCLUDE_PATHS})
+  TARGET_INCLUDE_DIRECTORIES(portaudio_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+  TARGET_LINK_LIBRARIES(portaudio_static ${PA_LIBRARY_DEPENDENCIES})
+  IF(NOT PA_LIBNAME_ADD_SUFFIX)
+    SET_PROPERTY(TARGET portaudio_static PROPERTY OUTPUT_NAME portaudio)
+  ENDIF()
+ENDIF()
 
 IF(WIN32 AND MSVC)
   OPTION(PA_CONFIG_LIB_OUTPUT_PATH "Make sure that output paths are kept neat" OFF)
@@ -370,8 +403,20 @@ IF(WIN32 AND MSVC)
       SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin/Win32)
     ENDIF()
   ENDIF()
-  SET_TARGET_PROPERTIES(portaudio PROPERTIES OUTPUT_NAME portaudio_${TARGET_POSTFIX} FOLDER "Portaudio")
-  SET_TARGET_PROPERTIES(portaudio_static PROPERTIES OUTPUT_NAME portaudio_static_${TARGET_POSTFIX} FOLDER "Portaudio")
+  IF(PA_BUILD_SHARED)
+    IF(PA_LIBNAME_ADD_SUFFIX)
+      SET_TARGET_PROPERTIES(portaudio PROPERTIES OUTPUT_NAME portaudio_${TARGET_POSTFIX})
+    ELSE()
+      SET_TARGET_PROPERTIES(portaudio PROPERTIES OUTPUT_NAME portaudio)
+    ENDIF()
+  ENDIF()
+  IF(PA_BUILD_STATIC)
+    IF(PA_LIBNAME_ADD_SUFFIX)
+      SET_TARGET_PROPERTIES(portaudio_static PROPERTIES OUTPUT_NAME portaudio_static_${TARGET_POSTFIX})
+    ELSE()
+      SET_TARGET_PROPERTIES(portaudio_static PROPERTIES OUTPUT_NAME portaudio)
+    ENDIF()
+  ENDIF()
 ELSE()
   IF(APPLE AND CMAKE_VERSION VERSION_GREATER 3.4.2)
     OPTION(PA_OUTPUT_OSX_FRAMEWORK "Generate an OS X framework instead of the simple library" OFF)
@@ -381,16 +426,52 @@ ELSE()
         MACOSX_FRAMEWORK_IDENTIFIER com.portaudio
         FRAMEWORK_VERSION A
         PUBLIC_HEADER "${PA_PUBLIC_INCLUDES}"
-        VERSION 19.0
-        SOVERSION 19.0)
+        VERSION ${PA_SOVERSION}
+        SOVERSION ${PA_SOVERSION})
     ENDIF()
   ENDIF()
+ENDIF()
 
-  IF(NOT PA_OUTPUT_OSX_FRAMEWORK)
-    CONFIGURE_FILE(cmake_support/portaudio-2.0.pc.in ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc @ONLY)
-    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION lib/pkgconfig)
-    INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION include)
-    INSTALL(TARGETS portaudio DESTINATION lib)
+# At least on Windows in embedded builds, portaudio's install target should likely
+# not be executed, as the library would usually already be installed as part of, and
+# by means of the host application.
+# The option below offers the option to avoid executing the portaudio install target
+# for cases in which the host-application executes install, but no independent install
+# of portaudio is wished.
+OPTION(PA_DISABLE_INSTALL "Disable targets install and uninstall (for embedded builds)" OFF)
+
+IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
+  INCLUDE(CMakePackageConfigHelpers)
+
+  CONFIGURE_PACKAGE_CONFIG_FILE(cmake_support/portaudioConfig.cmake.in ${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake
+    INSTALL_DESTINATION "lib/cmake/portaudio"
+    NO_CHECK_REQUIRED_COMPONENTS_MACRO)
+  WRITE_BASIC_PACKAGE_VERSION_FILE(${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake
+    VERSION ${PA_VERSION}
+    COMPATIBILITY SameMajorVersion)
+  CONFIGURE_FILE(cmake_support/portaudio-2.0.pc.in ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc @ONLY)
+  INSTALL(FILES README.txt DESTINATION share/doc/portaudio)
+  INSTALL(FILES LICENSE.txt DESTINATION share/doc/portaudio)
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION lib/pkgconfig)
+  INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION include)
+  INSTALL(TARGETS ${PA_TARGETS}
+    EXPORT portaudio-targets
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib)
+  INSTALL(EXPORT portaudio-targets FILE "portaudioTargets.cmake" DESTINATION "lib/cmake/portaudio")
+  EXPORT(TARGETS ${PA_TARGETS} FILE "${PROJECT_BINARY_DIR}/cmake/portaudio/portaudioTargets.cmake")
+  INSTALL(FILES "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake"
+                "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake"
+    DESTINATION "lib/cmake/portaudio")
+
+  IF (NOT TARGET uninstall)
+    CONFIGURE_FILE(
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake_support/cmake_uninstall.cmake.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+      IMMEDIATE @ONLY)
+    ADD_CUSTOM_TARGET(uninstall
+      COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
   ENDIF()
 ENDIF()
 
@@ -405,4 +486,3 @@ OPTION(PA_BUILD_EXAMPLES "Include example projects" OFF)
 IF(PA_BUILD_EXAMPLES)
   SUBDIRS(examples)
 ENDIF()
-
