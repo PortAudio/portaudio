@@ -24,7 +24,29 @@ else(WIN32)
   message(FATAL_ERROR "FindDXSDK.cmake: Unsupported platform ${CMAKE_SYSTEM_NAME}" )
 endif(WIN32)
 
-if(MSVC)
+# Dsound.lib is statically linked (i.e. dsound.dll not required) and DXSDK_LIBRARY_DIR not used.
+# In the environments supported by VCPKG we may as well avoid looking out for DX9 to avoid version
+# mismatch in find.
+
+if(MSVC AND MSVC_VERSION GREATER_EQUAL 1900)
+
+  # if the environment is set up properly, matching lib and header will be found
+
+  find_path(DXSDK_INCLUDE_DIR
+    dsound.h
+  )
+  find_library(DXSDK_DSOUND_LIBRARY
+    dsound.lib
+  )
+
+  INCLUDE(FindPackageHandleStandardArgs)
+  FIND_PACKAGE_HANDLE_STANDARD_ARGS(DXSDK DEFAULT_MSG DXSDK_INCLUDE_DIR DXSDK_DSOUND_LIBRARY)
+
+  MARK_AS_ADVANCED(
+    DXSDK_INCLUDE_DIR DXSDK_DSOUND_LIBRARY
+  )
+
+else()
 
   find_path(DXSDK_ROOT_DIR
     include/dxsdkver.h
@@ -34,28 +56,28 @@ if(MSVC)
 
   find_path(DXSDK_INCLUDE_DIR
     dxsdkver.h
-    PATHS
+    HINTS
       ${DXSDK_ROOT_DIR}/include
   )
 
   IF(CMAKE_CL_64)
-    find_path(DXSDK_LIBRARY_DIR
+  find_path(DXSDK_LIBRARY_DIR
     dsound.lib
-    PATHS
-      ${DXSDK_ROOT_DIR}/lib/x64
+    HINTS
+    ${DXSDK_ROOT_DIR}/lib/x64
   )
   ELSE(CMAKE_CL_64)
-    find_path(DXSDK_LIBRARY_DIR
+  find_path(DXSDK_LIBRARY_DIR
     dsound.lib
-    PATHS
-      ${DXSDK_ROOT_DIR}/lib/x86
+    HINTS
+    ${DXSDK_ROOT_DIR}/lib/x86
   )
   ENDIF(CMAKE_CL_64)
 
   find_library(DXSDK_DSOUND_LIBRARY
     dsound.lib
-    PATHS
-      ${DXSDK_LIBRARY_DIR}
+    HINTS
+    ${DXSDK_LIBRARY_DIR}
   )
 
   # handle the QUIETLY and REQUIRED arguments and set DXSDK_FOUND to TRUE if
@@ -63,26 +85,9 @@ if(MSVC)
   INCLUDE(FindPackageHandleStandardArgs)
   FIND_PACKAGE_HANDLE_STANDARD_ARGS(DXSDK DEFAULT_MSG DXSDK_ROOT_DIR DXSDK_INCLUDE_DIR)
 
-ELSEIF(MINGW)
-
-  GET_FILENAME_COMPONENT(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
-  GET_FILENAME_COMPONENT(MINGW_SYSROOT ${MINGW_BIN_DIR} DIRECTORY)
-  # The glob expression below should only return a single folder:
-  FILE(GLOB MINGW_TOOLCHAIN_FOLDER ${MINGW_SYSROOT}/*mingw32)
-  
-  find_library(DXSDK_DSOUND_LIBRARY
-    libdsound.a dsound
-    HINTS
-      "${MINGW_TOOLCHAIN_FOLDER}/lib"
-      "${MINGW_SYSROOT}/lib"
+  MARK_AS_ADVANCED(
+      DXSDK_ROOT_DIR DXSDK_INCLUDE_DIR
+      DXSDK_LIBRARY_DIR DXSDK_DSOUND_LIBRARY
   )
 
-  INCLUDE(FindPackageHandleStandardArgs)
-  FIND_PACKAGE_HANDLE_STANDARD_ARGS(DXSDK DEFAULT_MSG DXSDK_DSOUND_LIBRARY)
-
-ENDIF(MSVC)
-
-MARK_AS_ADVANCED(
-    DXSDK_ROOT_DIR DXSDK_INCLUDE_DIR
-    DXSDK_LIBRARY_DIR DXSDK_DSOUND_LIBRARY
-)
+endif()
