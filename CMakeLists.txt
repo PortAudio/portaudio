@@ -6,40 +6,6 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-# Check if the user is building PortAudio stand-alone or as part of a larger
-# project. If this is part of a larger project (i.e. the CMakeLists.txt has
-# been imported by some other CMakeLists.txt), we don't want to trump over
-# the top of that project's global settings.
-IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
-  PROJECT(portaudio)
-
-  # CMAKE_CONFIGURATION_TYPES only exists for multi-config generators (like
-  # Visual Studio or Xcode). For these projects, we won't define
-  # CMAKE_BUILD_TYPE as it does not make sense.
-  IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    MESSAGE(STATUS "Setting CMAKE_BUILD_TYPE type to 'Debug' as none was specified.")
-    SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
-    SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
-  ENDIF()
-
-  SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
-
-  IF(WIN32 AND MSVC)
-    OPTION(PA_DLL_LINK_WITH_STATIC_RUNTIME "Link with static runtime libraries (minimizes runtime dependencies)" ON)
-    IF(PA_DLL_LINK_WITH_STATIC_RUNTIME)
-      FOREACH(flag_var
-        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-        CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
-        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-        IF(${flag_var} MATCHES "/MD")
-          STRING(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        ENDIF()
-      ENDFOREACH()
-    ENDIF()
-  ENDIF()
-ENDIF()
-
 SET(PA_VERSION 19)
 SET(PA_PKGCONFIG_VERSION ${PA_VERSION})
 SET(PA_SOVERSION "${PA_VERSION}.0")
