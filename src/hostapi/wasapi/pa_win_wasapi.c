@@ -1790,19 +1790,6 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 					PA_DEBUG(("WASAPI:%d| name[%s]\n", i, deviceInfo->name));
                 }
 
-                // Default format
-                {
-                    PROPVARIANT value;
-                    PropVariantInit(&value);
-                    hr = IPropertyStore_GetValue(pProperty, &PKEY_AudioEngine_DeviceFormat, &value);
-					// We need to set the result to a value otherwise we will return paNoError
-					// [IF_FAILED_JUMP(hResult, error);]
-					IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
-					memcpy(&paWasapi->devInfo[i].DefaultFormat, value.blob.pBlobData, min(sizeof(paWasapi->devInfo[i].DefaultFormat), value.blob.cbSize));
-                    // cleanup
-                    PropVariantClear(&value);
-                }
-
                 // Formfactor
                 {
                     PROPVARIANT value;
@@ -1854,6 +1841,24 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 				// We need to set the result to a value otherwise we will return paNoError
 				// [IF_FAILED_JUMP(hResult, error);]
 				IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
+
+				// Get the default format.
+				//
+				// Note: this is using IAudioClient::GetMixFormat(), not
+				// PKEY_AudioEngine_DeviceFormat, because the latter has been shown to
+				// be unreliable - see:
+				//   https://app.assembla.com/spaces/portaudio/tickets/286
+				// The downside of using GetMixFormat() is that the sample type reported
+				// by PaWasapi_GetDeviceDefaultFormat() will always be 32-bit float.
+				// That seems fine since PortAudio will automatically do any required
+				// conversions.
+				WAVEFORMATEXTENSIBLE *format;
+				hr = IAudioClient_GetMixFormat(tmpClient, &format);
+				if (SUCCEEDED(hr))
+				{
+					memcpy(&paWasapi->devInfo[i].DefaultFormat, format, sizeof(*format));
+					CoTaskMemFree(format);
+				}
 
 				// Get latency
                 hr = IAudioClient_GetDevicePeriod(tmpClient,
