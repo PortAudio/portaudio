@@ -422,6 +422,9 @@ typedef struct PaWasapiDeviceInfo
 	// Default format (setup through Control Panel by user)
 	WAVEFORMATEXTENSIBLE DefaultFormat;
 
+	// Mix format (internal format used by WASAPI audio engine)
+	WAVEFORMATEXTENSIBLE MixFormat;
+
     // Fields filled from IMMEndpoint'sGetDataFlow
     EDataFlow flow;
 
@@ -1586,8 +1589,6 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 #ifndef PA_WINRT
     IMMDeviceCollection* pEndPoints = NULL;
 	IMMDeviceEnumerator *pEnumerator = NULL;
-#else
-	WAVEFORMATEX *mixFormat;
 #endif
 	IAudioClient *tmpClient;
 
@@ -1866,9 +1867,20 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 					hr = S_OK;
 				}
 				
+				// Get mix format
+				{
+					WAVEFORMATEX *mixFormat;
+
+					hr = IAudioClient_GetMixFormat(tmpClient, &mixFormat);
+					if (SUCCEEDED(hr))
+					{
+						memcpy(&paWasapi->devInfo[i].MixFormat, mixFormat, min(sizeof(paWasapi->devInfo[i].MixFormat), (sizeof(*mixFormat) + mixFormat->cbSize)));
+						CoTaskMemFree(mixFormat);
+					}
+				}
+
+				// Register WINRT device
 			#ifdef PA_WINRT
-				// Get mix format which will treat as default device format
-				hr = IAudioClient_GetMixFormat(tmpClient, &mixFormat);
 				if (SUCCEEDED(hr))
 				{
 					// Default device
@@ -1880,9 +1892,8 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 					// State
 					paWasapi->devInfo[i].state = DEVICE_STATE_ACTIVE;
 
-					// Default format
-					memcpy(&paWasapi->devInfo[i].DefaultFormat, mixFormat, min(sizeof(paWasapi->devInfo[i].DefaultFormat), (sizeof(*mixFormat) + mixFormat->cbSize)));
-					CoTaskMemFree(mixFormat);
+					// Default format is always a mix format
+					paWasapi->devInfo[i].DefaultFormat = paWasapi->devInfo[i].MixFormat;
 
 					// Form-factor
 					paWasapi->devInfo[i].formFactor = UnknownFormFactor;
@@ -1917,18 +1928,18 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
             // we can now fill in portaudio device data
             deviceInfo->maxInputChannels  = 0;
             deviceInfo->maxOutputChannels = 0;
-			deviceInfo->defaultSampleRate = paWasapi->devInfo[i].DefaultFormat.Format.nSamplesPerSec;
+			deviceInfo->defaultSampleRate = paWasapi->devInfo[i].MixFormat.Format.nSamplesPerSec;
             switch (paWasapi->devInfo[i].flow)
 			{
 			case eRender: {
-                deviceInfo->maxOutputChannels		 = paWasapi->devInfo[i].DefaultFormat.Format.nChannels;
+                deviceInfo->maxOutputChannels		 = paWasapi->devInfo[i].MixFormat.Format.nChannels;
                 deviceInfo->defaultHighOutputLatency = nano100ToSeconds(paWasapi->devInfo[i].DefaultDevicePeriod);
                 deviceInfo->defaultLowOutputLatency  = nano100ToSeconds(paWasapi->devInfo[i].MinimumDevicePeriod);
 				PA_DEBUG(("WASAPI:%d| def.SR[%d] max.CH[%d] latency{hi[%f] lo[%f]}\n", i, (UINT32)deviceInfo->defaultSampleRate,
 					deviceInfo->maxOutputChannels, (float)deviceInfo->defaultHighOutputLatency, (float)deviceInfo->defaultLowOutputLatency));
 				break;}
 			case eCapture: {
-                deviceInfo->maxInputChannels		= paWasapi->devInfo[i].DefaultFormat.Format.nChannels;
+                deviceInfo->maxInputChannels		= paWasapi->devInfo[i].MixFormat.Format.nChannels;
                 deviceInfo->defaultHighInputLatency = nano100ToSeconds(paWasapi->devInfo[i].DefaultDevicePeriod);
                 deviceInfo->defaultLowInputLatency  = nano100ToSeconds(paWasapi->devInfo[i].MinimumDevicePeriod);
 				PA_DEBUG(("WASAPI:%d| def.SR[%d] max.CH[%d] latency{hi[%f] lo[%f]}\n", i, (UINT32)deviceInfo->defaultSampleRate,
@@ -2219,6 +2230,39 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 	
 	size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].DefaultFormat));
 	memcpy(pFormat, &paWasapi->devInfo[ index ].DefaultFormat, size);
+
+	return size;
+}
+
+// ------------------------------------------------------------------------------------------
+int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice )
+{
+	PaError ret;
+	PaWasapiHostApiRepresentation *paWasapi;
+	UINT32 size;
+	PaDeviceIndex index;
+
+	if (pFormat == NULL)
+		return paBadBufferPtr;
+	if (nFormatSize <= 0)
+		return paBufferTooSmall;
+
+	// Get API
+	paWasapi = _GetHostApi(&ret);
+	if (paWasapi == NULL)
+		return ret;
+
+	// Get device index
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+    if (ret != paNoError)
+        return ret;
+
+	// Validate index
+	if ((UINT32)index >= paWasapi->deviceCount)
+		return paInvalidDevice;
+	
+	size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].MixFormat));
+	memcpy(pFormat, &paWasapi->devInfo[ index ].MixFormat, size);
 
 	return size;
 }

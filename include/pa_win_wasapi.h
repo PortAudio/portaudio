@@ -320,7 +320,7 @@ PaError PaWasapi_GetAudioClient( PaStream *pStream, void **pAudioClient, int bOu
 PaError PaWasapi_UpdateDeviceList();
 
 
-/** Returns current sound format of the device assigned to the opened stream. Format is represented by 
+/** Returns current audio format of the device assigned to the opened stream. Format is represented by 
     PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure. Use this function to reconfirm format if 
     PA's processor is overriden and paWinWasapiRedirectHostProcessor flag is specified.
 
@@ -336,8 +336,9 @@ PaError PaWasapi_UpdateDeviceList();
 int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned int nFormatSize, int bOutput );
 
 
-/** Returns default sound format for device. Format is represented by PaWinWaveFormat or 
-    WAVEFORMATEXTENSIBLE structure.
+/** Returns default audio format for device in Shared Mode. Format is represented by
+    PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure and obtained by getting
+    the device property with a PKEY_AudioEngine_DeviceFormat key.
 
  @param  pFormat     Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
  @param  nFormatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
@@ -348,6 +349,21 @@ int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned 
          or an error is encountered.
 */
 int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice );
+
+
+/** Returns mix audio format for device in Shared Mode. Format is represented by
+    PaWinWaveFormat or WAVEFORMATEXTENSIBLE structureand obtained by
+    IAudioClient::GetMixFormat.
+
+ @param  pFormat     Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
+ @param  nFormatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
+ @param  nDevice     Device index.
+
+ @return Non-negative value indicating the number of bytes copied into format decriptor
+         or, a PaErrorCode (which are always negative) if PortAudio is not initialized
+         or an error is encountered.
+*/
+int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice );
 
 
 /** Returns device role (PaWasapiDeviceRole enum).
