@@ -2942,10 +2942,10 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		// Work 1:1 with user buffer (only polling allows to use >1)
 		framesPerLatency += MakeFramesFromHns(SecondsTonano100(params->suggestedLatency), pSub->wavex.Format.nSamplesPerSec);
 
-		// Use Polling if overall latency is > 5ms as it allows to use 100% CPU in a callback,
+		// Use Polling if overall latency is >= 21.33ms as it allows to use 100% CPU in a callback,
 		// or user specified latency parameter
 		overall = MakeHnsPeriod(framesPerLatency, pSub->wavex.Format.nSamplesPerSec);
-		if ((overall >= (106667*2)/*21.33ms*/) || ((INT32)(params->suggestedLatency*100000.0) != 0/*0.01 msec granularity*/))
+		if (overall >= (106667 * 2)/*21.33ms*/)
 		{
 			framesPerLatency = _GetFramesPerHostBuffer(userFramesPerBuffer,
 				params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
@@ -2972,9 +2972,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	{
 		// Do it only for Polling mode
 		if ((pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)
-		{
 			framesPerLatency /= WASAPI_PACKETS_PER_INPUT_BUFFER;
-		}
 	}
 
 	// Calculate aligned period
@@ -3111,6 +3109,10 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 			// Get new aligned frames lowered by calculated ratio
 			framesPerLatency = MakeFramesFromHns(pSub->period / ratio, pSub->wavex.Format.nSamplesPerSec);
 			_CalculateAlignedPeriod(pSub, &framesPerLatency, ALIGN_BWD);
+
+			// Make sure we are not below the minimum period
+			if (pSub->period < pInfo->MinimumDevicePeriod)
+				pSub->period = pInfo->MinimumDevicePeriod;
 			
 			// Release previous client
 			SAFE_RELEASE(audioClient);
