@@ -87,6 +87,7 @@ sndioSetFmt(struct sio_par *sio, PaSampleFormat fmt)
 {
 	switch (fmt & ~paNonInterleaved) {
 	case paInt32:
+	case paFloat32:
 		sio->sig = 1;
 		sio->bits = 32;
 		break;
@@ -96,7 +97,6 @@ sndioSetFmt(struct sio_par *sio, PaSampleFormat fmt)
 		sio->bps = 3;	/* paInt24 is packed format */
 		break;
 	case paInt16:
-	case paFloat32:
 		sio->sig = 1;
 		sio->bits = 16;
 		break;
