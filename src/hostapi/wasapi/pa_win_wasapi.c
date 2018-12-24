@@ -1,9 +1,10 @@
 /*
  * Portable Audio I/O Library WASAPI implementation
- * Copyright (c) 2006-2010 David Viens, Dmitry Kostjuchenko
+ * Copyright (c) 2006-2010 David Viens
+ * Copyright (c) 2010-2018 Dmitry Kostjuchenko
  *
  * Based on the Open Source API proposed by Ross Bencina
- * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
+ * Copyright (c) 1999-2018 Ross Bencina, Phil Burk
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -292,6 +293,10 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
 
 #define MAX_STR_LEN 512
 
+#ifdef PA_WINRT
+	#define PA_WASAPI_DEVICE_ID_LEN 4096
+#endif
+
 enum { S_INPUT = 0, S_OUTPUT = 1, S_COUNT = 2, S_FULLDUPLEX = 0 };
 
 // Number of packets which compose single contignous buffer. With trial and error it was calculated
@@ -337,12 +342,6 @@ FAvRtWaitOnThreadOrderingGroup   pAvRtWaitOnThreadOrderingGroup = NULL;
 FAvSetMmThreadCharacteristics    pAvSetMmThreadCharacteristics = NULL;
 FAvRevertMmThreadCharacteristics pAvRevertMmThreadCharacteristics = NULL;
 FAvSetMmThreadPriority           pAvSetMmThreadPriority = NULL;
-#endif
-
-#ifdef PA_WINRT
-#define PA_WASAPI_DEVICE_ID_LEN 4096
-static OLECHAR g_DefaultRenderId[PA_WASAPI_DEVICE_ID_LEN] = { 0 };
-static OLECHAR g_DefaultCaptureId[PA_WASAPI_DEVICE_ID_LEN] = { 0 };
 #endif
 
 #define _GetProc(fun, type, name)  {                                                        \
@@ -452,15 +451,15 @@ typedef struct
 
     PaWinUtilComInitializationResult comInitializationResult;
 
-    //this is the REAL number of devices, whether they are usefull to PA or not!
+    // this is the REAL number of devices, whether they are usefull to PA or not!
     UINT32 deviceCount;
 
-    WCHAR defaultRenderer [MAX_STR_LEN];
-    WCHAR defaultCapturer [MAX_STR_LEN];
+    WCHAR defaultRenderer[MAX_STR_LEN];
+    WCHAR defaultCapturer[MAX_STR_LEN];
 
     PaWasapiDeviceInfo *devInfo;
 
-	// Is true when WOW64 Vista/7 Workaround is needed
+	// is TRUE when WOW64 Vista/7 Workaround is needed
 	BOOL useWOW64Workaround;
 }
 PaWasapiHostApiRepresentation;
@@ -584,6 +583,10 @@ typedef struct PaWasapiStream
 
 	// Thread priority level
 	PaWasapiThreadPriority nThreadPriority;
+
+	// State handler
+	PaWasapiStreamStateCallback fnStateHandler;
+	void *pStateHandlerUserData;
 }
 PaWasapiStream;
 
@@ -606,6 +609,10 @@ static void PaWasapi_FreeMemory(void *ptr);
 static PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext);
 
 // Local statics
+#ifdef PA_WINRT
+static OLECHAR g_DefaultRenderId[PA_WASAPI_DEVICE_ID_LEN] = { 0 };
+static OLECHAR g_DefaultCaptureId[PA_WASAPI_DEVICE_ID_LEN] = { 0 };
+#endif
 
 // ------------------------------------------------------------------------------------------
 #define LogHostError(HRES) __LogHostError(HRES, __FUNCTION__, __FILE__, __LINE__)
@@ -851,7 +858,7 @@ static UINT32 ALIGN_FWD(UINT32 v, UINT32 align)
 
 // ------------------------------------------------------------------------------------------
 // Get next value power of 2
-UINT32 ALIGN_NEXT_POW2(UINT32 v)
+static UINT32 ALIGN_NEXT_POW2(UINT32 v)
 {
 	UINT32 v2 = 1;
 	while (v > (v2 <<= 1)) { }
@@ -1584,6 +1591,18 @@ static DWORD SignalObjectAndWait(HANDLE hObjectToSignal, HANDLE hObjectToWaitOn,
 #endif
 
 // ------------------------------------------------------------------------------------------
+static void NotifyStateChanged(PaWasapiStream *stream, UINT32 flags, HRESULT hr)
+{
+	if (stream->fnStateHandler == NULL)
+		return;
+
+	if (FAILED(hr))
+		flags |= paWasapiStreamStateError;
+	
+	stream->fnStateHandler((PaStream *)stream, flags, hr, stream->pStateHandlerUserData);
+}
+
+// ------------------------------------------------------------------------------------------
 static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostApiIndex hostApiIndex)
 {
 	PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
@@ -1684,7 +1703,8 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 	}
 #endif
 
-    paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_AllocateMemory(sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
+    paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(
+		paWasapi->allocations, sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
     if (paWasapi->devInfo == NULL)
 	{
         result = paInsufficientMemory;
@@ -2013,7 +2033,7 @@ error:
 // ------------------------------------------------------------------------------------------
 PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
-    PaError result = paInternalError;
+    PaError result;
     PaWasapiHostApiRepresentation *paWasapi;
 
 #ifndef PA_WINRT
@@ -2032,10 +2052,12 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     }	
     memset(paWasapi, 0, sizeof(PaWasapiHostApiRepresentation)); /* ensure all fields are zeroed. especially paWasapi->allocations */
 
+	// Initialize COM subsystem
     result = PaWinUtil_CoInitialize(paWASAPI, &paWasapi->comInitializationResult);
     if (result != paNoError)
         goto error;
 
+	// Create memory group
     paWasapi->allocations = PaUtil_CreateAllocationGroup();
     if (paWasapi->allocations == NULL)
 	{
@@ -2091,15 +2113,20 @@ static void ReleaseWasapiDeviceInfoList( PaWasapiHostApiRepresentation *paWasapi
 {
 	UINT32 i;
 
-	// Release device info bound objects and device info itself
+	// Release device info bound objects
     for (i = 0; i < paWasapi->deviceCount; ++i)
 	{
 	#ifndef PA_WINRT
         SAFE_RELEASE(paWasapi->devInfo[i].device);
 	#endif
     }
-    PaUtil_FreeMemory(paWasapi->devInfo);
 
+	// Free device info
+	if (paWasapi->allocations != NULL)
+		PaUtil_GroupFreeMemory(paWasapi->allocations, paWasapi->devInfo);
+
+	// Be ready for a device list reinitialization and if its creation is failed pointers must not be dangling
+	paWasapi->devInfo = NULL;
 	paWasapi->deviceCount = 0;
 }
 
@@ -2110,16 +2137,20 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
 	if (paWasapi == NULL)
 		return;
 
+	// Release device list
 	ReleaseWasapiDeviceInfoList(paWasapi);
 
+	// Free allocations and memory group itself
     if (paWasapi->allocations != NULL)
 	{
         PaUtil_FreeAllAllocations(paWasapi->allocations);
         PaUtil_DestroyAllocationGroup(paWasapi->allocations);
     }
 
-    PaWinUtil_CoUninitialize( paWASAPI, &paWasapi->comInitializationResult );
+	// Release COM subsystem
+    PaWinUtil_CoUninitialize(paWASAPI, &paWasapi->comInitializationResult);
 
+	// Free API representation
     PaUtil_FreeMemory(paWasapi);
 
 	// Close AVRT
@@ -2127,18 +2158,19 @@ static void Terminate( PaUtilHostApiRepresentation *hostApi )
 }
 
 // ------------------------------------------------------------------------------------------
-static PaWasapiHostApiRepresentation *_GetHostApi(PaError *_error)
+static PaWasapiHostApiRepresentation *_GetHostApi(PaError *ret)
 {
 	PaError error;
-
 	PaUtilHostApiRepresentation *pApi;
+
 	if ((error = PaUtil_GetHostApiRepresentation(&pApi, paWASAPI)) != paNoError)
 	{
-		if (_error != NULL)
-			(*_error) = error;
+		if (ret != NULL)
+			(*ret) = error;
 
 		return NULL;
 	}
+
 	return (PaWasapiHostApiRepresentation *)pApi;
 }
 
@@ -2153,7 +2185,11 @@ static PaError UpdateDeviceList()
 	// Get API
 	hostApi = (PaUtilHostApiRepresentation *)(paWasapi = _GetHostApi(&ret));
 	if (paWasapi == NULL)
-		return ret;
+		return paNotInitialized;
+
+	// Make sure initialized properly
+	if (paWasapi->allocations == NULL)
+		return paNotInitialized;
 
 	// Release WASAPI internal device info list
 	ReleaseWasapiDeviceInfoList(paWasapi);
@@ -2168,6 +2204,8 @@ static PaError UpdateDeviceList()
 		PaUtil_GroupFreeMemory(paWasapi->allocations, hostApi->deviceInfos[0]);
 		PaUtil_GroupFreeMemory(paWasapi->allocations, hostApi->deviceInfos);
 
+		// Be ready for a device list reinitialization and if its creation is failed pointers must not be dangling
+		hostApi->deviceInfos = NULL;
 		hostApi->info.deviceCount = 0;
 		hostApi->info.defaultInputDevice = paNoDevice;
 		hostApi->info.defaultOutputDevice = paNoDevice;
@@ -2189,7 +2227,7 @@ PaError PaWasapi_UpdateDeviceList()
 #endif
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned int nFormatSize, int bOutput )
+int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned int formatSize, int bOutput )
 {
 	UINT32 size;
 	WAVEFORMATEXTENSIBLE *format;
@@ -2200,14 +2238,14 @@ int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned 
 	
 	format = (bOutput == TRUE ? &stream->out.wavex : &stream->in.wavex);
 
-	size = min(nFormatSize, (UINT32)sizeof(*format));
+	size = min(formatSize, (UINT32)sizeof(*format));
 	memcpy(pFormat, format, size);
 
 	return size;
 }
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice )
+int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device )
 {
 	PaError ret;
 	PaWasapiHostApiRepresentation *paWasapi;
@@ -2216,7 +2254,7 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 
 	if (pFormat == NULL)
 		return paBadBufferPtr;
-	if (nFormatSize <= 0)
+	if (formatSize <= 0)
 		return paBufferTooSmall;
 
 	// Get API
@@ -2225,7 +2263,7 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 		return ret;
 
 	// Get device index
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
     if (ret != paNoError)
         return ret;
 
@@ -2233,14 +2271,14 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, Pa
 	if ((UINT32)index >= paWasapi->deviceCount)
 		return paInvalidDevice;
 	
-	size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].DefaultFormat));
+	size = min(formatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].DefaultFormat));
 	memcpy(pFormat, &paWasapi->devInfo[ index ].DefaultFormat, size);
 
 	return size;
 }
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice )
+int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device )
 {
 	PaError ret;
 	PaWasapiHostApiRepresentation *paWasapi;
@@ -2249,7 +2287,7 @@ int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDevi
 
 	if (pFormat == NULL)
 		return paBadBufferPtr;
-	if (nFormatSize <= 0)
+	if (formatSize <= 0)
 		return paBufferTooSmall;
 
 	// Get API
@@ -2258,7 +2296,7 @@ int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDevi
 		return ret;
 
 	// Get device index
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
     if (ret != paNoError)
         return ret;
 
@@ -2266,14 +2304,14 @@ int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDevi
 	if ((UINT32)index >= paWasapi->deviceCount)
 		return paInvalidDevice;
 	
-	size = min(nFormatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].MixFormat));
+	size = min(formatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].MixFormat));
 	memcpy(pFormat, &paWasapi->devInfo[ index ].MixFormat, size);
 
 	return size;
 }
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceRole( PaDeviceIndex nDevice )
+int PaWasapi_GetDeviceRole( PaDeviceIndex device )
 {
 	PaError ret;
 	PaDeviceIndex index;
@@ -2284,7 +2322,7 @@ int PaWasapi_GetDeviceRole( PaDeviceIndex nDevice )
 		return paNotInitialized;
 
 	// Get device index
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
     if (ret != paNoError)
         return ret;
 
@@ -2296,17 +2334,17 @@ int PaWasapi_GetDeviceRole( PaDeviceIndex nDevice )
 }
 
 // ------------------------------------------------------------------------------------------
-PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *nInput, unsigned int *nOutput )
+PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *pInput, unsigned int *pOutput )
 {
     PaWasapiStream *stream = (PaWasapiStream *)pStream;
 	if (stream == NULL)
 		return paBadStreamPtr;
 
-	if (nInput != NULL)
-		(*nInput) = stream->in.framesPerHostCallback;
+	if (pInput != NULL)
+		(*pInput) = stream->in.framesPerHostCallback;
 
-	if (nOutput != NULL)
-		(*nOutput) = stream->out.framesPerHostCallback;
+	if (pOutput != NULL)
+		(*pOutput) = stream->out.framesPerHostCallback;
 
 	return paNoError;
 }
@@ -4849,19 +4887,19 @@ static void MMCSS_deactivate(HANDLE hTask)
 #endif
 
 // ------------------------------------------------------------------------------------------
-PaError PaWasapi_ThreadPriorityBoost(void **hTask, PaWasapiThreadPriority nPriorityClass)
+PaError PaWasapi_ThreadPriorityBoost(void **pTask, PaWasapiThreadPriority priorityClass)
 {
 	HANDLE task;
 	PaError ret;
 
-	if (hTask == NULL)
+	if (pTask == NULL)
 		return paUnanticipatedHostError;
 
 #ifndef PA_WINRT
-	if ((ret = MMCSS_activate(nPriorityClass, &task)) != paNoError)
+	if ((ret = MMCSS_activate(priorityClass, &task)) != paNoError)
 		return ret;
 #else
-	switch (nPriorityClass)
+	switch (priorityClass)
 	{
 	case eThreadPriorityAudio:
 	case eThreadPriorityProAudio: {
@@ -4885,21 +4923,21 @@ PaError PaWasapi_ThreadPriorityBoost(void **hTask, PaWasapiThreadPriority nPrior
 	}
 #endif
 
-	(*hTask) = task;
+	(*pTask) = task;
 	return ret;
 }
 
 // ------------------------------------------------------------------------------------------
-PaError PaWasapi_ThreadPriorityRevert(void *hTask)
+PaError PaWasapi_ThreadPriorityRevert(void *pTask)
 {
-	if (hTask == NULL)
+	if (pTask == NULL)
 		return paUnanticipatedHostError;
 
 #ifndef PA_WINRT
-	MMCSS_deactivate((HANDLE)hTask);
+	MMCSS_deactivate((HANDLE)pTask);
 #else
 	// Revert previous priority by removing 0x80000000 mask
-	if (SetThreadPriority(GetCurrentThread(), (int)((intptr_t)hTask & ~0x80000000)) == FALSE)
+	if (SetThreadPriority(GetCurrentThread(), (int)((intptr_t)pTask & ~0x80000000)) == FALSE)
 		return paUnanticipatedHostError;
 #endif
 
@@ -4910,7 +4948,7 @@ PaError PaWasapi_ThreadPriorityRevert(void *hTask)
 // Described at:
 // http://msdn.microsoft.com/en-us/library/dd371387(v=VS.85).aspx
 
-PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount)
+PaError PaWasapi_GetJackCount(PaDeviceIndex device, int *pJackCount)
 {
 #ifndef PA_WINRT
 	PaError ret;
@@ -4927,47 +4965,50 @@ PaError PaWasapi_GetJackCount(PaDeviceIndex nDevice, int *jcount)
 	if (paWasapi == NULL)
 		return paNotInitialized;
 
-	// Get device index.
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	if (pJackCount == NULL)
+		return paUnanticipatedHostError;
+
+	// Get device index
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
     if (ret != paNoError)
         return ret;
 
-	// Validate index.
+	// Validate index
 	if ((UINT32)index >= paWasapi->deviceCount)
 		return paInvalidDevice;
 
-	// Get the endpoint device's IDeviceTopology interface.
+	// Get the endpoint device's IDeviceTopology interface
 	hr = IMMDevice_Activate(paWasapi->devInfo[index].device, &pa_IID_IDeviceTopology,
 		CLSCTX_INPROC_SERVER, NULL, (void**)&pDeviceTopology);
 	IF_FAILED_JUMP(hr, error);
 
-    // The device topology for an endpoint device always contains just one connector (connector number 0).
+    // The device topology for an endpoint device always contains just one connector (connector number 0)
 	hr = IDeviceTopology_GetConnector(pDeviceTopology, 0, &pConnFrom);
 	IF_FAILED_JUMP(hr, error);
 
-    // Step across the connection to the jack on the adapter.
+    // Step across the connection to the jack on the adapter
 	hr = IConnector_GetConnectedTo(pConnFrom, &pConnTo);
     if (HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) == hr)
     {
-        // The adapter device is not currently active.
+        // The adapter device is not currently active
         hr = E_NOINTERFACE;
     }
 	IF_FAILED_JUMP(hr, error);
 
-	// Get the connector's IPart interface.
+	// Get the connector's IPart interface
 	hr = IConnector_QueryInterface(pConnTo, &pa_IID_IPart, (void**)&pPart);
 	IF_FAILED_JUMP(hr, error);
 
-	// Activate the connector's IKsJackDescription interface.
+	// Activate the connector's IKsJackDescription interface
 	hr = IPart_Activate(pPart, CLSCTX_INPROC_SERVER, &pa_IID_IKsJackDescription, (void**)&pJackDesc);
 	IF_FAILED_JUMP(hr, error);
 
-	// Return jack count for this device.
+	// Return jack count for this device
 	hr = IKsJackDescription_GetJackCount(pJackDesc, &jackCount);
 	IF_FAILED_JUMP(hr, error);
 
 	// Set.
-	(*jcount) = jackCount;
+	(*pJackCount) = jackCount;
 
 	// Ok.
 	ret = paNoError;
@@ -4983,8 +5024,8 @@ error:
 	LogHostError(hr);
 	return paNoError;
 #else
-	(void)nDevice;
-	(void)jcount;
+	(void)device;
+	(void)pJackCount;
 	return paUnanticipatedHostError;
 #endif
 }
@@ -5082,7 +5123,7 @@ static PaWasapiJackPortConnection _ConvertJackPortConnectionWASAPIToPA(int portC
 // Described at:
 // http://msdn.microsoft.com/en-us/library/dd371387(v=VS.85).aspx
 
-PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription)
+PaError PaWasapi_GetJackDescription(PaDeviceIndex device, int jackIndex, PaWasapiJackDescription *pJackDescription)
 {
 #ifndef PA_WINRT
 	PaError ret;
@@ -5099,46 +5140,46 @@ PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJ
 	if (paWasapi == NULL)
 		return paNotInitialized;
 
-	// Get device index.
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	// Get device index
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
     if (ret != paNoError)
         return ret;
 
-	// Validate index.
+	// Validate index
 	if ((UINT32)index >= paWasapi->deviceCount)
 		return paInvalidDevice;
 
-	// Get the endpoint device's IDeviceTopology interface.
+	// Get the endpoint device's IDeviceTopology interface
 	hr = IMMDevice_Activate(paWasapi->devInfo[index].device, &pa_IID_IDeviceTopology,
 		CLSCTX_INPROC_SERVER, NULL, (void**)&pDeviceTopology);
 	IF_FAILED_JUMP(hr, error);
 
-    // The device topology for an endpoint device always contains just one connector (connector number 0).
+    // The device topology for an endpoint device always contains just one connector (connector number 0)
 	hr = IDeviceTopology_GetConnector(pDeviceTopology, 0, &pConnFrom);
 	IF_FAILED_JUMP(hr, error);
 
-    // Step across the connection to the jack on the adapter.
+    // Step across the connection to the jack on the adapter
 	hr = IConnector_GetConnectedTo(pConnFrom, &pConnTo);
     if (HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND) == hr)
     {
-        // The adapter device is not currently active.
+        // The adapter device is not currently active
         hr = E_NOINTERFACE;
     }
 	IF_FAILED_JUMP(hr, error);
 
-	// Get the connector's IPart interface.
+	// Get the connector's IPart interface
 	hr = IConnector_QueryInterface(pConnTo, &pa_IID_IPart, (void**)&pPart);
 	IF_FAILED_JUMP(hr, error);
 
-	// Activate the connector's IKsJackDescription interface.
+	// Activate the connector's IKsJackDescription interface
 	hr = IPart_Activate(pPart, CLSCTX_INPROC_SERVER, &pa_IID_IKsJackDescription, (void**)&pJackDesc);
 	IF_FAILED_JUMP(hr, error);
 
-	// Test to return jack description struct for index 0.
-	hr = IKsJackDescription_GetJackDescription(pJackDesc, jindex, &jack);
+	// Test to return jack description struct for index 0
+	hr = IKsJackDescription_GetJackDescription(pJackDesc, jackIndex, &jack);
 	IF_FAILED_JUMP(hr, error);
 
-	// Convert WASAPI values to PA format.
+	// Convert WASAPI values to PA format
 	pJackDescription->channelMapping = jack.ChannelMapping;
 	pJackDescription->color          = jack.Color;
 	pJackDescription->connectionType = _ConvertJackConnectionTypeWASAPIToPA(jack.ConnectionType);
@@ -5147,7 +5188,7 @@ PaError PaWasapi_GetJackDescription(PaDeviceIndex nDevice, int jindex, PaWasapiJ
 	pJackDescription->isConnected    = jack.IsConnected;
 	pJackDescription->portConnection = _ConvertJackPortConnectionWASAPIToPA(jack.PortConnection);
 
-	// Ok.
+	// Ok
 	ret = paNoError;
 
 error:
@@ -5162,8 +5203,8 @@ error:
 	return ret;
 
 #else
-	(void)nDevice;
-	(void)jindex;
+	(void)device;
+	(void)jackIndex;
 	(void)pJackDescription;
 	return paUnanticipatedHostError;
 #endif
@@ -5188,11 +5229,12 @@ PaError PaWasapi_GetAudioClient(PaStream *pStream, void **pAudioClient, int bOut
 PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput )
 {
 #ifdef PA_WINRT
+	int i;
 
 	// Validate Id length
 	if (pId != NULL)
 	{
-		for (int i = 0; pId[i] != 0; ++i)
+		for (i = 0; pId[i] != 0; ++i)
 		{
 			if (i >= PA_WASAPI_DEVICE_ID_LEN)
 				return paBufferTooBig;
@@ -5205,7 +5247,7 @@ PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput )
 		memset(g_DefaultRenderId, 0, sizeof(g_DefaultRenderId));
 		if (pId != NULL)
 		{
-			for (int i = 0; (pId[i] != 0) && (i < STATIC_ARRAY_SIZE(g_DefaultRenderId)); ++i)
+			for (i = 0; (pId[i] != 0) && (i < STATIC_ARRAY_SIZE(g_DefaultRenderId)); ++i)
 				g_DefaultRenderId[i] = pId[i];
 		}
 	}
@@ -5214,7 +5256,7 @@ PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput )
 		memset(g_DefaultCaptureId, 0, sizeof(g_DefaultCaptureId));
 		if (pId != NULL)
 		{
-			for (int i = 0; (pId[i] != 0) && (i < STATIC_ARRAY_SIZE(g_DefaultCaptureId)); ++i)
+			for (i = 0; (pId[i] != 0) && (i < STATIC_ARRAY_SIZE(g_DefaultCaptureId)); ++i)
 				g_DefaultCaptureId[i] = pId[i];
 		}
 	}
@@ -5224,6 +5266,19 @@ PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput )
 #else
 	return paIncompatibleStreamHostApi;
 #endif
+}
+
+// ------------------------------------------------------------------------------------------
+PaError PaWasapi_SetStreamStateHandler( PaStream *pStream, PaWasapiStreamStateCallback fnStateHandler, void *pUserData )
+{
+	PaWasapiStream *stream = (PaWasapiStream *)pStream;
+	if (stream == NULL)
+		return paBadStreamPtr;
+
+	stream->fnStateHandler        = fnStateHandler;
+	stream->pStateHandlerUserData = pUserData;
+
+	return paNoError;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -5453,6 +5508,9 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	BOOL bWaitAllEvents = FALSE;
 	BOOL bThreadComInitialized = FALSE;
 
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadPrepare, ERROR_SUCCESS);
+
 	/*
 	If COM is already initialized CoInitialize will either return
 	FALSE, or RPC_E_CHANGED_MODE if it was initialized in a different
@@ -5565,6 +5623,9 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
 
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadStart, ERROR_SUCCESS);
+
 	// Processing Loop
 	for (;;)
     {
@@ -5632,6 +5693,9 @@ thread_end:
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
 
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadStop, hr);
+
 	return 0;
 
 thread_error:
@@ -5659,6 +5723,9 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	DWORD sleep_ms_out;
 
 	BOOL bThreadComInitialized = FALSE;
+
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadPrepare, ERROR_SUCCESS);
 
 	/*
 	If COM is already initialized CoInitialize will either return
@@ -5801,6 +5868,9 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 
 	// Notify: thread started
 	SetEvent(stream->hThreadStart);
+
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadStart, ERROR_SUCCESS);
 
 	if (!PA_WASAPI__IS_FULLDUPLEX(stream))
 	{
@@ -6156,6 +6226,9 @@ thread_end:
 
 	// Notify: thread exited
 	SetEvent(stream->hThreadExit);
+
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadStop, hr);
 
 	return 0;
 

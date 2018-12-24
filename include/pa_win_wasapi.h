@@ -3,9 +3,11 @@
 /*
  * $Id:  $
  * PortAudio Portable Real-Time Audio Library
- * DirectSound specific extensions
+ * WASAPI specific extensions
  *
- * Copyright (c) 1999-2007 Ross Bencina and Phil Burk
+ * Copyright (c) 1999-2018 Ross Bencina and Phil Burk
+ * Copyright (c) 2006-2010 David Viens
+ * Copyright (c) 2010-2018 Dmitry Kostjuchenko
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -28,13 +30,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -52,7 +54,7 @@ extern "C"
 #endif /* __cplusplus */
 
 
-/* Setup flags */
+/* Stream setup flags. */
 typedef enum PaWasapiFlags
 {
     /* put WASAPI into exclusive mode */
@@ -69,12 +71,12 @@ typedef enum PaWasapiFlags
              method can only provide 15-20ms latency. */
     paWinWasapiPolling                  = (1 << 3),
 
-    /* force custom thread priority setting, must be used if PaWasapiStreamInfo::threadPriority 
+    /* force custom thread priority setting, must be used if PaWasapiStreamInfo::threadPriority
        is set to a custom value */
     paWinWasapiThreadPriority           = (1 << 4),
 
-    /* force explicit sample format and do not allow PA to select suitable working format, API will 
-       fail if provided sample format is not supported by audio hardware in Exclusive mode 
+    /* force explicit sample format and do not allow PA to select suitable working format, API will
+       fail if provided sample format is not supported by audio hardware in Exclusive mode
        or system mixer in Shared mode */
     paWinWasapiExplicitSampleFormat     = (1 << 5)
 }
@@ -87,15 +89,62 @@ PaWasapiFlags;
 #define paWinWasapiExplicitSampleFormat  (paWinWasapiExplicitSampleFormat)
 
 
-/* Host processor. Allows to skip internal PA processing completely. 
-   You must set paWinWasapiRedirectHostProcessor flag to PaWasapiStreamInfo::flags member
-   in order to have host processor redirected to your callback.
-   Use with caution! inputFrames and outputFrames depend solely on final device setup.
-   To query maximal values of inputFrames/outputFrames use PaWasapi_GetFramesPerHostBuffer.
+/* Stream state.
+
+ @note Multiple states can be united into a bitmask.
+ @see  PaWasapiStreamStateCallback, PaWasapi_SetStreamStateHandler
 */
-typedef void (*PaWasapiHostProcessorCallback) (void *inputBuffer,  long inputFrames,
-                                               void *outputBuffer, long outputFrames,
-                                               void *userData);
+typedef enum PaWasapiStreamState
+{
+    /* state change was caused by the error:
+
+       Example:
+       1) If thread execution stopped due to AUDCLNT_E_RESOURCES_INVALIDATED then state
+          value will contain paWasapiStreamStateError|paWasapiStreamStateThreadStop.
+    */
+    paWasapiStreamStateError         = (1 << 0),
+
+    /* processing thread is preparing to start execution */
+    paWasapiStreamStateThreadPrepare = (1 << 1),
+
+    /* processing thread started execution (enters its loop) */
+    paWasapiStreamStateThreadStart   = (1 << 2),
+
+    /* processing thread stopped execution */
+    paWasapiStreamStateThreadStop    = (1 << 3)
+}
+PaWasapiStreamState;
+#define paWasapiStreamStateError         (paWasapiStreamStateError)
+#define paWasapiStreamStateThreadPrepare (paWasapiStreamStateThreadPrepare)
+#define paWasapiStreamStateThreadStart   (paWasapiStreamStateThreadStart)
+#define paWasapiStreamStateThreadStop    (paWasapiStreamStateThreadStop)
+
+
+/* Host processor.
+
+   Allows to skip internal PA processing completely. paWinWasapiRedirectHostProcessor flag
+   must be set to the PaWasapiStreamInfo::flags member in order to have host processor
+   redirected to this callback.
+
+   Use with caution! inputFrames and outputFrames depend solely on final device setup.
+   To query max values of inputFrames/outputFrames use PaWasapi_GetFramesPerHostBuffer.
+*/
+typedef void (*PaWasapiHostProcessorCallback) (void *inputBuffer, long inputFrames,
+    void *outputBuffer, long outputFrames, void *userData);
+
+
+/* Stream state handler.
+
+ @param pStream    Pointer to PaStream object.
+ @param stateFlags State flags, a collection of values from PaWasapiStreamState enum.
+ @param errorId    Error id provided by system API (HRESULT).
+ @param userData   Pointer to user data.
+
+ @see   PaWasapiStreamState
+*/
+typedef void (*PaWasapiStreamStateCallback) (PaStream *pStream, unsigned int stateFlags,
+    unsigned int errorId, void *pUserData);
+
 
 /* Device role. */
 typedef enum PaWasapiDeviceRole
@@ -130,7 +179,7 @@ typedef enum PaWasapiJackConnectionType
     eJackConnTypeXlrProfessional,
     eJackConnTypeRJ11Modem,
     eJackConnTypeCombination
-} 
+}
 PaWasapiJackConnectionType;
 
 
@@ -153,7 +202,7 @@ typedef enum PaWasapiJackGeoLocation
     eJackGeoLocATAPI,
     eJackGeoLocReserved5,
     eJackGeoLocReserved6,
-} 
+}
 PaWasapiJackGeoLocation;
 
 
@@ -164,7 +213,7 @@ typedef enum PaWasapiJackGenLocation
     eJackGenLocInternal,
     eJackGenLocSeparate,
     eJackGenLocOther
-} 
+}
 PaWasapiJackGenLocation;
 
 
@@ -175,7 +224,7 @@ typedef enum PaWasapiJackPortConnection
     eJackPortConnIntegratedDevice,
     eJackPortConnBothIntegratedAndJack,
     eJackPortConnUnknown
-} 
+}
 PaWasapiJackPortConnection;
 
 
@@ -195,7 +244,7 @@ PaWasapiThreadPriority;
 
 
 /* Stream descriptor. */
-typedef struct PaWasapiJackDescription 
+typedef struct PaWasapiJackDescription
 {
     unsigned long              channelMapping;
     unsigned long              color; /* derived from macro: #define RGB(r,g,b) ((COLORREF)(((BYTE)(r)|((WORD)((BYTE)(g))<<8))|(((DWORD)(BYTE)(b))<<16))) */
@@ -249,7 +298,7 @@ PaWasapiStreamOption;
 
 
 /* Stream descriptor. */
-typedef struct PaWasapiStreamInfo 
+typedef struct PaWasapiStreamInfo
 {
     unsigned long size;             /**< sizeof(PaWasapiStreamInfo) */
     PaHostApiTypeId hostApiType;    /**< paWASAPI */
@@ -258,16 +307,16 @@ typedef struct PaWasapiStreamInfo
     unsigned long flags;            /**< collection of PaWasapiFlags */
 
     /** Support for WAVEFORMATEXTENSIBLE channel masks. If flags contains
-       paWinWasapiUseChannelMask this allows you to specify which speakers 
+       paWinWasapiUseChannelMask this allows you to specify which speakers
        to address in a multichannel stream. Constants for channelMask
-       are specified in pa_win_waveformat.h. Will be used only if 
+       are specified in pa_win_waveformat.h. Will be used only if
        paWinWasapiUseChannelMask flag is specified.
     */
     PaWinWaveFormatChannelMask channelMask;
 
     /** Delivers raw data to callback obtained from GetBuffer() methods skipping
-       internal PortAudio processing inventory completely. userData parameter will 
-       be the same that was passed to Pa_OpenStream method. Will be used only if 
+       internal PortAudio processing inventory completely. userData parameter will
+       be the same that was passed to Pa_OpenStream method. Will be used only if
        paWinWasapiRedirectHostProcessor flag is specified.
     */
     PaWasapiHostProcessorCallback hostProcessorOutput;
@@ -293,13 +342,13 @@ typedef struct PaWasapiStreamInfo
      @version Available as of 19.6.0
     */
     PaWasapiStreamOption streamOption;
-} 
+}
 PaWasapiStreamInfo;
 
 
 /** Returns pointer to WASAPI's IAudioClient object of the stream.
 
- @param pStream      Pointer to PaStream.
+ @param pStream      Pointer to PaStream object.
  @param pAudioClient Pointer to pointer of IAudioClient.
  @param bOutput      TRUE (1) for output stream, FALSE (0) for input stream.
 
@@ -308,10 +357,11 @@ PaWasapiStreamInfo;
 PaError PaWasapi_GetAudioClient( PaStream *pStream, void **pAudioClient, int bOutput );
 
 
-/** Update device list. 
-    This function is available if PA_WASAPI_MAX_CONST_DEVICE_COUNT is defined during compile time 
-    with maximum constant WASAPI device count (recommended value - 32). 
-    If PA_WASAPI_MAX_CONST_DEVICE_COUNT is set to 0 (or not defined) during compile time the implementation 
+/** Update device list.
+
+    This function is available if PA_WASAPI_MAX_CONST_DEVICE_COUNT is defined during compile time
+    with maximum constant WASAPI device count (recommended value - 32).
+    If PA_WASAPI_MAX_CONST_DEVICE_COUNT is set to 0 (or not defined) during compile time the implementation
     will not define PaWasapi_UpdateDeviceList() and thus updating device list can only be possible by calling
     Pa_Terminate() and then Pa_Initialize().
 
@@ -320,115 +370,128 @@ PaError PaWasapi_GetAudioClient( PaStream *pStream, void **pAudioClient, int bOu
 PaError PaWasapi_UpdateDeviceList();
 
 
-/** Returns current audio format of the device assigned to the opened stream. Format is represented by 
-    PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure. Use this function to reconfirm format if 
-    PA's processor is overriden and paWinWasapiRedirectHostProcessor flag is specified.
+/** Get current audio format of the device assigned to the opened stream.
 
- @param pStream     Pointer to PaStream.
- @param pFormat     Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
- @param nFormatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
- @param bOutput     TRUE (1) for output stream, FALSE (0) for input stream.
+    Format is represented by PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
+    Use this function to reconfirm format if PA's processor is overriden and
+    paWinWasapiRedirectHostProcessor flag is specified.
 
- @return Non-negative value indicating the number of bytes copied into format decriptor
-         or, a PaErrorCode (which are always negative) if PortAudio is not initialized
-         or an error is encountered.
-*/
-int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned int nFormatSize, int bOutput );
-
-
-/** Returns default audio format for device in Shared Mode. Format is represented by
-    PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure and obtained by getting
-    the device property with a PKEY_AudioEngine_DeviceFormat key.
-
- @param  pFormat     Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
- @param  nFormatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
- @param  nDevice     Device index.
+ @param pStream    Pointer to PaStream object.
+ @param pFormat    Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
+ @param formatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
+ @param bOutput    TRUE (1) for output stream, FALSE (0) for input stream.
 
  @return Non-negative value indicating the number of bytes copied into format decriptor
-         or, a PaErrorCode (which are always negative) if PortAudio is not initialized
+         or, a PaErrorCode (which is always negative) if PortAudio is not initialized
          or an error is encountered.
 */
-int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice );
+int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned int formatSize, int bOutput );
 
 
-/** Returns mix audio format for device in Shared Mode. Format is represented by
-    PaWinWaveFormat or WAVEFORMATEXTENSIBLE structureand obtained by
+/** Get default audio format for the device in Shared Mode.
+
+    Format is represented by PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure and obtained
+    by getting the device property with a PKEY_AudioEngine_DeviceFormat key.
+
+ @param  pFormat    Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
+ @param  formatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
+ @param  device     Device index.
+
+ @return Non-negative value indicating the number of bytes copied into format decriptor
+         or, a PaErrorCode (which is always negative) if PortAudio is not initialized
+         or an error is encountered.
+*/
+int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device );
+
+
+/** Get mix audio format for the device in Shared Mode.
+
+    Format is represented by PaWinWaveFormat or WAVEFORMATEXTENSIBLE structureand obtained by
     IAudioClient::GetMixFormat.
 
- @param  pFormat     Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
- @param  nFormatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
- @param  nDevice     Device index.
+ @param  pFormat    Pointer to PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
+ @param  formatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
+ @param  device     Device index.
 
  @return Non-negative value indicating the number of bytes copied into format decriptor
-         or, a PaErrorCode (which are always negative) if PortAudio is not initialized
+         or, a PaErrorCode (which is always negative) if PortAudio is not initialized
          or an error is encountered.
 */
-int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int nFormatSize, PaDeviceIndex nDevice );
+int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device );
 
 
-/** Returns device role (PaWasapiDeviceRole enum).
+/** Get device role (PaWasapiDeviceRole enum).
 
- @param  nDevice Device index.
+ @param  device Device index.
 
- @return Non-negative value indicating device role or, a PaErrorCode (which are always negative)
+ @return Non-negative value indicating device role or, a PaErrorCode (which is always negative)
          if PortAudio is not initialized or an error is encountered.
 */
-int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex nDevice );
+int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
 
 
-/** Boost thread priority of calling thread (MMCSS). Use it for Blocking Interface only for thread
-    which makes calls to Pa_WriteStream/Pa_ReadStream.
+/** Boost thread priority of calling thread (MMCSS).
 
- @param  hTask Handle to pointer to priority task. Must be used with PaWasapi_RevertThreadPriority
-               method to revert thread priority to initial state.
+    Use it for Blocking Interface only inside the thread which makes calls to Pa_WriteStream/Pa_ReadStream.
 
- @param  nPriorityClass Id of thread priority of PaWasapiThreadPriority type. Specifying 
+ @param  pTask          Handle to pointer to priority task. Must be used with PaWasapi_RevertThreadPriority
+                        method to revert thread priority to initial state.
+
+ @param  priorityClass  Id of thread priority of PaWasapiThreadPriority type. Specifying
                         eThreadPriorityNone does nothing.
 
  @return Error code indicating success or failure.
  @see    PaWasapi_RevertThreadPriority
 */
-PaError PaWasapi_ThreadPriorityBoost( void **hTask, PaWasapiThreadPriority nPriorityClass );
+PaError PaWasapi_ThreadPriorityBoost( void **pTask, PaWasapiThreadPriority priorityClass );
 
 
-/** Boost thread priority of calling thread (MMCSS). Use it for Blocking Interface only for thread
-    which makes calls to Pa_WriteStream/Pa_ReadStream.
+/** Boost thread priority of calling thread (MMCSS).
 
- @param  hTask Task handle obtained by PaWasapi_BoostThreadPriority method.
+    Use it for Blocking Interface only inside the thread which makes calls to Pa_WriteStream/Pa_ReadStream.
+
+ @param  pTask Task handle obtained by PaWasapi_BoostThreadPriority method.
+
  @return Error code indicating success or failure.
  @see    PaWasapi_BoostThreadPriority
 */
-PaError PaWasapi_ThreadPriorityRevert( void *hTask );
+PaError PaWasapi_ThreadPriorityRevert( void *pTask );
 
 
-/** Get number of frames per host buffer. This is maximal value of frames of WASAPI buffer which 
-    can be locked for operations. Use this method as helper to findout maximal values of 
-    inputFrames/outputFrames of PaWasapiHostProcessorCallback.
+/** Get number of frames per host buffer.
 
- @param  pStream Pointer to PaStream to query.
- @param  nInput  Pointer to variable to receive number of input frames. Can be NULL.
- @param  nOutput Pointer to variable to receive number of output frames. Can be NULL.
+    It is max value of frames of WASAPI buffer which can be locked for operations.
+    Use this method as helper to findout max values of inputFrames/outputFrames
+    of PaWasapiHostProcessorCallback.
+
+ @param  pStream Pointer to PaStream object.
+ @param  pInput  Pointer to variable to receive number of input frames. Can be NULL.
+ @param  pOutput Pointer to variable to receive number of output frames. Can be NULL.
+
  @return Error code indicating success or failure.
  @see    PaWasapiHostProcessorCallback
 */
-PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *nInput, unsigned int *nOutput );
+PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *pInput, unsigned int *pOutput );
 
 
-/** Get number of jacks associated with a WASAPI device.  Use this method to determine if
-    there are any jacks associated with the provided WASAPI device.  Not all audio devices
-    will support this capability.  This is valid for both input and output devices.
+/** Get number of jacks associated with a WASAPI device.
+
+    Use this method to determine if there are any jacks associated with the provided WASAPI device.
+    Not all audio devices will support this capability. This is valid for both input and output devices.
 
  @note   Not available on UWP platform.
 
- @param  nDevice  device index.
- @param  jcount   Number of jacks is returned in this variable
- @return Error code indicating success or failure
+ @param  device     Device index.
+ @param  pJackCount Pointer to variable to receive number of jacks.
+
+ @return Error code indicating success or failure.
  @see    PaWasapi_GetJackDescription
  */
-PaError PaWasapi_GetJackCount( PaDeviceIndex nDevice, int *jcount );
+PaError PaWasapi_GetJackCount( PaDeviceIndex device, int *pJackCount );
 
 
-/** Get the jack description associated with a WASAPI device and jack number
+/** Get the jack description associated with a WASAPI device and jack number.
+
     Before this function is called, use PaWasapi_GetJackCount to determine the
     number of jacks associated with device.  If jcount is greater than zero, then
     each jack from 0 to jcount can be queried with this function to get the jack
@@ -436,19 +499,21 @@ PaError PaWasapi_GetJackCount( PaDeviceIndex nDevice, int *jcount );
 
  @note   Not available on UWP platform.
 
- @param  nDevice device index.
- @param  jindex  Which jack to return information
+ @param  device           Device index.
+ @param  jackIndex        Jack index.
  @param  pJackDescription Pointer to PaWasapiJackDescription.
- @return Error code indicating success or failure
+
+ @return Error code indicating success or failure.
  @see PaWasapi_GetJackCount
  */
-PaError PaWasapi_GetJackDescription( PaDeviceIndex nDevice, int jindex, PaWasapiJackDescription *pJackDescription );
+PaError PaWasapi_GetJackDescription( PaDeviceIndex device, int jackIndex, PaWasapiJackDescription *pJackDescription );
 
 
 /** Set default interface Id.
-    By default PA implementation will use DEVINTERFACE_AUDIO_RENDER and 
-    DEVINTERFACE_AUDIO_CAPTURE if device Id is not provided explicitly. These default Ids 
-    will not allow to use Exclusive mode on UWP platform and thus you must provide 
+
+    By default PA implementation will use DEVINTERFACE_AUDIO_RENDER and
+    DEVINTERFACE_AUDIO_CAPTURE if device Id is not provided explicitly. These default Ids
+    will not allow to use Exclusive mode on UWP platform and thus you must provide
     device Id explicitly via this API before calling Pa_OpenStream().
     Device Ids on UWP platform are obtainable via
     Windows::Media::Devices::MediaDevice::GetDefaultAudioRenderId() or
@@ -459,18 +524,30 @@ PaError PaWasapi_GetJackDescription( PaDeviceIndex nDevice, int jindex, PaWasapi
  @param  pId     Interface Id, pointer to the 16-bit Unicode string (WCHAR). If NULL then device Id
                  will be reset to the default, e.g. DEVINTERFACE_AUDIO_RENDER or DEVINTERFACE_AUDIO_CAPTURE.
  @param  bOutput TRUE (1) for output (render), FALSE (0) for input (capture).
+
  @return Error code indicating success or failure. Will return paIncompatibleStreamHostApi if PA is not compiled
          for UWP platform. If Id is longer than 4096 characters paBufferTooBig will be returned.
 */
 PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput );
 
 
+/** Set stream state handler.
+
+ @param  pStream        Pointer to PaStream object.
+ @param  fnStateHandler Pointer to state handling function.
+ @param  pUserData      Pointer to user data.
+
+ @return Error code indicating success or failure.
+*/
+PaError PaWasapi_SetStreamStateHandler( PaStream *pStream, PaWasapiStreamStateCallback fnStateHandler, void *pUserData );
+
+
 /*
     IMPORTANT:
 
     WASAPI is implemented for Callback and Blocking interfaces. It supports Shared and Exclusive
-    share modes. 
-    
+    share modes.
+
     Exclusive Mode:
 
         Exclusive mode allows to deliver audio data directly to hardware bypassing
@@ -479,20 +556,20 @@ PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput );
 
     Callback Interface:
 
-        Provides best audio quality with low latency. Callback interface is implemented in 
+        Provides best audio quality with low latency. Callback interface is implemented in
         two versions:
 
         1) Event-Driven:
         This is the most powerful WASAPI implementation which provides glitch-free
-        audio at around 3ms latency in Exclusive mode. Lowest possible latency for this mode is 
-        3 ms for HD Audio class audio chips. For the Shared mode latency can not be 
+        audio at around 3ms latency in Exclusive mode. Lowest possible latency for this mode is
+        3 ms for HD Audio class audio chips. For the Shared mode latency can not be
         lower than 20 ms.
 
         2) Poll-Driven:
         Polling is another 2-nd method to operate with WASAPI. It is less efficient than Event-Driven
         and provides latency at around 10-13ms. Polling must be used to overcome a system bug
-        under Windows Vista x64 when application is WOW64(32-bit) and Event-Driven method simply 
-        times out (event handle is never signalled on buffer completion). Please note, such WOW64 bug 
+        under Windows Vista x64 when application is WOW64(32-bit) and Event-Driven method simply
+        times out (event handle is never signalled on buffer completion). Please note, such WOW64 bug
         does not exist in Vista x86 or Windows 7.
         Polling can be setup by speciying 'paWinWasapiPolling' flag. Our WASAPI implementation detects
         WOW64 bug and sets 'paWinWasapiPolling' automatically.
@@ -501,44 +578,51 @@ PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput );
 
         Normally thread priority is set automatically and does not require modification. Although
         if user wants some tweaking thread priority can be modified by setting 'paWinWasapiThreadPriority'
-        flag and specifying 'PaWasapiStreamInfo::threadPriority' with value from PaWasapiThreadPriority 
+        flag and specifying 'PaWasapiStreamInfo::threadPriority' with value from PaWasapiThreadPriority
         enum.
 
     Blocking Interface:
 
         Blocking interface is implemented but due to above described Poll-Driven method can not
-        deliver lowest possible latency. Specifying too low latency in Shared mode will result in 
+        deliver lowest possible latency. Specifying too low latency in Shared mode will result in
         distorted audio although Exclusive mode adds stability.
 
     8.24 format:
 
-        If paCustomFormat is specified as sample format then the implementation will understand it 
+        If paCustomFormat is specified as sample format then the implementation will understand it
         as valid 24-bits inside 32-bit container (e.g. wBitsPerSample = 32, Samples.wValidBitsPerSample = 24).
-        
-        By using paCustomFormat there will be small optimization when samples are be copied 
-        with Copy_24_To_24 by PA processor instead of conversion from packed 3-byte (24-bit) data 
+
+        By using paCustomFormat there will be small optimization when samples are be copied
+        with Copy_24_To_24 by PA processor instead of conversion from packed 3-byte (24-bit) data
         with Int24_To_Int32.
 
     Pa_IsFormatSupported:
 
-        To check format with correct Share Mode (Exclusive/Shared) you must supply PaWasapiStreamInfo 
-        with flags paWinWasapiExclusive set through member of PaStreamParameters::hostApiSpecificStreamInfo 
-        structure. 
-        
-        If paWinWasapiExplicitSampleFormat flag is provided then implementation will not try to select 
-        suitable close format and will return an error instead of paFormatIsSupported. By specifying 
-        paWinWasapiExplicitSampleFormat flag it is possible to find out what sample formats are 
+        To check format with correct Share Mode (Exclusive/Shared) you must supply PaWasapiStreamInfo
+        with flags paWinWasapiExclusive set through member of PaStreamParameters::hostApiSpecificStreamInfo
+        structure.
+
+        If paWinWasapiExplicitSampleFormat flag is provided then implementation will not try to select
+        suitable close format and will return an error instead of paFormatIsSupported. By specifying
+        paWinWasapiExplicitSampleFormat flag it is possible to find out what sample formats are
         supported by Exclusive or Shared modes.
 
     Pa_OpenStream:
 
         To set desired Share Mode (Exclusive/Shared) you must supply
-        PaWasapiStreamInfo with flags paWinWasapiExclusive set through member of 
+        PaWasapiStreamInfo with flags paWinWasapiExclusive set through member of
         PaStreamParameters::hostApiSpecificStreamInfo structure.
+
+    Coding style for parameters and structure members of the public API:
+
+        1) bXXX - boolean, [1 (TRUE), 0 (FALSE)]
+        2) pXXX - pointer
+        3) fnXXX - pointer to function
+        4) structure members are never prefixed with a type distinguisher
 */
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif /* PA_WIN_WASAPI_H */                                  
+#endif /* PA_WIN_WASAPI_H */
