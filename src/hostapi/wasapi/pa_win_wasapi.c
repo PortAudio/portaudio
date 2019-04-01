@@ -293,6 +293,13 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
 	#define AUDCLNT_E_INVALID_DEVICE_PERIOD AUDCLNT_ERR(0x020)
 #endif
 
+#ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
+	#define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
+#endif
+#ifndef AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+	#define AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 0x80000000
+#endif
+
 #define MAX_STR_LEN 512
 
 #ifdef PA_WINRT
@@ -2667,6 +2674,10 @@ static PaError GetClosestFormat(IAudioClient *client, double sampleRate, const P
 
 	// Try standard approach, e.g. if data is > 16 bits it will be packed into 32-bit containers
     MakeWaveFormatFromParams(outWavex, &params, sampleRate, FALSE);
+	if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) && (shareMode == AUDCLNT_SHAREMODE_SHARED) && _params->hostApiSpecificStreamInfo && (((PaWasapiStreamInfo *)_params->hostApiSpecificStreamInfo)->flags & paWinWasapiAutoConvert))
+	{
+		return paFormatIsSupported;
+	}
 	hr = IAudioClient_IsFormatSupported(client, shareMode, &outWavex->Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
 	
 	// Exclusive mode can require packed format for some devices
@@ -3586,6 +3597,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		if (fullDuplex)
 			stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
+		if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) && (stream->in.shareMode == AUDCLNT_SHAREMODE_SHARED) && (inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiAutoConvert))
+			stream->in.streamFlags |= AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+
 		// Fill parameters for Audio Client creation
 		stream->in.params.device_info       = info;
 		stream->in.params.stream_params     = (*inputParameters);
@@ -3713,6 +3727,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		else
 		if (fullDuplex)
 			stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
+
+		if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) && (stream->out.shareMode == AUDCLNT_SHAREMODE_SHARED) && (outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiAutoConvert))
+			stream->out.streamFlags |= AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 
 		// Fill parameters for Audio Client creation
 		stream->out.params.device_info       = info;
