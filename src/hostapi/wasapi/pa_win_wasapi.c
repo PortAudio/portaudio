@@ -287,7 +287,7 @@ typedef struct _pa_AudioClientProperties {
 PA_THREAD_FUNC ProcThreadEvent(void *param);
 PA_THREAD_FUNC ProcThreadPoll(void *param);
 
-// Availabe from Windows 7
+// Error codes (availabe since Windows 7)
 #ifndef AUDCLNT_E_BUFFER_ERROR
 	#define AUDCLNT_E_BUFFER_ERROR AUDCLNT_ERR(0x018)
 #endif
@@ -296,6 +296,14 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
 #endif
 #ifndef AUDCLNT_E_INVALID_DEVICE_PERIOD
 	#define AUDCLNT_E_INVALID_DEVICE_PERIOD AUDCLNT_ERR(0x020)
+#endif
+
+// Stream flags (availabe since Windows 7)
+#ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
+	#define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
+#endif
+#ifndef AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+	#define AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 0x80000000
 #endif
 
 #define MAX_STR_LEN 512
@@ -2672,6 +2680,13 @@ static PaError GetClosestFormat(IAudioClient *client, double sampleRate, const P
 
 	// Try standard approach, e.g. if data is > 16 bits it will be packed into 32-bit containers
     MakeWaveFormatFromParams(outWavex, &params, sampleRate, FALSE);
+	
+	// If built-in PCM converter requested then shared mode format will always succeed
+	if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) && 
+		(shareMode == AUDCLNT_SHAREMODE_SHARED) && 
+		((streamInfo != NULL) && (streamInfo->flags & paWinWasapiAutoConvert)))
+		return paFormatIsSupported;
+
 	hr = IAudioClient_IsFormatSupported(client, shareMode, &outWavex->Format, (shareMode == AUDCLNT_SHAREMODE_SHARED ? &sharedClosestMatch : NULL));
 	
 	// Exclusive mode can require packed format for some devices
@@ -3591,6 +3606,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		if (fullDuplex)
 			stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
+		// Use built-in PCM converter (channel count and sample rate) if requested
+		if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) && 
+			(stream->in.shareMode == AUDCLNT_SHAREMODE_SHARED) && 
+			((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiAutoConvert)))
+			stream->in.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
+
 		// Fill parameters for Audio Client creation
 		stream->in.params.device_info       = info;
 		stream->in.params.stream_params     = (*inputParameters);
@@ -3718,6 +3739,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		else
 		if (fullDuplex)
 			stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
+
+		// Use built-in PCM converter (channel count and sample rate) if requested
+		if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) && 
+			(stream->out.shareMode == AUDCLNT_SHAREMODE_SHARED) && 
+			((outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiAutoConvert)))
+			stream->out.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
 
 		// Fill parameters for Audio Client creation
 		stream->out.params.device_info       = info;
