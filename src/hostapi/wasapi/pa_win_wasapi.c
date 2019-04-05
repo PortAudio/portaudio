@@ -1576,13 +1576,54 @@ error:
 #endif
 
 // ------------------------------------------------------------------------------------------
-static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, IAudioClient **client)
+static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, const PaWasapiStreamInfo *streamInfo, 
+	IAudioClient **client)
 {
+	HRESULT hr;
+
 #ifndef PA_WINRT
-	return IMMDevice_Activate(deviceInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)client);
+	if (FAILED(hr = IMMDevice_Activate(deviceInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)client)))
+		return hr;
 #else
-	return ActivateAudioInterface_WINRT(deviceInfo->flow, GetAudioClientIID(), (void **)client);
+	if (FAILED(hr = ActivateAudioInterface_WINRT(deviceInfo->flow, GetAudioClientIID(), (void **)client)))
+		return hr;
 #endif
+
+	// Set audio client options (applicable only to IAudioClient2+): options may affect the audio format
+	// support by IAudioClient implementation and therefore we should set them before GetClosestFormat()
+	// in order to correctly match the requested format
+#ifdef __IAudioClient2_INTERFACE_DEFINED__
+	if ((streamInfo != NULL) && (GetAudioClientVersion() >= 2))
+	{
+		pa_AudioClientProperties audioProps = { 0 };
+		audioProps.cbSize     = sizeof(pa_AudioClientProperties);
+		audioProps.bIsOffload = FALSE;
+		audioProps.eCategory  = (AUDIO_STREAM_CATEGORY)streamInfo->streamCategory;
+		switch (streamInfo->streamOption)
+		{
+		case eStreamOptionRaw:
+			if (GetWindowsVersion() >= WINDOWS_8_1_SERVER2012R2)
+				audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_RAW;
+			break;
+		case eStreamOptionMatchFormat:
+			if (GetWindowsVersion() >= WINDOWS_10_SERVER2016)
+				audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_MATCH_FORMAT;
+			break;
+		}
+
+		if (FAILED(hr = IAudioClient2_SetClientProperties((IAudioClient2 *)(*client), (AudioClientProperties *)&audioProps)))
+		{
+			PRINT(("WASAPI: IAudioClient2_SetClientProperties(IsOffload = %d, Category = %d, Options = %d) failed\n", audioProps.bIsOffload, audioProps.eCategory, audioProps.Options));
+			LogHostError(hr);
+		}
+		else
+		{
+			PRINT(("WASAPI: IAudioClient2 set properties: IsOffload = %d, Category = %d, Options = %d\n", audioProps.bIsOffload, audioProps.eCategory, audioProps.Options));
+		}
+	}
+#endif
+
+	return S_OK;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -1878,7 +1919,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 			#endif
 
 				// Create temp Audio Client instance to query additional details
-                hr = ActivateAudioInterface(&paWasapi->devInfo[i], &tmpClient);
+                hr = ActivateAudioInterface(&paWasapi->devInfo[i], NULL, &tmpClient);
 				// We need to set the result to a value otherwise we will return paNoError
 				// [IF_FAILED_JUMP(hResult, error);]
 				IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
@@ -2806,9 +2847,9 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 		inputStreamInfo = (PaWasapiStreamInfo *)inputParameters->hostApiSpecificStreamInfo;
 
 		if (inputStreamInfo && (inputStreamInfo->flags & paWinWasapiExclusive))
-			shareMode  = AUDCLNT_SHAREMODE_EXCLUSIVE;
+			shareMode = AUDCLNT_SHAREMODE_EXCLUSIVE;
 
-		hr = ActivateAudioInterface(&paWasapi->devInfo[inputParameters->device], &tmpClient);
+		hr = ActivateAudioInterface(&paWasapi->devInfo[inputParameters->device], inputStreamInfo, &tmpClient);
 		if (hr != S_OK)
 		{
 			LogHostError(hr);
@@ -2831,9 +2872,9 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         outputStreamInfo = (PaWasapiStreamInfo *)outputParameters->hostApiSpecificStreamInfo;
 
 		if (outputStreamInfo && (outputStreamInfo->flags & paWinWasapiExclusive))
-			shareMode  = AUDCLNT_SHAREMODE_EXCLUSIVE;
+			shareMode = AUDCLNT_SHAREMODE_EXCLUSIVE;
 
-		hr = ActivateAudioInterface(&paWasapi->devInfo[outputParameters->device], &tmpClient);
+		hr = ActivateAudioInterface(&paWasapi->devInfo[outputParameters->device], outputStreamInfo, &tmpClient);
 		if (hr != S_OK)
 		{
 			LogHostError(hr);
@@ -2977,7 +3018,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 	}
 
     // Get the audio client
-	if (FAILED(hr = ActivateAudioInterface(pInfo, &audioClient)))
+	if (FAILED(hr = ActivateAudioInterface(pInfo, &pSub->params.wasapi_params, &audioClient)))
 	{
 		(*pa_error) = paInsufficientMemory;
 		LogHostError(hr);
@@ -3127,38 +3168,6 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 		}
 	}
 
-	// Set Raw mode (applicable only to IAudioClient2)
-#ifdef __IAudioClient2_INTERFACE_DEFINED__
-	if (GetAudioClientVersion() >= 2)
-	{
-		pa_AudioClientProperties audioProps = { 0 };
-		audioProps.cbSize     = sizeof(pa_AudioClientProperties);
-		audioProps.bIsOffload = FALSE;
-		audioProps.eCategory  = (AUDIO_STREAM_CATEGORY)pSub->params.wasapi_params.streamCategory;
-		switch (pSub->params.wasapi_params.streamOption)
-		{
-		case eStreamOptionRaw:
-			if (GetWindowsVersion() >= WINDOWS_8_1_SERVER2012R2)
-				audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_RAW;
-			break;
-		case eStreamOptionMatchFormat:
-			if (GetWindowsVersion() >= WINDOWS_10_SERVER2016)
-				audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_MATCH_FORMAT;
-			break;
-		}
-
-		if (FAILED(hr = IAudioClient2_SetClientProperties((IAudioClient2 *)audioClient, (AudioClientProperties *)&audioProps)))
-		{
-			PRINT(("WASAPI: IAudioClient2_SetClientProperties(IsOffload = %d, Category = %d, Options = %d) failed\n", audioProps.bIsOffload, audioProps.eCategory, audioProps.Options));
-			LogHostError(hr);
-		}
-		else
-		{
-			PRINT(("WASAPI: IAudioClient2 set properties: IsOffload = %d, Category = %d, Options = %d\n", audioProps.bIsOffload, audioProps.eCategory, audioProps.Options));
-		}
-	}
-#endif
-
 	// Set device scheduling period (always 0 in Shared mode according Microsoft docs)
 	_CalculatePeriodicity(pSub, output, &eventPeriodicity);
 	
@@ -3206,7 +3215,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 			SAFE_RELEASE(audioClient);
 
 			// Create a new audio client
-    		if (FAILED(hr = ActivateAudioInterface(pInfo, &audioClient)))
+    		if (FAILED(hr = ActivateAudioInterface(pInfo, &pSub->params.wasapi_params, &audioClient)))
 			{
 				(*pa_error) = paInsufficientMemory;
 				LogHostError(hr);
@@ -3246,7 +3255,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-    	if (FAILED(hr = ActivateAudioInterface(pInfo, &audioClient)))
+    	if (FAILED(hr = ActivateAudioInterface(pInfo, &pSub->params.wasapi_params, &audioClient)))
 		{
 			(*pa_error) = paInsufficientMemory;
 			LogHostError(hr);
@@ -3279,7 +3288,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         SAFE_RELEASE(audioClient);
 
         // Create a new audio client
-    	if (FAILED(hr = ActivateAudioInterface(pInfo, &audioClient)))
+    	if (FAILED(hr = ActivateAudioInterface(pInfo, &pSub->params.wasapi_params, &audioClient)))
 		{
 			(*pa_error) = paInsufficientMemory;
 			LogHostError(hr);
