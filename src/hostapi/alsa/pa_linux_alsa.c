@@ -827,13 +827,13 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     PaAlsa_CloseLibrary();
 }
 
-/** Determine max channels and default latencies.
+/** Determine max channels, default latencies, default sample rate.
  *
- * This function provides functionality to grope an opened (might be opened for capture or playback) pcm device for
+ * This function provides functionality to query an opened (might be opened for capture or playback) pcm device for
  * traits like max channels, suitable default latencies and default sample rate. Upon error, max channels is set to zero,
  * and a suitable result returned. The device is closed before returning.
  */
-static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, int openBlocking,
+static PaError DetermineDeviceInfos( snd_pcm_t* pcm, int isPlug, StreamDirection mode, int openBlocking,
         PaAlsaDeviceInfo* devInfo )
 {
     PaError result = paNoError;
@@ -1167,10 +1167,10 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
     if( deviceHwInfo->hasCapture &&
         OpenPcm( &pcm, deviceHwInfo->alsaName, SND_PCM_STREAM_CAPTURE, blocking, 0 ) >= 0 )
     {
-        if( GropeDevice( pcm, deviceHwInfo->isPlug, StreamDirection_In, blocking, devInfo ) != paNoError )
+        if( DetermineDeviceInfos( pcm, deviceHwInfo->isPlug, StreamDirection_In, blocking, devInfo ) != paNoError )
         {
             /* Error */
-            PA_DEBUG(( "%s: Failed groping %s for capture\n", __FUNCTION__, deviceHwInfo->alsaName ));
+            PA_DEBUG(( "%s: Failed querying %s for capture device info\n", __FUNCTION__, deviceHwInfo->alsaName ));
             goto end;
         }
     }
@@ -1179,10 +1179,10 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
     if( deviceHwInfo->hasPlayback &&
         OpenPcm( &pcm, deviceHwInfo->alsaName, SND_PCM_STREAM_PLAYBACK, blocking, 0 ) >= 0 )
     {
-        if( GropeDevice( pcm, deviceHwInfo->isPlug, StreamDirection_Out, blocking, devInfo ) != paNoError )
+        if( DetermineDeviceInfos( pcm, deviceHwInfo->isPlug, StreamDirection_Out, blocking, devInfo ) != paNoError )
         {
             /* Error */
-            PA_DEBUG(( "%s: Failed groping %s for playback\n", __FUNCTION__, deviceHwInfo->alsaName ));
+            PA_DEBUG(( "%s: Failed querying %s for playback device info\n", __FUNCTION__, deviceHwInfo->alsaName ));
             goto end;
         }
     }
