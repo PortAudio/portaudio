@@ -323,8 +323,10 @@ int _PA_LOCAL_IMPL(snd_pcm_hw_params_get_buffer_size_max) (const snd_pcm_hw_para
     snd_pcm_uframes_t pmax = 0;
     unsigned int      pcnt = 0;
 
+    dir = 0;
     if(( ret = _PA_LOCAL_IMPL(snd_pcm_hw_params_get_period_size_max)(params, &pmax, &dir) ) < 0 )
         return ret;
+    dir = 0;
     if(( ret = _PA_LOCAL_IMPL(snd_pcm_hw_params_get_periods_max)(params, &pcnt, &dir) ) < 0 )
         return ret;
 
@@ -2323,6 +2325,7 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
         /* It may be that the device only supports 2 periods for instance */
         dir = 0;
         ENSURE_( alsa_snd_pcm_hw_params_get_periods_min( hwParams, &minPeriods, &dir ), paUnanticipatedHostError );
+        dir = 0;
         ENSURE_( alsa_snd_pcm_hw_params_get_periods_max( hwParams, &maxPeriods, &dir ), paUnanticipatedHostError );
         assert( maxPeriods > 1 );
 
@@ -3208,6 +3211,7 @@ error:
         unsigned int _min = 0, _max = 0;
         int _dir = 0;
         ENSURE_( alsa_snd_pcm_hw_params_get_rate_min( hwParams, &_min, &_dir ), paUnanticipatedHostError );
+        _dir = 0;
         ENSURE_( alsa_snd_pcm_hw_params_get_rate_max( hwParams, &_max, &_dir ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: SR min = %u, max = %u, req = %u\n", __FUNCTION__, _min, _max, reqRate ));
     }
