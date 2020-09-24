@@ -1057,8 +1057,9 @@ static const KSTOPOLOGY_CONNECTION* FindStartConnectionFrom(ULONG startPin, PaWi
         }
     }
 
+    /* Some devices may report topologies that leave pins unconnected. This may be by design or driver installation
+       issues. Pass the error condition back to caller. */
     PA_DEBUG(("FindStartConnectionFrom: returning NULL\n"));
-    assert(FALSE);
     return 0;
 }
 
@@ -1077,8 +1078,8 @@ static const KSTOPOLOGY_CONNECTION* FindStartConnectionTo(ULONG startPin, PaWinW
         }
     }
 
+    /* Unconnected pin. Inform caller. */
     PA_DEBUG(("FindStartConnectionTo: returning NULL\n"));
-    assert(FALSE);
     return 0;
 }
 
