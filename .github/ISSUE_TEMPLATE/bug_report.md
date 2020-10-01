@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-(Please use the mailing list for general discussion. This is only for actual bugs.)
+(Please use the mailing list for support requests and general discussion. This is only for actual bugs.)
 
 **Describe the bug**
 A clear and concise description of what the bug is.
@@ -25,10 +25,10 @@ Include a recording if helpful.
 Error messages or logs longer than a page should be attached as a .txt file.
 
 **Desktop (please complete the following information):**
- - OS: [e.g. iOS]
+ - OS: [e.g. Mac OS]
  - OS Version [e.g. 22]
- - PortAudio: stable or current
- - If Windows, which API:
+ - PortAudio version: stable, nightly snapshot (which?), current (please give date and/or Git hash):
+ - If Windows or Linux, which Host API (e.g. WASAPI):
 
 **Additional context**
 Add any other context about the problem here.
