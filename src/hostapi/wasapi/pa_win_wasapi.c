@@ -61,6 +61,9 @@
 //       not change the Event mode to Polling and use the mode which user provided.
 //#define PA_WASAPI_FORCE_POLL_IF_LARGE_BUFFER
 
+//! Poll mode time slots logging.
+//#define PA_WASAPI_LOG_TIME_SLOTS
+
 // WinRT
 #if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
 	#define PA_WINRT
@@ -741,6 +744,7 @@ typedef struct ThreadIdleScheduler
 	UINT32 m_resolution;		//!< resolution in number of milliseconds
 }
 ThreadIdleScheduler;
+
 //! Setup scheduler.
 static void ThreadIdleScheduler_Setup(ThreadIdleScheduler *sched, UINT32 resolution, UINT32 microseconds)
 {
@@ -754,16 +758,92 @@ static void ThreadIdleScheduler_Setup(ThreadIdleScheduler *sched, UINT32 resolut
 	sched->m_resolution        = resolution;
 	sched->m_next_sleep        = (resolution * 1000) / microseconds;
 }
+
 //! Iterate and check if can sleep.
-static UINT32 ThreadIdleScheduler_NextSleep(ThreadIdleScheduler *sched)
+static inline UINT32 ThreadIdleScheduler_NextSleep(ThreadIdleScheduler *sched)
 {
 	// advance and check if thread can sleep
-	if (++ sched->m_i == sched->m_next_sleep)
+	if (++sched->m_i == sched->m_next_sleep)
 	{
 		sched->m_i = 0;
 		return sched->m_resolution;
 	}
 	return 0;
+}
+
+// ------------------------------------------------------------------------------------------
+typedef struct _SystemTimer
+{
+	UINT32 granularity;
+
+} SystemTimer;
+static LARGE_INTEGER g_SystemTimerFrequency;
+static BOOL          g_SystemTimerUseQpc = FALSE;
+
+//! Set granularity of the system timer.
+static BOOL SystemTimer_SetGranularity(SystemTimer *timer, UINT32 granularity)
+{
+#ifndef PA_WINRT
+	TIMECAPS caps;
+
+	timer->granularity = granularity;
+
+	if (timeGetDevCaps(&caps, sizeof(caps)) == MMSYSERR_NOERROR)
+	{
+		if (timer->granularity < caps.wPeriodMin)
+			timer->granularity = caps.wPeriodMin;
+	}
+
+    if (timeBeginPeriod(timer->granularity) != TIMERR_NOERROR)
+	{
+        PRINT(("SetSystemTimer: timeBeginPeriod(1) failed!\n"));
+
+		timer->granularity = 0;
+		return FALSE;
+    }
+#endif
+
+	return TRUE;
+}
+
+//! Restore granularity of the system timer.
+static void SystemTimer_RestoreGranularity(SystemTimer *timer)
+{
+#ifndef PA_WINRT
+	if (timer->granularity != 0)
+	{
+		if (timeEndPeriod(timer->granularity) != TIMERR_NOERROR)
+		{
+			PRINT(("RestoreSystemTimer: timeEndPeriod(1) failed!\n"));
+		}
+	}
+#endif
+}
+
+//! Initialize high-resolution time getter.
+static void SystemTimer_InitializeTimeGetter()
+{
+	g_SystemTimerUseQpc = QueryPerformanceFrequency(&g_SystemTimerFrequency);
+}
+
+//! Get high-resolution time in milliseconds (using QPC by default).
+static inline LONGLONG SystemTimer_GetTime(SystemTimer *timer)
+{
+	// QPC: https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
+	if (g_SystemTimerUseQpc)
+	{
+		LARGE_INTEGER now;
+		QueryPerformanceCounter(&now);
+		return (now.QuadPart * 1000LL) / g_SystemTimerFrequency.QuadPart;
+	}
+	else
+	{
+	#ifdef PA_WINRT
+		return GetTickCount64();
+	#else
+		return timeGetTime();
+	#endif
+	}
 }
 
 // ------------------------------------------------------------------------------------------
@@ -2139,6 +2219,9 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
 	// Detect if platform workaround is required
 	paWasapi->useWOW64Workaround = UseWOW64Workaround();
+
+	// Initialize time getter
+	SystemTimer_InitializeTimeGetter();
 
     PaUtil_InitializeStreamInterface( &paWasapi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
@@ -5507,19 +5590,9 @@ void _StreamOnStop(PaWasapiStream *stream)
 }
 
 // ------------------------------------------------------------------------------------------
-PA_THREAD_FUNC ProcThreadEvent(void *param)
+static BOOL PrepareComPointers(PaWasapiStream *stream, BOOL *threadComInitialized)
 {
-    PaWasapiHostProcessor processor[S_COUNT];
 	HRESULT hr;
-	DWORD dwResult;
-    PaWasapiStream *stream = (PaWasapiStream *)param;
-	PaWasapiHostProcessor defaultProcessor;
-	BOOL set_event[S_COUNT] = { FALSE, FALSE };
-	BOOL bWaitAllEvents = FALSE;
-	BOOL bThreadComInitialized = FALSE;
-
-	// Notify: state
-	NotifyStateChanged(stream, paWasapiStreamStateThreadPrepare, ERROR_SUCCESS);
 
 	/*
 	If COM is already initialized CoInitialize will either return
@@ -5532,22 +5605,61 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	if (FAILED(hr) && (hr != RPC_E_CHANGED_MODE))
 	{
 		PRINT(("WASAPI: failed ProcThreadEvent CoInitialize"));
-		return (UINT32)paUnanticipatedHostError;
+		return FALSE;
 	}
 	if (hr != RPC_E_CHANGED_MODE)
-		bThreadComInitialized = TRUE;
+		*threadComInitialized = TRUE;
 
 	// Unmarshal stream pointers for safe COM operation
 	hr = UnmarshalStreamComPointers(stream);
-	if (hr != S_OK) {
-		PRINT(("Error unmarshaling stream COM pointers. HRESULT: %i\n", hr));
-		goto thread_end;
+	if (hr != S_OK)
+	{
+		PRINT(("WASAPI: Error unmarshaling stream COM pointers. HRESULT: %i\n", hr));
+		CoUninitialize();
+		return FALSE;
 	}
+
+	return TRUE;
+}
+
+// ------------------------------------------------------------------------------------------
+static void FinishComPointers(PaWasapiStream *stream, BOOL threadComInitialized)
+{
+	// Release unmarshaled COM pointers
+	ReleaseUnmarshaledComPointers(stream);
+
+	// Cleanup COM for this thread
+	if (threadComInitialized == TRUE)
+		CoUninitialize();
+}
+
+// ------------------------------------------------------------------------------------------
+PA_THREAD_FUNC ProcThreadEvent(void *param)
+{
+    PaWasapiHostProcessor processor[S_COUNT];
+	HRESULT hr;
+	DWORD dwResult;
+    PaWasapiStream *stream = (PaWasapiStream *)param;
+	PaWasapiHostProcessor defaultProcessor;
+	BOOL setEvent[S_COUNT] = { FALSE, FALSE };
+	BOOL waitAllEvents = FALSE;
+	BOOL threadComInitialized = FALSE;
+	SystemTimer timer;
+
+	// Notify: state
+	NotifyStateChanged(stream, paWasapiStreamStateThreadPrepare, ERROR_SUCCESS);
+
+	// Prepare COM pointers
+	if (!PrepareComPointers(stream, &threadComInitialized))
+		return (UINT32)paUnanticipatedHostError;
+
+	// Request fine (1 ms) granularity of the system timer functions for precise operation of waitable timers
+	SystemTimer_SetGranularity(&timer, 1);
 
 	// Waiting on all events in case of Full-Duplex/Exclusive mode.
 	if ((stream->in.clientProc != NULL) && (stream->out.clientProc != NULL))
 	{
-		bWaitAllEvents = (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) &&
+		waitAllEvents = (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) &&
 			(stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE);
 	}
 
@@ -5564,12 +5676,12 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	if (stream->event[S_OUTPUT] == NULL)
 	{
 		stream->event[S_OUTPUT] = CreateEvent(NULL, FALSE, FALSE, NULL);
-		set_event[S_OUTPUT] = TRUE;
+		setEvent[S_OUTPUT] = TRUE;
 	}
 	if (stream->event[S_INPUT] == NULL)
 	{
 		stream->event[S_INPUT]  = CreateEvent(NULL, FALSE, FALSE, NULL);
-		set_event[S_INPUT] = TRUE;
+		setEvent[S_INPUT] = TRUE;
 	}
 	if ((stream->event[S_OUTPUT] == NULL) || (stream->event[S_INPUT] == NULL))
 	{
@@ -5581,7 +5693,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	if (stream->in.clientProc)
 	{
 		// Create & set handle
-		if (set_event[S_INPUT])
+		if (setEvent[S_INPUT])
 		{
 			if ((hr = IAudioClient_SetEventHandle(stream->in.clientProc, stream->event[S_INPUT])) != S_OK)
 			{
@@ -5602,7 +5714,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	if (stream->out.clientProc)
 	{
 		// Create & set handle
-		if (set_event[S_OUTPUT])
+		if (setEvent[S_OUTPUT])
 		{
 			if ((hr = IAudioClient_SetEventHandle(stream->out.clientProc, stream->event[S_OUTPUT])) != S_OK)
 			{
@@ -5640,7 +5752,7 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
 	for (;;)
     {
 	    // 10 sec timeout (on timeout stream will auto-stop when processed by WAIT_TIMEOUT case)
-        dwResult = WaitForMultipleObjects(S_COUNT, stream->event, bWaitAllEvents, 10*1000);
+        dwResult = WaitForMultipleObjects(S_COUNT, stream->event, waitAllEvents, 10*1000);
 
 		// Check for close event (after wait for buffers to avoid any calls to user
 		// callback when hCloseRequest was set)
@@ -5691,11 +5803,10 @@ thread_end:
 	_StreamOnStop(stream);
 
 	// Release unmarshaled COM pointers
-	ReleaseUnmarshaledComPointers(stream);
+	FinishComPointers(stream, threadComInitialized);
 
-	// Cleanup COM for this thread
-	if (bThreadComInitialized == TRUE)
-		CoUninitialize();
+	// Restore system timer granularity
+	SystemTimer_RestoreGranularity(&timer);
 
 	// Notify: not running
 	stream->running = FALSE;
@@ -5718,6 +5829,105 @@ thread_error:
 }
 
 // ------------------------------------------------------------------------------------------
+static UINT32 GetSleepTime(PaWasapiStream *stream, UINT32 sleepTimeIn, UINT32 sleepTimeOut, UINT32 userFramesOut)
+{
+	UINT32 sleepTime;
+
+	// According to the issue [https://github.com/PortAudio/portaudio/issues/303] glitches may occur when user frames
+	// equal to 1/2 of the host buffer frames, therefore the emperical workaround for this problem is to lower 
+	// the sleep time by 2
+	if (userFramesOut != 0)
+	{
+		UINT32 chunks = stream->out.framesPerHostCallback / userFramesOut;
+		if (chunks <= 2)
+		{
+			sleepTimeOut /= 2;
+			PRINT(("WASAPI: underrun workaround, sleep [%d] ms - 1/2 of the user buffer[%d] | host buffer[%d]\n", sleepTimeOut, userFramesOut, stream->out.framesPerHostCallback));
+		}
+	}
+
+	// Choose the smallest
+	if ((sleepTimeIn != 0) && (sleepTimeOut != 0))
+		sleepTime = min(sleepTimeIn, sleepTimeOut);
+	else
+		sleepTime = (sleepTimeIn ? sleepTimeIn : sleepTimeOut);
+
+	return sleepTime;
+}
+
+// ------------------------------------------------------------------------------------------
+static UINT32 ConfigureLoopSleepTimeAndScheduler(PaWasapiStream *stream, ThreadIdleScheduler *scheduler)
+{
+	UINT32 sleepTime, sleepTimeIn, sleepTimeOut;
+	UINT32 userFramesIn = stream->in.framesPerHostCallback / WASAPI_PACKETS_PER_INPUT_BUFFER;
+	UINT32 userFramesOut = stream->out.framesPerBuffer;
+
+	// Adjust polling time for non-paUtilFixedHostBufferSize, input stream is not adjustable as it is being
+	// polled according its packet length
+	if (stream->bufferMode != paUtilFixedHostBufferSize)
+	{
+		userFramesOut = (stream->bufferProcessor.framesPerUserBuffer ? stream->bufferProcessor.framesPerUserBuffer : 
+			stream->out.params.frames_per_buffer);
+	}
+
+	// Calculate timeout for the next polling attempt
+	sleepTimeIn  = GetFramesSleepTime(userFramesIn, stream->in.wavex.Format.nSamplesPerSec);
+	sleepTimeOut = GetFramesSleepTime(userFramesOut, stream->out.wavex.Format.nSamplesPerSec);
+
+	// WASAPI input packets tend to expire very easily, let's limit sleep time to 2 milliseconds
+	// for all cases. Please propose better solution if any
+	if (sleepTimeIn > 2)
+		sleepTimeIn = 2;
+
+	sleepTime = GetSleepTime(stream, sleepTimeIn, sleepTimeOut, userFramesOut);
+
+	// Make sure not 0, othervise use ThreadIdleScheduler to bounce between [0, 1] ms to avoid too busy loop
+	if (sleepTime == 0)
+	{
+		sleepTimeIn  = GetFramesSleepTimeMicroseconds(userFramesIn, stream->in.wavex.Format.nSamplesPerSec);
+		sleepTimeOut = GetFramesSleepTimeMicroseconds(userFramesOut, stream->out.wavex.Format.nSamplesPerSec);
+
+		sleepTime = GetSleepTime(stream, sleepTimeIn, sleepTimeOut, userFramesOut);
+
+		// Setup thread sleep scheduler
+		ThreadIdleScheduler_Setup(scheduler, 1, sleepTime/* microseconds here */);
+		sleepTime = 0;
+	}
+
+	return sleepTime;
+}
+
+// ------------------------------------------------------------------------------------------
+static inline INT32 GetNextSleepTime(SystemTimer *timer, ThreadIdleScheduler *scheduler, LONGLONG startTime, 
+	UINT32 sleepTime)
+{
+	INT32 nextSleepTime;
+
+	// Get next sleep time
+	if (sleepTime == 0)
+		nextSleepTime = ThreadIdleScheduler_NextSleep(scheduler);
+	else
+		nextSleepTime = sleepTime;
+
+	// Adjust next sleep time dynamically depending on how much time was spent in ProcessOutputBuffer/ProcessInputBuffer
+	// therefore periodicity will not jitter or be increased for the amount of time spent in processing;
+	// example when sleepTime is 10 ms where [] is polling time slot, {} processing time slot:
+	//
+	// [9],{2},[8],{1},[9],{1},[9],{3},[7],{2},[8],{3},[7],{2},[8],{2},[8],{3},[7],{2},[8],...
+	//
+	INT32 procTime = (INT32)(SystemTimer_GetTime(timer) - startTime);
+	nextSleepTime -= procTime;
+	if (nextSleepTime < 0)
+		nextSleepTime = 0;
+
+#ifdef PA_WASAPI_LOG_TIME_SLOTS
+	printf("{%d},", procTime);
+#endif
+
+	return nextSleepTime;
+}
+
+// ------------------------------------------------------------------------------------------
 PA_THREAD_FUNC ProcThreadPoll(void *param)
 {
     PaWasapiHostProcessor processor[S_COUNT];
@@ -5726,80 +5936,27 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	PaWasapiHostProcessor defaultProcessor;
 	INT32 i;
 	ThreadIdleScheduler scheduler;
-
-	// Calculate the actual duration of the allocated buffer.
-	DWORD sleep_ms = 0;
-	DWORD sleep_ms_in;
-	DWORD sleep_ms_out;
-
-	BOOL bThreadComInitialized = FALSE;
+	SystemTimer timer;
+	LONGLONG startTime;
+	UINT32 sleepTime;
+	INT32 nextSleepTime = 0; //! Do first loop without waiting as time could be spent when calling other APIs before ProcessXXXBuffer.
+	BOOL threadComInitialized = FALSE;
+#ifdef PA_WASAPI_LOG_TIME_SLOTS
+	LONGLONG startWaitTime;
+#endif
 
 	// Notify: state
 	NotifyStateChanged(stream, paWasapiStreamStateThreadPrepare, ERROR_SUCCESS);
 
-	/*
-	If COM is already initialized CoInitialize will either return
-	FALSE, or RPC_E_CHANGED_MODE if it was initialized in a different
-	threading mode. In either case we shouldn't consider it an error
-	but we need to be careful to not call CoUninitialize() if 
-	RPC_E_CHANGED_MODE was returned.
-	*/
-	hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-	if (FAILED(hr) && (hr != RPC_E_CHANGED_MODE))
-	{
-		PRINT(("WASAPI: failed ProcThreadPoll CoInitialize"));
+	// Prepare COM pointers
+	if (!PrepareComPointers(stream, &threadComInitialized))
 		return (UINT32)paUnanticipatedHostError;
-	}
-	if (hr != RPC_E_CHANGED_MODE)
-		bThreadComInitialized = TRUE;
 
-	// Unmarshal stream pointers for safe COM operation
-	hr = UnmarshalStreamComPointers(stream);
-	if (hr != S_OK) 
-	{
-		PRINT(("Error unmarshaling stream COM pointers. HRESULT: %i\n", hr));
-		return 0;
-	}
+	// Request fine (1 ms) granularity of the system timer functions to guarantee correct logic around WaitForSingleObject
+	SystemTimer_SetGranularity(&timer, 1);
 
-	// Calculate timeout for next polling attempt.
-	sleep_ms_in  = GetFramesSleepTime(stream->in.framesPerHostCallback / WASAPI_PACKETS_PER_INPUT_BUFFER, stream->in.wavex.Format.nSamplesPerSec);
-	sleep_ms_out = GetFramesSleepTime(stream->out.framesPerBuffer, stream->out.wavex.Format.nSamplesPerSec);
-
-	// WASAPI Input packets tend to expire very easily, let's limit sleep time to 2 milliseconds
-	// for all cases. Please propose better solution if any.
-	if (sleep_ms_in > 2)
-		sleep_ms_in = 2;
-
-	// Adjust polling time for non-paUtilFixedHostBufferSize. Input stream is not adjustable as it is being
-	// polled according its packet length.
-	if (stream->bufferMode != paUtilFixedHostBufferSize)
-	{
-		//sleep_ms_in = GetFramesSleepTime((stream->bufferProcessor.framesPerUserBuffer ? stream->bufferProcessor.framesPerUserBuffer : stream->in.params.frames_per_buffer), stream->in.wavex.Format.nSamplesPerSec);
-		sleep_ms_out = GetFramesSleepTime((stream->bufferProcessor.framesPerUserBuffer ? stream->bufferProcessor.framesPerUserBuffer : stream->out.params.frames_per_buffer), stream->out.wavex.Format.nSamplesPerSec);
-	}
-
-	// Choose smallest
-	if ((sleep_ms_in != 0) && (sleep_ms_out != 0))
-		sleep_ms = min(sleep_ms_in, sleep_ms_out);
-	else
-		sleep_ms = (sleep_ms_in ? sleep_ms_in : sleep_ms_out);
-
-	// Make sure not 0, othervise use ThreadIdleScheduler
-	if (sleep_ms == 0)
-	{
-		sleep_ms_in  = GetFramesSleepTimeMicroseconds(stream->in.framesPerHostCallback / WASAPI_PACKETS_PER_INPUT_BUFFER, stream->in.wavex.Format.nSamplesPerSec);
-		sleep_ms_out = GetFramesSleepTimeMicroseconds((stream->bufferProcessor.framesPerUserBuffer ? stream->bufferProcessor.framesPerUserBuffer : stream->out.params.frames_per_buffer), stream->out.wavex.Format.nSamplesPerSec);
-
-		// Choose smallest
-		if ((sleep_ms_in != 0) && (sleep_ms_out != 0))
-			sleep_ms = min(sleep_ms_in, sleep_ms_out);
-		else
-			sleep_ms = (sleep_ms_in ? sleep_ms_in : sleep_ms_out);
-
-		// Setup thread sleep scheduler
-		ThreadIdleScheduler_Setup(&scheduler, 1, sleep_ms/* microseconds here */);
-		sleep_ms = 0;
-	}
+	// Claculate sleep time of the processing loop (inside WaitForSingleObject)
+	sleepTime = ConfigureLoopSleepTimeAndScheduler(stream, &scheduler);
 
     // Setup data processors
     defaultProcessor.processor = WaspiHostProcessingLoop;
@@ -5829,17 +5986,20 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 		{
 			UINT32 frames = 0;
 			if ((hr = _PollGetOutputFramesAvailable(stream, &frames)) == S_OK)
-            {
+			{
 				if (stream->bufferMode == paUtilFixedHostBufferSize)
 				{
-					if (frames >= stream->out.framesPerBuffer)
+					// It is important to preload whole host buffer to avoid underruns/glitches when stream is started,
+					// for more details see the discussion: https://github.com/PortAudio/portaudio/issues/303
+					while (frames >= stream->out.framesPerBuffer)
 					{
-						frames = stream->out.framesPerBuffer;
-
-						if ((hr = ProcessOutputBuffer(stream, processor, frames)) != S_OK)
+						if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
 						{
 							LogHostError(hr); // not fatal, just log
+							break;
 						}
+
+						frames -= stream->out.framesPerBuffer;
 					}
 				}
 				else
@@ -5859,8 +6019,8 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 						LogHostError(hr); // not fatal, just log
 					}
 				}
-            }
-            else
+			}
+			else
 			{
 				LogHostError(hr); // not fatal, just log
 			}
@@ -5883,16 +6043,20 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 	// Notify: state
 	NotifyStateChanged(stream, paWasapiStreamStateThreadStart, ERROR_SUCCESS);
 
+#ifdef PA_WASAPI_LOG_TIME_SLOTS
+	startWaitTime = SystemTimer_GetTime(&timer);
+#endif
+
 	if (!PA_WASAPI__IS_FULLDUPLEX(stream))
 	{
-		UINT32 next_sleep = sleep_ms;
-
 		// Processing Loop
-		while (WaitForSingleObject(stream->hCloseRequest, next_sleep) == WAIT_TIMEOUT)
+		while (WaitForSingleObject(stream->hCloseRequest, nextSleepTime) == WAIT_TIMEOUT)
 		{
-			// Get next sleep time
-			if (sleep_ms == 0)
-				next_sleep = ThreadIdleScheduler_NextSleep(&scheduler);
+			startTime = SystemTimer_GetTime(&timer);
+
+		#ifdef PA_WASAPI_LOG_TIME_SLOTS
+			printf("[%d|%d],", nextSleepTime, (INT32)(startTime - startWaitTime));
+		#endif
 
 			for (i = 0; i < S_COUNT; ++i)
 			{
@@ -5916,12 +6080,13 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 				// Output stream
 				case S_OUTPUT: {
 
-					UINT32 frames;
+					UINT32 framesAvail;
+
 					if (stream->renderClient == NULL)
 						break;
 
 					// Get available frames
-					if ((hr = _PollGetOutputFramesAvailable(stream, &frames)) != S_OK)
+					if ((hr = _PollGetOutputFramesAvailable(stream, &framesAvail)) != S_OK)
 					{
 						LogHostError(hr);
 						goto thread_error;
@@ -5930,21 +6095,33 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					// Output data to the user callback
 					if (stream->bufferMode == paUtilFixedHostBufferSize)
 					{
-						while (frames >= stream->out.framesPerBuffer)
+						UINT32 framesProc = stream->out.framesPerBuffer;
+
+						// If we got less frames avoid sleeping again as it might be the corner case and buffer
+						// has sufficient number of frames now, in case 'out.framesPerBuffer' is 1/2 of the host 
+						// buffer sleeping again may cause underruns. Do short busy waiting (normally might take 
+						// 1-2 iterations)
+						if (framesAvail < framesProc)
 						{
-							if ((hr = ProcessOutputBuffer(stream, processor, stream->out.framesPerBuffer)) != S_OK)
+							nextSleepTime = 0;
+							continue;
+						}
+
+						while (framesAvail >= framesProc)
+						{
+							if ((hr = ProcessOutputBuffer(stream, processor, framesProc)) != S_OK)
 							{
 								LogHostError(hr);
 								goto thread_error;
 							}
 
-							frames -= stream->out.framesPerBuffer;
+							framesAvail -= framesProc;
 						}
 					}
 					else
-					if (frames != 0)
+					if (framesAvail != 0)
 					{
-						if ((hr = ProcessOutputBuffer(stream, processor, frames)) != S_OK)
+						if ((hr = ProcessOutputBuffer(stream, processor, framesAvail)) != S_OK)
 						{
 							LogHostError(hr);
 							goto thread_error;
@@ -5954,143 +6131,29 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
 					break; }
 				}
 			}
+
+			// Get next sleep time
+			nextSleepTime = GetNextSleepTime(&timer, &scheduler, startTime, sleepTime);
+
+		#ifdef PA_WASAPI_LOG_TIME_SLOTS
+			startWaitTime = SystemTimer_GetTime(&timer);
+		#endif
 		}
 	}
 	else
 	{
-#if 0
-		// Processing Loop
-		while (WaitForSingleObject(stream->hCloseRequest, 1) == WAIT_TIMEOUT)
+		// Processing Loop (full-duplex)
+		while (WaitForSingleObject(stream->hCloseRequest, nextSleepTime) == WAIT_TIMEOUT)
 		{
-			UINT32 i_frames = 0, i_processed = 0;
+			UINT32 i_frames = 0, i_processed = 0, o_frames = 0;
 			BYTE *i_data = NULL, *o_data = NULL, *o_data_host = NULL;
 			DWORD i_flags = 0;
-			UINT32 o_frames = 0;
+			
+			startTime = SystemTimer_GetTime(&timer);
 
-			// get host input buffer
-			if ((hr = IAudioCaptureClient_GetBuffer(stream->captureClient, &i_data, &i_frames, &i_flags, NULL, NULL)) != S_OK)
-			{
-				if (hr == AUDCLNT_S_BUFFER_EMPTY)
-					continue; // no data in capture buffer
-
-				LogHostError(hr);
-				break;
-			}
-
-			// get available frames
-			if ((hr = _PollGetOutputFramesAvailable(stream, &o_frames)) != S_OK)
-			{
-				// release input buffer
-				IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
-
-				LogHostError(hr);
-				break;
-			}
-
-			// process equal ammount of frames
-			if (o_frames >= i_frames)
-			{
-				// process input ammount of frames
-				UINT32 o_processed = i_frames;
-
-				// get host output buffer
-				if ((hr = IAudioRenderClient_GetBuffer(stream->procRCClient, o_processed, &o_data)) == S_OK)
-				{
-					// processed amount of i_frames
-					i_processed = i_frames;
-					o_data_host = o_data;
-
-					// convert output mono
-					if (stream->out.monoMixer)
-					{
-						UINT32 mono_frames_size = o_processed * (stream->out.wavex.Format.wBitsPerSample / 8);
-						// expand buffer
-						if (mono_frames_size > stream->out.monoBufferSize)
-						{
-							stream->out.monoBuffer = PaWasapi_ReallocateMemory(stream->out.monoBuffer, (stream->out.monoBufferSize = mono_frames_size));
-							if (stream->out.monoBuffer == NULL)
-							{
-								// release input buffer
-								IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
-								// release output buffer
-								IAudioRenderClient_ReleaseBuffer(stream->renderClient, 0, 0);
-
-								LogPaError(paInsufficientMemory);
-								break;
-							}
-						}
-
-						// replace buffer pointer
-						o_data = (BYTE *)stream->out.monoBuffer;
-					}
-
-					// convert input mono
-					if (stream->in.monoMixer)
-					{
-						UINT32 mono_frames_size = i_processed * (stream->in.wavex.Format.wBitsPerSample / 8);
-						// expand buffer
-						if (mono_frames_size > stream->in.monoBufferSize)
-						{
-							stream->in.monoBuffer = PaWasapi_ReallocateMemory(stream->in.monoBuffer, (stream->in.monoBufferSize = mono_frames_size));
-							if (stream->in.monoBuffer == NULL)
-							{
-								// release input buffer
-								IAudioCaptureClient_ReleaseBuffer(stream->captureClient, 0);
-								// release output buffer
-								IAudioRenderClient_ReleaseBuffer(stream->renderClient, 0, 0);
-
-								LogPaError(paInsufficientMemory);
-								break;
-							}
-						}
-
-						// mix 2 to 1 input channels
-						stream->in.monoMixer(stream->in.monoBuffer, i_data, i_processed);
-
-						// replace buffer pointer
-						i_data = (BYTE *)stream->in.monoBuffer;
-					}
-
-					// process
-					processor[S_FULLDUPLEX].processor(i_data, i_processed, o_data, o_processed, processor[S_FULLDUPLEX].userData);
-
-					// mix 1 to 2 output channels
-					if (stream->out.monoBuffer)
-						stream->out.monoMixer(o_data_host, stream->out.monoBuffer, o_processed);
-
-					// release host output buffer
-					if ((hr = IAudioRenderClient_ReleaseBuffer(stream->renderClient, o_processed, 0)) != S_OK)
-						LogHostError(hr);
-				}
-				else
-				{
-					if (stream->out.shareMode != AUDCLNT_SHAREMODE_SHARED)
-						LogHostError(hr); // be silent in shared mode, try again next time
-				}
-			}
-
-			// release host input buffer
-			if ((hr = IAudioCaptureClient_ReleaseBuffer(stream->captureClient, i_processed)) != S_OK)
-			{
-				LogHostError(hr);
-				break;
-			}
-		}
-#else
-		// Processing Loop
-		UINT32 next_sleep = sleep_ms;
-		while (WaitForSingleObject(stream->hCloseRequest, next_sleep) == WAIT_TIMEOUT)
-		{
-			UINT32 i_frames = 0, i_processed = 0;
-			BYTE *i_data = NULL, *o_data = NULL, *o_data_host = NULL;
-			DWORD i_flags = 0;
-			UINT32 o_frames = 0;
-
-			// Get next sleep time
-			if (sleep_ms == 0)
-			{
-				next_sleep = ThreadIdleScheduler_NextSleep(&scheduler);
-			}
+		#ifdef PA_WASAPI_LOG_TIME_SLOTS
+			printf("[%d|%d],", nextSleepTime, (INT32)(startTime - startWaitTime));
+		#endif
 
 			// get available frames
 			if ((hr = _PollGetOutputFramesAvailable(stream, &o_frames)) != S_OK)
@@ -6213,8 +6276,14 @@ fd_release_buffer_in:
 				if (i_processed == 0)
 					break;
 			}
+
+			// Get next sleep time
+			nextSleepTime = GetNextSleepTime(&timer, &scheduler, startTime, sleepTime);
+
+		#ifdef PA_WASAPI_LOG_TIME_SLOTS
+			startWaitTime = SystemTimer_GetTime(&timer);
+		#endif
 		}
-#endif
 	}
 
 thread_end:
@@ -6223,11 +6292,10 @@ thread_end:
 	_StreamOnStop(stream);
 
 	// Release unmarshaled COM pointers
-	ReleaseUnmarshaledComPointers(stream);
+	FinishComPointers(stream, threadComInitialized);
 
-	// Cleanup COM for this thread
-	if (bThreadComInitialized == TRUE)
-		CoUninitialize();
+	// Restore system timer granularity
+	SystemTimer_RestoreGranularity(&timer);
 
 	// Notify: not running
 	stream->running = FALSE;
@@ -6266,35 +6334,3 @@ void PaWasapi_FreeMemory(void *ptr)
 {
 	free(ptr);
 }
-
-//#endif //VC 2005
-
-
-
-
-#if 0
-			if(bFirst) {
-				float masteur;
-				hr = stream->outVol->GetMasterVolumeLevelScalar(&masteur);
-				if (hr != S_OK)
-					LogHostError(hr);
-				float chan1, chan2;
-				hr = stream->outVol->GetChannelVolumeLevelScalar(0, &chan1);
-				if (hr != S_OK)
-					LogHostError(hr);
-				hr = stream->outVol->GetChannelVolumeLevelScalar(1, &chan2);
-				if (hr != S_OK)
-					LogHostError(hr);
-
-				BOOL bMute;
-				hr = stream->outVol->GetMute(&bMute);
-				if (hr != S_OK)
-					LogHostError(hr);
-
-				stream->outVol->SetMasterVolumeLevelScalar(0.5, NULL);
-				stream->outVol->SetChannelVolumeLevelScalar(0, 0.5, NULL);
-				stream->outVol->SetChannelVolumeLevelScalar(1, 0.5, NULL);
-				stream->outVol->SetMute(FALSE, NULL);
-				bFirst = FALSE;
-			}
-#endif

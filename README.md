@@ -17,7 +17,7 @@ native format internally.
 For information on compiling programs with PortAudio, please see the
 tutorial at:
 
-  http://portaudio.com/trac/wiki/TutorialDir/TutorialStart
+  http://portaudio.com/docs/v19-doxydocs/tutorial_start.html
   
 We have an active mailing list for user and developer discussions.
 Please feel free to join. See http://www.portaudio.com for details.
