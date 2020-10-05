@@ -3705,11 +3705,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		stream->in.params.wow64_workaround  = paWasapi->useWOW64Workaround;
 
 		// Create and activate audio client
-        if (FAILED(hr = ActivateAudioClientInput(stream)))
+		if ((result = ActivateAudioClientInput(stream)) != paNoError)
 		{
-			LogPaError(result = paInvalidDevice);
+			LogPaError(result);
 			goto error;
-        }
+		}
 
 		// Get closest format
         hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(WaveToPaFormat(&stream->in.wavex), inputSampleFormat);
@@ -3839,11 +3839,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 		stream->out.params.wow64_workaround  = paWasapi->useWOW64Workaround;
 
 		// Create and activate audio client
-        if (FAILED(hr = ActivateAudioClientOutput(stream)))
+		if ((result = ActivateAudioClientOutput(stream)) != paNoError)
 		{
-			LogPaError(result = paInvalidDevice);
+			LogPaError(result);
 			goto error;
-        }
+		}
 
 		// Get closest format
         hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(WaveToPaFormat(&stream->out.wavex), outputSampleFormat);
