@@ -17,3 +17,14 @@ jobs:
       run: ./configure
     - name: make
       run: make
+
+  build-cmake:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: cmake
+      run: cmake .
+    - name: make
+      run: make
