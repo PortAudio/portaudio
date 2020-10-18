@@ -17,3 +17,14 @@ jobs:
       run: ./configure
     - name: make
       run: make
+
+  build-cmake-msvc:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: cmake
+      run: cmake .
+    - name: build
+      run: cmake --build .
