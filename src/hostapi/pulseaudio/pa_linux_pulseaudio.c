@@ -133,7 +133,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New(
         goto fail;
     }
 
-    memset(buf, 0x00, PAPULSEAUDIO_MAX_DEVICENAME);
+    /* Use program name as PulseAudio device name */
     snprintf(buf, PAPULSEAUDIO_MAX_DEVICENAME, "%s", __progname);
 
     ptr->context =
