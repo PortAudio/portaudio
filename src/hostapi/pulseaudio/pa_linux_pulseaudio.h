@@ -97,8 +97,8 @@ extern "C"
         PaHostApiIndex hostApiIndex;
         PaDeviceInfo deviceInfoArray[PAPULSEAUDIO_MAX_DEVICECOUNT];
         char *pulseaudioDeviceNames[PAPULSEAUDIO_MAX_DEVICECOUNT];
-        char pulseaudioDefaultSource[PAPULSEAUDIO_MAX_DEVICENAME + 1];
-        char pulseaudioDefaultSink[PAPULSEAUDIO_MAX_DEVICENAME + 1];
+        char pulseaudioDefaultSource[PAPULSEAUDIO_MAX_DEVICENAME];
+        char pulseaudioDefaultSink[PAPULSEAUDIO_MAX_DEVICENAME];
 
         /* PulseAudio stuff goes here */
         pa_threaded_mainloop *mainloop;

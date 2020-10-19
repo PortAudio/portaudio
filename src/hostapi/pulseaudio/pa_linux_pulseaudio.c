@@ -229,20 +229,19 @@ void PaPulseAudio_ServerInfoCb(
   PaError result = paNoError;
   const char *l_strName = NULL;
 
-  memset(l_ptrHostApi->pulseaudioDefaultSource, 0x00,
-         PAPULSEAUDIO_MAX_DEVICENAME);
-  memset(l_ptrHostApi->pulseaudioDefaultSink, 0x00,
-         PAPULSEAUDIO_MAX_DEVICENAME);
+  l_ptrHostApi->pulseaudioDefaultSource[0] = '\0';
+  l_ptrHostApi->pulseaudioDefaultSink[0] = '\0';
 
   if(i->default_sink_name != NULL)
   {
-    strncpy(l_ptrHostApi->pulseaudioDefaultSink, i->default_sink_name,
-            PAPULSEAUDIO_MAX_DEVICENAME);
+    /* Make sure there is '\0' is at the end of string with using snprintf */
+    snprintf(l_ptrHostApi->pulseaudioDefaultSink, PAPULSEAUDIO_MAX_DEVICENAME, "%s", i->default_sink_name);
   }
 
   if(i->default_source_name != NULL)
   {
-    strncpy(l_ptrHostApi->pulseaudioDefaultSource, i->default_source_name, 64);
+    /* Make sure there is '\0' is at the end of string with using snprintf */
+    snprintf(l_ptrHostApi->pulseaudioDefaultSource, PAPULSEAUDIO_MAX_DEVICENAME, "%s", i->default_source_name);
   }
 
   pa_threaded_mainloop_signal(l_ptrHostApi->mainloop, 0);
