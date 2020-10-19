@@ -108,7 +108,6 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New(
 {
     PaPulseAudio_HostApiRepresentation *ptr;
     int fd[2] = { -1, -1 };
-    char proc[PAPULSEAUDIO_MAX_DEVICENAME];
     char buf[PAPULSEAUDIO_MAX_DEVICENAME];
 
     ptr =
