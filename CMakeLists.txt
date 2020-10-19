@@ -366,26 +366,21 @@ elseif(UNIX)
       set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_AUDIOIO=1")
     endif()
 
-    if(PULSEAUDIO_FOUND)
-      OPTION(PA_USE_PULSEAUDIO "Enable support for PulseAudio" ON)
-    else()
-      OPTION(PA_USE_PULSEAUDIO "Disable support for PulseAudio" OFF)
-    endif()
-
+    find_package(PulseAudio)
+    cmake_dependent_option(PA_USE_PULSEAUDIO "Enable support for PulseAudio general purpose sound server" ON PulseAudio_FOUND OFF)
     if(PA_USE_PULSEAUDIO)
-      find_package(PULSEAUDIO)
-      set(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} ${PULSEAUDIO_INCLUDE_DIRS})
-      set(PA_PULSEAUDIO_SOURCES src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
-                                src/hostapi/pulseaudio/pa_linux_pulseaudio.c
-                                src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
-      source_group("hostapi\\PULSEAUDIO" FILES ${PA_PULSEAUDIO_SOURCES})
-      set(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} src/hostapi/pulseaudio/pa_linux_pulseaudio_block.h
-                                                   src/hostapi/pulseaudio/pa_linux_pulseaudio.h
-                                                   src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.h)
-      set(PA_SOURCES ${PA_SOURCES} ${PA_PULSEAUDIO_SOURCES})
-      set(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} PA_USE_PULSEAUDIO)
-      set(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ${PULSEAUDIO_LIBRARIES})
-      set(PA_PKGCONFIG_LDFLAGS "${PA_PKGCONFIG_LDFLAGS} -lpulseaudio")
+      message(WARNING "${PulseAudio_LIBRARIES}")
+      target_link_libraries(PortAudio PRIVATE "${PulseAudio_LIBRARIES}")
+      target_sources(PortAudio PRIVATE
+        src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
+        src/hostapi/pulseaudio/pa_linux_pulseaudio.c
+        src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
+
+      target_compile_definitions(PortAudio PRIVATE PA_USE_PULSEAUDIO=1)
+      set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} libpulse")
+
+      # needed for PortAudioConfig.cmake so `find_package(PortAudio)` works in downstream projects
+      install(FILES cmake/modules/FindPulseAudio.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
     endif()
 
   endif()
