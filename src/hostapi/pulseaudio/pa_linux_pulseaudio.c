@@ -303,8 +303,6 @@ int _PaPulseAudio_AddAudioDevice(
 
     hostapi->deviceInfoArray[hostapi->deviceCount].name = l_strLocalName;
 
-    hostapi->pulseaudioDeviceNames[hostapi->deviceCount][l_iRealNameLen - 1] = '\0';
-
     hostapi->deviceInfoArray[hostapi->deviceCount].maxInputChannels = inputChannels;
     hostapi->deviceInfoArray[hostapi->deviceCount].maxOutputChannels = outputChannels;
     hostapi->deviceInfoArray[hostapi->deviceCount].defaultLowInputLatency = defaultLowInputLatency;
