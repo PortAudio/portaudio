@@ -369,8 +369,7 @@ elseif(UNIX)
     find_package(PulseAudio)
     cmake_dependent_option(PA_USE_PULSEAUDIO "Enable support for PulseAudio general purpose sound server" ON PulseAudio_FOUND OFF)
     if(PA_USE_PULSEAUDIO)
-      message(WARNING "${PulseAudio_LIBRARIES}")
-      target_link_libraries(PortAudio PRIVATE "${PulseAudio_LIBRARIES}")
+      target_link_libraries(PortAudio PRIVATE PulseAudio::PulseAudio)
       target_sources(PortAudio PRIVATE
         src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
         src/hostapi/pulseaudio/pa_linux_pulseaudio.c
