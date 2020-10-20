@@ -58,7 +58,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <pulse/pulseaudio.h>
-#include <pulse/simple.h>
 
 
 
@@ -121,7 +120,6 @@ extern "C"
         PaUnixThread thread;
         unsigned long framesPerHostCallback;
         pa_threaded_mainloop *mainloop;
-        pa_simple *simple;
         pa_context *context;
         pa_sample_spec outSampleSpec;
         pa_sample_spec inSampleSpec;
