@@ -92,6 +92,9 @@
     #include <malloc.h>
     #include <memory.h>
 #endif
+#ifndef PA_WINRT
+    #include <mmsystem.h>
+#endif
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -104,12 +107,24 @@
 #include "pa_ringbuffer.h"
 #include "pa_win_coinitialize.h"
 
-#if !defined(NTDDI_VERSION)
+#if !defined(NTDDI_VERSION) || (defined(__GNUC__) && (__GNUC__ <= 6) && !defined(__MINGW64__))
  
     #undef WINVER
     #undef _WIN32_WINNT
     #define WINVER       0x0600 // VISTA
     #define _WIN32_WINNT WINVER
+
+    #ifndef WINAPI
+        #define WINAPI __stdcall
+    #endif
+
+    #ifndef __unaligned
+        #define __unaligned
+    #endif
+    
+    #ifndef __C89_NAMELESS
+        #define __C89_NAMELESS
+    #endif
 
     #ifndef _AVRT_ //<< fix MinGW dummy compile by defining missing type: AVRT_PRIORITY
         typedef enum _AVRT_PRIORITY
@@ -129,6 +144,8 @@
         #define __LPCGUID_DEFINED__
         typedef const GUID *LPCGUID;
     #endif
+    typedef GUID IID;
+    typedef GUID CLSID;
 
     #ifndef PROPERTYKEY_DEFINED
         #define PROPERTYKEY_DEFINED
@@ -147,7 +164,6 @@
 
     #ifdef WIN64
         #include <wtypes.h>
-        typedef LONG NTSTATUS;
         #define FASTCALL
         #include <oleidl.h>
         #include <objidl.h>
@@ -160,6 +176,10 @@
         typedef /* [unique] */  __RPC_unique_pointer BYTE_BLOB *UP_BYTE_BLOB;
         typedef LONGLONG REFERENCE_TIME;
         #define NONAMELESSUNION
+    #endif
+
+    #ifndef NT_SUCCESS
+        typedef LONG NTSTATUS;
     #endif
     
     #ifndef WAVE_FORMAT_IEEE_FLOAT
