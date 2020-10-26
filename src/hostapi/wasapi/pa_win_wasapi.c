@@ -309,10 +309,10 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
     #define AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 0x80000000
 #endif
 
-#define MAX_STR_LEN 512
-
+#define PA_WASAPI_DEVICE_ID_LEN   256
+#define PA_WASAPI_DEVICE_NAME_LEN 128
 #ifdef PA_WINRT
-    #define PA_WASAPI_DEVICE_ID_LEN 4096
+    #define PA_WASAPI_DEVICE_MAX_COUNT 16
 #endif
 
 enum { S_INPUT = 0, S_OUTPUT = 1, S_COUNT = 2, S_FULLDUPLEX = 0 };
@@ -430,8 +430,8 @@ typedef struct PaWasapiDeviceInfo
     IMMDevice *device;
 #endif
 
-    // from GetId
-    WCHAR szDeviceID[MAX_STR_LEN];
+    // device Id
+    WCHAR deviceId[PA_WASAPI_DEVICE_ID_LEN];
 
     // from GetState
     DWORD state;
@@ -450,7 +450,7 @@ typedef struct PaWasapiDeviceInfo
     // Fields filled from IMMEndpoint'sGetDataFlow
     EDataFlow flow;
 
-    // Formfactor
+    // Form-factor
     EndpointFormFactor formFactor;
 }
 PaWasapiDeviceInfo;
@@ -623,10 +623,44 @@ static void *PaWasapi_ReallocateMemory(void *prev, size_t size);
 static void PaWasapi_FreeMemory(void *ptr);
 static PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext);
 
-// Local statics
+// WinRT (UWP) device list
 #ifdef PA_WINRT
-static OLECHAR g_DefaultRenderId[PA_WASAPI_DEVICE_ID_LEN] = { 0 };
-static OLECHAR g_DefaultCaptureId[PA_WASAPI_DEVICE_ID_LEN] = { 0 };
+typedef struct PaWasapiWinrtDeviceInfo
+{
+    WCHAR              id[PA_WASAPI_DEVICE_ID_LEN];
+    WCHAR              name[PA_WASAPI_DEVICE_NAME_LEN];
+    EndpointFormFactor formFactor;
+}
+PaWasapiWinrtDeviceInfo;
+typedef struct PaWasapiWinrtDeviceListRole
+{
+    WCHAR                   defaultId[PA_WASAPI_DEVICE_ID_LEN];
+    PaWasapiWinrtDeviceInfo devices[PA_WASAPI_DEVICE_MAX_COUNT];
+    UINT32                  deviceCount;
+}
+PaWasapiWinrtDeviceListRole;
+typedef struct PaWasapiWinrtDeviceList
+{
+    PaWasapiWinrtDeviceListRole render;
+    PaWasapiWinrtDeviceListRole capture;
+}
+PaWasapiWinrtDeviceList;
+static PaWasapiWinrtDeviceList g_DeviceListInfo = { 0 };
+#endif
+
+// WinRT (UWP) device list context
+#ifdef PA_WINRT
+typedef struct PaWasapiWinrtDeviceListContextEntry
+{
+    PaWasapiWinrtDeviceInfo *info;
+    EDataFlow                flow;
+}
+PaWasapiWinrtDeviceListContextEntry;
+typedef struct PaWasapiWinrtDeviceListContext
+{
+    PaWasapiWinrtDeviceListContextEntry devices[PA_WASAPI_DEVICE_MAX_COUNT * 2]; 
+}
+PaWasapiWinrtDeviceListContext;
 #endif
 
 // ------------------------------------------------------------------------------------------
@@ -1593,65 +1627,72 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Acti
     return hr;
 }
 
-static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCompletionHandler(const IID *iid, void **obj)
+static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCompletionHandler(const IID *iid, void **client)
 {
     PaActivateAudioInterfaceCompletionHandler *handler = PaUtil_AllocateMemory(sizeof(PaActivateAudioInterfaceCompletionHandler));
-    ZeroMemory(handler, sizeof(*handler));
+    
+    memset(handler, 0, sizeof(*handler));
+    
     handler->parent.lpVtbl = PaUtil_AllocateMemory(sizeof(*handler->parent.lpVtbl));
     handler->parent.lpVtbl->QueryInterface    = &PaActivateAudioInterfaceCompletionHandler_QueryInterface;
     handler->parent.lpVtbl->AddRef            = &PaActivateAudioInterfaceCompletionHandler_AddRef;
     handler->parent.lpVtbl->Release           = &PaActivateAudioInterfaceCompletionHandler_Release;
     handler->parent.lpVtbl->ActivateCompleted = &PaActivateAudioInterfaceCompletionHandler_ActivateCompleted;
-    handler->refs = 1;
+    handler->refs   = 1;
     handler->in.iid = iid;
-    handler->in.obj = obj;
+    handler->in.obj = client;
+    
     return (IActivateAudioInterfaceCompletionHandler *)handler;
 }
 #endif
 
 // ------------------------------------------------------------------------------------------
 #ifdef PA_WINRT
-static HRESULT ActivateAudioInterface_WINRT(EDataFlow flow, const IID *iid, void **obj)
+static HRESULT WinRT_GetDefaultDeviceId(WCHAR *deviceId, UINT32 deviceIdMax, EDataFlow flow)
 {
-#define PA_WASAPI_DEVICE_PATH_LEN 64
-    
-    PaError result = paNoError;
-    HRESULT hr = S_OK;
-    IActivateAudioInterfaceAsyncOperation *asyncOp = NULL;
-    IActivateAudioInterfaceCompletionHandler *handler = CreateActivateAudioInterfaceCompletionHandler(iid, obj);
-    PaActivateAudioInterfaceCompletionHandler *handlerImpl = (PaActivateAudioInterfaceCompletionHandler *)handler;
-    OLECHAR tmp[PA_WASAPI_DEVICE_PATH_LEN] = { 0 };
-    OLECHAR *devicePath = tmp;
-
-    // Get device path in form L"{DEVICE_GUID}"
     switch (flow)
     {
     case eRender:
-        if (g_DefaultRenderId[0] != 0)
-            devicePath = g_DefaultRenderId;
+        if (g_DeviceListInfo.render.defaultId[0] != 0)
+            wcsncpy_s(deviceId, deviceIdMax, g_DeviceListInfo.render.defaultId, wcslen(g_DeviceListInfo.render.defaultId));
         else
-            StringFromGUID2(&DEVINTERFACE_AUDIO_RENDER, devicePath, PA_WASAPI_DEVICE_PATH_LEN - 1);
+            StringFromGUID2(&DEVINTERFACE_AUDIO_RENDER, deviceId, deviceIdMax);
         break;
     case eCapture:
-        if (g_DefaultCaptureId[0] != 0)
-            devicePath = g_DefaultCaptureId;
+        if (g_DeviceListInfo.capture.defaultId[0] != 0)
+            wcsncpy_s(deviceId, deviceIdMax, g_DeviceListInfo.capture.defaultId, wcslen(g_DeviceListInfo.capture.defaultId));
         else
-            StringFromGUID2(&DEVINTERFACE_AUDIO_CAPTURE, devicePath, PA_WASAPI_DEVICE_PATH_LEN - 1);
+            StringFromGUID2(&DEVINTERFACE_AUDIO_CAPTURE, deviceId, deviceIdMax);
         break;
     default:
         return S_FALSE;
-    }    
+    } 
 
+    return S_OK;
+}
+#endif
+
+// ------------------------------------------------------------------------------------------
+#ifdef PA_WINRT
+static HRESULT WinRT_ActivateAudioInterface(const WCHAR *deviceId, const IID *iid, void **client)
+{    
+    PaError result = paNoError;
+    HRESULT hr = S_OK;
+    IActivateAudioInterfaceAsyncOperation *asyncOp = NULL;
+    IActivateAudioInterfaceCompletionHandler *handler = CreateActivateAudioInterfaceCompletionHandler(iid, client);
+    PaActivateAudioInterfaceCompletionHandler *handlerImpl = (PaActivateAudioInterfaceCompletionHandler *)handler;
+    UINT32 sleepToggle = 0;
+   
     // Async operation will call back to IActivateAudioInterfaceCompletionHandler::ActivateCompleted 
     // which must be an agile interface implementation
-    hr = ActivateAudioInterfaceAsync(devicePath, iid, NULL, handler, &asyncOp);
+    hr = ActivateAudioInterfaceAsync(deviceId, iid, NULL, handler, &asyncOp);
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
     // Wait in busy loop for async operation to complete
     // Use Interlocked API here to ensure that ->done variable is read every time through the loop
     while (SUCCEEDED(hr) && !InterlockedOr(&handlerImpl->done, 0))
     {
-        Sleep(1);
+        Sleep(sleepToggle ^= 1);
     }
 
     hr = handlerImpl->out.hr;
@@ -1662,8 +1703,6 @@ error:
     SAFE_RELEASE(handler);
 
     return hr;
-    
-#undef PA_WASAPI_DEVICE_PATH_LEN
 }
 #endif
 
@@ -1677,7 +1716,7 @@ static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, cons
     if (FAILED(hr = IMMDevice_Activate(deviceInfo->device, GetAudioClientIID(), CLSCTX_ALL, NULL, (void **)client)))
         return hr;
 #else
-    if (FAILED(hr = ActivateAudioInterface_WINRT(deviceInfo->flow, GetAudioClientIID(), (void **)client)))
+    if (FAILED(hr = WinRT_ActivateAudioInterface(deviceInfo->deviceId, GetAudioClientIID(), (void **)client)))
         return hr;
 #endif
 
@@ -1766,37 +1805,41 @@ static PaError FillInactiveDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, P
 }
 
 // ------------------------------------------------------------------------------------------
-static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEndPoints, INT32 index, const WCHAR *defaultRenderer, 
-    const WCHAR *defaultCapturer, PaDeviceInfo *deviceInfo, PaWasapiDeviceInfo *wasapiDeviceInfo)
+static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEndPoints, INT32 index, const WCHAR *defaultRenderId, 
+    const WCHAR *defaultCaptureId, PaDeviceInfo *deviceInfo, PaWasapiDeviceInfo *wasapiDeviceInfo
+#ifdef PA_WINRT
+    , PaWasapiWinrtDeviceListContext *deviceListContext
+#endif
+)
 {
     HRESULT hr;
     PaError result;
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
+#ifdef PA_WINRT
+    PaWasapiWinrtDeviceListContextEntry *listEntry = &deviceListContext->devices[index];
+    (void)pEndPoints;
+    (void)defaultRenderId;
+    (void)defaultCaptureId;
+#endif
 
 #ifndef PA_WINRT
     hr = IMMDeviceCollection_Item((IMMDeviceCollection *)pEndPoints, index, &wasapiDeviceInfo->device);
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
-    // getting ID
+    // Get device Id
     {
-        WCHAR *pszDeviceId;
+        WCHAR *deviceId;
 
-        hr = IMMDevice_GetId(wasapiDeviceInfo->device, &pszDeviceId);
+        hr = IMMDevice_GetId(wasapiDeviceInfo->device, &deviceId);
         IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
-        wcsncpy(wasapiDeviceInfo->szDeviceID, pszDeviceId, MAX_STR_LEN - 1);
-        CoTaskMemFree(pszDeviceId);
-
-        if ((defaultCapturer != NULL) && (lstrcmpW(wasapiDeviceInfo->szDeviceID, defaultCapturer) == 0))
-            hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
-
-        if ((defaultRenderer != NULL) && (lstrcmpW(wasapiDeviceInfo->szDeviceID, defaultRenderer) == 0))
-            hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
+        wcsncpy(wasapiDeviceInfo->deviceId, deviceId, PA_WASAPI_DEVICE_ID_LEN - 1);
+        CoTaskMemFree(deviceId);
     }
 
+    // Get state of the device
     hr = IMMDevice_GetState(wasapiDeviceInfo->device, &wasapiDeviceInfo->state);
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
-
     if (wasapiDeviceInfo->state != DEVICE_STATE_ACTIVE)
     {
         PRINT(("WASAPI device: %d is not currently available (state:%d)\n", index, wasapiDeviceInfo->state));
@@ -1818,16 +1861,16 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
             hr = IPropertyStore_GetValue(pProperty, &PKEY_Device_FriendlyName, &value);
             IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
-            if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1)) == NULL)
+            if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN)) == NULL)
             {
                 result = paInsufficientMemory;
                 PropVariantClear(&value);
                 goto error;
             }
             if (value.pwszVal)
-                WideCharToMultiByte(CP_UTF8, 0, value.pwszVal, (int)wcslen(value.pwszVal), (char *)deviceInfo->name, MAX_STR_LEN - 1, 0, 0);
+                WideCharToMultiByte(CP_UTF8, 0, value.pwszVal, (INT32)wcslen(value.pwszVal), (char *)deviceInfo->name, PA_WASAPI_DEVICE_NAME_LEN - 1, 0, 0);
             else
-                _snprintf((char *)deviceInfo->name, MAX_STR_LEN - 1, "baddev%d", index);
+                _snprintf((char *)deviceInfo->name, PA_WASAPI_DEVICE_NAME_LEN - 1, "baddev%d", index);
             
             PropVariantClear(&value);
 
@@ -1879,24 +1922,39 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
         SAFE_RELEASE(pProperty);
     }
 #else
-    (void)pEndPoints;
-    (void)defaultRenderer;
-    (void)defaultCapturer;
+    // Set device Id
+    wcsncpy(wasapiDeviceInfo->deviceId, listEntry->info->id, PA_WASAPI_DEVICE_ID_LEN - 1);
+
+    // Set device name
+    if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN)) == NULL)
+    {
+        result = paInsufficientMemory;
+        goto error;
+    }
+    ((char *)deviceInfo->name)[0] = 0;
+    if (listEntry->info->name[0] != 0)
+        WideCharToMultiByte(CP_UTF8, 0, listEntry->info->name, (INT32)wcslen(listEntry->info->name), (char *)deviceInfo->name, PA_WASAPI_DEVICE_NAME_LEN - 1, 0, 0);
+    if (deviceInfo->name[0] == 0) // fallback if WideCharToMultiByte is failed, or listEntry is nameless
+        _snprintf((char *)deviceInfo->name, PA_WASAPI_DEVICE_NAME_LEN - 1, "WASAPI_%s:%d", (listEntry->flow == eRender ? "Output" : "Input"), index);
+
+    // Form-factor
+    wasapiDeviceInfo->formFactor = listEntry->info->formFactor;
+
+    // Set data flow
+    wasapiDeviceInfo->flow = listEntry->flow;
 #endif
 
-    // Getting a temporary IAudioClient for more fields
-    // we make sure NOT to call Initialize yet!
+    // Set default Output/Input devices
+    if ((defaultRenderId != NULL) && (wcsncmp(wasapiDeviceInfo->deviceId, defaultRenderId, PA_WASAPI_DEVICE_NAME_LEN - 1) == 0))
+        hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;   
+    if ((defaultCaptureId != NULL) && (wcsncmp(wasapiDeviceInfo->deviceId, defaultCaptureId, PA_WASAPI_DEVICE_NAME_LEN - 1) == 0))
+        hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
+
+    // Get a temporary IAudioClient for more details
     {
         IAudioClient *tmpClient;
         WAVEFORMATEX *mixFormat;
 
-    #ifdef PA_WINRT
-        // Set flow as ActivateAudioInterface depends on it and selects corresponding 
-        // direction for the Audio Client
-        wasapiDeviceInfo->flow = (index == 0 ? eRender : eCapture);
-    #endif
-
-        // Create temp Audio Client instance to query additional details
         hr = ActivateAudioInterface(wasapiDeviceInfo, NULL, &tmpClient);
         IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
@@ -1926,30 +1984,11 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
     #ifdef PA_WINRT
         if (SUCCEEDED(hr))
         {
-            // Default device
-            if (index == 0)
-                hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
-            else
-                hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
-
-            // State
+            // Set state
             wasapiDeviceInfo->state = DEVICE_STATE_ACTIVE;
 
-            // Default format is always a mix format
+            // Default format (Shared mode) is always a mix format
             wasapiDeviceInfo->DefaultFormat = wasapiDeviceInfo->MixFormat;
-
-            // Form-factor
-            wasapiDeviceInfo->formFactor = UnknownFormFactor;
-
-            // Name
-            if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, MAX_STR_LEN + 1)) == NULL)
-            {
-                SAFE_RELEASE(tmpClient);
-                result = paInsufficientMemory;
-                goto error;
-            }
-            _snprintf((char *)deviceInfo->name, MAX_STR_LEN - 1, "WASAPI_%s:%d", (index == 0 ? "Output" : "Input"), index);
-            PA_DEBUG(("WASAPI:%d| name[%s]\n", index, deviceInfo->name));
         }
     #endif
 
@@ -2049,9 +2088,9 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaError result = paNoError;
     PaDeviceInfo *deviceInfoArray;
-    UINT i;
-    WCHAR *defaultRenderer = NULL;
-    WCHAR *defaultCapturer = NULL;
+    UINT32 i;
+    WCHAR *defaultRenderId = NULL;
+    WCHAR *defaultCaptureId = NULL;
 #ifndef PA_WINRT
     HRESULT hr;
     IMMDeviceCollection *pEndPoints = NULL;
@@ -2059,6 +2098,9 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 #else
     void *pEndPoints = NULL;
     IAudioClient *tmpClient;
+    PaWasapiWinrtDeviceListContext deviceListContext = { 0 };
+    PaWasapiWinrtDeviceInfo defaultRender = { 0 };
+    PaWasapiWinrtDeviceInfo defaultCapture = { 0 };
 #endif
 
     // Make sure device list empty
@@ -2084,7 +2126,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
         }
         else
         {
-            hr = IMMDevice_GetId(device, &defaultRenderer);
+            hr = IMMDevice_GetId(device, &defaultRenderId);
             IMMDevice_Release(device);
             IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
         }
@@ -2099,7 +2141,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
         }
         else
         {
-            hr = IMMDevice_GetId(device, &defaultCapturer);
+            hr = IMMDevice_GetId(device, &defaultCaptureId);
             IMMDevice_Release(device);
             IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
         }
@@ -2113,16 +2155,52 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     hr = IMMDeviceCollection_GetCount(pEndPoints, &paWasapi->deviceCount);
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 #else
-    // Determine number of available devices by activating AudioClient for render and capture data flows
-    if (SUCCEEDED(ActivateAudioInterface_WINRT(eRender, GetAudioClientIID(), &tmpClient)))
+    WinRT_GetDefaultDeviceId(defaultRender.id, STATIC_ARRAY_SIZE(defaultRender.id) - 1, eRender);
+    defaultRenderId = defaultRender.id;
+
+    WinRT_GetDefaultDeviceId(defaultCapture.id, STATIC_ARRAY_SIZE(defaultCapture.id) - 1, eCapture);
+    defaultCaptureId = defaultCapture.id;
+
+    if (g_DeviceListInfo.render.deviceCount == 0)
     {
-        paWasapi->deviceCount++;
-        SAFE_RELEASE(tmpClient);
+        if (SUCCEEDED(WinRT_ActivateAudioInterface(defaultRenderId, GetAudioClientIID(), &tmpClient)))
+        {
+            deviceListContext.devices[paWasapi->deviceCount].info = &defaultRender;
+            deviceListContext.devices[paWasapi->deviceCount].flow = eRender;
+            paWasapi->deviceCount++;
+
+            SAFE_RELEASE(tmpClient);
+        }
     }
-    if (SUCCEEDED(ActivateAudioInterface_WINRT(eCapture, GetAudioClientIID(), &tmpClient)))
+    else
     {
-        paWasapi->deviceCount++;
-        SAFE_RELEASE(tmpClient);
+        for (i = 0; i < g_DeviceListInfo.render.deviceCount; ++i)
+        {
+            deviceListContext.devices[paWasapi->deviceCount].info = &g_DeviceListInfo.render.devices[i];
+            deviceListContext.devices[paWasapi->deviceCount].flow = eRender;
+            paWasapi->deviceCount++;
+        }    
+    }
+
+    if (g_DeviceListInfo.capture.deviceCount == 0)
+    {
+        if (SUCCEEDED(WinRT_ActivateAudioInterface(defaultCaptureId, GetAudioClientIID(), &tmpClient)))
+        {
+            deviceListContext.devices[paWasapi->deviceCount].info = &defaultCapture;
+            deviceListContext.devices[paWasapi->deviceCount].flow = eCapture;
+            paWasapi->deviceCount++;
+            
+            SAFE_RELEASE(tmpClient);
+        }
+    }
+    else
+    {
+        for (i = 0; i < g_DeviceListInfo.capture.deviceCount; ++i)
+        {
+            deviceListContext.devices[paWasapi->deviceCount].info = &g_DeviceListInfo.capture.devices[i];
+            deviceListContext.devices[paWasapi->deviceCount].flow = eCapture;
+            paWasapi->deviceCount++;
+        }    
     }
 #endif
 
@@ -2143,8 +2221,12 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 
         FillBaseDeviceInfo(deviceInfo, hostApiIndex);
 
-        if ((result = FillDeviceInfo(paWasapi, pEndPoints, i, defaultRenderer, defaultCapturer, 
-            deviceInfo, &paWasapi->devInfo[i])) != paNoError)
+        if ((result = FillDeviceInfo(paWasapi, pEndPoints, i, defaultRenderId, defaultCaptureId, 
+            deviceInfo, &paWasapi->devInfo[i]
+        #ifdef PA_WINRT
+            , &deviceListContext
+        #endif            
+            )) != paNoError)
         {
             // Faulty device is made inactive
             if ((result = FillInactiveDeviceInfo(paWasapi, deviceInfo)) != paNoError)
@@ -2182,8 +2264,8 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 done:
 
 #ifndef PA_WINRT
-    CoTaskMemFree(defaultRenderer);
-    CoTaskMemFree(defaultCapturer);
+    CoTaskMemFree(defaultRenderId);
+    CoTaskMemFree(defaultCaptureId);
     SAFE_RELEASE(pEndPoints);
     SAFE_RELEASE(pEnumerator);
 #endif
@@ -5346,10 +5428,30 @@ PaError PaWasapi_GetAudioClient(PaStream *pStream, void **pAudioClient, int bOut
 }
 
 // ------------------------------------------------------------------------------------------
-PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput )
+#ifdef PA_WINRT
+static void CopyNameOrIdString(WCHAR *dst, const UINT32 dstMaxCount, const WCHAR *src)
+{
+    UINT32 i;
+
+    for (i = 0; i < dstMaxCount; ++i)
+        dst[i] = 0;
+
+    if (src != NULL)
+    {
+        for (i = 0; (src[i] != 0) && (i < dstMaxCount); ++i)
+            dst[i] = src[i];
+    }
+}
+#endif
+
+// ------------------------------------------------------------------------------------------
+PaError PaWasapiWinrt_SetDefaultDeviceId( const unsigned short *pId, int bOutput )
 {
 #ifdef PA_WINRT
-    int i;
+    INT32 i;
+    PaWasapiWinrtDeviceListRole *role = (bOutput ? &g_DeviceListInfo.render : &g_DeviceListInfo.capture);
+
+    assert(STATIC_ARRAY_SIZE(role->defaultId) == PA_WASAPI_DEVICE_ID_LEN);
 
     // Validate Id length
     if (pId != NULL)
@@ -5362,27 +5464,66 @@ PaError PaWasapi_SetDefaultInterfaceId( unsigned short *pId, int bOutput )
     }
 
     // Set Id (or reset to all 0 if NULL is provided)
-    if (bOutput)
+    CopyNameOrIdString(role->defaultId, STATIC_ARRAY_SIZE(role->defaultId), pId);
+
+    return paNoError;
+#else
+    return paIncompatibleStreamHostApi;
+#endif
+}
+
+// ------------------------------------------------------------------------------------------
+PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsigned short **pName, 
+    const PaWasapiDeviceRole *pRole, unsigned int count, int bOutput )
+{
+#ifdef PA_WINRT
+    UINT32 i, j;
+    PaWasapiWinrtDeviceListRole *role = (bOutput ? &g_DeviceListInfo.render : &g_DeviceListInfo.capture);
+
+    memset(&role->devices, 0, sizeof(role->devices));
+    role->deviceCount = 0;
+
+    if (count == 0)
+        return paNoError;
+    else
+    if (count > PA_WASAPI_DEVICE_MAX_COUNT)
+        return paBufferTooBig;
+
+    // pName or pRole are optional
+    if (pId == NULL)
+        return paInsufficientMemory;
+
+    // Validate Id and Name lengths
+    for (i = 0; i < count; ++i)
     {
-        memset(g_DefaultRenderId, 0, sizeof(g_DefaultRenderId));
-        if (pId != NULL)
+        const unsigned short *id = pId[i];
+        const unsigned short *name = pName[i];
+
+        for (j = 0; id[j] != 0; ++j)
         {
-            for (i = 0; (pId[i] != 0) && (i < STATIC_ARRAY_SIZE(g_DefaultRenderId)); ++i)
-                g_DefaultRenderId[i] = pId[i];
+            if (j >= PA_WASAPI_DEVICE_ID_LEN)
+                return paBufferTooBig;
+        }
+
+        for (j = 0; name[j] != 0; ++j)
+        {
+            if (j >= PA_WASAPI_DEVICE_NAME_LEN)
+                return paBufferTooBig;
         }
     }
-    else
+
+    // Set Id and Name (or reset to all 0 if NULL is provided)
+    for (i = 0; i < count; ++i)
     {
-        memset(g_DefaultCaptureId, 0, sizeof(g_DefaultCaptureId));
-        if (pId != NULL)
-        {
-            for (i = 0; (pId[i] != 0) && (i < STATIC_ARRAY_SIZE(g_DefaultCaptureId)); ++i)
-                g_DefaultCaptureId[i] = pId[i];
-        }
+        CopyNameOrIdString(role->devices[i].id, STATIC_ARRAY_SIZE(role->devices[i].id), pId[i]);
+        CopyNameOrIdString(role->devices[i].name, STATIC_ARRAY_SIZE(role->devices[i].name), pName[i]);
+        role->devices[i].formFactor = (pRole != NULL ? (EndpointFormFactor)pRole[i] : UnknownFormFactor);
+
+        // Count device if it has at least the Id
+        role->deviceCount += (role->devices[i].id[0] != 0);
     }
 
     return paNoError;
-
 #else
     return paIncompatibleStreamHostApi;
 #endif
