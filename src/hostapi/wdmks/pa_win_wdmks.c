@@ -1971,8 +1971,8 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                                 }
                                 else
                                 {
-                                    /* Should never come here! */
-                                    assert(FALSE);
+                                    /* Unconnected pin */
+                                    goto error;
                                 }
                             }
                         }
