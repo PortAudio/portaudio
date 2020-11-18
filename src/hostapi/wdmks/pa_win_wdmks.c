@@ -2845,6 +2845,10 @@ PaError FilterInitializePins( PaWinWdmFilter* filter )
             filter->pins[pinId] = newPin;
             ++filter->validPinCount;
         }
+        else
+        {
+            filter->pins[pinId] = 0;
+        }
     }
 
     if (filter->validPinCount == 0)

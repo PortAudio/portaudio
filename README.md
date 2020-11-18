@@ -9,15 +9,15 @@ native format internally.
 
 ## Documentation:
 
-* Documentation is available in "/doc/html/index.html"
-* Also see "src/common/portaudio.h" for API spec.
-* Also see http://www.portaudio.com/docs/
-* And see the "test/" directory for many examples of usage. (we suggest "test/patest_saw.c" for an example)
+* Documentation is available at http://www.portaudio.com/docs/
+* Or at `/doc/html/index.html` after running Doxygen.
+* Also see `src/common/portaudio.h` for the API spec.
+* And see the `examples/` and `test/` directories for many examples of usage. (We suggest `examples/paex_saw.c` for an example.)
 
 For information on compiling programs with PortAudio, please see the
 tutorial at:
 
-  http://portaudio.com/trac/wiki/TutorialDir/TutorialStart
+  http://portaudio.com/docs/v19-doxydocs/tutorial_start.html
   
 We have an active mailing list for user and developer discussions.
 Please feel free to join. See http://www.portaudio.com for details.
