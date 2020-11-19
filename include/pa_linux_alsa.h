@@ -50,6 +50,8 @@
 extern "C" {
 #endif
 
+PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex );
+
 typedef struct PaAlsaStreamInfo
 {
     unsigned long size;
