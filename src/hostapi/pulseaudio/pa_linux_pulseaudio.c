@@ -67,9 +67,7 @@
 extern char *__progname;
 
 /* PulseAudio specific functions */
-int PaPulseAudio_CheckConnection(
-    PaPulseAudio_HostApiRepresentation * ptr
-)
+int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
     pa_context_state_t state;
 
@@ -102,9 +100,7 @@ int PaPulseAudio_CheckConnection(
     return 0;
 }
 
-PaPulseAudio_HostApiRepresentation *PaPulseAudio_New(
-    void
-)
+PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 {
     PaPulseAudio_HostApiRepresentation *ptr;
     int fd[2] = { -1, -1 };
@@ -163,9 +159,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New(
     return NULL;
 }
 
-void PaPulseAudio_Free(
-    PaPulseAudio_HostApiRepresentation * ptr
-)
+void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
 {
 
     /* Sanity check if ptr if NULL don't go anywhere or
@@ -198,10 +192,8 @@ void PaPulseAudio_Free(
 }
 
 
-void PaPulseAudio_CheckContextStateCb(
-    pa_context * c,
-    void *userdata
-)
+void PaPulseAudio_CheckContextStateCb( pa_context * c,
+                                      void *userdata )
 {
     PaPulseAudio_HostApiRepresentation *ptr = userdata;
 
@@ -218,11 +210,9 @@ void PaPulseAudio_CheckContextStateCb(
     pa_threaded_mainloop_signal(ptr->mainloop, 0);
 }
 
-void PaPulseAudio_ServerInfoCb(
-    pa_context *c,
-    const pa_server_info *i,
-    void *userdata
-)
+void PaPulseAudio_ServerInfoCb( pa_context *c,
+                                const pa_server_info *i,
+                                void *userdata )
 {
   PaPulseAudio_HostApiRepresentation *l_ptrHostApi =
       (PaPulseAudio_HostApiRepresentation *) userdata;
@@ -248,18 +238,16 @@ void PaPulseAudio_ServerInfoCb(
 }
 
 
-int _PaPulseAudio_AddAudioDevice(
-    PaPulseAudio_HostApiRepresentation *hostapi,
-    const char *PaPulseAudio_SinkSourceName,
-    const char *PaPulseAudio_SinkSourceNameDesc,
-    int inputChannels,
-    int outputChannels,
-    double defaultLowInputLatency,
-    double defaultHighInputLatency,
-    double defaultLowOutputLatency,
-    double defaultHighOutputLatency,
-    const long defaultSampleRate
-)
+int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
+                                  const char *PaPulseAudio_SinkSourceName,
+                                  const char *PaPulseAudio_SinkSourceNameDesc,
+                                  int inputChannels,
+                                  int outputChannels,
+                                  double defaultLowInputLatency,
+                                  double defaultHighInputLatency,
+                                  double defaultLowOutputLatency,
+                                  double defaultHighOutputLatency,
+                                  const long defaultSampleRate )
 {
     /* These should be at least 1 */
     int l_iRealNameLen = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME);
@@ -318,12 +306,10 @@ int _PaPulseAudio_AddAudioDevice(
     return paNoError;
 }
 
-void PaPulseAudio_SinkListCb(
-    pa_context * c,
-    const pa_sink_info * l,
-    int eol,
-    void *userdata
-)
+void PaPulseAudio_SinkListCb( pa_context * c,
+                              const pa_sink_info * l,
+                              int eol,
+                              void *userdata )
 {
     PaPulseAudio_HostApiRepresentation *l_ptrHostApi =
         (PaPulseAudio_HostApiRepresentation *) userdata;
@@ -372,12 +358,10 @@ void PaPulseAudio_SinkListCb(
     pa_threaded_mainloop_signal(l_ptrHostApi->mainloop, 0);
 }
 
-void PaPulseAudio_SourceListCb(
-    pa_context * c,
-    const pa_source_info * l,
-    int eol,
-    void *userdata
-)
+void PaPulseAudio_SourceListCb( pa_context * c,
+                                const pa_source_info * l,
+                                int eol,
+                                void *userdata )
 {
     PaPulseAudio_HostApiRepresentation *l_ptrHostApi =
         (PaPulseAudio_HostApiRepresentation *) userdata;
@@ -427,10 +411,8 @@ void PaPulseAudio_SourceListCb(
 }
 
 /* This routine is called whenever the stream state changes */
-void PaPulseAudio_StreamStateCb(
-    pa_stream * s,
-    void *userdata
-)
+void PaPulseAudio_StreamStateCb( pa_stream * s,
+                                 void *userdata )
 {
     const pa_buffer_attr *a;
     /* If you need debug pring enable these
@@ -466,10 +448,8 @@ void PaPulseAudio_StreamStateCb(
     }
 }
 
-void PaPulseAudio_StreamUnderflowCb(
-    pa_stream * s,
-    void *userdata
-)
+void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
+                                     void *userdata )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) userdata;
 
@@ -501,10 +481,8 @@ void PaPulseAudio_StreamUnderflowCb(
 }
 
 
-PaError PaPulseAudio_Initialize(
-    PaUtilHostApiRepresentation ** hostApi,
-    PaHostApiIndex hostApiIndex
-)
+PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
+                                 PaHostApiIndex hostApiIndex )
 {
     PaError result = paNoError;
     int i;
@@ -691,9 +669,7 @@ PaError PaPulseAudio_Initialize(
 }
 
 
-void Terminate(
-    struct PaUtilHostApiRepresentation *hostApi
-)
+void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 {
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
         (PaPulseAudio_HostApiRepresentation *) hostApi;
@@ -712,12 +688,10 @@ void Terminate(
 }
 
 
-PaError IsFormatSupported(
-    struct PaUtilHostApiRepresentation *hostApi,
-    const PaStreamParameters * inputParameters,
-    const PaStreamParameters * outputParameters,
-    double sampleRate
-)
+PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
+                           const PaStreamParameters * inputParameters,
+                           const PaStreamParameters * outputParameters,
+                           double sampleRate )
 {
     int inputChannelCount,
      outputChannelCount;
@@ -807,10 +781,8 @@ PaError IsFormatSupported(
     return paFormatIsSupported;
 }
 
-PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_(
-    PaSampleFormat portaudiosf,
-    pa_sample_spec * pulseaudiosf
-)
+PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_( PaSampleFormat portaudiosf,
+                                                            pa_sample_spec * pulseaudiosf )
 {
     switch (portaudiosf)
     {
@@ -851,11 +823,9 @@ PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_(
 
 
 /* Allocate buffer. */
-PaError PaPulseAudio_BlockingInitRingBuffer(
-    PaPulseAudio_Stream * stream,
-    PaUtilRingBuffer * rbuf,
-    int size
-)
+PaError PaPulseAudio_BlockingInitRingBuffer( PaPulseAudio_Stream * stream,
+                                             PaUtilRingBuffer * rbuf,
+                                             int size )
 {
     long l_lNumBytes = 4096 * size;
     char *l_ptrBuffer = (char *) malloc(l_lNumBytes);
@@ -872,17 +842,15 @@ PaError PaPulseAudio_BlockingInitRingBuffer(
 
 /* see pa_hostapi.h for a list of validity guarantees made about OpenStream parameters */
 
-PaError OpenStream(
-    struct PaUtilHostApiRepresentation *hostApi,
-    PaStream ** s,
-    const PaStreamParameters * inputParameters,
-    const PaStreamParameters * outputParameters,
-    double sampleRate,
-    unsigned long framesPerBuffer,
-    PaStreamFlags streamFlags,
-    PaStreamCallback * streamCallback,
-    void *userData
-)
+PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
+                    PaStream ** s,
+                    const PaStreamParameters * inputParameters,
+                    const PaStreamParameters * outputParameters,
+                    double sampleRate,
+                    unsigned long framesPerBuffer,
+                    PaStreamFlags streamFlags,
+                    PaStreamCallback * streamCallback,
+                    void *userData )
 {
     PaError result = paNoError;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
@@ -1193,27 +1161,21 @@ PaError OpenStream(
     return result;
 }
 
-PaError IsStreamStopped(
-    PaStream * s
-)
+PaError IsStreamStopped( PaStream * s )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
     return stream->isStopped;
 }
 
 
-PaError IsStreamActive(
-    PaStream * s
-)
+PaError IsStreamActive( PaStream * s )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
     return stream->isActive;
 }
 
 
-PaTime GetStreamTime(
-    PaStream * s
-)
+PaTime GetStreamTime( PaStream * s )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi = stream->hostapi;
@@ -1236,9 +1198,7 @@ PaTime GetStreamTime(
 }
 
 
-double GetStreamCpuLoad(
-    PaStream * s
-)
+double GetStreamCpuLoad( PaStream * s )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
 

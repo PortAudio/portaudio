@@ -85,172 +85,139 @@ extern "C"
    @todo change this to something more sophisticated */
 #define PULSEAUDIO_BUFFER_SIZE (88100 * 4 * 2)
 
-    typedef struct
-    {
-        PaUtilHostApiRepresentation inheritedHostApiRep;
-        PaUtilStreamInterface callbackStreamInterface;
-        PaUtilStreamInterface blockingStreamInterface;
+typedef struct
+{
+    PaUtilHostApiRepresentation inheritedHostApiRep;
+    PaUtilStreamInterface callbackStreamInterface;
+    PaUtilStreamInterface blockingStreamInterface;
 
-        PaUtilAllocationGroup *allocations;
+    PaUtilAllocationGroup *allocations;
 
-        PaHostApiIndex hostApiIndex;
-        PaDeviceInfo deviceInfoArray[PAPULSEAUDIO_MAX_DEVICECOUNT];
-        char *pulseaudioDeviceNames[PAPULSEAUDIO_MAX_DEVICECOUNT];
-        char pulseaudioDefaultSource[PAPULSEAUDIO_MAX_DEVICENAME];
-        char pulseaudioDefaultSink[PAPULSEAUDIO_MAX_DEVICENAME];
+    PaHostApiIndex hostApiIndex;
+    PaDeviceInfo deviceInfoArray[PAPULSEAUDIO_MAX_DEVICECOUNT];
+    char *pulseaudioDeviceNames[PAPULSEAUDIO_MAX_DEVICECOUNT];
+    char pulseaudioDefaultSource[PAPULSEAUDIO_MAX_DEVICENAME];
+    char pulseaudioDefaultSink[PAPULSEAUDIO_MAX_DEVICENAME];
 
-        /* PulseAudio stuff goes here */
-        pa_threaded_mainloop *mainloop;
-        pa_context *context;
-        int deviceCount;
-        pa_context_state_t state;
-        pa_time_event *timeEvent;
-    }
-    PaPulseAudio_HostApiRepresentation;
+    /* PulseAudio stuff goes here */
+    pa_threaded_mainloop *mainloop;
+    pa_context *context;
+    int deviceCount;
+    pa_context_state_t state;
+    pa_time_event *timeEvent;
+}
+PaPulseAudio_HostApiRepresentation;
 
 /* PaPulseAudio_Stream - a stream data structure specifically for this implementation */
 
-    typedef struct PaPulseAudio_Stream
-    {
-        PaUtilStreamRepresentation streamRepresentation;
-        PaUtilCpuLoadMeasurer cpuLoadMeasurer;
-        PaUtilBufferProcessor bufferProcessor;
-        PaPulseAudio_HostApiRepresentation *hostapi;
+typedef struct PaPulseAudio_Stream
+{
+    PaUtilStreamRepresentation streamRepresentation;
+    PaUtilCpuLoadMeasurer cpuLoadMeasurer;
+    PaUtilBufferProcessor bufferProcessor;
+    PaPulseAudio_HostApiRepresentation *hostapi;
 
-        PaUnixThread thread;
-        unsigned long framesPerHostCallback;
-        pa_threaded_mainloop *mainloop;
-        pa_context *context;
-        pa_sample_spec outSampleSpec;
-        pa_sample_spec inSampleSpec;
-        pa_stream *outStream;
-        pa_stream *inStream;
-        size_t writableSize;
-        pa_usec_t outStreamTime;
-        pa_buffer_attr bufferAttr;
-        int underflows;
-        int latency;
-        int outputChannelCount;
+    PaUnixThread thread;
+    unsigned long framesPerHostCallback;
+    pa_threaded_mainloop *mainloop;
+    pa_context *context;
+    pa_sample_spec outSampleSpec;
+    pa_sample_spec inSampleSpec;
+    pa_stream *outStream;
+    pa_stream *inStream;
+    size_t writableSize;
+    pa_usec_t outStreamTime;
+    pa_buffer_attr bufferAttr;
+    int underflows;
+    int latency;
+    int outputChannelCount;
 
-        int callbackMode;       /* bool: are we running in callback mode? */
-        int rtSched;
-        long maxFramesPerBuffer;
-        long maxFramesHostPerBuffer;
-        int outputFrameSize;
-        int inputFrameSize;
+    int callbackMode;       /* bool: are we running in callback mode? */
+    int rtSched;
+    long maxFramesPerBuffer;
+    long maxFramesHostPerBuffer;
+    int outputFrameSize;
+    int inputFrameSize;
 
-        PaDeviceIndex inDevice;
-        PaDeviceIndex outDevice;
+    PaDeviceIndex inDevice;
+    PaDeviceIndex outDevice;
 
-        void *outBuffer;
-        void *inBuffer;
+    void *outBuffer;
+    void *inBuffer;
 
-        PaUtilRingBuffer inputRing;
-        PaUtilRingBuffer outputRing;
+    PaUtilRingBuffer inputRing;
+    PaUtilRingBuffer outputRing;
 
-        /* Used in communication between threads */
-        volatile sig_atomic_t callback_finished;        /* bool: are we in the "callback finished" state? */
-        volatile sig_atomic_t callbackAbort;    /* Drop frames? */
-        volatile sig_atomic_t isActive; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
-        volatile sig_atomic_t isStopped;        /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    /* Used in communication between threads */
+    volatile sig_atomic_t callback_finished;        /* bool: are we in the "callback finished" state? */
+    volatile sig_atomic_t callbackAbort;    /* Drop frames? */
+    volatile sig_atomic_t isActive; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    volatile sig_atomic_t isStopped;        /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
 
-    }
-    PaPulseAudio_Stream;
+}
+PaPulseAudio_Stream;
 
-    PaError PaPulseAudio_Initialize(
-    PaUtilHostApiRepresentation ** hostApi,
-    PaHostApiIndex index
-    );
+PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
+                                 PaHostApiIndex index );
 
-    void Terminate(
-    struct PaUtilHostApiRepresentation *hostApi
-    );
+void Terminate( struct PaUtilHostApiRepresentation *hostApi );
 
 
-    PaError IsFormatSupported(
-    struct PaUtilHostApiRepresentation *hostApi,
-    const PaStreamParameters * inputParameters,
-    const PaStreamParameters * outputParameters,
-    double sampleRate
-    );
+PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
+                           const PaStreamParameters * inputParameters,
+                           const PaStreamParameters * outputParameters,
+                           double sampleRate );
 
-    PaError OpenStream(
-    struct PaUtilHostApiRepresentation *hostApi,
-    PaStream ** s,
-    const PaStreamParameters * inputParameters,
-    const PaStreamParameters * outputParameters,
-    double sampleRate,
-    unsigned long framesPerBuffer,
-    PaStreamFlags streamFlags,
-    PaStreamCallback * streamCallback,
-    void *userData
-    );
+PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
+                    PaStream ** s,
+                    const PaStreamParameters * inputParameters,
+                    const PaStreamParameters * outputParameters,
+                    double sampleRate,
+                    unsigned long framesPerBuffer,
+                    PaStreamFlags streamFlags,
+                    PaStreamCallback * streamCallback,
+                    void *userData );
 
 
-    PaError IsStreamStopped(
-    PaStream * s
-    );
-    PaError IsStreamActive(
-    PaStream * stream
-    );
+PaError IsStreamStopped( PaStream * s );
+PaError IsStreamActive( PaStream * stream );
 
-    PaTime GetStreamTime(
-    PaStream * stream
-    );
-    double GetStreamCpuLoad(
-    PaStream * stream
-    );
+PaTime GetStreamTime( PaStream * stream );
+double GetStreamCpuLoad( PaStream * stream );
 
-    PaPulseAudio_HostApiRepresentation *PaPulseAudio_New(
-    void
-    );
-    void PaPulseAudio_Free(
-    PaPulseAudio_HostApiRepresentation * ptr
-    );
+PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void );
+void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr );
 
-    int PaPulseAudio_CheckConnection(
-    PaPulseAudio_HostApiRepresentation * ptr
-    );
+int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr );
 
-    void PaPulseAudio_CheckContextStateCb(
-    pa_context * c,
-    void *userdata
-    );
-    void PaPulseAudio_ServerInfoCb(
-        pa_context *c,
-        const pa_server_info *i,
-        void *userdata
-    );
-    void PaPulseAudio_SinkListCb(
-    pa_context * c,
-    const pa_sink_info * l,
-    int eol,
-    void *userdata
-    );
-    void PaPulseAudio_SourceListCb(
-    pa_context * c,
-    const pa_source_info * l,
-    int eol,
-    void *userdata
-    );
+void PaPulseAudio_CheckContextStateCb( pa_context * c,
+                                       void *userdata );
+void PaPulseAudio_ServerInfoCb( pa_context *c,
+                                const pa_server_info *i,
+                                void *userdata );
 
-    void PaPulseAudio_StreamStateCb(
-    pa_stream * s,
-    void *userdata
-    );
-    void PaPulseAudio_StreamStartedCb(
-    pa_stream * s,
-    void *userdata
-    );
-    void PaPulseAudio_StreamUnderflowCb(
-    pa_stream * s,
-    void *userdata
-    );
+void PaPulseAudio_SinkListCb( pa_context * c,
+                              const pa_sink_info * l,
+                              int eol,
+                              void *userdata );
 
-    PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_(
-    PaSampleFormat portaudiosf,
-    pa_sample_spec * pulseaudiosf
-    );
+void PaPulseAudio_SourceListCb( pa_context * c,
+                                const pa_source_info * l,
+                                int eol,
+                                void *userdata );
+
+void PaPulseAudio_StreamStateCb( pa_stream * s,
+                                 void *userdata );
+
+void PaPulseAudio_StreamStartedCb( pa_stream * s,
+                                   void *userdata );
+
+void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
+                                     void *userdata );
+
+PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_( PaSampleFormat portaudiosf,
+                                                            pa_sample_spec * pulseaudiosf
+);
 
 #ifdef __cplusplus
 }

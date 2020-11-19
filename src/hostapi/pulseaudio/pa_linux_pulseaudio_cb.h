@@ -68,29 +68,21 @@ extern "C"
 #endif                          /* __cplusplus */
 
 
-    PaError PaPulseAudio_CloseStreamCb(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_StartStreamCb(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_StopStreamCb(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_AbortStreamCb(
-    PaStream * stream
-    );
+PaError PaPulseAudio_CloseStreamCb( PaStream * stream );
 
-    void PaPulseAudio_StreamRecordCb(
-    pa_stream * s,
-    size_t length,
-    void *userdata
-    );
-    void PaPulseAudio_StreamPlaybackCb(
-    pa_stream * s,
-    size_t length,
-    void *userdata
-    );
+PaError PaPulseAudio_StartStreamCb( PaStream * stream );
+
+PaError PaPulseAudio_StopStreamCb( PaStream * stream );
+
+PaError PaPulseAudio_AbortStreamCb( PaStream * stream );
+
+void PaPulseAudio_StreamRecordCb( pa_stream * s,
+                                  size_t length,
+                                  void *userdata );
+
+void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
+                                    size_t length,
+                                    void *userdata );
 
 #ifdef __cplusplus
 }

@@ -58,11 +58,9 @@
     for blocking streams.
 */
 
-PaError PaPulseAudio_ReadStreamBlock(
-    PaStream * s,
-    void *buffer,
-    unsigned long frames
-)
+PaError PaPulseAudio_ReadStreamBlock( PaStream * s,
+                                      void *buffer,
+                                      unsigned long frames )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
@@ -87,11 +85,9 @@ PaError PaPulseAudio_ReadStreamBlock(
 }
 
 
-PaError PaPulseAudio_WriteStreamBlock(
-    PaStream * s,
-    const void *buffer,
-    unsigned long frames
-)
+PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
+                                       const void *buffer,
+                                       unsigned long frames )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
@@ -157,9 +153,7 @@ PaError PaPulseAudio_WriteStreamBlock(
 }
 
 
-signed long PaPulseAudio_GetStreamReadAvailableBlock(
-    PaStream * s
-)
+signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * s )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
 
@@ -173,9 +167,7 @@ signed long PaPulseAudio_GetStreamReadAvailableBlock(
 }
 
 
-signed long PaPulseAudio_GetStreamWriteAvailableBlock(
-    PaStream * s
-)
+signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * s )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =

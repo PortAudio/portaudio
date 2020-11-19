@@ -65,34 +65,25 @@ extern "C"
 {
 #endif                          /* __cplusplus */
 
-    PaError PaPulseAudio_CloseStreamBlock(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_StartStreamBlock(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_StopStreamBlock(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_AbortStreamBlock(
-    PaStream * stream
-    );
-    PaError PaPulseAudio_ReadStreamBlock(
-    PaStream * stream,
-    void *buffer,
-    unsigned long frames
-    );
-    PaError PaPulseAudio_WriteStreamBlock(
-    PaStream * stream,
-    const void *buffer,
-    unsigned long frames
-    );
-    signed long PaPulseAudio_GetStreamReadAvailableBlock(
-    PaStream * stream
-    );
-    signed long PaPulseAudio_GetStreamWriteAvailableBlock(
-    PaStream * stream
-    );
+PaError PaPulseAudio_CloseStreamBlock( PaStream * stream );
+
+PaError PaPulseAudio_StartStreamBlock( PaStream * stream );
+
+PaError PaPulseAudio_StopStreamBlock( PaStream * stream );
+
+PaError PaPulseAudio_AbortStreamBlock( PaStream * stream );
+
+PaError PaPulseAudio_ReadStreamBlock( PaStream * stream,
+                                      void *buffer,
+                                      unsigned long frames );
+
+PaError PaPulseAudio_WriteStreamBlock( PaStream * stream,
+                                       const void *buffer,
+                                       unsigned long frames );
+
+signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * stream );
+
+signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * stream );
 
 #ifdef __cplusplus
 }

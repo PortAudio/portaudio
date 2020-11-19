@@ -67,11 +67,9 @@
 #include <string.h>
 #include <unistd.h>
 
-void PaPulseAudio_updateTimeInfo(
-  pa_stream * s,
-  PaStreamCallbackTimeInfo *timeInfo,
-  int record
-)
+void PaPulseAudio_updateTimeInfo( pa_stream * s,
+                                  PaStreamCallbackTimeInfo *timeInfo,
+                                  int record )
 {
   unsigned int l_iNegative = 0;
   pa_usec_t l_lStreamTime = 0;
@@ -107,11 +105,9 @@ void PaPulseAudio_updateTimeInfo(
 }
 
 
-void PaPulseAudio_StreamRecordCb(
-    pa_stream * s,
-    size_t length,
-    void *userdata
-)
+void PaPulseAudio_StreamRecordCb( pa_stream * s,
+                                  size_t length,
+                                  void *userdata )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) userdata;
     PaStreamCallbackTimeInfo timeInfo = { 0, 0, 0 };    /* TODO: IMPLEMENT ME */
@@ -212,11 +208,9 @@ void PaPulseAudio_StreamRecordCb(
     pa_threaded_mainloop_signal(l_ptrStream->mainloop, 0);
 }
 
-void PaPulseAudio_StreamPlaybackCb(
-    pa_stream * s,
-    size_t length,
-    void *userdata
-)
+void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
+                                    size_t length,
+                                    void *userdata )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) userdata;
     PaStreamCallbackTimeInfo timeInfo = { 0, 0, 0 };    /* TODO: IMPLEMENT ME */
@@ -326,11 +320,9 @@ void PaPulseAudio_StreamPlaybackCb(
 
 
 /* This is left for future use! */
-static void PaPulseAudio_StreamSuccessCb(
-    pa_stream * s,
-    int success,
-    void *userdata
-)
+static void PaPulseAudio_StreamSuccessCb( pa_stream * s,
+                                          int success,
+                                          void *userdata )
 {
     PA_DEBUG(("Portaudio %s: %d\n", __FUNCTION__, success));
 }
@@ -348,10 +340,8 @@ static void PaPulseAudio_CorkSuccessCb(
 
 
 /* This is left for future use! */
-void PaPulseAudio_StreamStartedCb(
-    pa_stream * stream,
-    void *userdata
-)
+void PaPulseAudio_StreamStartedCb( pa_stream * stream,
+                                   void *userdata )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) userdata;
     pa_threaded_mainloop_signal(l_ptrStream->mainloop, 0);
@@ -362,9 +352,7 @@ void PaPulseAudio_StreamStartedCb(
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
 */
-PaError PaPulseAudio_CloseStreamCb(
-    PaStream * s
-)
+PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 {
     PaError result = paNoError;
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
@@ -439,9 +427,7 @@ PaError PaPulseAudio_CloseStreamCb(
 }
 
 
-PaError PaPulseAudio_StartStreamCb(
-    PaStream * s
-)
+PaError PaPulseAudio_StartStreamCb( PaStream * s )
 {
     PaError result = paNoError;
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
@@ -616,10 +602,8 @@ PaError PaPulseAudio_StartStreamCb(
     goto end;
 }
 
-PaError RequestStop(
-    PaPulseAudio_Stream * stream,
-    int abort
-)
+PaError RequestStop( PaPulseAudio_Stream * stream,
+                     int abort )
 {
     PaError result = paNoError;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi = stream->hostapi;
@@ -660,17 +644,13 @@ PaError RequestStop(
     return result;
 }
 
-PaError PaPulseAudio_StopStreamCb(
-    PaStream * s
-)
+PaError PaPulseAudio_StopStreamCb( PaStream * s )
 {
     return RequestStop((PaPulseAudio_Stream *) s, 0);
 }
 
 
-PaError PaPulseAudio_AbortStreamCb(
-    PaStream * s
-)
+PaError PaPulseAudio_AbortStreamCb( PaStream * s )
 {
     return RequestStop((PaPulseAudio_Stream *) s, 1);
 }
