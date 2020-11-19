@@ -98,13 +98,13 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
     long l_lLength = (frames * l_ptrStream->outputFrameSize);
     pa_operation *l_ptrOperation = NULL;
 
-    PaUtil_BeginCpuLoadMeasurement(&l_ptrStream->cpuLoadMeasurer);
+    PaUtil_BeginCpuLoadMeasurement( &l_ptrStream->cpuLoadMeasurer );
 
     while (l_lLength > 0)
     {
-        pa_threaded_mainloop_lock(l_ptrStream->mainloop);
-        l_lWritable = pa_stream_writable_size(l_ptrStream->outStream);
-        pa_threaded_mainloop_unlock(l_ptrStream->mainloop);
+        pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+        l_lWritable = pa_stream_writable_size( l_ptrStream->outStream );
+        pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
         if(l_lWritable > 0)
         {
@@ -112,29 +112,29 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
            {
                 l_lWritable = l_lLength;
            }
-           pa_threaded_mainloop_lock(l_ptrStream->mainloop);
-           l_iRet = pa_stream_write(l_ptrStream->outStream,
-                l_ptrData,
-                l_lWritable,
-                NULL,
-                0,
-                PA_SEEK_RELATIVE
-            );
+           pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+           l_iRet = pa_stream_write( l_ptrStream->outStream,
+                                     l_ptrData,
+                                     l_lWritable,
+                                     NULL,
+                                     0,
+                                     PA_SEEK_RELATIVE );
 
-            l_ptrOperation = pa_stream_update_timing_info(l_ptrStream->outStream,
-                                                          NULL,
-                                                          NULL);
-                                                          pa_threaded_mainloop_unlock(l_ptrStream->mainloop);
+            l_ptrOperation = pa_stream_update_timing_info( l_ptrStream->outStream,
+                                                           NULL,
+                                                           NULL );
+            pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
-            while (pa_operation_get_state(l_ptrOperation) == PA_OPERATION_RUNNING)
+            while (pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING)
             {
                 usleep(100);
             }
-            pa_threaded_mainloop_lock(l_ptrStream->mainloop);
 
-            pa_operation_unref(l_ptrOperation);
+            pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+
+            pa_operation_unref( l_ptrOperation );
             l_ptrOperation = NULL;
-            pa_threaded_mainloop_unlock(l_ptrStream->mainloop);
+            pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
             l_ptrData += l_lWritable;
             l_lLength -= l_lWritable;
@@ -147,7 +147,8 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
         }
 
     }
-    PaUtil_EndCpuLoadMeasurement(&l_ptrStream->cpuLoadMeasurer, frames);
+    PaUtil_EndCpuLoadMeasurement( &l_ptrStream->cpuLoadMeasurer,
+                                  frames );
 
     return paNoError;
 }
