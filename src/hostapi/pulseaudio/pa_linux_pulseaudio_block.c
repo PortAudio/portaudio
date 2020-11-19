@@ -71,13 +71,13 @@ PaError PaPulseAudio_ReadStreamBlock( PaStream * s,
     long l_lLength = (frames * l_ptrStream->inputFrameSize);
 
     pa_threaded_mainloop_lock( l_ptrStream->mainloop );
-    while (l_lLength > 0)
+    while( l_lLength > 0)
     {
         long l_read = PaUtil_ReadRingBuffer( &l_ptrStream->inputRing, l_ptrData,
                                              l_lLength );
         l_ptrData += l_read;
         l_lLength -= l_read;
-        if ( l_lLength > 0 )
+        if( l_lLength > 0 )
             pa_threaded_mainloop_wait( l_ptrStream->mainloop );
     }
     pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
@@ -100,15 +100,15 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
 
     PaUtil_BeginCpuLoadMeasurement( &l_ptrStream->cpuLoadMeasurer );
 
-    while (l_lLength > 0)
+    while( l_lLength > 0)
     {
         pa_threaded_mainloop_lock( l_ptrStream->mainloop );
         l_lWritable = pa_stream_writable_size( l_ptrStream->outStream );
         pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
-        if(l_lWritable > 0)
+        if( l_lWritable > 0 )
         {
-           if(l_lLength < l_lWritable)
+           if( l_lLength < l_lWritable )
            {
                 l_lWritable = l_lLength;
            }
@@ -125,7 +125,7 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
                                                            NULL );
             pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
-            while (pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING)
+            while( pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING)
             {
                 usleep(100);
             }
@@ -140,9 +140,11 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
             l_lLength -= l_lWritable;
         }
 
-        if(l_lLength > 0)
+        if( l_lLength > 0 )
         {
-            // Sleep small amount of time not burn CPU we block anyway so this is bearable
+            /* Sleep small amount of time not burn CPU
+            * we block anyway so this is bearable
+            */
             usleep(100);
         }
 
@@ -158,7 +160,7 @@ signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * s )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
 
-    if (l_ptrStream->inStream == NULL)
+    if( l_ptrStream->inStream == NULL )
     {
         return 0;
     }
@@ -174,7 +176,7 @@ signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * s )
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
         l_ptrStream->hostapi;
 
-    if (l_ptrStream->outStream == NULL)
+    if( l_ptrStream->outStream == NULL )
     {
         return 0;
     }
