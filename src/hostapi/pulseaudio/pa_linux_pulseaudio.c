@@ -256,8 +256,8 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
                                   const long defaultSampleRate )
 {
     /* These should be at least 1 */
-    int l_iRealNameLen = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME);
-    int l_iDeviceNameLen = strnlen(PaPulseAudio_SinkSourceName, PAPULSEAUDIO_MAX_DEVICENAME);
+    int l_iRealNameLen = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME) + 1;
+    int l_iDeviceNameLen = strnlen(PaPulseAudio_SinkSourceName, PAPULSEAUDIO_MAX_DEVICENAME) + 1;
     char *l_strLocalName = NULL;
 
     hostapi->deviceInfoArray[hostapi->deviceCount].structVersion = 2;
