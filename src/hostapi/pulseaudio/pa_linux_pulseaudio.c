@@ -112,7 +112,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     /* ptr is NULL if runs out of memory or pointer to allocated memory */
     if( !ptr )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PulseAudio can't alloc memory");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "Can't allocate memory required for using PulseAudio");
         return NULL;
     }
 
