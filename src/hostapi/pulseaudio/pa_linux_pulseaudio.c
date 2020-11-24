@@ -221,6 +221,15 @@ void PaPulseAudio_ServerInfoCb( pa_context *c,
   l_ptrHostApi->pulseaudioDefaultSource[0] = '\0';
   l_ptrHostApi->pulseaudioDefaultSink[0] = '\0';
 
+  if( !c  || !i )
+  {
+      PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                         "PaPulseAudio_ServerInfoCb: Invalid context or can't get server info" );
+      pa_threaded_mainloop_signal(l_ptrHostApi->mainloop, 0);
+      return;
+  }
+
+
   if( i->default_sink_name != NULL )
   {
     /* Make sure there is '\0' is at the end of string with using snprintf */
@@ -330,7 +339,7 @@ void PaPulseAudio_SinkListCb( pa_context * c,
 
 
     /* If this is null we have big problems and we probably are out of memory */
-    if( !c )
+    if( !c || !l )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                            "PaPulseAudio_SinkListCb: Invalid context or sink info" );
