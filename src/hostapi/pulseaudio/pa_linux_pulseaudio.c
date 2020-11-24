@@ -194,8 +194,8 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
 void PaPulseAudio_CheckContextStateCb( pa_context * c,
                                       void *userdata )
 {
-    PaPulseAudio_HostApiRepresentation *ptr = userdata;
-
+    PaPulseAudio_HostApiRepresentation *ptr =
+      (PaPulseAudio_HostApiRepresentation *) userdata;
     /* If this is null we have big problems and we probably are out of memory */
     if( !c )
     {
