@@ -200,7 +200,7 @@ void PaPulseAudio_CheckContextStateCb( pa_context * c,
     if( !c )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_CheckContextStateCb: Out of memory" );
+                                           "PaPulseAudio_CheckContextStateCb: Invalid context " );
         pa_threaded_mainloop_signal(ptr->mainloop, 0);
         return;
     }
