@@ -256,17 +256,17 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
                                   const long defaultSampleRate )
 {
     /* These should be at least 1 */
-    int l_iRealNameLen = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME) + 1;
-    int l_iDeviceNameLen = strnlen(PaPulseAudio_SinkSourceName, PAPULSEAUDIO_MAX_DEVICENAME) + 1;
+    int l_iRealNameSize = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME - 1) + 1;
+    int l_iDeviceNameSize = strnlen(PaPulseAudio_SinkSourceName, PAPULSEAUDIO_MAX_DEVICENAME - 1) + 1;
     char *l_strLocalName = NULL;
 
     hostapi->deviceInfoArray[hostapi->deviceCount].structVersion = 2;
     hostapi->deviceInfoArray[hostapi->deviceCount].hostApi = hostapi->hostApiIndex;
     hostapi->pulseaudioDeviceNames[hostapi->deviceCount] =
         PaUtil_GroupAllocateMemory( hostapi->allocations,
-                                    l_iRealNameLen );
+                                    l_iRealNameSize );
     l_strLocalName = PaUtil_GroupAllocateMemory( hostapi->allocations,
-                                                 l_iDeviceNameLen );
+                                                 l_iDeviceNameSize );
     if( !hostapi->pulseaudioDeviceNames[hostapi->deviceCount] &&
         !l_strLocalName )
     {
@@ -275,11 +275,11 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
     }
 
     snprintf( hostapi->pulseaudioDeviceNames[hostapi->deviceCount],
-              l_iRealNameLen,
+              l_iRealNameSize,
               "%s",
               PaPulseAudio_SinkSourceNameDesc );
     snprintf( l_strLocalName,
-              l_iDeviceNameLen,
+              l_iDeviceNameSize,
               "%s",
               PaPulseAudio_SinkSourceName );
 
