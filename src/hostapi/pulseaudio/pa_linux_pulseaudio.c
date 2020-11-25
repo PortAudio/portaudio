@@ -333,7 +333,7 @@ void PaPulseAudio_SinkListCb( pa_context * c,
     if( !c )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_SinkListCb: Out of memory" );
+                                           "PaPulseAudio_SinkListCb: Invalid context or sink info" );
         goto error;
     }
 
@@ -385,7 +385,7 @@ void PaPulseAudio_SourceListCb( pa_context * c,
     if( !c )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_SourceListCb: Out of memory" );
+                                           "PaPulseAudio_SourceListCb: Invalid context" );
         goto error;
     }
 
@@ -436,7 +436,7 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
     if( !s )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_StreamStateCb: Out of memory" );
+                                           "PaPulseAudio_StreamStateCb: Invalid stream" );
         return;
     }
 
@@ -471,7 +471,7 @@ void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
     if( !s )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_StreamUnderflowCb: Out of memory" );
+                                           "PaPulseAudio_StreamUnderflowCb: Invalid stream" );
         return;
     }
 
