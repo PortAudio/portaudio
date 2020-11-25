@@ -485,18 +485,12 @@ void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
 
     stream->underflows++;
 
-    if( stream->underflows >= 6 && stream->latency < 2000000 )
-    {
-        stream->latency = (stream->latency * 3) / 2;
-        stream->bufferAttr.maxlength =
-            pa_usec_to_bytes(stream->latency, &stream->outSampleSpec);
-        stream->bufferAttr.tlength =
-            pa_usec_to_bytes(stream->latency, &stream->outSampleSpec);
-        pa_stream_set_buffer_attr(s, &stream->bufferAttr, NULL, NULL);
-        stream->underflows = 0;
-        PA_DEBUG(("Portaudio %s: latency increased to %d\n", __FUNCTION__,
-                  stream->latency));
-    }
+    PA_DEBUG( ("Portaudio %s: PulseAudio stream has underflows %d times\n",
+               __FUNCTION__,
+               stream->underflow ) );
+
+    PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                       "PaPulseAudio_StreamUnderflowCb: Pulseaudio stream underflow");
 
     pa_threaded_mainloop_signal( stream->mainloop,
                                  0 );
