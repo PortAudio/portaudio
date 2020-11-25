@@ -119,7 +119,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 {
     PaPulseAudio_HostApiRepresentation *ptr;
     int fd[2] = { -1, -1 };
-    char buf[PAPULSEAUDIO_MAX_DEVICENAME];
+    char l_strDeviceName[PAPULSEAUDIO_MAX_DEVICENAME];
 
     ptr = (PaPulseAudio_HostApiRepresentation *)
           PaUtil_AllocateMemory(sizeof(PaPulseAudio_HostApiRepresentation));
@@ -145,10 +145,10 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     }
 
     /* Use program name as PulseAudio device name */
-    snprintf( buf, PAPULSEAUDIO_MAX_DEVICENAME, "%s", __progname );
+    snprintf( l_strDeviceName, PAPULSEAUDIO_MAX_DEVICENAME, "%s", __progname );
 
     ptr->context =
-        pa_context_new( pa_threaded_mainloop_get_api(ptr->mainloop), buf );
+        pa_context_new( pa_threaded_mainloop_get_api(ptr->mainloop), l_strDeviceName );
 
     if( !ptr->context )
     {
