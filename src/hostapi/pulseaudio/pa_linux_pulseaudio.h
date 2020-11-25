@@ -103,7 +103,6 @@ typedef struct
     pa_threaded_mainloop *mainloop;
     pa_context *context;
     int deviceCount;
-    pa_context_state_t state;
     pa_time_event *timeEvent;
 }
 PaPulseAudio_HostApiRepresentation;

@@ -205,7 +205,6 @@ void PaPulseAudio_CheckContextStateCb( pa_context * c,
         return;
     }
 
-    ptr->state = pa_context_get_state( c );
     pa_threaded_mainloop_signal( ptr->mainloop, 0 );
 }
 
