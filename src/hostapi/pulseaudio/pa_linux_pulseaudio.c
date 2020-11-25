@@ -545,7 +545,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                            "PulseAudio_Initialize: Can't connect to server");
-        result = paNoError;
+        result = paNotInitialized;
         pa_threaded_mainloop_unlock( l_ptrPulseAudioHostApi->mainloop );
         goto error;
     }
