@@ -123,7 +123,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     if( !ptr->mainloop )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PulseAudio can't alloc mainloop");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "Can't allocate PulseAudio mainloop");
         goto fail;
     }
 
@@ -135,7 +135,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     if( !ptr->context )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0, "PulseAudio can't alloc context" );
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0, "Can't instantiate PulseAudio context" );
         goto fail;
     }
 
