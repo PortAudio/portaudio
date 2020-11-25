@@ -93,7 +93,22 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 
     if( !PA_CONTEXT_IS_GOOD(state) )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: PulseAudio has general error");
+        switch( state )
+        {
+            /* These can be found from
+             * https://freedesktop.org/software/pulseaudio/doxygen/def_8h.html
+             */
+
+        	case PA_CONTEXT_UNCONNECTED:
+               PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The context hasn't been connected yet (PA_CONTEXT_UNCONNECTED)");
+            break;
+
+        	case PA_CONTEXT_FAILED:
+               PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The connection failed or was disconnected. (PA_CONTEXT_FAILED)");
+            break;
+                    	
+        }
+
         return -1;
     }
 
