@@ -78,14 +78,14 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
     if( !ptr )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "Host API is NULL! Can't do anything about it");
+                                          "PaPulseAudio_CheckConnection: Host API is NULL! Can't do anything about it");
         return -1;
     }
 
     if( !ptr->context || !ptr->mainloop )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PulseAudio context or mainloop are NULL");
+                                          "PaPulseAudio_CheckConnection: PulseAudio context or mainloop are NULL");
         return -1;
     }
 
@@ -93,7 +93,7 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 
     if( !PA_CONTEXT_IS_GOOD(state) )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PulseAudio has general error");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: PulseAudio has general error");
         return -1;
     }
 
@@ -112,7 +112,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     /* ptr is NULL if runs out of memory or pointer to allocated memory */
     if( !ptr )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "Can't allocate memory required for using PulseAudio");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
+                                          "PaPulseAudio_HostApiRepresentation: Can't allocate memory required for using PulseAudio");
         return NULL;
     }
 
@@ -123,7 +124,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     if( !ptr->mainloop )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "Can't allocate PulseAudio mainloop");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
+                                          "PaPulseAudio_HostApiRepresentation: Can't allocate PulseAudio mainloop");
         goto fail;
     }
 
@@ -135,7 +137,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     if( !ptr->context )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0, "Can't instantiate PulseAudio context" );
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_HostApiRepresentation: Can't instantiate PulseAudio context" );
         goto fail;
     }
 
@@ -145,7 +148,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     if( pa_threaded_mainloop_start( ptr->mainloop ) < 0 )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0, "PulseAudio can't start mainloop" );
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_HostApiRepresentation: PulseAudio can't start mainloop" );
         goto fail;
     }
 
@@ -167,7 +171,7 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
     if( !ptr )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "Host API is NULL! Can't do anything about it");
+                                          "PaPulseAudio_Free: Host API is NULL! Can't do anything about it");
         return;
     }
 
@@ -278,7 +282,8 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
     if( !hostapi->pulseaudioDeviceNames[hostapi->deviceCount] &&
         !l_strLocalName )
     {
-       PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0, "Can't alloc memory" );
+       PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                          "_PaPulseAudio_AddAudioDevice: Can't alloc memory" );
        return paInsufficientMemory;
     }
 
