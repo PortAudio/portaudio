@@ -428,7 +428,7 @@ PaError setBestSampleRateForDevice( const AudioDeviceID device,
    int i=0;
    Float64 max  = -1; /*the maximum rate available*/
    Float64 best = -1; /*the lowest sample rate still greater than desired rate*/
-   VDBUG(("Setting sample rate for device %ld to %g.\n",device,(float)desiredSrate));
+   VDBUG(("Setting sample rate for device %ld to %g.\n",(long)device,(float)desiredSrate));
 
    /* -- try setting the sample rate -- */
    srate = 0;
