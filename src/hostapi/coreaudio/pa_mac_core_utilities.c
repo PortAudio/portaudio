@@ -641,13 +641,13 @@ OSStatus xrunCallback(
    return 0;
 }
 
-int initializeXRunListenerList()
+int initializeXRunListenerList( void )
 {
    xRunListSize = 0;
    bzero( (void *) &firstXRunListNode, sizeof(firstXRunListNode) );
    return pthread_mutex_init( &xrunMutex, NULL );
 }
-int destroyXRunListenerList()
+int destroyXRunListenerList( void )
 {
    PaMacXRunListNode *node;
    node = firstXRunListNode.next;
