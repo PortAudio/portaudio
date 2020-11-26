@@ -412,7 +412,7 @@ case "${host_os}" in
            OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.o"
            OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_block.o"
            OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio.o"
-           dnl INCLUDES="$INCLUDES pa_pulseaudio.h src/hostapi/pulseaudio/pa_linux_pulseaudio.h"
+           dnl INCLUDES="$INCLUDES pa_pulseaudio.h src/hostapi/pulseaudio/pa_linux_pulseaudio_internal.h src/hostapi/pulseaudio/pa_linux_pulseaudio_block_internal.h src/hostapi/pulseaudio/pa_linux_pulseaudio_cb_internal.h"
            AC_DEFINE(PA_USE_PULSEAUDIO,1)
         fi
 

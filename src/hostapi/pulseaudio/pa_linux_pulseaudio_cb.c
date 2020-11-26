@@ -60,7 +60,7 @@
 #include "pa_unix_util.h"
 #include "pa_ringbuffer.h"
 
-#include "pa_linux_pulseaudio_cb.h"
+#include "pa_linux_pulseaudio_cb_internal.h"
 
 
 /* PulseAudio headers */

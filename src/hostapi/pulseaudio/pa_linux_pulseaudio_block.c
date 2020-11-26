@@ -49,7 +49,7 @@
  it has callbackmode and normal write mode support
 */
 
-#include "pa_linux_pulseaudio_block.h"
+#include "pa_linux_pulseaudio_block_internal.h"
 #include <unistd.h>
 
 /*

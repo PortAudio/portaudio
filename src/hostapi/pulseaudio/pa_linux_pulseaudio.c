@@ -52,11 +52,8 @@
 
 #include <string.h>     /* strlen() */
 
-
-#include "pa_linux_pulseaudio.h"
-#include "pa_linux_pulseaudio_cb.h"
-#include "pa_linux_pulseaudio_block.h"
-
+#include "pa_linux_pulseaudio_cb_internal.h"
+#include "pa_linux_pulseaudio_block_internal.h"
 
 /* PulseAudio headers */
 #include <stdio.h>
@@ -106,7 +103,7 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
         	case PA_CONTEXT_FAILED:
                PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The connection failed or was disconnected. (PA_CONTEXT_FAILED)");
             break;
-                    	
+
         }
 
         return -1;

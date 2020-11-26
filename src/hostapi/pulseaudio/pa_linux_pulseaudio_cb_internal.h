@@ -40,8 +40,8 @@
  * license above.
  */
 
-#ifndef _PA_HOSTAPI_PULSEAUDIO_BLOCK_H_
-#define _PA_HOSTAPI_PULSEAUDIO_BLOCK_H_
+#ifndef _PA_HOSTAPI_PULSEAUDIO_CB_H_
+#define _PA_HOSTAPI_PULSEAUDIO_CB_H_
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -53,37 +53,36 @@
 #include "pa_unix_util.h"
 #include "pa_ringbuffer.h"
 
+
 /* PulseAudio headers */
 #include <stdio.h>
 #include <string.h>
 #include <pulse/pulseaudio.h>
 
-#include "pa_linux_pulseaudio.h"
+#include "pa_linux_pulseaudio_internal.h"
+
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif                          /* __cplusplus */
 
-PaError PaPulseAudio_CloseStreamBlock( PaStream * stream );
 
-PaError PaPulseAudio_StartStreamBlock( PaStream * stream );
+PaError PaPulseAudio_CloseStreamCb( PaStream * stream );
 
-PaError PaPulseAudio_StopStreamBlock( PaStream * stream );
+PaError PaPulseAudio_StartStreamCb( PaStream * stream );
 
-PaError PaPulseAudio_AbortStreamBlock( PaStream * stream );
+PaError PaPulseAudio_StopStreamCb( PaStream * stream );
 
-PaError PaPulseAudio_ReadStreamBlock( PaStream * stream,
-                                      void *buffer,
-                                      unsigned long frames );
+PaError PaPulseAudio_AbortStreamCb( PaStream * stream );
 
-PaError PaPulseAudio_WriteStreamBlock( PaStream * stream,
-                                       const void *buffer,
-                                       unsigned long frames );
+void PaPulseAudio_StreamRecordCb( pa_stream * s,
+                                  size_t length,
+                                  void *userdata );
 
-signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * stream );
-
-signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * stream );
+void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
+                                    size_t length,
+                                    void *userdata );
 
 #ifdef __cplusplus
 }
