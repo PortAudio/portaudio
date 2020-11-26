@@ -111,9 +111,66 @@
 # define VVDBUG(MSG)
 #endif
 
+#if (MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_5)
+#define PA_NEW_HAL 1
+#else
+#define PA_NEW_HAL 0
+#endif
 
+#if PA_NEW_HAL
+typedef AudioObjectPropertyListenerProc pa_AudioDevicePropertyListenerProc;
+#else
+typedef AudioDevicePropertyListenerProc pa_AudioDevicePropertyListenerProc;
+#endif
 
-
+OSStatus pa_AudioHardwareGetProperty(
+    AudioHardwarePropertyID inPropertyID,
+    UInt32*                 ioPropertyDataSize,
+    void*                   outPropertyData);
+OSStatus pa_AudioHardwareGetPropertySize(
+    AudioHardwarePropertyID inPropertyID,
+    UInt32*                 outSize);
+OSStatus pa_AudioDeviceGetProperty(
+    AudioDeviceID         inDevice,
+    UInt32                inChannel,
+    Boolean               isInput,
+    AudioDevicePropertyID inPropertyID,
+    UInt32*               ioPropertyDataSize,
+    void*                 outPropertyData);
+OSStatus pa_AudioDeviceSetProperty(
+    AudioDeviceID         inDevice,
+    const AudioTimeStamp* inWhen,
+    UInt32                inChannel,
+    Boolean               isInput,
+    AudioDevicePropertyID inPropertyID,
+    UInt32                inPropertyDataSize,
+    const void*           inPropertyData);
+OSStatus pa_AudioDeviceGetPropertySize(
+    AudioDeviceID         inDevice,
+    UInt32                inChannel,
+    Boolean               isInput,
+    AudioDevicePropertyID inPropertyID,
+    UInt32*               outSize);
+OSStatus pa_AudioDeviceAddPropertyListener(
+    AudioDeviceID                      inDevice,
+    UInt32                             inChannel,
+    Boolean                            isInput,
+    AudioDevicePropertyID              inPropertyID,
+    pa_AudioDevicePropertyListenerProc inProc,
+    void*                              inClientData);
+OSStatus pa_AudioDeviceRemovePropertyListener(
+    AudioDeviceID                      inDevice,
+    UInt32                             inChannel,
+    Boolean                            isInput,
+    AudioDevicePropertyID              inPropertyID,
+    pa_AudioDevicePropertyListenerProc inProc,
+    void*                              inClientData);
+OSStatus pa_AudioStreamGetProperty(
+    AudioStreamID         inStream,
+    UInt32                inChannel,
+    AudioDevicePropertyID inPropertyID,
+    UInt32*               ioPropertyDataSize,
+    void*                 outPropertyData);
 
 #define UNIX_ERR(err) PaMacCore_SetUnixError( err, __LINE__ )
 
@@ -143,12 +200,20 @@ long computeRingBufferSize( const PaStreamParameters *inputParameters,
                                    long outputFramesPerBuffer,
                                    double sampleRate );
 
+#if PA_NEW_HAL
+OSStatus propertyProc(
+    AudioObjectID inObjectID,
+    UInt32 inNumberAddresses,
+    const AudioObjectPropertyAddress* inAddresses,
+    void* inClientData);
+#else
 OSStatus propertyProc(
     AudioDeviceID inDevice, 
     UInt32 inChannel, 
     Boolean isInput, 
     AudioDevicePropertyID inPropertyID, 
     void* inClientData );
+#endif
 
 /* sets the value of the given property and waits for the change to 
    be acknowledged, and returns the final value, which is not guaranteed
@@ -198,12 +263,20 @@ PaError setBestFramesPerBuffer( const AudioDeviceID device,
  *
  *********************/
 
+#if PA_NEW_HAL
+OSStatus xrunCallback(
+    AudioObjectID inObjectID,
+    UInt32 inNumberAddresses,
+    const AudioObjectPropertyAddress* inAddresses,
+    void * inClientData );
+#else
 OSStatus xrunCallback(
     AudioDeviceID inDevice, 
     UInt32 inChannel, 
     Boolean isInput, 
     AudioDevicePropertyID inPropertyID, 
     void* inClientData ) ;
+#endif
 
 /** returns zero on success or a unix style error code. */
 int initializeXRunListenerList( void );
