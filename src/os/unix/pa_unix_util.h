@@ -157,7 +157,7 @@ typedef struct
 
 /** Initialize global threading state.
  */
-PaError PaUnixThreading_Initialize();
+PaError PaUnixThreading_Initialize( void );
 
 /** Perish, passing on eventual error code.
  *
