@@ -72,7 +72,7 @@ OSStatus pa_AudioHardwareGetProperty(
     AudioObjectPropertyAddress address = { inPropertyID, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
     return AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
 #else
-    macErr = AudioHardwareGetProperty(inPropertyID, ioPropertyDataSize, outPropertyData);
+    return AudioHardwareGetProperty(inPropertyID, ioPropertyDataSize, outPropertyData);
 #endif
 }
 
@@ -84,7 +84,7 @@ OSStatus pa_AudioHardwareGetPropertySize(
     AudioObjectPropertyAddress address = { inPropertyID, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
     return AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &address, 0, NULL, outSize);
 #else
-    macErr = AudioHardwareGetPropertyInfo(inPropertyID, outSize, NULL);
+    return AudioHardwareGetPropertyInfo(inPropertyID, outSize, NULL);
 #endif
 }
 
@@ -101,7 +101,7 @@ OSStatus pa_AudioDeviceGetProperty(
    AudioObjectPropertyAddress address = { inPropertyID, scope, inChannel };
    return AudioObjectGetPropertyData(inDevice, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
 #else
-    macErr = AudioDeviceGetProperty(inDevice, inChannel, isInput, inPropertyID, ioPropertyDataSize, outPropertyData);
+    return AudioDeviceGetProperty(inDevice, inChannel, isInput, inPropertyID, ioPropertyDataSize, outPropertyData);
 #endif
 }
 
