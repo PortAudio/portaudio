@@ -3641,7 +3641,6 @@ static PaError PaAlsaStreamComponent_BeginPolling( PaAlsaStreamComponent* self, 
 {
     PaError result = paNoError;
     int ret = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
-    (void)ret;  /* Prevent unused variable warning if asserts are turned off */
     /* If alsa returns anything else, like -EPIPE return*/
     if( ret != self->nfds )
     {
