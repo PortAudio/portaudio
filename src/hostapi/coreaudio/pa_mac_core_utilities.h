@@ -121,15 +121,17 @@
 typedef AudioObjectPropertyListenerProc pa_AudioDevicePropertyListenerProc;
 #else
 typedef AudioDevicePropertyListenerProc pa_AudioDevicePropertyListenerProc;
-#endif
+#endif /* PA_NEW_HAL */
 
 OSStatus pa_AudioHardwareGetProperty(
     AudioHardwarePropertyID inPropertyID,
     UInt32*                 ioPropertyDataSize,
     void*                   outPropertyData);
+
 OSStatus pa_AudioHardwareGetPropertySize(
     AudioHardwarePropertyID inPropertyID,
     UInt32*                 outSize);
+
 OSStatus pa_AudioDeviceGetProperty(
     AudioDeviceID         inDevice,
     UInt32                inChannel,
@@ -137,6 +139,7 @@ OSStatus pa_AudioDeviceGetProperty(
     AudioDevicePropertyID inPropertyID,
     UInt32*               ioPropertyDataSize,
     void*                 outPropertyData);
+
 OSStatus pa_AudioDeviceSetProperty(
     AudioDeviceID         inDevice,
     const AudioTimeStamp* inWhen,
@@ -145,12 +148,14 @@ OSStatus pa_AudioDeviceSetProperty(
     AudioDevicePropertyID inPropertyID,
     UInt32                inPropertyDataSize,
     const void*           inPropertyData);
+
 OSStatus pa_AudioDeviceGetPropertySize(
     AudioDeviceID         inDevice,
     UInt32                inChannel,
     Boolean               isInput,
     AudioDevicePropertyID inPropertyID,
     UInt32*               outSize);
+
 OSStatus pa_AudioDeviceAddPropertyListener(
     AudioDeviceID                      inDevice,
     UInt32                             inChannel,
@@ -158,6 +163,7 @@ OSStatus pa_AudioDeviceAddPropertyListener(
     AudioDevicePropertyID              inPropertyID,
     pa_AudioDevicePropertyListenerProc inProc,
     void*                              inClientData);
+
 OSStatus pa_AudioDeviceRemovePropertyListener(
     AudioDeviceID                      inDevice,
     UInt32                             inChannel,
@@ -165,6 +171,7 @@ OSStatus pa_AudioDeviceRemovePropertyListener(
     AudioDevicePropertyID              inPropertyID,
     pa_AudioDevicePropertyListenerProc inProc,
     void*                              inClientData);
+
 OSStatus pa_AudioStreamGetProperty(
     AudioStreamID         inStream,
     UInt32                inChannel,
@@ -213,7 +220,7 @@ OSStatus propertyProc(
     Boolean isInput, 
     AudioDevicePropertyID inPropertyID, 
     void* inClientData );
-#endif
+#endif /* PA_NEW_HAL */
 
 /* sets the value of the given property and waits for the change to 
    be acknowledged, and returns the final value, which is not guaranteed
@@ -276,7 +283,7 @@ OSStatus xrunCallback(
     Boolean isInput, 
     AudioDevicePropertyID inPropertyID, 
     void* inClientData ) ;
-#endif
+#endif /* PA_NEW_HAL */
 
 /** returns zero on success or a unix style error code. */
 int initializeXRunListenerList( void );
