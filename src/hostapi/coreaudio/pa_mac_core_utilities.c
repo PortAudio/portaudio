@@ -73,7 +73,7 @@ OSStatus pa_AudioHardwareGetProperty(
     return AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
 #else
     return AudioHardwareGetProperty(inPropertyID, ioPropertyDataSize, outPropertyData);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioHardwareGetPropertySize(
@@ -85,7 +85,7 @@ OSStatus pa_AudioHardwareGetPropertySize(
     return AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &address, 0, NULL, outSize);
 #else
     return AudioHardwareGetPropertyInfo(inPropertyID, outSize, NULL);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioDeviceGetProperty(
@@ -102,7 +102,7 @@ OSStatus pa_AudioDeviceGetProperty(
    return AudioObjectGetPropertyData(inDevice, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
 #else
     return AudioDeviceGetProperty(inDevice, inChannel, isInput, inPropertyID, ioPropertyDataSize, outPropertyData);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioDeviceSetProperty(
@@ -120,7 +120,7 @@ OSStatus pa_AudioDeviceSetProperty(
     return AudioObjectSetPropertyData(inDevice, &address, 0, NULL, inPropertyDataSize, inPropertyData);
 #else
     return AudioDeviceSetProperty(inDevice, inWhen, inChannel, isInput, inPropertyID, inPropertyDataSize, inPropertyData);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioDeviceGetPropertySize(
@@ -136,7 +136,7 @@ OSStatus pa_AudioDeviceGetPropertySize(
     return AudioObjectGetPropertyDataSize(inDevice, &address, 0, NULL, outSize);
 #else
     return AudioDeviceGetPropertyInfo(inDevice, inChannel, isInput, inPropertyID, outSize, NULL);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioDeviceAddPropertyListener(
@@ -153,7 +153,7 @@ OSStatus pa_AudioDeviceAddPropertyListener(
     return AudioObjectAddPropertyListener(inDevice, &address, inProc, inClientData);
 #else
     return AudioDeviceAddPropertyListener(inDevice, inChannel, isInput, inPropertyID, inProc, inClientData);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioDeviceRemovePropertyListener(
@@ -170,7 +170,7 @@ OSStatus pa_AudioDeviceRemovePropertyListener(
     return AudioObjectRemovePropertyListener(inDevice, &address, inProc, inClientData);
 #else
     return AudioDeviceRemovePropertyListener(inDevice, inChannel, isInput, inPropertyID, inProc);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 OSStatus pa_AudioStreamGetProperty(
@@ -185,7 +185,7 @@ OSStatus pa_AudioStreamGetProperty(
     return AudioObjectGetPropertyData(inStream, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
 #else
     return AudioStreamGetProperty(inStream, inChannel, inPropertyID, ioPropertyDataSize, outPropertyData);
-#endif
+#endif /* PA_NEW_HAL */
 }
 
 PaError PaMacCore_SetUnixError( int err, int line )
@@ -455,7 +455,7 @@ OSStatus propertyProc(
    // this is where we would set the condition variable
    return noErr;
 }
-#endif
+#endif /* PA_NEW_HAL */
 
 /* sets the value of the given property and waits for the change to 
    be acknowledged, and returns the final value, which is not guaranteed
@@ -815,7 +815,7 @@ OSStatus xrunCallback(
 
    return 0;
 }
-#endif
+#endif /* PA_NEW_HAL */
 
 int initializeXRunListenerList( void )
 {
