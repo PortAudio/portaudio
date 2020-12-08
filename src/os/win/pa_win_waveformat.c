@@ -98,14 +98,15 @@ void PaWin_InitializeWaveFormatExtensible( PaWinWaveFormat *waveFormat,
 	waveFormatEx->wBitsPerSample = bytesPerSample * 8;
 	waveFormatEx->cbSize = 22;
 
-	*((WORD*)&waveFormat->fields[PAWIN_INDEXOF_WVALIDBITSPERSAMPLE]) =
-			waveFormatEx->wBitsPerSample;
+    memcpy(&waveFormat->fields[PAWIN_INDEXOF_WVALIDBITSPERSAMPLE],
+        &waveFormatEx->wBitsPerSample, sizeof(WORD));
 
-	*((DWORD*)&waveFormat->fields[PAWIN_INDEXOF_DWCHANNELMASK]) = channelMask;
-		
+    memcpy(&waveFormat->fields[PAWIN_INDEXOF_DWCHANNELMASK],
+        &channelMask, sizeof(DWORD));
+
     guid = pawin_ksDataFormatSubtypeGuidBase;
     guid.Data1 = (USHORT)waveFormatTag;
-    *((GUID*)&waveFormat->fields[PAWIN_INDEXOF_SUBFORMAT]) = guid;
+    memcpy(&waveFormat->fields[PAWIN_INDEXOF_SUBFORMAT], &guid, sizeof(GUID));
 }
 
 PaWinWaveFormatChannelMask PaWin_DefaultChannelMask( int numChannels )
