@@ -825,7 +825,7 @@ static inline UINT32 ThreadIdleScheduler_NextSleep(ThreadIdleScheduler *sched)
 // ------------------------------------------------------------------------------------------
 typedef struct _SystemTimer
 {
-    UINT32 granularity;
+    INT32 granularity;
 
 } SystemTimer;
 static LARGE_INTEGER g_SystemTimerFrequency;
@@ -849,12 +849,15 @@ static BOOL SystemTimer_SetGranularity(SystemTimer *timer, UINT32 granularity)
     {
         PRINT(("SetSystemTimer: timeBeginPeriod(1) failed!\n"));
 
-        timer->granularity = 0;
+        timer->granularity = 10;
         return FALSE;
     }
 #else
-    (void)timer;
     (void)granularity;
+
+    // UWP does not support increase of the timer precision change and thus calling WaitForSingleObject with anything 
+    // below 10 milliseconds will cause underruns for input and output stream.
+    timer->granularity = 10;
 #endif
 
     return TRUE;
@@ -6113,8 +6116,11 @@ static inline INT32 GetNextSleepTime(SystemTimer *timer, ThreadIdleScheduler *sc
     //
     INT32 procTime = (INT32)(SystemTimer_GetTime(timer) - startTime);
     nextSleepTime -= procTime;
-    if (nextSleepTime < 0)
+    if (nextSleepTime < timer->granularity)
         nextSleepTime = 0;
+    else
+    if (timer->granularity > 1)
+        nextSleepTime = ALIGN_BWD(nextSleepTime, timer->granularity);
 
 #ifdef PA_WASAPI_LOG_TIME_SLOTS
     printf("{%d},", procTime);
