@@ -310,7 +310,7 @@ typedef struct _pa_AudioClientProperties {
 PA_THREAD_FUNC ProcThreadEvent(void *param);
 PA_THREAD_FUNC ProcThreadPoll(void *param);
 
-// Error codes (availabe since Windows 7)
+// Error codes (available since Windows 7)
 #ifndef AUDCLNT_E_BUFFER_ERROR
     #define AUDCLNT_E_BUFFER_ERROR AUDCLNT_ERR(0x018)
 #endif
@@ -321,7 +321,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param);
     #define AUDCLNT_E_INVALID_DEVICE_PERIOD AUDCLNT_ERR(0x020)
 #endif
 
-// Stream flags (availabe since Windows 7)
+// Stream flags (available since Windows 7)
 #ifndef AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
     #define AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY 0x08000000
 #endif
@@ -489,7 +489,7 @@ typedef struct
 
     PaWinUtilComInitializationResult comInitializationResult;
 
-    // this is the REAL number of devices, whether they are usefull to PA or not!
+    // this is the REAL number of devices, whether they are useful to PA or not!
     UINT32 deviceCount;
 
     PaWasapiDeviceInfo *devInfo;
@@ -783,7 +783,7 @@ static PaError __LogPaError(PaError err, const char *func, const char *file, int
 // ------------------------------------------------------------------------------------------
 /*! \class ThreadSleepScheduler
            Allows to emulate thread sleep of less than 1 millisecond under Windows. Scheduler
-           calculates number of times the thread must run untill next sleep of 1 millisecond.
+           calculates number of times the thread must run until next sleep of 1 millisecond.
            It does not make thread sleeping for real number of microseconds but rather controls
            how many of imaginary microseconds the thread task can allow thread to sleep.
 */
@@ -3168,7 +3168,7 @@ static void _CalculateAlignedPeriod(PaWasapiSubStream *pSub, UINT32 *nFramesPerL
     // Align frames to HD Audio packet size of 128 bytes for Exclusive mode only.
     // Not aligning on Windows Vista will cause Event timeout, although Windows 7 will
     // return AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED error to realign buffer. Aligning is necessary
-    // for Exclusive mode only! when audio data is feeded directly to hardware.
+    // for Exclusive mode only! when audio data is fed directly to hardware.
     if (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
     {
         (*nFramesPerLatency) = AlignFramesPerBuffer((*nFramesPerLatency),
@@ -3205,7 +3205,7 @@ static void _CalculatePeriodicity(PaWasapiSubStream *pSub, BOOL output, REFERENC
             REFERENCE_TIME userPeriodicity;
 
             // Align frames backwards, so device will likely make buffer read ready when we are ready
-            // to read it (our sheduling will wait for amount of millisoconds of frames_per_buffer)
+            // to read it (our scheduling will wait for amount of millisoconds of frames_per_buffer)
             alignedFrames = AlignFramesPerBuffer(pSub->params.frames_per_buffer,
                 pSub->wavex.Format.nSamplesPerSec, pSub->wavex.Format.nBlockAlign, ALIGN_BWD);
 
@@ -3562,7 +3562,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
     _RecalculateBuffersCount(pSub, userFramesPerBuffer, MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec),
         fullDuplex);
 
-    // No error, client is succesfully created
+    // No error, client is successfully created
     (*pa_error) = paNoError;
 
 done:
@@ -3904,7 +3904,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         inputChannelCount = 0;
-        inputSampleFormat = hostInputSampleFormat = paInt16; /* Surpress 'uninitialised var' warnings. */
+        inputSampleFormat = hostInputSampleFormat = paInt16; /* Suppress 'uninitialised var' warnings. */
     }
 
     // Try create device: Output
@@ -4007,7 +4007,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         outputChannelCount = 0;
-        outputSampleFormat = hostOutputSampleFormat = paInt16; /* Surpress 'uninitialized var' warnings. */
+        outputSampleFormat = hostOutputSampleFormat = paInt16; /* Suppress 'uninitialized var' warnings. */
     }
 
     // log full-duplex
@@ -4065,7 +4065,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         // serious problem #2 - No, Not a problem, as framesPerHostCallback take into account
         // sample size while it is not a problem for PA full-duplex, we must care of
-        // preriod only!
+        // period only!
         /*if (stream->out.framesPerHostCallback != stream->in.framesPerHostCallback)
         {
             PRINT(("WASAPI: OpenStream: framesPerHostCallback discrepancy\n"));
@@ -4636,7 +4636,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
             ((BYTE **)user_buffer)[i] = ((BYTE **)_buffer)[i];
     }
 
-    // Findout if there are tail frames, flush them all before reading hardware
+    // Find out if there are tail frames, flush them all before reading hardware
     if ((available = PaUtil_GetRingBufferReadAvailable(stream->in.tailBuffer)) != 0)
     {
         ring_buffer_size_t buf1_size = 0, buf2_size = 0, read, desired;
@@ -4815,7 +4815,7 @@ static PaError WriteStream( PaStream* s, const void *_buffer, unsigned long fram
             ((const BYTE **)user_buffer)[i] = ((const BYTE **)_buffer)[i];
     }
 
-    // Blocking (potentially, untill 'frames' are consumed) loop
+    // Blocking (potentially, until 'frames' are consumed) loop
     while (frames != 0)
     {
         // Check if blocking call must be interrupted
@@ -5694,7 +5694,7 @@ static HRESULT ProcessInputBuffer(PaWasapiStream *stream, PaWasapiHostProcessor 
         if (WaitForSingleObject(stream->hCloseRequest, 0) != WAIT_TIMEOUT)
             break;
 
-        // Findout if any frames available
+        // Find out if any frames available
         frames = 0;
         if ((hr = _PollGetInputFramesAvailable(stream, &frames)) != S_OK)
             return hr;
@@ -6033,7 +6033,7 @@ static UINT32 GetSleepTime(PaWasapiStream *stream, UINT32 sleepTimeIn, UINT32 sl
     UINT32 sleepTime;
 
     // According to the issue [https://github.com/PortAudio/portaudio/issues/303] glitches may occur when user frames
-    // equal to 1/2 of the host buffer frames, therefore the emperical workaround for this problem is to lower 
+    // equal to 1/2 of the host buffer frames, therefore the empirical workaround for this problem is to lower 
     // the sleep time by 2
     if (userFramesOut != 0)
     {
@@ -6157,7 +6157,7 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
     // Request fine (1 ms) granularity of the system timer functions to guarantee correct logic around WaitForSingleObject
     SystemTimer_SetGranularity(&timer, 1);
 
-    // Claculate sleep time of the processing loop (inside WaitForSingleObject)
+    // Calculate sleep time of the processing loop (inside WaitForSingleObject)
     sleepTime = ConfigureLoopSleepTimeAndScheduler(stream, &scheduler);
 
     // Setup data processors
@@ -6376,10 +6376,10 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
                     break;
                 }
 
-                // process equal ammount of frames
+                // process equal amount of frames
                 if (o_frames >= i_frames)
                 {
-                    // process input ammount of frames
+                    // process input amount of frames
                     UINT32 o_processed = i_frames;
 
                     // get host output buffer

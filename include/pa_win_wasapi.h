@@ -267,7 +267,7 @@ PaWasapiJackDescription;
 /** Stream category.
    Note:
     - values are equal to WASAPI AUDIO_STREAM_CATEGORY enum
-    - supported since Windows 8.0, noop on earler versions
+    - supported since Windows 8.0, noop on earlier versions
     - values 1,2 are deprecated on Windows 10 and not included into enumeration
 
  @version Available as of 19.6.0
@@ -291,7 +291,7 @@ PaWasapiStreamCategory;
 /** Stream option.
    Note:
     - values are equal to WASAPI AUDCLNT_STREAMOPTIONS enum
-    - supported since Windows 8.1, noop on earler versions
+    - supported since Windows 8.1, noop on earlier versions
 
  @version Available as of 19.6.0
 */
@@ -380,7 +380,7 @@ PaError PaWasapi_UpdateDeviceList();
 /** Get current audio format of the device assigned to the opened stream.
 
     Format is represented by PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure.
-    Use this function to reconfirm format if PA's processor is overriden and
+    Use this function to reconfirm format if PA's processor is overridden and
     paWinWasapiRedirectHostProcessor flag is specified.
 
  @param pStream    Pointer to PaStream object.
@@ -388,7 +388,7 @@ PaError PaWasapi_UpdateDeviceList();
  @param formatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
  @param bOutput    TRUE (1) for output stream, FALSE (0) for input stream.
 
- @return Non-negative value indicating the number of bytes copied into format decriptor
+ @return Non-negative value indicating the number of bytes copied into format descriptor
          or, a PaErrorCode (which is always negative) if PortAudio is not initialized
          or an error is encountered.
 */
@@ -404,7 +404,7 @@ int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned 
  @param  formatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
  @param  device     Device index.
 
- @return Non-negative value indicating the number of bytes copied into format decriptor
+ @return Non-negative value indicating the number of bytes copied into format descriptor
          or, a PaErrorCode (which is always negative) if PortAudio is not initialized
          or an error is encountered.
 */
@@ -420,7 +420,7 @@ int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int formatSize, PaD
  @param  formatSize Size of PaWinWaveFormat or WAVEFORMATEXTENSIBLE structure in bytes.
  @param  device     Device index.
 
- @return Non-negative value indicating the number of bytes copied into format decriptor
+ @return Non-negative value indicating the number of bytes copied into format descriptor
          or, a PaErrorCode (which is always negative) if PortAudio is not initialized
          or an error is encountered.
 */
@@ -468,7 +468,7 @@ PaError PaWasapi_ThreadPriorityRevert( void *pTask );
 /** Get number of frames per host buffer.
 
     It is max value of frames of WASAPI buffer which can be locked for operations.
-    Use this method as helper to findout max values of inputFrames/outputFrames
+    Use this method as helper to find out max values of inputFrames/outputFrames
     of PaWasapiHostProcessorCallback.
 
  @param  pStream Pointer to PaStream object.
@@ -624,7 +624,7 @@ PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsi
         under Windows Vista x64 when application is WOW64(32-bit) and Event-Driven method simply
         times out (event handle is never signalled on buffer completion). Please note, such WOW64 bug
         does not exist in Vista x86 or Windows 7.
-        Polling can be setup by speciying 'paWinWasapiPolling' flag. Our WASAPI implementation detects
+        Polling can be setup by specifying 'paWinWasapiPolling' flag. Our WASAPI implementation detects
         WOW64 bug and sets 'paWinWasapiPolling' automatically.
 
     Thread priority:

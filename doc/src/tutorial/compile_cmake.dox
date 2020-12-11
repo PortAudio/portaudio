@@ -23,7 +23,7 @@ The "-G" option specifies the type of build metadata which will be generated. Yo
 
 "make install" should install the same set of files that are installed using the usual configure script included with PortAudio along with a few extra files (similar to pkg-config metadata files) which make it easier for other CMake projects to use the installed libraries.
 
-On Windows, you can use CMake to generate Visual Studio project files which can be used to create the PortAudio libraries. The following serves as an example (and should be done from a directory outside the PortAudio tree) which will create Visual Studio 2015 project files targetting a 64-bit build:
+On Windows, you can use CMake to generate Visual Studio project files which can be used to create the PortAudio libraries. The following serves as an example (and should be done from a directory outside the PortAudio tree) which will create Visual Studio 2015 project files targeting a 64-bit build:
 
     C:\PABUILD> cmake {portaudio path} -G "Visual Studio 14 2015 Win64"
 

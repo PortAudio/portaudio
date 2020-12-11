@@ -182,7 +182,7 @@ typedef KS_LogicalMemoryType *PKS_LogicalMemoryType;
 typedef struct _PIPE_TERMINATION {
   ULONG Flags;
   ULONG OutsideFactors;
-  ULONG Weigth;
+  ULONG Weight;
   KS_FRAMING_RANGE PhysicalRange;
   KS_FRAMING_RANGE_WEIGHTED OptimalRange;
   KS_COMPRESSION Compression;

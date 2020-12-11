@@ -92,7 +92,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
     unsigned int i;
     int result = paContinue;
 
-    /* supress unused parameter warnings */
+    /* suppress unused parameter warnings */
     (void) inputBuffer;
     (void) timeInfo;
     (void) statusFlags;
@@ -227,7 +227,7 @@ int main(void)
     return err;
 error:
     Pa_Terminate();
-    fprintf( stderr, "An error occured while using the portaudio stream\n" );
+    fprintf( stderr, "An error occurred while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
     return err;

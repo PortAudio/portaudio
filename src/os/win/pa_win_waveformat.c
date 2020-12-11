@@ -134,7 +134,7 @@ PaWinWaveFormatChannelMask PaWin_DefaultChannelMask( int numChannels )
         /* case 7: */
 		case 8:
             /* RoBi: PAWIN_SPEAKER_7POINT1_SURROUND fits normal surround sound setups better than PAWIN_SPEAKER_7POINT1, f.i. NVidia HDMI Audio
-               output is silent on channels 5&6 with NVidia drivers, and channel 7&8 with Micrsoft HD Audio driver using PAWIN_SPEAKER_7POINT1. 
+               output is silent on channels 5&6 with NVidia drivers, and channel 7&8 with Microsoft HD Audio driver using PAWIN_SPEAKER_7POINT1. 
                With PAWIN_SPEAKER_7POINT1_SURROUND both setups work OK. */
 			return PAWIN_SPEAKER_7POINT1_SURROUND;
 	}
@@ -149,7 +149,7 @@ PaWinWaveFormatChannelMask PaWin_DefaultChannelMask( int numChannels )
     /* Note that Alec Rogers proposed the following as an alternate method to 
         generate the default channel mask, however it doesn't seem to be an improvement
         over the above, since some drivers will matrix outputs mapping to non-present
-        speakers accross multiple physical speakers.
+        speakers across multiple physical speakers.
 
         if(nChannels==1) {
             pwfFormat->dwChannelMask = SPEAKER_FRONT_CENTER;
