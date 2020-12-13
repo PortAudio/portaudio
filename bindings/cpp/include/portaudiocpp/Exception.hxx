@@ -36,7 +36,7 @@ namespace portaudio
 	/// other code.
 	///
 	/// To know what exceptions each function may throw, look up 
-	/// the errors that can occure in the PortAudio documentation 
+	/// the errors that can occur in the PortAudio documentation 
 	/// for the equivalent functions.
 	///
 	/// Some functions are likely to throw an exception (such as 

@@ -219,7 +219,7 @@ public class TestBasic extends TestCase
 			e.printStackTrace();
 		}
 
-		assertTrue( "caught no expection", (caught != null) );
+		assertTrue( "caught no exception", (caught != null) );
 		assertTrue( "exception should say stream is stopped", caught
 				.getMessage().contains( "stopped" ) );
 
@@ -233,7 +233,7 @@ public class TestBasic extends TestCase
 			caught = e;
 			e.printStackTrace();
 		}
-		assertTrue( "caught no expection", (caught != null) );
+		assertTrue( "caught no exception", (caught != null) );
 		assertTrue( "exception should say stream is stopped", caught
 				.getMessage().contains( "null" ) );
 
@@ -251,7 +251,7 @@ public class TestBasic extends TestCase
 			e.printStackTrace();
 		}
 
-		assertTrue( "caught no expection", (caught != null) );
+		assertTrue( "caught no exception", (caught != null) );
 		assertTrue( "exception should say tried to", caught.getMessage()
 				.contains( "Tried to write short" ) );
 

@@ -29,7 +29,7 @@ namespace portaudio
 	/// clients need to explicitly call close() to ensure the stream closed successfully.
 	///
 	/// The Stream object can be used to manipulate the Stream's state. Also, time-constant 
-	/// and time-varying information about the Stream can be retreived.
+	/// and time-varying information about the Stream can be retrieved.
 	//////
 	class Stream
 	{

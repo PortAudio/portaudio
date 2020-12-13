@@ -39,7 +39,7 @@ namespace portaudio
 	//////
 	/// Sets the requested sample rate. If this sample rate isn't supported by the hardware, the 
 	/// Stream will fail to open. The real-life sample rate used might differ slightly due to 
-	/// imperfections in the sound card hardware; use Stream::sampleRate() to retreive the 
+	/// imperfections in the sound card hardware; use Stream::sampleRate() to retrieve the 
 	/// best known estimate for this value.
 	//////
 	void StreamParameters::setSampleRate(double sampleRate)

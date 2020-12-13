@@ -130,7 +130,7 @@ void PaQa_SetupSineGenerator( PaQaSineGenerator *generator, double frequency, do
 /*================= Recordings ===================================*/
 /*================================================================*/
 /**
- * Allocate memory for containg a mono audio signal. Set up recording for writing.
+ * Allocate memory for containing a mono audio signal. Set up recording for writing.
  */
  int PaQa_InitializeRecording( PaQaRecording *recording, int maxSamples, int sampleRate );
  

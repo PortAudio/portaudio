@@ -41,7 +41,7 @@ namespace portaudio
 	{
 	public:
 		// query info: name, max in channels, max out channels, 
-		// default low/hight input/output latency, default sample rate
+		// default low/high input/output latency, default sample rate
 		PaDeviceIndex index() const;
 		const char *name() const;
 		int maxInputChannels() const;
