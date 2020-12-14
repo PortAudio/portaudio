@@ -74,7 +74,7 @@
 #include "pa_types.h"
 #include "pa_hostapi.h"
 #include "pa_stream.h"
-#include "pa_trace.h" /* still usefull?*/
+#include "pa_trace.h" /* still useful?*/
 #include "pa_debugprint.h"
 
 #ifndef PA_GIT_REVISION
@@ -805,7 +805,7 @@ static int SampleFormatIsValid( PaSampleFormat format )
 }
 
 /*
-    NOTE: make sure this validation list is kept syncronised with the one in
+    NOTE: make sure this validation list is kept synchronised with the one in
             pa_hostapi.h
 
     ValidateOpenStreamParameters() checks that parameters to Pa_OpenStream()
@@ -884,7 +884,7 @@ static PaError ValidateOpenStreamParameters(
     PaDeviceIndex *hostApiInputDevice,
     PaDeviceIndex *hostApiOutputDevice )
 {
-    int inputHostApiIndex  = -1, /* Surpress uninitialised var warnings: compiler does */
+    int inputHostApiIndex  = -1, /* Suppress uninitialised var warnings: compiler does */
         outputHostApiIndex = -1; /* not see that if inputParameters and outputParame-  */
                                  /* ters are both nonzero, these indices are set.      */
 
@@ -1195,7 +1195,7 @@ PaError Pa_OpenStream( PaStream** stream,
     }
 
     /* Check for parameter errors.
-        NOTE: make sure this validation list is kept syncronised with the one
+        NOTE: make sure this validation list is kept synchronised with the one
         in pa_hostapi.h
     */
 

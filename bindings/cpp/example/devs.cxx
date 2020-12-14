@@ -158,19 +158,19 @@ int main(int, char*[])
 	}
 	catch (const portaudio::PaException &e)
 	{
-		std::cout << "A PortAudio error occured: " << e.paErrorText() << std::endl;
+		std::cout << "A PortAudio error occurred: " << e.paErrorText() << std::endl;
 	}
 	catch (const portaudio::PaCppException &e)
 	{
-		std::cout << "A PortAudioCpp error occured: " << e.what() << std::endl;
+		std::cout << "A PortAudioCpp error occurred: " << e.what() << std::endl;
 	}
 	catch (const std::exception &e)
 	{
-		std::cout << "A generic exception occured: " << e.what() << std::endl;
+		std::cout << "A generic exception occurred: " << e.what() << std::endl;
 	}
 	catch (...)
 	{
-		std::cout << "An unknown exception occured." << std::endl;
+		std::cout << "An unknown exception occurred." << std::endl;
 	}
 
 	return 0;
