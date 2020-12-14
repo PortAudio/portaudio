@@ -2498,12 +2498,14 @@ static PaError UpdateDeviceList()
 }
 
 // ------------------------------------------------------------------------------------------
-#if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
 PaError PaWasapi_UpdateDeviceList()
 {
+#if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
     return UpdateDeviceList();
-}
+#else
+    return paNoError;
 #endif
+}
 
 // ------------------------------------------------------------------------------------------
 int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned int formatSize, int bOutput )
