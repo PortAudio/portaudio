@@ -3639,16 +3639,15 @@ error:
  */
 static PaError PaAlsaStreamComponent_BeginPolling( PaAlsaStreamComponent* self, struct pollfd* pfds )
 {
-    PaError result = paNoError;
-    int ret = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
-    /* If alsa returns anything else, like -EPIPE return*/
-    if( ret != self->nfds )
+    int nfds = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
+    /* If alsa returns anything else, like -EPIPE return */
+    if( nfds != self->nfds )
     {
-      return paUnanticipatedHostError;
+        return paUnanticipatedHostError;
     }
     self->ready = 0;
 
-    return result;
+    return paNoError;
 }
 
 /** Examine results from poll().
