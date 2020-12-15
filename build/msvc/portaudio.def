@@ -52,5 +52,5 @@ PaWasapi_ThreadPriorityRevert       @63
 PaWasapi_GetFramesPerHostBuffer     @64
 PaWasapi_GetJackCount               @65
 PaWasapi_GetJackDescription         @66
-PaWasapi_SetDefaultInterfaceId      @67
+PaWasapiWinrt_SetDefaultDeviceId    @67
 PaWasapi_SetStreamStateHandler      @68
