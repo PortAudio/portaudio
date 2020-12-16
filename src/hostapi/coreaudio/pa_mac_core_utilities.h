@@ -111,28 +111,16 @@
 # define VVDBUG(MSG)
 #endif
 
-#if (MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_5)
-#define PA_NEW_HAL 1
-#else
-#define PA_NEW_HAL 0
-#endif
-
-#if PA_NEW_HAL
-typedef AudioObjectPropertyListenerProc pa_AudioDevicePropertyListenerProc;
-#else
-typedef AudioDevicePropertyListenerProc pa_AudioDevicePropertyListenerProc;
-#endif /* PA_NEW_HAL */
-
-OSStatus pa_AudioHardwareGetProperty(
+OSStatus PaMacCore_AudioHardwareGetProperty(
     AudioHardwarePropertyID inPropertyID,
     UInt32*                 ioPropertyDataSize,
     void*                   outPropertyData);
 
-OSStatus pa_AudioHardwareGetPropertySize(
+OSStatus PaMacCore_AudioHardwareGetPropertySize(
     AudioHardwarePropertyID inPropertyID,
     UInt32*                 outSize);
 
-OSStatus pa_AudioDeviceGetProperty(
+OSStatus PaMacCore_AudioDeviceGetProperty(
     AudioDeviceID         inDevice,
     UInt32                inChannel,
     Boolean               isInput,
@@ -140,7 +128,7 @@ OSStatus pa_AudioDeviceGetProperty(
     UInt32*               ioPropertyDataSize,
     void*                 outPropertyData);
 
-OSStatus pa_AudioDeviceSetProperty(
+OSStatus PaMacCore_AudioDeviceSetProperty(
     AudioDeviceID         inDevice,
     const AudioTimeStamp* inWhen,
     UInt32                inChannel,
@@ -149,30 +137,30 @@ OSStatus pa_AudioDeviceSetProperty(
     UInt32                inPropertyDataSize,
     const void*           inPropertyData);
 
-OSStatus pa_AudioDeviceGetPropertySize(
+OSStatus PaMacCore_AudioDeviceGetPropertySize(
     AudioDeviceID         inDevice,
     UInt32                inChannel,
     Boolean               isInput,
     AudioDevicePropertyID inPropertyID,
     UInt32*               outSize);
 
-OSStatus pa_AudioDeviceAddPropertyListener(
-    AudioDeviceID                      inDevice,
-    UInt32                             inChannel,
-    Boolean                            isInput,
-    AudioDevicePropertyID              inPropertyID,
-    pa_AudioDevicePropertyListenerProc inProc,
-    void*                              inClientData);
+OSStatus PaMacCore_AudioDeviceAddPropertyListener(
+    AudioDeviceID                   inDevice,
+    UInt32                          inChannel,
+    Boolean                         isInput,
+    AudioDevicePropertyID           inPropertyID,
+    AudioObjectPropertyListenerProc inProc,
+    void*                           inClientData);
 
-OSStatus pa_AudioDeviceRemovePropertyListener(
-    AudioDeviceID                      inDevice,
-    UInt32                             inChannel,
-    Boolean                            isInput,
-    AudioDevicePropertyID              inPropertyID,
-    pa_AudioDevicePropertyListenerProc inProc,
-    void*                              inClientData);
+OSStatus PaMacCore_AudioDeviceRemovePropertyListener(
+    AudioDeviceID                   inDevice,
+    UInt32                          inChannel,
+    Boolean                         isInput,
+    AudioDevicePropertyID           inPropertyID,
+    AudioObjectPropertyListenerProc inProc,
+    void*                           inClientData);
 
-OSStatus pa_AudioStreamGetProperty(
+OSStatus PaMacCore_AudioStreamGetProperty(
     AudioStreamID         inStream,
     UInt32                inChannel,
     AudioDevicePropertyID inPropertyID,
@@ -207,20 +195,11 @@ long computeRingBufferSize( const PaStreamParameters *inputParameters,
                                    long outputFramesPerBuffer,
                                    double sampleRate );
 
-#if PA_NEW_HAL
 OSStatus propertyProc(
     AudioObjectID inObjectID,
     UInt32 inNumberAddresses,
     const AudioObjectPropertyAddress* inAddresses,
     void* inClientData);
-#else
-OSStatus propertyProc(
-    AudioDeviceID inDevice, 
-    UInt32 inChannel, 
-    Boolean isInput, 
-    AudioDevicePropertyID inPropertyID, 
-    void* inClientData );
-#endif /* PA_NEW_HAL */
 
 /* sets the value of the given property and waits for the change to 
    be acknowledged, and returns the final value, which is not guaranteed
@@ -270,20 +249,11 @@ PaError setBestFramesPerBuffer( const AudioDeviceID device,
  *
  *********************/
 
-#if PA_NEW_HAL
 OSStatus xrunCallback(
     AudioObjectID inObjectID,
     UInt32 inNumberAddresses,
     const AudioObjectPropertyAddress* inAddresses,
     void * inClientData );
-#else
-OSStatus xrunCallback(
-    AudioDeviceID inDevice, 
-    UInt32 inChannel, 
-    Boolean isInput, 
-    AudioDevicePropertyID inPropertyID, 
-    void* inClientData ) ;
-#endif /* PA_NEW_HAL */
 
 /** returns zero on success or a unix style error code. */
 int initializeXRunListenerList( void );
