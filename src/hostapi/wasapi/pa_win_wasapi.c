@@ -2503,7 +2503,7 @@ PaError PaWasapi_UpdateDeviceList()
 #if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
     return UpdateDeviceList();
 #else
-    return paNoError;
+    return paInternalError;
 #endif
 }
 
