@@ -3639,14 +3639,15 @@ error:
  */
 static PaError PaAlsaStreamComponent_BeginPolling( PaAlsaStreamComponent* self, struct pollfd* pfds )
 {
-    PaError result = paNoError;
-    int ret = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
-    (void)ret;  /* Prevent unused variable warning if asserts are turned off */
-    assert( ret == self->nfds );
-
+    int nfds = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
+    /* If alsa returns anything else, like -EPIPE return */
+    if( nfds != self->nfds )
+    {
+        return paUnanticipatedHostError;
+    }
     self->ready = 0;
 
-    return result;
+    return paNoError;
 }
 
 /** Examine results from poll().
@@ -3803,14 +3804,24 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
         if( pollCapture )
         {
             capturePfds = self->pfds;
-            PA_ENSURE( PaAlsaStreamComponent_BeginPolling( &self->capture, capturePfds ) );
+            PaError res = PaAlsaStreamComponent_BeginPolling( &self->capture, capturePfds );
+            if( res != paNoError)
+            {
+              xrun = 1;
+              goto end;
+            }
             totalFds += self->capture.nfds;
         }
         if( pollPlayback )
         {
             /* self->pfds is in effect an array of fds; if necessary, index past the capture fds */
             playbackPfds = self->pfds + (pollCapture ? self->capture.nfds : 0);
-            PA_ENSURE( PaAlsaStreamComponent_BeginPolling( &self->playback, playbackPfds ) );
+            PaError res = PaAlsaStreamComponent_BeginPolling( &self->playback, playbackPfds );
+            if( res != paNoError)
+            {
+              xrun = 1;
+              goto end;
+            }
             totalFds += self->playback.nfds;
         }
 
