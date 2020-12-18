@@ -667,13 +667,16 @@ static void DetectDefaultSampleRate( PaWinMmeDeviceInfo *winMmeDeviceInfo, int w
 
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static int QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels )
+static int QueryWaveInKSFilterMaxChannels( UINT waveInDeviceId, int *maxChannels )
 {
     void *devicePath;
     DWORD devicePathSize;
     int result = 0;
 
-    if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
+    /* pass UINT ID via punned HWAVEIN, as per DRV_QUERYDEVICEINTERFACESIZE documentation */
+    HWAVEIN hDeviceId = (HWAVEIN)((UINT_PTR)waveInDeviceId);
+
+    if( waveInMessage(hDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
             (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
         return 0;
 
@@ -682,7 +685,7 @@ static int QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels 
         return 0;
 
     /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path, although this is undocumented */
-    if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACE,
+    if( waveInMessage(hDeviceId, DRV_QUERYDEVICEINTERFACE,
             (DWORD_PTR)devicePath, devicePathSize ) == MMSYSERR_NOERROR )
     {
         int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( devicePath, /* isInput= */ 1  );
@@ -797,13 +800,16 @@ error:
 
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static int QueryWaveOutKSFilterMaxChannels( int waveOutDeviceId, int *maxChannels )
+static int QueryWaveOutKSFilterMaxChannels( UINT waveOutDeviceId, int *maxChannels )
 {
     void *devicePath;
     DWORD devicePathSize;
     int result = 0;
 
-    if( waveOutMessage((HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
+    /* pass UINT ID via punned HWAVEOUT, as per DRV_QUERYDEVICEINTERFACESIZE documentation */
+    HWAVEOUT hDeviceId = (HWAVEOUT)((UINT_PTR)waveOutDeviceId);
+
+    if( waveOutMessage(hDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
             (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
         return 0;
 
@@ -812,7 +818,7 @@ static int QueryWaveOutKSFilterMaxChannels( int waveOutDeviceId, int *maxChannel
         return 0;
 
     /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path, although this is undocumented */
-    if( waveOutMessage((HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACE,
+    if( waveOutMessage(hDeviceId, DRV_QUERYDEVICEINTERFACE,
             (DWORD_PTR)devicePath, devicePathSize ) == MMSYSERR_NOERROR )
     {
         int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( devicePath, /* isInput= */ 0  );
@@ -1017,11 +1023,11 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     /* the following calls assume that if wave*Message fails the preferred device parameter won't be modified */
     preferredDeviceStatusFlags = 0;
     waveInPreferredDevice = -1;
-    waveInMessage( (HWAVEIN)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveInPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
+    waveInMessage( (HWAVEIN)((UINT_PTR)WAVE_MAPPER), DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveInPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
 
     preferredDeviceStatusFlags = 0;
     waveOutPreferredDevice = -1;
-    waveOutMessage( (HWAVEOUT)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
+    waveOutMessage( (HWAVEOUT)((UINT_PTR)WAVE_MAPPER), DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
 
     maximumPossibleDeviceCount = 0;
 
