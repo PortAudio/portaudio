@@ -135,7 +135,7 @@ void PaWinUtil_CoUninitialize( PaHostApiTypeId hostApiType, PaWinUtilComInitiali
         DWORD currentThreadId = GetCurrentThreadId();
 		if( comInitializationResult->initializingThreadId != currentThreadId )
 		{
-			PA_DEBUG(("ERROR: failed PaWinUtil_CoUninitialize calling thread[%d] does not match initializing thread[%d]\n",
+			PA_DEBUG(("ERROR: failed PaWinUtil_CoUninitialize calling thread[%lu] does not match initializing thread[%lu]\n",
 				currentThreadId, comInitializationResult->initializingThreadId));
 		}
 		else
