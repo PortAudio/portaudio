@@ -2386,24 +2386,24 @@ static OSStatus AudioIOProc( void *inRefCon,
          if( stream->inputSRConverter )
          {
                OSStatus err;
-               UInt32 size;
                float data[ inChan * frames ];
-               size = sizeof( data );
                AudioBufferList bufferList;
                bufferList.mNumberBuffers = 1;
                bufferList.mBuffers[0].mNumberChannels = inChan;
-               bufferList.mBuffers[0].mDataByteSize = size;
+               bufferList.mBuffers[0].mDataByteSize = sizeof( data );
                bufferList.mBuffers[0].mData = data;
+               UInt32 packets = frames;
                err = AudioConverterFillComplexBuffer(
                    stream->inputSRConverter,
                    ringBufferIOProc,
                    &stream->inputRingBuffer,
-                   &size,
+                   &packets,
                    &bufferList,
                    NULL);
                if( err == RING_BUFFER_EMPTY )
                { /* the ring buffer callback underflowed */
                   err = 0;
+                  UInt32 size = packets * bytesPerFrame;
                   bzero( ((char *)data) + size, sizeof(data)-size );
                   /* The ring buffer can underflow normally when the stream is stopping.
                    * So only report an error if the stream is active. */
@@ -2576,20 +2576,17 @@ static OSStatus AudioIOProc( void *inRefCon,
          OSStatus err;
          do
          { /* Run the buffer processor until we are out of data. */
-            UInt32 size;
-            long f;
-
-            size = sizeof( data );
             AudioBufferList bufferList;
             bufferList.mNumberBuffers = 1;
             bufferList.mBuffers[0].mNumberChannels = chan;
-            bufferList.mBuffers[0].mDataByteSize = size;
+            bufferList.mBuffers[0].mDataByteSize = sizeof( data );
             bufferList.mBuffers[0].mData = data;
+            UInt32 packets = inNumberFrames;
             err = AudioConverterFillComplexBuffer(
                 stream->inputSRConverter,
                 ringBufferIOProc,
                 &stream->inputRingBuffer,
-                &size,
+                &packets,
                 &bufferList,
                 NULL);
             if( err != RING_BUFFER_EMPTY )
@@ -2599,9 +2596,8 @@ static OSStatus AudioIOProc( void *inRefCon,
                 goto stop_stream;
             }
 
-            f = size / ( chan * sizeof(float) );
-            PaUtil_SetInputFrameCount( &(stream->bufferProcessor), f );
-            if( f )
+            PaUtil_SetInputFrameCount( &(stream->bufferProcessor), packets );
+            if( packets > 0 )
             {
                PaUtil_BeginBufferProcessing( &(stream->bufferProcessor),
                                              &timeInfo,
