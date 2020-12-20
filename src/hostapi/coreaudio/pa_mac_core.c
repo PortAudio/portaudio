@@ -2136,29 +2136,35 @@ static OSStatus ringBufferIOProc(
     AudioStreamPacketDescription** outDataPacketDescription,
     void*                          inUserData)
 {
-   UInt32 * ioDataSize = &ioData->mBuffers[0].mDataByteSize;
-   void ** outData = &ioData->mBuffers[0].mData;
-
-   void *dummyData;
-   ring_buffer_size_t dummySize;
-   PaUtilRingBuffer *rb = (PaUtilRingBuffer *) inUserData;
-
    VVDBUG(("ringBufferIOProc()\n"));
 
+   PaUtilRingBuffer *rb = (PaUtilRingBuffer *) inUserData;
+
    if( PaUtil_GetRingBufferReadAvailable( rb ) == 0 ) {
-      *outData = NULL;
-      *ioDataSize = 0;
+      ioData->mBuffers[0].mData = NULL;
+      ioData->mBuffers[0].mDataByteSize = 0;
+      *ioNumberDataPackets = 0;
+      VVDBUG(("Ring buffer empty!\n"));
       return RING_BUFFER_EMPTY;
    }
-   assert(sizeof(UInt32) == sizeof(ring_buffer_size_t));
-   assert( ( (*ioDataSize) / rb->elementSizeBytes ) * rb->elementSizeBytes == (*ioDataSize) ) ;
-   (*ioDataSize) /= rb->elementSizeBytes ;
-   PaUtil_GetRingBufferReadRegions( rb, *ioDataSize,
-                                    outData, (ring_buffer_size_t *)ioDataSize, 
+
+   UInt32 packetSize = sizeof(float) * ioData->mBuffers[0].mNumberChannels;
+   UInt32 dataSize = *ioNumberDataPackets * packetSize;
+   assert(dataSize % rb->elementSizeBytes == 0);
+   UInt32 rbElements = dataSize / rb->elementSizeBytes;
+   ring_buffer_size_t rbElementsRead = rbElements;
+   void *dummyData;
+   ring_buffer_size_t dummySize;
+   PaUtil_GetRingBufferReadRegions( rb, rbElements,
+                                    &ioData->mBuffers[0].mData, &rbElementsRead,
                                     &dummyData, &dummySize );
-   assert( *ioDataSize );
-   PaUtil_AdvanceRingBufferReadIndex( rb, *ioDataSize );
-   (*ioDataSize) *= rb->elementSizeBytes ;
+   assert(rbElementsRead > 0);
+   VVDBUG(("RingBuffer read elements %u of %u\n", rbElementsRead, rbElements));
+   PaUtil_AdvanceRingBufferReadIndex( rb, rbElementsRead );
+
+   UInt32 bytesRead = rbElementsRead * rb->elementSizeBytes;
+   ioData->mBuffers[0].mDataByteSize = bytesRead;
+   *ioNumberDataPackets = bytesRead / packetSize;
 
    return noErr;
 }
