@@ -25,7 +25,7 @@ jobs:
 
     - uses: actions/checkout@v2
 
-    - name: Upgrade Solution
+    - name: Upgrade VC Project File
       # We maintain our vcproj file in an old format to maintain backwards compatibility
       # This step upgrades the project to the latest version of MSVC
       # see https://docs.microsoft.com/en-us/visualstudio/ide/reference/upgrade-devenv-exe?view=vs-2019
@@ -43,7 +43,7 @@ jobs:
         Start-Sleep -Seconds 10
         Write-Output "done."
 
-    - name: Remove ASIO Files
+    - name: Remove ASIO Files and Enable PA_USE_DS=1
       # Process the project files to remove ASIO-related sources and includes (since we can not access the ASIO SDK in a public build)
       run: |
         # Process .vcxproj file: remove source files
