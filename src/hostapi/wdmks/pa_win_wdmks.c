@@ -4380,7 +4380,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         userInputChannels = 0;
-        inputSampleFormat = hostInputSampleFormat = paInt16; /* Suppress 'uninitialised var' warnings. */
+        inputSampleFormat = paInt16; /* Suppress 'uninitialised var' warnings. */
     }
 
     if( outputParameters )
@@ -4415,7 +4415,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         userOutputChannels = 0;
-        outputSampleFormat = hostOutputSampleFormat = paInt16; /* Suppress 'uninitialized var' warnings. */
+        outputSampleFormat = paInt16; /* Suppress 'uninitialized var' warnings. */
     }
 
     /* validate platform specific flags */
@@ -4600,6 +4600,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
     else
     {
+        hostInputSampleFormat = (PaSampleFormat)0; /* Avoid uninitialized variable warning */
+
         stream->capture.pPin = NULL;
         stream->capture.bytesPerFrame = 0;
     }
@@ -4724,6 +4726,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
     else
     {
+        hostOutputSampleFormat = (PaSampleFormat)0; /* Avoid uninitialized variable warning */
+
         stream->render.pPin = NULL;
         stream->render.bytesPerFrame = 0;
     }
