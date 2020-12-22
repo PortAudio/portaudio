@@ -66,6 +66,9 @@
 #include "pa_endianness.h"
 #include "pa_types.h"
 
+#ifdef PA_USE_C99_LRINTF
+#include <math.h>
+#endif
 
 PaSampleFormat PaUtil_SelectClosestAvailableFormat(
         PaSampleFormat availableFormats, PaSampleFormat format )
