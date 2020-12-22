@@ -295,7 +295,7 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
         wchar_t mmeErrorTextWide[ MAXERRORLENGTH ];                     \
         char mmeErrorText[ MAXERRORLENGTH ];                            \
         waveInGetErrorTextW( mmresult, mmeErrorTextWide, MAXERRORLENGTH );   \
-        WideCharToMultiByte( CP_UTF8, WC_COMPOSITECHECK | WC_DEFAULTCHAR,\
+        WideCharToMultiByte( CP_UTF8, 0,                                \
             mmeErrorTextWide, -1, mmeErrorText, MAXERRORLENGTH, NULL, NULL );  \
         PaUtil_SetLastHostErrorInfo( paMME, mmresult, mmeErrorText );   \
     }
@@ -305,7 +305,7 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
         wchar_t mmeErrorTextWide[ MAXERRORLENGTH ];                     \
         char mmeErrorText[ MAXERRORLENGTH ];                            \
         waveOutGetErrorTextW( mmresult, mmeErrorTextWide, MAXERRORLENGTH );  \
-        WideCharToMultiByte( CP_UTF8, WC_COMPOSITECHECK | WC_DEFAULTCHAR,\
+        WideCharToMultiByte( CP_UTF8, 0,                                \
             mmeErrorTextWide, -1, mmeErrorText, MAXERRORLENGTH, NULL, NULL );  \
         PaUtil_SetLastHostErrorInfo( paMME, mmresult, mmeErrorText );   \
     }
