@@ -6548,6 +6548,7 @@ static PaError PaPinCaptureSubmitHandler_WaveCyclic(PaProcessThreadInfo* pInfo, 
     assert(packet != 0);
     PA_HP_TRACE((pInfo->stream->hLog, "Capture submit: %u", eventIndex));
     packet->Header.DataUsed = 0; /* Reset for reuse */
+    packet->Header.OptionsFlags = 0; /* Reset for reuse. Required for e.g. Focusrite Scarlett 2i4 (1st Gen) see #310 */
     ResetEvent(packet->Signal.hEvent);
     result = PinRead(pInfo->stream->capture.pPin->handle, packet);
     ++pInfo->pending;
