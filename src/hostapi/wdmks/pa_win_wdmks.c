@@ -4340,8 +4340,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaWinWdmStream *stream = 0;
     /* unsigned long framesPerHostBuffer; these may not be equivalent for all implementations */
     PaSampleFormat inputSampleFormat, outputSampleFormat;
-    PaSampleFormat hostInputSampleFormat = paInt16;
-    PaSampleFormat hostOutputSampleFormat = paInt16;
+    PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
     int userInputChannels,userOutputChannels;
     WAVEFORMATEXTENSIBLE wfx = { 0 };
 
@@ -4601,6 +4600,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
     else
     {
+        hostInputSampleFormat = (PaSampleFormat) 0; /* Avoid uninitialized variable warning */
+        
         stream->capture.pPin = NULL;
         stream->capture.bytesPerFrame = 0;
     }
@@ -4725,6 +4726,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
     else
     {
+        hostOutputSampleFormat = (PaSampleFormat) 0; /* Avoid uninitialized variable warning */
+
         stream->render.pPin = NULL;
         stream->render.bytesPerFrame = 0;
     }
