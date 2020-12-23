@@ -112,6 +112,7 @@
 
 #include "pa_win_wmme.h"
 #include "pa_win_waveformat.h"
+#include "pa_win_util.h"
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
 #include "pa_win_wdmks_utils.h"
@@ -313,18 +314,7 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
 
 static void PaMme_SetLastSystemError( DWORD errorCode )
 {
-    char *lpMsgBuf;
-    FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL,
-        errorCode,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPTSTR) &lpMsgBuf,
-        0,
-        NULL
-    );
-    PaUtil_SetLastHostErrorInfo( paMME, errorCode, lpMsgBuf );
-    LocalFree( lpMsgBuf );
+    PaWinUtil_SetLastSystemErrorInfo( paMME, errorCode );
 }
 
 #define PA_MME_SET_LAST_SYSTEM_ERROR( errorCode ) \

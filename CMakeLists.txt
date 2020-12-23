@@ -126,6 +126,7 @@ IF(WIN32)
     src/os/win/pa_win_wdmks_utils.c
     src/os/win/pa_win_coinitialize.c)
   SET(PA_PLATFORM_INCLUDES
+    src/os/win/pa_win_util.h
     src/os/win/pa_win_coinitialize.h
     src/os/win/pa_win_wdmks_utils.h)
 

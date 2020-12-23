@@ -83,6 +83,7 @@
 #include "pa_process.h"
 #include "pa_debugprint.h"
 
+#include "pa_win_util.h"
 #include "pa_win_ds.h"
 #include "pa_win_ds_dynlink.h"
 #include "pa_win_waveformat.h"
@@ -203,9 +204,14 @@ static signed long GetStreamReadAvailable( PaStream* stream );
 static signed long GetStreamWriteAvailable( PaStream* stream );
 
 
-/* FIXME: should convert hr to a string */
+#if _WIN32_WINNT >= 0x0602 // Windows 8 and above
+#define PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr ) \
+    PaWinUtil_SetLastSystemErrorInfo( paDirectSound, hr )
+#else
+/* FIXME: should use DXGetErrorString/DXGetErrorDescription for Windows 7 and below */
 #define PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr ) \
     PaUtil_SetLastHostErrorInfo( paDirectSound, hr, "DirectSound error" )
+#endif
 
 /************************************************* DX Prototypes **********/
 static BOOL CALLBACK CollectGUIDsProcW(LPGUID lpGUID,

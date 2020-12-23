@@ -102,6 +102,7 @@
 #include "pa_ringbuffer.h"
 
 #include "pa_win_coinitialize.h"
+#include "pa_win_util.h"
 
 /* This version of pa_asio.cpp is currently only targeted at Win32,
    It would require a few tweaks to work with pre-OS X Macintosh.
@@ -214,18 +215,7 @@ static ASIOCallbacks asioCallbacks_ =
 
 static void PaAsio_SetLastSystemError( DWORD errorCode )
 {
-    LPVOID lpMsgBuf;
-    FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL,
-        errorCode,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPTSTR) &lpMsgBuf,
-        0,
-        NULL
-    );
-    PaUtil_SetLastHostErrorInfo( paASIO, errorCode, (const char*)lpMsgBuf );
-    LocalFree( lpMsgBuf );
+    PaWinUtil_SetLastSystemErrorInfo( paASIO, errorCode );
 }
 
 #define PA_ASIO_SET_LAST_SYSTEM_ERROR( errorCode ) \
