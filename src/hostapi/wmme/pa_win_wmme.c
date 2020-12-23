@@ -290,24 +290,24 @@ static signed long GetStreamWriteAvailable( PaStream* stream );
 
 /* macros for setting last host error information */
 
-#define PA_MME_SET_LAST_WAVEIN_ERROR( mmresult ) \
-    {                                                                   \
-        wchar_t mmeErrorTextWide[ MAXERRORLENGTH ];                     \
-        char mmeErrorText[ MAXERRORLENGTH ];                            \
-        waveInGetErrorTextW( mmresult, mmeErrorTextWide, MAXERRORLENGTH );   \
-        WideCharToMultiByte( CP_UTF8, 0,                                \
-            mmeErrorTextWide, -1, mmeErrorText, MAXERRORLENGTH, NULL, NULL );  \
-        PaUtil_SetLastHostErrorInfo( paMME, mmresult, mmeErrorText );   \
+#define PA_MME_SET_LAST_WAVEIN_ERROR( mmresult )                              \
+    {                                                                         \
+        wchar_t mmeErrorTextWide[ MAXERRORLENGTH ];                           \
+        char mmeErrorText[ MAXERRORLENGTH ];                                  \
+        waveInGetErrorTextW( mmresult, mmeErrorTextWide, MAXERRORLENGTH );    \
+        WideCharToMultiByte( CP_UTF8, 0, mmeErrorTextWide, -1,                \
+            mmeErrorText, MAXERRORLENGTH, NULL, NULL );                       \
+        PaUtil_SetLastHostErrorInfo( paMME, mmresult, mmeErrorText );         \
     }
 
-#define PA_MME_SET_LAST_WAVEOUT_ERROR( mmresult ) \
-    {                                                                   \
-        wchar_t mmeErrorTextWide[ MAXERRORLENGTH ];                     \
-        char mmeErrorText[ MAXERRORLENGTH ];                            \
-        waveOutGetErrorTextW( mmresult, mmeErrorTextWide, MAXERRORLENGTH );  \
-        WideCharToMultiByte( CP_UTF8, 0,                                \
-            mmeErrorTextWide, -1, mmeErrorText, MAXERRORLENGTH, NULL, NULL );  \
-        PaUtil_SetLastHostErrorInfo( paMME, mmresult, mmeErrorText );   \
+#define PA_MME_SET_LAST_WAVEOUT_ERROR( mmresult )                             \
+    {                                                                         \
+        wchar_t mmeErrorTextWide[ MAXERRORLENGTH ];                           \
+        char mmeErrorText[ MAXERRORLENGTH ];                                  \
+        waveOutGetErrorTextW( mmresult, mmeErrorTextWide, MAXERRORLENGTH );   \
+        WideCharToMultiByte( CP_UTF8, 0, mmeErrorTextWide, -1,                \
+            mmeErrorText, MAXERRORLENGTH, NULL, NULL );                       \
+        PaUtil_SetLastHostErrorInfo( paMME, mmresult, mmeErrorText );         \
     }
 
 
