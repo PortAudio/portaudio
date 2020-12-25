@@ -1,5 +1,4 @@
 # EditorConfig info: https://editorconfig.org/
-
 root = true
 
 [Makefile*]
