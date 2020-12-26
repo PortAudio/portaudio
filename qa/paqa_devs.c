@@ -1,11 +1,12 @@
 /** @file paqa_devs.c
     @ingroup qa_src
     @brief Self Testing Quality Assurance app for PortAudio
-    Try to open the default devices and run through all the
-    possible configurations. This test does not verify
-    that the configuration works well. It just verifies
-    that it does not crash. It requires a human to listen to
-    the sine wave outputs.
+    Try to open devices and run through all possible configurations.
+    By default, open only the default devices. Command line options support
+    opening every device, or all input devices, or all output devices.
+    This test does not verify that the configuration works well.
+    It just verifies that it does not crash. It requires a human to
+    listen to the sine wave outputs.
 
     @author Phil Burk  http://www.softsynth.com
 
