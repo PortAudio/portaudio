@@ -8,8 +8,8 @@
     the sine wave outputs.
 
     @author Phil Burk  http://www.softsynth.com
-    
-    Pieter adapted to V19 API. Test now relies heavily on 
+
+    Pieter adapted to V19 API. Test now relies heavily on
     Pa_IsFormatSupported(). Uses same 'standard' sample rates
     as in test pa_devs.c.
 */
@@ -41,13 +41,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -170,7 +170,7 @@ static int QaCallback( const void *inputBuffer, void *outputBuffer,
                 }
             }
             break;
-                
+
         case paInt16:
             {
                 short *out =  (short *) outputBuffer;
@@ -317,7 +317,7 @@ static void TestDevices( int mode, int allDevices )
             maxChannels = MAX_TEST_CHANNELS;
 
         if (!allDevices && !isDefault) continue; // skip this device
-        
+
         for( jc=1; jc<=maxChannels; jc++ )
         {
             printf("\n===========================================================\n");
@@ -352,7 +352,7 @@ static int TestAdvance( int mode, PaDeviceIndex deviceID, double sampleRate,
     PaQaData myData;
     #define FRAMES_PER_BUFFER  (64)
     const int kNumSeconds = 100;
-    
+
     /* Setup data for synthesis thread. */
     myData.framesLeft = (unsigned long) (sampleRate * kNumSeconds);
     myData.numChannels = numChannels;
