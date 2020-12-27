@@ -1,0 +1,39 @@
+# Options for astyle, for example:
+#
+#      astyle project=_astylerc test/style/*.c,cpp,h
+#
+# For full docs:
+# http://astyle.sourceforge.net/astyle.html
+#
+# - Preserve file modification date
+--preserve-date
+
+# - Do not create file backups, everything should be VCSed anyway
+--suffix=none
+
+# Align curly brackets
+--style=ansi
+
+# Indent with 4 spaces, convert tabs to spaces
+--indent=spaces=4
+--convert-tabs
+
+# Continuation lines indented 2 levels or aligned
+--indent-continuation=2
+--max-code-length=100
+
+# Put space around operands like + and after commas.
+--pad-oper
+--pad-comma
+
+# Put space inside of parentheses
+--pad-paren-in
+--unpad-paren
+
+# Put space after "if", "for" etcetera
+--pad-header
+
+# "int *foo, int &foo"
+--align-pointer=name
+--align-reference=name
+
