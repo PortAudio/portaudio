@@ -1,0 +1,16 @@
+---
+Language:        Cpp
+BasedOnStyle:  WebKit
+
+# These were customized for PortAudio
+AlignEscapedNewlines: Left
+AlignOperands: true
+AllowAllParametersOfDeclarationOnNextLine: false
+BreakBeforeBraces: Allman
+ColumnLimit: 100
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ContinuationIndentWidth: 8
+PointerAlignment: Right
+SpacesInParentheses: true
+TabWidth: 4
+...
