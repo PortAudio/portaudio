@@ -18,7 +18,7 @@ extern "C" {
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_BlockingStream_getReadAvailable
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -26,7 +26,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_BlockingStream_getReadAvailable
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_BlockingStream_getWriteAvailable
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -34,7 +34,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_BlockingStream_getWriteAvailable
  * Signature: ([FI)Z
  */
 JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readFloats
-  (JNIEnv *, jobject, jfloatArray, jint);
+( JNIEnv *, jobject, jfloatArray, jint );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -42,7 +42,7 @@ JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readFloats
  * Signature: ([FI)Z
  */
 JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeFloats
-  (JNIEnv *, jobject, jfloatArray, jint);
+( JNIEnv *, jobject, jfloatArray, jint );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -50,7 +50,7 @@ JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeFloats
  * Signature: ([SI)Z
  */
 JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readShorts
-  (JNIEnv *, jobject, jshortArray, jint);
+( JNIEnv *, jobject, jshortArray, jint );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -58,7 +58,7 @@ JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_readShorts
  * Signature: ([SI)Z
  */
 JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeShorts
-  (JNIEnv *, jobject, jshortArray, jint);
+( JNIEnv *, jobject, jshortArray, jint );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -66,7 +66,7 @@ JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_writeShorts
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_start
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -74,7 +74,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_start
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_stop
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -82,7 +82,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_stop
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_abort
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -90,7 +90,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_abort
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_close
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -98,7 +98,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_close
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_isStopped
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -106,7 +106,7 @@ JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_isStopped
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_isActive
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -114,7 +114,7 @@ JNIEXPORT jboolean JNICALL Java_com_portaudio_BlockingStream_isActive
  * Signature: ()D
  */
 JNIEXPORT jdouble JNICALL Java_com_portaudio_BlockingStream_getTime
-  (JNIEnv *, jobject);
+( JNIEnv *, jobject );
 
 /*
  * Class:     com_portaudio_BlockingStream
@@ -122,7 +122,7 @@ JNIEXPORT jdouble JNICALL Java_com_portaudio_BlockingStream_getTime
  * Signature: (Lcom/portaudio/StreamInfo;)V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_BlockingStream_getInfo
-  (JNIEnv *, jobject, jobject);
+( JNIEnv *, jobject, jobject );
 
 #ifdef __cplusplus
 }

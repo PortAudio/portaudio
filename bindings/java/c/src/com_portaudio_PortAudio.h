@@ -63,7 +63,7 @@ extern "C" {
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getVersion
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -71,7 +71,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getVersion
  * Signature: ()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_portaudio_PortAudio_getVersionText
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -79,7 +79,7 @@ JNIEXPORT jstring JNICALL Java_com_portaudio_PortAudio_getVersionText
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_initialize
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -87,7 +87,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_initialize
  * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_terminate
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -95,7 +95,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_terminate
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDeviceCount
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -103,7 +103,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDeviceCount
  * Signature: (ILcom/portaudio/DeviceInfo;)V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_getDeviceInfo
-  (JNIEnv *, jclass, jint, jobject);
+( JNIEnv *, jclass, jint, jobject );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -111,7 +111,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_getDeviceInfo
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getHostApiCount
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -119,7 +119,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getHostApiCount
  * Signature: (ILcom/portaudio/HostApiInfo;)V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_getHostApiInfo
-  (JNIEnv *, jclass, jint, jobject);
+( JNIEnv *, jclass, jint, jobject );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -127,7 +127,7 @@ JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_getHostApiInfo
  * Signature: (I)I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_hostApiTypeIdToHostApiIndex
-  (JNIEnv *, jclass, jint);
+( JNIEnv *, jclass, jint );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -135,7 +135,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_hostApiTypeIdToHostApiIndex
  * Signature: (II)I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_hostApiDeviceIndexToDeviceIndex
-  (JNIEnv *, jclass, jint, jint);
+( JNIEnv *, jclass, jint, jint );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -143,7 +143,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_hostApiDeviceIndexToDeviceIn
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDefaultInputDevice
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -151,7 +151,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDefaultInputDevice
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDefaultOutputDevice
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -159,7 +159,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDefaultOutputDevice
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDefaultHostApi
-  (JNIEnv *, jclass);
+( JNIEnv *, jclass );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -167,7 +167,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_getDefaultHostApi
  * Signature: (Lcom/portaudio/StreamParameters;Lcom/portaudio/StreamParameters;I)I
  */
 JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_isFormatSupported
-  (JNIEnv *, jclass, jobject, jobject, jint);
+( JNIEnv *, jclass, jobject, jobject, jint );
 
 /*
  * Class:     com_portaudio_PortAudio
@@ -175,7 +175,7 @@ JNIEXPORT jint JNICALL Java_com_portaudio_PortAudio_isFormatSupported
  * Signature: (Lcom/portaudio/BlockingStream;Lcom/portaudio/StreamParameters;Lcom/portaudio/StreamParameters;III)V
  */
 JNIEXPORT void JNICALL Java_com_portaudio_PortAudio_openStream
-  (JNIEnv *, jclass, jobject, jobject, jobject, jint, jint, jint);
+( JNIEnv *, jclass, jobject, jobject, jobject, jint, jint, jint );
 
 #ifdef __cplusplus
 }
