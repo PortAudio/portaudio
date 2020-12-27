@@ -26,13 +26,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -49,10 +49,13 @@ jlong jpa_GetLongField( JNIEnv *env, jclass cls, jobject obj, const char *fieldN
 void jpa_SetLongField( JNIEnv *env, jclass cls, jobject obj, const char *fieldName, jlong value );
 
 jdouble jpa_GetDoubleField( JNIEnv *env, jclass cls, jobject obj, const char *fieldName );
-void jpa_SetDoubleField( JNIEnv *env, jclass cls, jobject obj, const char *fieldName, jdouble value );
+void jpa_SetDoubleField(
+        JNIEnv *env, jclass cls, jobject obj, const char *fieldName, jdouble value );
 
-void jpa_SetStringField( JNIEnv *env, jclass cls, jobject obj, const char *fieldName, const char *value );
-PaStreamParameters *jpa_FillStreamParameters( JNIEnv *env, jobject jstreamParam, PaStreamParameters *myParams );
+void jpa_SetStringField(
+        JNIEnv *env, jclass cls, jobject obj, const char *fieldName, const char *value );
+PaStreamParameters *jpa_FillStreamParameters(
+        JNIEnv *env, jobject jstreamParam, PaStreamParameters *myParams );
 
 jint jpa_CheckError( JNIEnv *env, PaError err );
 jint jpa_ThrowError( JNIEnv *env, const char *message );
