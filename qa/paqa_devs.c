@@ -107,8 +107,8 @@ static int gNumFailed = 0;
         } \
         else { \
             printf("ERROR - 0x%x - %s for %s\n", result, \
-                   ((result == 0) ? "-" : Pa_GetErrorText(result)), \
-                   #_exp ); \
+                    ((result == 0) ? "-" : Pa_GetErrorText(result)), \
+                    #_exp ); \
             gNumFailed++; \
             goto error; \
         } \
@@ -386,7 +386,7 @@ static int TestAdvance( int mode, PaDeviceIndex deviceID, double sampleRate,
     }
     else
     {
-       ipp = NULL;
+        ipp = NULL;
     }
 
     if( mode == MODE_OUTPUT )
