@@ -5890,6 +5890,12 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
         goto thread_error;
     }
 
+    // Signal: stream running
+    stream->running = TRUE;
+
+    // Notify: thread started
+    SetEvent(stream->hThreadStart);
+
     // Initialize event & start INPUT stream
     if (stream->in.clientProc)
     {
@@ -5939,12 +5945,6 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
         }
 
     }
-
-    // Signal: stream running
-    stream->running = TRUE;
-
-    // Notify: thread started
-    SetEvent(stream->hThreadStart);
 
     // Notify: state
     NotifyStateChanged(stream, paWasapiStreamStateThreadStart, ERROR_SUCCESS);
@@ -6171,6 +6171,12 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
     // Boost thread priority
     PaWasapi_ThreadPriorityBoost((void **)&stream->hAvTask, stream->nThreadPriority);
 
+    // Signal: stream running
+    stream->running = TRUE;
+
+    // Notify: thread started
+    SetEvent(stream->hThreadStart);
+
     // Initialize event & start INPUT stream
     if (stream->in.clientProc)
     {
@@ -6237,12 +6243,6 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
             goto thread_error;
         }
     }
-
-    // Signal: stream running
-    stream->running = TRUE;
-
-    // Notify: thread started
-    SetEvent(stream->hThreadStart);
 
     // Notify: state
     NotifyStateChanged(stream, paWasapiStreamStateThreadStart, ERROR_SUCCESS);
