@@ -277,10 +277,10 @@ static PaError BlockingTermFIFO( PaUtilRingBuffer *rbuf )
 static int
 BlockingCallback( const void                      *inputBuffer,
                   void                            *outputBuffer,
-		  unsigned long                    framesPerBuffer,
-		  const PaStreamCallbackTimeInfo*  timeInfo,
-		  PaStreamCallbackFlags            statusFlags,
-		  void                             *userData )
+          unsigned long                    framesPerBuffer,
+          const PaStreamCallbackTimeInfo*  timeInfo,
+          PaStreamCallbackFlags            statusFlags,
+          void                             *userData )
 {
     struct PaJackStream *stream = (PaJackStream *)userData;
     long numBytes = stream->bytesPerFrame * framesPerBuffer;
@@ -918,7 +918,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 
 #define ABS(x) ( (x) > 0 ? (x) : -(x) )
     if( ABS(sampleRate - jack_get_sample_rate(((PaJackHostApiRepresentation *) hostApi)->jack_client )) > 1 )
-       return paInvalidSampleRate;
+        return paInvalidSampleRate;
 #undef ABS
 
     return paFormatIsSupported;
@@ -1161,7 +1161,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
 #define ABS(x) ( (x) > 0 ? (x) : -(x) )
     if( ABS(sampleRate - jackSr) > 1 )
-       return paInvalidSampleRate;
+        return paInvalidSampleRate;
 #undef ABS
 
     UNLESS( stream = (PaJackStream*)PaUtil_AllocateMemory( sizeof(PaJackStream) ), paInsufficientMemory );
@@ -1610,7 +1610,7 @@ static PaError StartStream( PaStream *s )
         {
             int r = jack_connect( stream->jack_client, jack_port_name( stream->remote_output_ports[i] ),
                     jack_port_name( stream->local_input_ports[i] ) );
-           UNLESS( 0 == r || EEXIST == r, paUnanticipatedHostError );
+            UNLESS( 0 == r || EEXIST == r, paUnanticipatedHostError );
         }
     }
 
@@ -1620,7 +1620,7 @@ static PaError StartStream( PaStream *s )
         {
             int r = jack_connect( stream->jack_client, jack_port_name( stream->local_output_ports[i] ),
                     jack_port_name( stream->remote_input_ports[i] ) );
-           UNLESS( 0 == r || EEXIST == r, paUnanticipatedHostError );
+            UNLESS( 0 == r || EEXIST == r, paUnanticipatedHostError );
         }
     }
 
