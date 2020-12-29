@@ -1137,11 +1137,11 @@ static OSStatus SetupDevicePropertyListeners( PaMacCoreStream *stream, AudioDevi
                                    AudioDevicePropertyActualSampleRateListenerProc, stream );
 
     PaMacCore_AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioStreamPropertyLatency,
-                                      AudioDevicePropertyGenericListenerProc, stream );
+                                   AudioDevicePropertyGenericListenerProc, stream );
     PaMacCore_AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioDevicePropertyBufferFrameSize,
-                                      AudioDevicePropertyGenericListenerProc, stream );
+                                   AudioDevicePropertyGenericListenerProc, stream );
     PaMacCore_AudioDeviceAddPropertyListener( deviceID, 0, isInput, kAudioDevicePropertySafetyOffset,
-                                      AudioDevicePropertyGenericListenerProc, stream );
+                                   AudioDevicePropertyGenericListenerProc, stream );
 
     return osErr;
 }
@@ -1149,14 +1149,14 @@ static OSStatus SetupDevicePropertyListeners( PaMacCoreStream *stream, AudioDevi
 static void CleanupDevicePropertyListeners( PaMacCoreStream *stream, AudioDeviceID deviceID, Boolean isInput )
 {
     PaMacCore_AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertyActualSampleRate,
-                                         AudioDevicePropertyActualSampleRateListenerProc, stream );
+                                   AudioDevicePropertyActualSampleRateListenerProc, stream );
 
     PaMacCore_AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertyLatency,
-                                         AudioDevicePropertyGenericListenerProc, stream );
+                                   AudioDevicePropertyGenericListenerProc, stream );
     PaMacCore_AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertyBufferFrameSize,
-                                         AudioDevicePropertyGenericListenerProc, stream );
+                                   AudioDevicePropertyGenericListenerProc, stream );
     PaMacCore_AudioDeviceRemovePropertyListener( deviceID, 0, isInput, kAudioDevicePropertySafetyOffset,
-                                         AudioDevicePropertyGenericListenerProc, stream );
+                                   AudioDevicePropertyGenericListenerProc, stream );
 }
 
 /* ================================================================================= */
