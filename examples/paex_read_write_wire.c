@@ -1,7 +1,7 @@
 /** @file paex_read_write_wire.c
-	@ingroup examples_src
-	@brief Tests full duplex blocking I/O by passing input straight to output.
-	@author Bjorn Roche. XO Audio LLC for Z-Systems Engineering.
+    @ingroup examples_src
+    @brief Tests full duplex blocking I/O by passing input straight to output.
+    @author Bjorn Roche. XO Audio LLC for Z-Systems Engineering.
     @author based on code by: Phil Burk  http://www.softsynth.com
     @author based on code by: Ross Bencina rossb@audiomulch.com
 */
@@ -179,22 +179,22 @@ int main(void)
 xrun:
     printf("err = %d\n", err); fflush(stdout);
     if( stream ) {
-       Pa_AbortStream( stream );
-       Pa_CloseStream( stream );
+        Pa_AbortStream( stream );
+        Pa_CloseStream( stream );
     }
     free( sampleBlock );
     Pa_Terminate();
     if( err & paInputOverflow )
-       fprintf( stderr, "Input Overflow.\n" );
+        fprintf( stderr, "Input Overflow.\n" );
     if( err & paOutputUnderflow )
-       fprintf( stderr, "Output Underflow.\n" );
+        fprintf( stderr, "Output Underflow.\n" );
     return -2;
 error1:
     free( sampleBlock );
 error2:
     if( stream ) {
-       Pa_AbortStream( stream );
-       Pa_CloseStream( stream );
+        Pa_AbortStream( stream );
+        Pa_CloseStream( stream );
     }
     Pa_Terminate();
     fprintf( stderr, "An error occurred while using the portaudio stream\n" );
