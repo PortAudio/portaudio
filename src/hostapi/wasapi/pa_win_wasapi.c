@@ -841,8 +841,8 @@ static BOOL SystemTimer_SetGranularity(SystemTimer *timer, UINT32 granularity)
 
     if (timeGetDevCaps(&caps, sizeof(caps)) == MMSYSERR_NOERROR)
     {
-        if (timer->granularity < caps.wPeriodMin)
-            timer->granularity = caps.wPeriodMin;
+        if (timer->granularity < (INT32)caps.wPeriodMin)
+            timer->granularity = (INT32)caps.wPeriodMin;
     }
 
     if (timeBeginPeriod(timer->granularity) != TIMERR_NOERROR)
