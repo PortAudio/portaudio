@@ -277,10 +277,10 @@ static PaError BlockingTermFIFO( PaUtilRingBuffer *rbuf )
 static int
 BlockingCallback( const void                      *inputBuffer,
                   void                            *outputBuffer,
-          unsigned long                    framesPerBuffer,
-          const PaStreamCallbackTimeInfo*  timeInfo,
-          PaStreamCallbackFlags            statusFlags,
-          void                             *userData )
+                  unsigned long                    framesPerBuffer,
+                  const PaStreamCallbackTimeInfo*  timeInfo,
+                  PaStreamCallbackFlags            statusFlags,
+                  void                             *userData )
 {
     struct PaJackStream *stream = (PaJackStream *)userData;
     long numBytes = stream->bytesPerFrame * framesPerBuffer;

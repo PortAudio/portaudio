@@ -734,8 +734,7 @@ static PaError ValidateParameters( const PaStreamParameters *parameters, const P
         return paInvalidDevice;
     }
 
-    maxChans = (mode == StreamMode_In ? deviceInfo->maxInputChannels :
-        deviceInfo->maxOutputChannels);
+    maxChans = (mode == StreamMode_In ? deviceInfo->maxInputChannels : deviceInfo->maxOutputChannels);
     if( parameters->channelCount > maxChans )
     {
         return paInvalidChannelCount;
@@ -1948,19 +1947,19 @@ static PaError ReadStream( PaStream* s,
     {
         framesRequested = PA_MIN( frames, stream->capture->hostFrames );
 
-    bytesRequested = framesRequested * PaOssStreamComponent_FrameSize( stream->capture );
-    ENSURE_( (bytesRead = read( stream->capture->fd, stream->capture->buffer, bytesRequested )),
-                 paUnanticipatedHostError );
-    if ( bytesRequested != bytesRead )
-    {
-        PA_DEBUG(( "Requested %d bytes, read %d\n", bytesRequested, bytesRead ));
-        return paUnanticipatedHostError;
-    }
+        bytesRequested = framesRequested * PaOssStreamComponent_FrameSize( stream->capture );
+        ENSURE_( (bytesRead = read( stream->capture->fd, stream->capture->buffer, bytesRequested )),
+                    paUnanticipatedHostError );
+        if ( bytesRequested != bytesRead )
+        {
+            PA_DEBUG(( "Requested %d bytes, read %d\n", bytesRequested, bytesRead ));
+            return paUnanticipatedHostError;
+        }
 
-    PaUtil_SetInputFrameCount( &stream->bufferProcessor, stream->capture->hostFrames );
-    PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor, 0, stream->capture->buffer, stream->capture->hostChannelCount );
+        PaUtil_SetInputFrameCount( &stream->bufferProcessor, stream->capture->hostFrames );
+        PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor, 0, stream->capture->buffer, stream->capture->hostChannelCount );
         PaUtil_CopyInput( &stream->bufferProcessor, &userBuffer, framesRequested );
-    frames -= framesRequested;
+        frames -= framesRequested;
     }
 
 error:
@@ -1989,21 +1988,21 @@ static PaError WriteStream( PaStream *s, const void *buffer, unsigned long frame
 
     while( frames )
     {
-    PaUtil_SetOutputFrameCount( &stream->bufferProcessor, stream->playback->hostFrames );
-    PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor, 0, stream->playback->buffer, stream->playback->hostChannelCount );
+        PaUtil_SetOutputFrameCount( &stream->bufferProcessor, stream->playback->hostFrames );
+        PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor, 0, stream->playback->buffer, stream->playback->hostChannelCount );
 
-    framesConverted = PaUtil_CopyOutput( &stream->bufferProcessor, &userBuffer, frames );
-    frames -= framesConverted;
+        framesConverted = PaUtil_CopyOutput( &stream->bufferProcessor, &userBuffer, frames );
+        frames -= framesConverted;
 
-    bytesRequested = framesConverted * PaOssStreamComponent_FrameSize( stream->playback );
-    ENSURE_( (bytesWritten = write( stream->playback->fd, stream->playback->buffer, bytesRequested )),
-                 paUnanticipatedHostError );
+        bytesRequested = framesConverted * PaOssStreamComponent_FrameSize( stream->playback );
+        ENSURE_( (bytesWritten = write( stream->playback->fd, stream->playback->buffer, bytesRequested )),
+                    paUnanticipatedHostError );
 
-    if ( bytesRequested != bytesWritten )
-    {
-        PA_DEBUG(( "Requested %d bytes, wrote %d\n", bytesRequested, bytesWritten ));
-        return paUnanticipatedHostError;
-    }
+        if ( bytesRequested != bytesWritten )
+        {
+            PA_DEBUG(( "Requested %d bytes, wrote %d\n", bytesRequested, bytesWritten ));
+            return paUnanticipatedHostError;
+        }
     }
 
 error:

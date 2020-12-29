@@ -556,7 +556,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
             continue;
         }
         hpiError = HPI_AdapterGetInfo( NULL, idx, &outStreams, &inStreams,
-                    &version, &serial, &type );
+                                       &version, &serial, &type );
         /* Skip to next device on failure */
         if( hpiError )
         {
@@ -738,7 +738,7 @@ PaError PaAsiHpi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
          * interface and paNoError */
         PA_DEBUG(( "Could not open HPI interface\n" ));
 
-    *hostApi = NULL;
+        *hostApi = NULL;
         return paNoError;
     }
     else
@@ -1584,7 +1584,7 @@ static PaError PaAsiHpi_SetupBuffers( PaAsiHpiStreamComponent *streamComp, uint3
             /* If BBM not supported, foreground transfers will be used, but not a show-stopper */
             /* Anything else is an error */
             else if (( hpiError != HPI_ERROR_INVALID_OPERATION ) &&
-             ( hpiError != HPI_ERROR_INVALID_FUNC ))
+                    ( hpiError != HPI_ERROR_INVALID_FUNC ))
             {
                 PA_ASIHPI_REPORT_ERROR_( hpiError );
                 result = paUnanticipatedHostError;
