@@ -1,6 +1,10 @@
-name: MSBuild
+name: MSBuild MSVC Project File CI
 
-on: [push]
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 env:
   # Path to the solution file relative to the root of the project.
