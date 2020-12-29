@@ -1,7 +1,7 @@
 /** @file patest_unplug.c
-	@ingroup test_src
-	@brief Debug a crash involving unplugging a USB device.
-	@author Phil Burk  http://www.softsynth.com
+    @ingroup test_src
+    @brief Debug a crash involving unplugging a USB device.
+    @author Phil Burk  http://www.softsynth.com
 */
 /*
  * $Id$
@@ -131,10 +131,10 @@ int main(int argc, char **args)
     printf("Test unplugging a USB device.\n");
 
     if( argc > 1 ) {
-       inputDevice = outputDevice = atoi( args[1] );
-       printf("Using device number %d.\n\n", inputDevice );
+        inputDevice = outputDevice = atoi( args[1] );
+        printf("Using device number %d.\n\n", inputDevice );
     } else {
-       printf("Using default device.\n\n" );
+        printf("Using default device.\n\n" );
     }
 
     memset(&data, 0, sizeof(data));

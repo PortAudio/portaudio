@@ -1,8 +1,8 @@
 /** @file patest_write_stop_threads.c
-	@brief Call Pa_StopStream() from another thread to see if PortAudio hangs.
-	@author Bjorn Roche of XO Audio (www.xoaudio.com)
-	@author Ross Bencina
-	@author Phil Burk
+    @brief Call Pa_StopStream() from another thread to see if PortAudio hangs.
+    @author Bjorn Roche of XO Audio (www.xoaudio.com)
+    @author Ross Bencina
+    @author Phil Burk
 */
 /*
  * $Id$
