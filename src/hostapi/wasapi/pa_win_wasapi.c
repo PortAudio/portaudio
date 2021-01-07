@@ -2228,7 +2228,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 #endif
 
     // Allocate memory for the device list
-    if ((deviceInfoArray = AllocateDeviceListMemory(paWasapi)) == NULL)
+    if ( paWasapi->deviceCount!=0 && (deviceInfoArray = AllocateDeviceListMemory(paWasapi)) == NULL)
     {
         result = paInsufficientMemory;
         goto error;
