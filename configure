@@ -2759,7 +2759,7 @@ if test "${enable_debug_output+set}" = set; then :
   enableval=$enable_debug_output; if test "x$enableval" != "xno" ; then
 
 $as_echo "#define PA_ENABLE_DEBUG_OUTPUT /**/" >>confdefs.h
-
+$as_echo "Debug output enabled"
                   debug_output=yes
                fi
 
@@ -15887,13 +15887,16 @@ case "${host_os}" in
               elif xcodebuild -version -sdk macosx11.0 Path >/dev/null 2>&1 ; then
                  mac_version_min="-mmacosx-version-min=10.6"
                  mac_sysroot="-isysroot `xcodebuild -version -sdk macosx11.0 Path`"
+              elif xcodebuild -version -sdk macosx11.1 Path >/dev/null 2>&1 ; then
+                 mac_version_min="-mmacosx-version-min=10.6"
+                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx11.1 Path`"
               else
                  as_fn_error $? "Could not find 10.5 to 11.0 SDK." "$LINENO" 5
               fi
            esac
 
                                  mac_arches=""
-           for arch in x86_64
+           for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"
               CFLAGS="$CFLAGS -arch $arch"
