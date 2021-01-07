@@ -2110,7 +2110,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 {
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaError result = paNoError;
-    PaDeviceInfo *deviceInfoArray;
+    PaDeviceInfo *deviceInfoArray = NULL;
     UINT32 i;
     WCHAR *defaultRenderId = NULL;
     WCHAR *defaultCaptureId = NULL;
@@ -2228,7 +2228,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 #endif
 
     // Allocate memory for the device list
-    if ((deviceInfoArray = AllocateDeviceListMemory(paWasapi)) == NULL)
+    if ((paWasapi->deviceCount != 0) && (deviceInfoArray = AllocateDeviceListMemory(paWasapi)) == NULL)
     {
         result = paInsufficientMemory;
         goto error;
@@ -2262,7 +2262,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 
     // Fill the remaining slots with inactive device info
 #if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
-    if (hostApi->info.deviceCount < PA_WASAPI_MAX_CONST_DEVICE_COUNT)
+    if ((hostApi->info.deviceCount != 0) && (hostApi->info.deviceCount < PA_WASAPI_MAX_CONST_DEVICE_COUNT))
     {        
         for (i = hostApi->info.deviceCount; i < PA_WASAPI_MAX_CONST_DEVICE_COUNT; ++i)
         {
