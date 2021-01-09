@@ -929,7 +929,11 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     alsaPeriodFrames = 512;
     /* Have to reset hwParams, to set new buffer size; need to also set sample rate again */
     ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
-    ENSURE_( SetApproximateSampleRate( pcm, hwParams, defaultSr ), paUnanticipatedHostError );
+    result =  SetApproximateSampleRate( pcm, hwParams, defaultSr );
+    if(result == paInvalidSampleRate)
+        result = paNoError;
+    else
+        ENSURE_( result, paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, NULL ), paUnanticipatedHostError );
     *defaultHighLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
