@@ -5,7 +5,7 @@
     This test uses the same method to overload the stream as does
     patest_out_underflow.c -- it generates sine waves until the cpu load
     exceeds a certain level. However this test is only concerned with
-    input and so doesn't ouput any sound.
+    input and so doesn't output any sound.
     
     @author Ross Bencina <rossb@audiomulch.com>
 	@author Phil Burk <philburk@softsynth.com>
@@ -229,7 +229,7 @@ int main(void)
     return err;
 error:
     Pa_Terminate();
-    fprintf( stderr, "An error occured while using the portaudio stream\n" );
+    fprintf( stderr, "An error occurred while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
     return err;

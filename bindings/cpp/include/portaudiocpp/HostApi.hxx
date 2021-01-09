@@ -28,7 +28,7 @@ namespace portaudio
 	/// A single System can support multiple HostApi's each one typically having 
 	/// a set of Devices using that HostApi (usually driver type). All Devices in 
 	/// the HostApi can be enumerated and the default input/output Device for this 
-	/// HostApi can be retreived.
+	/// HostApi can be retrieved.
 	//////
 	class HostApi
 	{

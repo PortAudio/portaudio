@@ -1325,7 +1325,7 @@ static void Int16_To_Float32(
 
     while( count-- )
     {
-        float samp = *src * const_1_div_32768_; /* FIXME: i'm concerned about this being asymetrical with float->int16 -rb */
+        float samp = *src * const_1_div_32768_; /* FIXME: i'm concerned about this being asymmetrical with float->int16 -rb */
         *dest = samp;
 
         src += sourceStride;

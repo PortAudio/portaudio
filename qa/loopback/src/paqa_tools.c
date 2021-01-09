@@ -146,7 +146,7 @@ void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat o
 			for( i=0; i<numSamples; i++ )
 			{
 				float value = *input++;
-				// Use assymmetric conversion to avoid clipping.
+				// Use asymmetric conversion to avoid clipping.
 				short sval = value * 32767.0;
 				*data++ = sval;
 			}
@@ -159,7 +159,7 @@ void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat o
 			for( i=0; i<numSamples; i++ )
 			{
 				float value = *input++;
-				// Use assymmetric conversion to avoid clipping.
+				// Use asymmetric conversion to avoid clipping.
 				int ival = value * ((double) 0x007FFFF0);
 				ival = ival << 8;
 				*data++ = ival;

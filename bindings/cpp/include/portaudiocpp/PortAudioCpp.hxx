@@ -50,7 +50,7 @@
 ///   Other platforms should be easily supported as PortAudioCpp is platform-independent and (reasonably) C++ standard compliant.
 /// </p>
 /// <p>
-///   This documentation mainly provides information specific to PortAudioCpp. For a more complete explaination of all of the 
+///   This documentation mainly provides information specific to PortAudioCpp. For a more complete explanation of all of the 
 ///   concepts used, please consult the PortAudio documentation.
 /// </p>
 /// <p>

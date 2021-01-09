@@ -26,7 +26,7 @@ namespace portaudio
 	/// @brief System singleton which represents the PortAudio system.
 	///
 	/// The System is used to initialize/terminate PortAudio and provide 
-	/// a single acccess point to the PortAudio System (instance()).
+	/// a single access point to the PortAudio System (instance()).
 	/// It can be used to iterate through all HostApi 's in the System as 
 	/// well as all devices in the System. It also provides some utility 
 	/// functionality of PortAudio.
