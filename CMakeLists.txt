@@ -109,7 +109,7 @@ SOURCE_GROUP("common" FILES ${PA_COMMON_INCLUDES} ${PA_COMMON_SOURCES})
 
 SET(PA_PUBLIC_INCLUDES include/portaudio.h)
 
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake_support)
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 SET(PA_SKELETON_SOURCES src/hostapi/skeleton/pa_hostapi_skeleton.c)
 SOURCE_GROUP("hostapi\\skeleton" ${PA_SKELETON_SOURCES})
@@ -229,8 +229,8 @@ IF(WIN32)
   ENDIF()
 
   SET(GENERATED_MESSAGE "CMake generated file, do NOT edit! Use CMake-GUI to change configuration instead.")
-  CONFIGURE_FILE(cmake_support/template_portaudio.def ${CMAKE_CURRENT_BINARY_DIR}/portaudio_cmake.def @ONLY)
-  CONFIGURE_FILE(cmake_support/options_cmake.h.in ${CMAKE_CURRENT_BINARY_DIR}/options_cmake.h @ONLY)
+  CONFIGURE_FILE(cmake/template_portaudio.def ${CMAKE_CURRENT_BINARY_DIR}/portaudio_cmake.def @ONLY)
+  CONFIGURE_FILE(cmake/options_cmake.h.in ${CMAKE_CURRENT_BINARY_DIR}/options_cmake.h @ONLY)
   SET(PA_PRIVATE_INCLUDES ${PA_PRIVATE_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR}/options_cmake.h)
   SET(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIONS} PORTAUDIO_CMAKE_GENERATED)
   SOURCE_GROUP("cmake_generated" FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio_cmake.def ${CMAKE_CURRENT_BINARY_DIR}/options_cmake.h)
@@ -441,13 +441,13 @@ OPTION(PA_DISABLE_INSTALL "Disable targets install and uninstall (for embedded b
 IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
   INCLUDE(CMakePackageConfigHelpers)
 
-  CONFIGURE_PACKAGE_CONFIG_FILE(cmake_support/portaudioConfig.cmake.in ${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake
+  CONFIGURE_PACKAGE_CONFIG_FILE(cmake/portaudioConfig.cmake.in ${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake
     INSTALL_DESTINATION "lib/cmake/portaudio"
     NO_CHECK_REQUIRED_COMPONENTS_MACRO)
   WRITE_BASIC_PACKAGE_VERSION_FILE(${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake
     VERSION ${PA_VERSION}
     COMPATIBILITY SameMajorVersion)
-  CONFIGURE_FILE(cmake_support/portaudio-2.0.pc.in ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc @ONLY)
+  CONFIGURE_FILE(cmake/portaudio-2.0.pc.in ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc @ONLY)
   INSTALL(FILES README.md DESTINATION share/doc/portaudio)
   INSTALL(FILES LICENSE.txt DESTINATION share/doc/portaudio)
   INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION lib/pkgconfig)
@@ -465,7 +465,7 @@ IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
 
   IF (NOT TARGET uninstall)
     CONFIGURE_FILE(
-      "${CMAKE_CURRENT_SOURCE_DIR}/cmake_support/cmake_uninstall.cmake.in"
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
       "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
       IMMEDIATE @ONLY)
     ADD_CUSTOM_TARGET(uninstall

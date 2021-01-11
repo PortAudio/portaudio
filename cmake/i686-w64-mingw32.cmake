@@ -1,6 +1,6 @@
 # CMake Toolchain file for cross-compiling PortAudio to i686-w64-mingw32
 # Inspired from: https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/cross_compiling/Mingw
-# Example usage: $ cmake -DCMAKE_TOOLCHAIN_FILE=i686-w64-mingw32.cmake .
+# Example usage: $ cmake -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake .
 # i686-w64-mingw32 needs to be installed for this to work. On Debian-based
 # distributions the package is typically named `mingw-w64`.
 
