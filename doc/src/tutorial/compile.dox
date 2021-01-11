@@ -1,7 +1,5 @@
-/** @page compile_cmake PortAudio on Windows, OS X or Linux via. CMake
+/** @page compile Building PortAudio
 @ingroup tutorial
-
-@section cmake_building Building PortAudio stand-alone on Windows, OS X or Linux
 
 CMake can be used to generate Visual Studio solutions on Windows, Makefiles (on Linux and OS X) and build metadata for other build systems for PortAudio. You should obtain a recent version of CMake from [http://www.cmake.org] if you do not have one already. If you are unfamiliar with CMake, this section will provide some information on using CMake to build PortAudio.
 
