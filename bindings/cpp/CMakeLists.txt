@@ -1,20 +1,20 @@
 add_library(portaudiocpp
-    source/portaudiocpp/BlockingStream
-    source/portaudiocpp/CallbackInterface
-    source/portaudiocpp/CallbackStream
-    source/portaudiocpp/CFunCallbackStream
-    source/portaudiocpp/CppFunCallbackStream
-    source/portaudiocpp/Device
-    source/portaudiocpp/DirectionSpecificStreamParameters
-    source/portaudiocpp/Exception
-    source/portaudiocpp/HostApi
-    source/portaudiocpp/InterfaceCallbackStream
-    source/portaudiocpp/MemFunCallbackStream
-    source/portaudiocpp/Stream
-    source/portaudiocpp/StreamParameters
-    source/portaudiocpp/System
-    source/portaudiocpp/SystemDeviceIterator
-    source/portaudiocpp/SystemHostApiIterator
+    src/BlockingStream
+    src/CallbackInterface
+    src/CallbackStream
+    src/CFunCallbackStream
+    src/CppFunCallbackStream
+    src/Device
+    src/DirectionSpecificStreamParameters
+    src/Exception
+    src/HostApi
+    src/InterfaceCallbackStream
+    src/MemFunCallbackStream
+    src/Stream
+    src/StreamParameters
+    src/System
+    src/SystemDeviceIterator
+    src/SystemHostApiIterator
 )
 target_link_libraries(portaudiocpp PUBLIC portaudio)
 target_include_directories(portaudiocpp PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -27,30 +27,30 @@ install(TARGETS portaudiocpp
 )
 
 install(FILES
-    include/portaudiocpp/AutoSystem.hxx
-    include/portaudiocpp/BlockingStream.hxx
-    include/portaudiocpp/CallbackInterface.hxx
-    include/portaudiocpp/CallbackStream.hxx
-    include/portaudiocpp/CFunCallbackStream.hxx
-    include/portaudiocpp/CppFunCallbackStream.hxx
-    include/portaudiocpp/Device.hxx
-    include/portaudiocpp/DirectionSpecificStreamParameters.hxx
-    include/portaudiocpp/Exception.hxx
-    include/portaudiocpp/HostApi.hxx
-    include/portaudiocpp/InterfaceCallbackStream.hxx
-    include/portaudiocpp/MemFunCallbackStream.hxx
-    include/portaudiocpp/PortAudioCpp.hxx
-    include/portaudiocpp/SampleDataFormat.hxx
-    include/portaudiocpp/Stream.hxx
-    include/portaudiocpp/StreamParameters.hxx
-    include/portaudiocpp/SystemDeviceIterator.hxx
-    include/portaudiocpp/SystemHostApiIterator.hxx
-    include/portaudiocpp/System.hxx
+    include/AutoSystem.hxx
+    include/BlockingStream.hxx
+    include/CallbackInterface.hxx
+    include/CallbackStream.hxx
+    include/CFunCallbackStream.hxx
+    include/CppFunCallbackStream.hxx
+    include/Device.hxx
+    include/DirectionSpecificStreamParameters.hxx
+    include/Exception.hxx
+    include/HostApi.hxx
+    include/InterfaceCallbackStream.hxx
+    include/MemFunCallbackStream.hxx
+    include/PortAudioCpp.hxx
+    include/SampleDataFormat.hxx
+    include/Stream.hxx
+    include/StreamParameters.hxx
+    include/SystemDeviceIterator.hxx
+    include/SystemHostApiIterator.hxx
+    include/System.hxx
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp"
 )
     
 if(WIN32)
-    install(FILES include/portaudiocpp/AsioDeviceAdapter.hxx DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp")
+    install(FILES include/AsioDeviceAdapter.hxx DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp")
 endif()
 
 set(PORTAUDIOCPP_VERSION 12)
