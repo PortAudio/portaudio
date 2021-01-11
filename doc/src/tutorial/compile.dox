@@ -19,6 +19,12 @@ If you want to install PortAudio to the system, also run:
 
 If you want ASIO support on Windows, download the [ASIO SDK](https://www.steinberg.net/asiosdk) from Steinberg and place it the same parent directory as the PortAudio source code (*not* inside the PortAudio source code directory). The ASIO SDK is available to download and use without charge but the license does not allow us (or you) to redistribute it. Both ASIO and the DirectX SDK are automatically searched for by the CMake script. If they are found, they will be enabled by default.
 
+@section mingw Cross compiling to Windows from Linux with mingw
+
+To cross compile for Windows from Linux, first install the mingw package from your distribution. For the configure step of cmake (the first command documented above), add the argument `-DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake`. For example:
+
+    $ cmake -DCMAKE_INSTALL_PREFIX=/path/you/want/to/install/to -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake -S . -B build
+
 @section cmake_using Using PortAudio in your CMake project
 
 PortAudio defines the following CMake targets:
