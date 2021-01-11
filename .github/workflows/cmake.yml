@@ -1,0 +1,56 @@
+name: CMake build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu
+            os: ubuntu-latest
+            install_dir: ~/portaudio
+          - name: Ubuntu mingw64
+            os: ubuntu-latest
+            install_dir: ~/portaudio
+            dependencies_extras: mingw-w64
+            cmake_extras: -DCMAKE_TOOLCHAIN_FILE=i686-w64-mingw32.cmake
+          - name: Windows
+            os: windows-latest
+            install_dir: C:\portaudio
+          - name: macOS
+            os: macOS-latest
+            install_dir: ~/portaudio
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+    env:
+      cmake_build_type: RelWithDebInfo
+    steps:
+    - name: checkout Git repository
+      uses: actions/checkout@v2
+    - name: "[Ubuntu] install dependencies"
+      run: sudo apt-get install libasound2-dev libjack-dev ${{ matrix.dependencies_extras }}
+      if: matrix.os == 'ubuntu-latest'
+    - name: configure
+      run: cmake ${{ matrix.cmake_extras }}
+           -DCMAKE_INSTALL_PREFIX=${{ matrix.install_dir }}
+           -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
+           -DPA_BUILD_TESTS=ON
+           -DPA_BUILD_EXAMPLES=ON
+           -S .
+           -B build
+    - name: build
+      run: cmake --build build --config ${{ env.cmake_build_type }} --parallel 2
+    - name: install
+      run: cmake --install build --config ${{ env.cmake_build_type }}
+    - name: "Upload GitHub Actions artifacts"
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.name }} PortAudio build
+        path: ${{ matrix.install_dir }}
