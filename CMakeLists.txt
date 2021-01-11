@@ -473,6 +473,11 @@ IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
   ENDIF()
 ENDIF()
 
+OPTION(CPP_BINDINGS "Build C++ bindings" ON)
+if(CPP_BINDINGS)
+  SUBDIRS(bindings/cpp)
+ENDIF()
+
 # Prepared for inclusion of test files
 OPTION(PA_BUILD_TESTS "Include test projects" OFF)
 IF(PA_BUILD_TESTS)
