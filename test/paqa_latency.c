@@ -44,7 +44,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
-#include "loopback/src/qa_tools.h"
+#include "qa_tools.h"
 
 #define NUM_SECONDS   (5)
 #define SAMPLE_RATE   (44100)

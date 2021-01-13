@@ -63,3 +63,9 @@ ADD_TEST(patest_write_stop)
 IF(UNIX)
     ADD_TEST(patest_write_stop_hang_illegal)
 ENDIF()
+
+ADD_TEST(paqa_devs)
+ADD_TEST(paqa_errs)
+ADD_TEST(paqa_latency)
+
+SUBDIRS(loopback)
