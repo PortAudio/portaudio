@@ -215,7 +215,7 @@ float MaximumAbsDifference( float* sourceBuffer, float* referenceBuffer, int cou
     return result;
 }  
 
-int main( const char **argv, int argc )
+int main( int argc, const char **argv )
 {
     PaUtilTriangularDitherGenerator ditherState;
     PaUtilConverter *converter;
