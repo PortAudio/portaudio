@@ -32,12 +32,3 @@
 *.jpg binary
 *.wav binary
 *.la binary
-config.guess binary
-config.status binary
-config.sub binary
-configure binary
-depcomp binary
-install-sh binary
-libtool binary
-missing binary
-
