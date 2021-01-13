@@ -2,7 +2,7 @@
 
 MACRO(ADD_EXAMPLE appl_name)
   ADD_EXECUTABLE(${appl_name} "${appl_name}.c")
-  TARGET_LINK_LIBRARIES(${appl_name} portaudio_static)
+  TARGET_LINK_LIBRARIES(${appl_name} portaudio)
   SET_TARGET_PROPERTIES(${appl_name} PROPERTIES FOLDER "Examples C")
   IF(WIN32)
     SET_PROPERTY(TARGET ${appl_name} APPEND_STRING PROPERTY COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
@@ -11,7 +11,7 @@ ENDMACRO(ADD_EXAMPLE)
 
 MACRO(ADD_EXAMPLE_CPP appl_name)
   ADD_EXECUTABLE(${appl_name} "${appl_name}.cpp")
-  TARGET_LINK_LIBRARIES(${appl_name} portaudio_static)
+  TARGET_LINK_LIBRARIES(${appl_name} portaudio)
   SET_TARGET_PROPERTIES(${appl_name} PROPERTIES FOLDER "Examples C++")
   IF(WIN32)
     SET_PROPERTY(TARGET ${appl_name} APPEND_STRING PROPERTY COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
