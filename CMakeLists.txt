@@ -430,15 +430,7 @@ ELSE()
   ENDIF()
 ENDIF()
 
-# At least on Windows in embedded builds, portaudio's install target should likely
-# not be executed, as the library would usually already be installed as part of, and
-# by means of the host application.
-# The option below offers the option to avoid executing the portaudio install target
-# for cases in which the host-application executes install, but no independent install
-# of portaudio is wished.
-OPTION(PA_DISABLE_INSTALL "Disable targets install and uninstall (for embedded builds)" OFF)
-
-IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
+IF(NOT PA_OUTPUT_OSX_FRAMEWORK)
   INCLUDE(CMakePackageConfigHelpers)
 
   CONFIGURE_PACKAGE_CONFIG_FILE(cmake_support/portaudioConfig.cmake.in ${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake
