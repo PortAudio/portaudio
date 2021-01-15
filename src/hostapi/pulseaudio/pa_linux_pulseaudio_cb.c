@@ -83,7 +83,7 @@ void PaPulseAudio_updateTimeInfo( pa_stream * s,
   }
   else
   {
-    timeInfo->currentTime = ((float) l_lStreamTime / (float) 1000000);
+    timeInfo->currentTime = ((PaTime) l_lStreamTime / (PaTime) 1000000);
   }
 
   if( pa_stream_get_latency( s,
@@ -97,11 +97,11 @@ void PaPulseAudio_updateTimeInfo( pa_stream * s,
   {
       if( record == 0 )
       {
-          timeInfo->outputBufferDacTime = ((float) l_lStreamLatency / (float) 1000000);
+          timeInfo->outputBufferDacTime = ((PaTime) l_lStreamLatency / (PaTime) 1000000);
       }
       else
       {
-          timeInfo->inputBufferAdcTime = ((float) l_lStreamLatency / (float) 1000000);
+          timeInfo->inputBufferAdcTime = ((PaTime) l_lStreamLatency / (PaTime) 1000000);
       }
   }
 
