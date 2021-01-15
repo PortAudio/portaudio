@@ -12,20 +12,101 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Ubuntu
+          - name: Ubuntu GCC dynamic
             os: ubuntu-latest
             install_dir: ~/portaudio
-          - name: Ubuntu mingw64
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DOSS=ON
+              -DBUILD_SHARED_LIBS=ON
+          - name: Ubuntu GCC static
             os: ubuntu-latest
             install_dir: ~/portaudio
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DOSS=ON
+              -DBUILD_SHARED_LIBS=OFF
+          - name: Ubuntu MinGW dynamic
+            os: ubuntu-latest
+            install_dir: ~/portaudio
+            asio_sdk_cache_path: asiosdk.zip
             dependencies_extras: mingw-w64
-            cmake_extras: -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake
-          - name: Windows
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DASIO_SDK_ZIP_PATH=asiosdk.zip
+              -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake
+              -DBUILD_SHARED_LIBS=ON
+          - name: Ubuntu MinGW static
+            os: ubuntu-latest
+            install_dir: ~/portaudio
+            asio_sdk_cache_path: asiosdk.zip
+            dependencies_extras: mingw-w64
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DASIO_SDK_ZIP_PATH=asiosdk.zip
+              -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake
+              -DBUILD_SHARED_LIBS=OFF
+          - name: Windows MSVC dynamic
             os: windows-latest
             install_dir: C:\portaudio
-          - name: macOS
+            cmake_generator: "Visual Studio 16 2019"
+            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
+            # asiosdk instead of asiosdk.zip.
+            asio_sdk_cache_path: "asiosdk.zip"
+            cmake_options:
+              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
+              -DBUILD_SHARED_LIBS=ON
+          - name: Windows MSVC static
+            os: windows-latest
+            install_dir: C:\portaudio
+            cmake_generator: "Visual Studio 16 2019"
+            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
+            # asiosdk instead of asiosdk.zip.
+            asio_sdk_cache_path: "asiosdk.zip"
+            cmake_options:
+              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
+              -DBUILD_SHARED_LIBS=OFF
+          - name: Windows MinGW dynamic
+            os: windows-latest
+            install_dir: C:\portaudio
+            cmake_generator: "MinGW Makefiles"
+            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
+            # asiosdk instead of asiosdk.zip.
+            asio_sdk_cache_path: "asiosdk.zip"
+            cmake_options:
+              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
+              -DBUILD_SHARED_LIBS=ON
+          - name: Windows MinGW static
+            os: windows-latest
+            install_dir: C:\portaudio
+            cmake_generator: "MinGW Makefiles"
+            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
+            # asiosdk instead of asiosdk.zip.
+            asio_sdk_cache_path: "asiosdk.zip"
+            cmake_options:
+              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
+              -DBUILD_SHARED_LIBS=OFF
+          - name: macOS Clang dynamic
             os: macOS-latest
             install_dir: ~/portaudio
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DCMAKE_FRAMEWORK=OFF
+              -DBUILD_SHARED_LIBS=ON
+          - name: macOS Clang static
+            os: macOS-latest
+            install_dir: ~/portaudio
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DCMAKE_FRAMEWORK=OFF
+              -DBUILD_SHARED_LIBS=OFF
+          - name: macOS Clang framework
+            os: macOS-latest
+            install_dir: ~/portaudio
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DCMAKE_FRAMEWORK=ON
+              -DBUILD_SHARED_LIBS=ON
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -37,12 +118,26 @@ jobs:
     - name: "[Ubuntu] install dependencies"
       run: sudo apt-get install libasound2-dev libjack-dev ${{ matrix.dependencies_extras }}
       if: matrix.os == 'ubuntu-latest'
+    - name: "[macOS] install dependencies"
+      run: brew install jack
+      if: matrix.os == 'macOS-latest'
+    - name: "[Windows MinGW] install dependencies"
+      run: choco install mingw
+      if: startsWith(matrix.os, 'Windows MinGW')
+    - name: "[Windows/MinGW] set up ASIO SDK cache"
+      uses: actions/cache@v2
+      if: matrix.asio_sdk_cache_path != null
+      with:
+        path: ${{ matrix.asio_sdk_cache_path }}
+        key: ${{ hashFiles('.github/asiosdk-version.txt') }}
     - name: configure
-      run: cmake ${{ matrix.cmake_extras }}
+      run: cmake
+           -G "${{ matrix.cmake_generator }}"
+           ${{ matrix.cmake_options }}
            -DCMAKE_INSTALL_PREFIX=${{ matrix.install_dir }}
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
-           -DPA_BUILD_TESTS=ON
-           -DPA_BUILD_EXAMPLES=ON
+           -DBUILD_TESTING=ON
+           -DBUILD_EXAMPLES=ON
            -S .
            -B build
     - name: build
