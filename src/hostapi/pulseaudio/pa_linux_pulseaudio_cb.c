@@ -235,7 +235,7 @@ void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
                                     void *userdata )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) userdata;
-    PaStreamCallbackTimeInfo timeInfo = { 0, 0, 0 };    /* TODO: IMPLEMENT ME */
+    PaStreamCallbackTimeInfo timeInfo = { 0, 0, 0 };
     int l_iResult = paContinue;
     long numFrames = 0;
     unsigned int i = 0;
