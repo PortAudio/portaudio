@@ -499,7 +499,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
     stream->latency = 20000;
-    stream->underflows = 0;
+    stream->outputUnderflows = 0;
     stream->bufferAttr.fragsize = (uint32_t) - 1;
     stream->bufferAttr.prebuf = (uint32_t) - 1;
 

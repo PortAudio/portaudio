@@ -127,7 +127,7 @@ typedef struct PaPulseAudio_Stream
     size_t writableSize;
     pa_usec_t outStreamTime;
     pa_buffer_attr bufferAttr;
-    int underflows;
+    int outputUnderflows;
     int latency;
     int outputChannelCount;
 
