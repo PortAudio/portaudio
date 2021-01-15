@@ -503,7 +503,7 @@ void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
 
     stream->underflows++;
 
-    PA_DEBUG( ("Portaudio %s: PulseAudio stream has underflows %d times\n",
+    PA_DEBUG( ("Portaudio %s: PulseAudio playback stream has underflowed %d times\n",
                __FUNCTION__,
                stream->underflow ) );
 
