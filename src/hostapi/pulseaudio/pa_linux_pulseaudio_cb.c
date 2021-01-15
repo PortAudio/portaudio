@@ -288,10 +288,6 @@ void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
         /* We can't get as much we want let's calculate new size */
         if( numFrames != (length / l_ptrStream->outputFrameSize) )
         {
-            fprintf( stderr,
-                     "WANTED %ld and got %ld \n",
-                     numFrames,
-                     (length / l_ptrStream->outputFrameSize) );
             length = numFrames * l_ptrStream->outputFrameSize;
         }
     }
