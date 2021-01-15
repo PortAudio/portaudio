@@ -15,11 +15,46 @@ If you want to install PortAudio to the system, also run:
 
     $ cmake --install build
     
-@section asio ASIO support on Windows
+Note that when using the MSVC generator, you must specify the [build configuration](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html), for example:
 
-If you want ASIO support on Windows, download the [ASIO SDK](https://www.steinberg.net/asiosdk) from Steinberg and place it the same parent directory as the PortAudio source code (*not* inside the PortAudio source code directory). The ASIO SDK is available to download and use without charge but the license does not allow us (or you) to redistribute it. Both ASIO and the DirectX SDK are automatically searched for by the CMake script. If they are found, they will be enabled by default.
+    $ cmake --install build --config RelWithDebInfo
 
-@section mingw Cross compiling to Windows from Linux with mingw
+Alternative, you can use the [Ninja](https://ninja-build.org/) generator to avoid specifying the build configuration:
+
+    $ cmake -G Ninja -DCMAKE_INSTALL_PREFIX=/path/you/want/to/install/to -S . -B build
+    
+There are a handful of supported options you can use with CMake as documented below. To use change them, use the syntax `-DPARAMETER=VALUE` with the CMake configure step (the first cmake command above). For example:
+
+    $ cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=/path/you/want/to/install/to -S . -B build
+
+@section global_options Platform-independent options
+
+@param BUILD_SHARED_LIBS link PortAudio dynamically (default ON)
+@param BUILD_TESTING build tests (default OFF)
+@param BUILD_EXAMPLES build examples (default OFF)
+@param CPP_BINDINGS build the PortAudio C++ bindings (default ON)
+@param JACK build JACK Audio Connection Kit host API (default ON)
+  
+@section unix_options Linux/BSD/Unix options
+
+@param ALSA build Advanced Linux Sound Architecture host API (default ON)
+@param OSS build Open Sound System host API (default OFF)
+  
+@section windows_options Windows options
+
+@param ASIO build ASIO host API. If the [Steinberg ASIO SDK](https://www.steinberg.net/en/company/developers.html) ZIP file is not located in the source tree, it will be downloaded automatically to the CMake build directory. Note that the SDK license does not permit redistributing it, but it does permit usage without royalties. Refer to the license in the SDK for details. (default ON)
+@param ASIO_SDK_ZIP_PATH path to the ASIO SDK ZIP file. You are not required to specify this to use the ASIO option. The SDK will be automatically downloaded to the CMake build directory if the path is not found. Specifying this option can be helpful to cache the download outside the code repository for CI scripts. (default empty)
+@param DIRECTSOUND build DirectSound host API (default ON)
+@param MME build MME host API (default ON)
+@param WASAPI build WASAPI host API (default ON)
+@param WDMKS build WDMKS host API (default ON)
+@param DLL_LINK_WITH_STATIC_RUNTIME if BUILD_SHARED_LIBS=ON, link to static runtime libraries. Only available with MSVC, not MinGW. (default OFF)
+
+@section macos_options macOS options
+
+@param CMAKE_FRAMEWORK build PortAudio as a macOS framework (default OFF)
+
+@section mingw Cross compiling to Windows from Linux with MinGW
 
 To cross compile for Windows from Linux, first install the mingw package from your distribution. For the configure step of cmake (the first command documented above), add the argument `-DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake`. For example:
 
@@ -27,22 +62,13 @@ To cross compile for Windows from Linux, first install the mingw package from yo
 
 @section cmake_using Using PortAudio in your CMake project
 
-PortAudio defines the following CMake targets:
-
- - "portaudio_static" for a static library and
- - "portaudio" for a dynamic library
-
-If you installed PortAudio as described above in \ref cmake_building and the install prefix you used (CMAKE_INSTALL_PREFIX) is in your system PATH or CMAKE_MODULE_PATH CMake variable, you should be able to use:
+After installing PortAudio as documented above, add the following to your CMake project:
 
     find_package(portaudio)
+    
+This should work as long as the [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html) you used with PortAudio is included in your [CMAKE_SYSTEM_PREFIX_PATH](https://cmake.org/cmake/help/latest/variable/CMAKE_SYSTEM_PREFIX_PATH.html) or the [CMAKE_PREFIX_PATH](https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html) for your project.
 
-To define the "portaudio_static" and "portaudio" targets in your CMake project.
-
-If you do not want to install portaudio into your system but would rather just have it get built as part of your own project (which may be particularly convenient on Windows), you may also use:
-
-    add_subdirectory("path to PortAudio location" "some binary directory" EXCLUDE_FROM_ALL)
-
-EXCLUDE_FROM_ALL is not strictly necessary, but will ensure that targets which you don't use in your project won't get built.
+Alternatively, if you do not want to install PortAudio to the system, you can set [CMAKE_MODULE_PATH](https://cmake.org/cmake/help/latest/variable/CMAKE_MODULE_PATH.html) to the `cmake` folder under your PortAudio CMake build directory.
 
 Back to \ref tutorial_start
 

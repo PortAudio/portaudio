@@ -8,6 +8,8 @@ The library provides functions that allow your software to acquire and output re
 
 @section start_here Start here
 
+- @ref compile
+
 - @ref api_overview <br>
 A top-down view of the PortAudio API, its capabilities, functions and data structures
 
