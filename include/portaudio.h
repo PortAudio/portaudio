@@ -849,8 +849,11 @@ typedef int PaStreamCallback(
  outputParameters must be NULL for input-only streams.
  
  @param sampleRate The desired sampleRate. For full-duplex streams it is the
- sample rate for both input and output
-     
+ sample rate for both input and output. Note that the actual sampleRate
+ may differ very slightly from the desired rate because of hardware limitations.
+ The exact rate can be queried using Pa_GetStreamInfo(). If nothing close
+ to the desired sampleRate is available then the open will fail and return an error.
+
  @param framesPerBuffer The number of frames passed to the stream callback
  function, or the preferred block granularity for a blocking read/write stream.
  The special value paFramesPerBufferUnspecified (0) may be used to request that
