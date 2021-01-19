@@ -927,6 +927,11 @@ static PaError Pa2OssFormat( PaSampleFormat paFormat, int *ossFormat )
         case paInt16:
             *ossFormat = AFMT_S16_NE;
             break;
+#ifdef AFMT_S32_NE
+        case paInt32:
+            *ossFormat = AFMT_S32_NE;
+            break;
+#endif
         default:
             return paInternalError;     /* This shouldn't happen */
     }
@@ -950,6 +955,10 @@ static PaError GetAvailableFormats( PaOssStreamComponent *component, PaSampleFor
         frmts |= paInt8;
     if( mask & AFMT_S16_NE )
         frmts |= paInt16;
+#ifdef AFMT_S32_NE
+    if( mask & AFMT_S32_NE )
+        frmts |= paInt32;
+#endif
     if( frmts == 0 )
         result = paSampleFormatNotSupported;
 
