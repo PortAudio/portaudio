@@ -111,18 +111,8 @@ static pthread_t mainThread_;
     } while( 0 );
 
 #ifndef AFMT_S16_NE
-#define AFMT_S16_NE  Get_AFMT_S16_NE()
-/*********************************************************************
- * Some versions of OSS do not define AFMT_S16_NE. So check CPU.
- * PowerPC is Big Endian. X86 is Little Endian.
- */
-static int Get_AFMT_S16_NE( void )
-{
-    long testData = 1;
-    char *ptr = (char *) &testData;
-    int isLittle = ( *ptr == 1 ); /* Does address point to least significant byte? */
-    return isLittle ? AFMT_S16_LE : AFMT_S16_BE;
-}
+/* Implement compile-time endian #defines if this is still true on any OS. */
+#error OSS implementation does not support AFMT_S16_NE.
 #endif
 
 /* PaOSSHostApiRepresentation - host api datastructure specific to this implementation */
