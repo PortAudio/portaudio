@@ -961,7 +961,7 @@ static PaError GetAvailableFormats( PaOssStreamComponent *component, PaSampleFor
         frmts |= paInt8;
     if( mask & AFMT_S16_NE )
         frmts |= paInt16;
-    else
+    if( frmts == 0 )
         result = paSampleFormatNotSupported;
 
     *availableFormats = frmts;
