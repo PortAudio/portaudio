@@ -71,6 +71,20 @@ PaError PaAsio_GetAvailableBufferSizes( PaDeviceIndex device,
         long *minBufferSizeFrames, long *maxBufferSizeFrames, long *preferredBufferSizeFrames, long *granularity );
 
 
+typedef void (*PaAsioResetRequestCallback)();
+
+/** Register callback to detect reset requests.
+
+ This correponds to the ASIO kAsioResetRequest and kAsioBufferSizeChange
+ messages.
+
+ @param callback The function to call on ASIO reset request.  This is called
+ when the driver's buffer size has changed or it needs a reset, usually in
+ response to a user changing the configuration.  Pass NULL to unregister a
+ callback.
+*/
+void PaAsio_RegisterResetRequestCallback( PaAsioResetRequestCallback callback );
+
 /** Backwards compatibility alias for PaAsio_GetAvailableBufferSizes
 
  @see PaAsio_GetAvailableBufferSizes

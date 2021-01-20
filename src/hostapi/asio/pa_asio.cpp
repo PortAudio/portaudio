@@ -276,7 +276,7 @@ typedef struct PaAsioDriverInfo
     ASIODriverInfo asioDriverInfo;
     long inputChannelCount, outputChannelCount;
     long bufferMinSize, bufferMaxSize, bufferPreferredSize, bufferGranularity;
-    bool postOutput;
+    bool postOutput, bufferSizeOutdated;
 }
 PaAsioDriverInfo;
 
@@ -928,6 +928,30 @@ PaError PaAsio_GetAvailableBufferSizes( PaDeviceIndex device,
             PaAsioDeviceInfo *asioDeviceInfo =
                     (PaAsioDeviceInfo*)hostApi->deviceInfos[hostApiDevice];
 
+            PaAsioHostApiRepresentation *asioApi = (PaAsioHostApiRepresentation*) hostApi;
+            if ( hostApiDevice == asioApi->openAsioDeviceIndex &&
+                 asioApi->openAsioDriverInfo.bufferSizeOutdated )
+            {
+                ASIOError asioError;
+                PaAsioDriverInfo &driverInfo = asioApi->openAsioDriverInfo;
+                if( (asioError = ASIOGetBufferSize(&driverInfo.bufferMinSize,
+                        &driverInfo.bufferMaxSize, &driverInfo.bufferPreferredSize,
+                        &driverInfo.bufferGranularity)) != ASE_OK )
+                {
+                    PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
+                    return paUnanticipatedHostError;
+                }
+                else
+                {
+                    asioDeviceInfo->minBufferSize = driverInfo.bufferMinSize;
+                    asioDeviceInfo->maxBufferSize = driverInfo.bufferMaxSize;
+                    asioDeviceInfo->preferredBufferSize = driverInfo.bufferPreferredSize;
+                    asioDeviceInfo->bufferGranularity = driverInfo.bufferGranularity;
+
+                    driverInfo.bufferSizeOutdated = false;
+                }
+            }
+
             *minBufferSizeFrames = asioDeviceInfo->minBufferSize;
             *maxBufferSizeFrames = asioDeviceInfo->maxBufferSize;
             *preferredBufferSizeFrames = asioDeviceInfo->preferredBufferSize;
@@ -995,6 +1019,7 @@ static PaError LoadAsioDriver( PaAsioHostApiRepresentation *asioHostApi, const c
         PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
         goto error;
     }
+    driverInfo->bufferSizeOutdated = false;
 
     if( ASIOOutputReady() == ASE_OK )
         driverInfo->postOutput = true;
@@ -3199,6 +3224,28 @@ static void sampleRateChanged(ASIOSampleRate sRate)
     PA_DEBUG( ("sampleRateChanged : %d \n", sRate));
 }
 
+static PaAsioResetRequestCallback resetRequestCallback_;
+
+void PaAsio_RegisterResetRequestCallback( PaAsioResetRequestCallback callback )
+{
+    resetRequestCallback_ = callback;
+}
+
+static void setBufferSizesOutdated()
+{
+    PaUtilHostApiRepresentation *hostApi;
+    PaAsioHostApiRepresentation *asioApi;
+
+    PaError result = PaUtil_GetHostApiRepresentation( &hostApi, paASIO );
+    if( result != paNoError )
+        return;
+    asioApi = (PaAsioHostApiRepresentation*) hostApi;
+    if ( asioApi->openAsioDeviceIndex == paNoDevice )
+        return;
+
+    asioApi->openAsioDriverInfo.bufferSizeOutdated = true;
+}
+
 static long asioMessages(long selector, long value, void* message, double* opt)
 {
 // TAKEN FROM THE ASIO SDK
@@ -3226,6 +3273,11 @@ static long asioMessages(long selector, long value, void* message, double* opt)
 
         case kAsioBufferSizeChange:
             //printf("kAsioBufferSizeChange \n");
+            setBufferSizesOutdated();
+            if (resetRequestCallback_) {
+                resetRequestCallback_();
+                ret = 1L;
+            }
             break;
 
         case kAsioResetRequest:
@@ -3240,6 +3292,10 @@ static long asioMessages(long selector, long value, void* message, double* opt)
                 http://www.portaudio.com/trac/ticket/108
             */
             //asioDriverInfo.stopped;  // In this sample the processing will just stop
+            setBufferSizesOutdated();
+            if (resetRequestCallback_) {
+                resetRequestCallback_();
+            }
             ret = 1L;
             break;
 
