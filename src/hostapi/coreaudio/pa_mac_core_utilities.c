@@ -63,6 +63,99 @@
 #include <pthread.h>
 #include <sys/time.h>
 
+OSStatus PaMacCore_AudioHardwareGetProperty(
+    AudioHardwarePropertyID inPropertyID,
+    UInt32*                 ioPropertyDataSize,
+    void*                   outPropertyData)
+{
+    AudioObjectPropertyAddress address = { inPropertyID, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
+    return AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
+}
+
+OSStatus PaMacCore_AudioHardwareGetPropertySize(
+    AudioHardwarePropertyID inPropertyID,
+    UInt32*                 outSize)
+{
+    AudioObjectPropertyAddress address = { inPropertyID, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
+    return AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &address, 0, NULL, outSize);
+}
+
+OSStatus PaMacCore_AudioDeviceGetProperty(
+    AudioDeviceID         inDevice,
+    UInt32                inChannel,
+    Boolean               isInput,
+    AudioDevicePropertyID inPropertyID,
+    UInt32*               ioPropertyDataSize,
+    void*                 outPropertyData)
+{
+   AudioObjectPropertyScope scope = isInput ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput;
+   AudioObjectPropertyAddress address = { inPropertyID, scope, inChannel };
+   return AudioObjectGetPropertyData(inDevice, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
+}
+
+OSStatus PaMacCore_AudioDeviceSetProperty(
+    AudioDeviceID         inDevice,
+    const AudioTimeStamp* inWhen,
+    UInt32                inChannel,
+    Boolean               isInput,
+    AudioDevicePropertyID inPropertyID,
+    UInt32                inPropertyDataSize,
+    const void*           inPropertyData)
+{
+    AudioObjectPropertyScope scope = isInput ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput;
+    AudioObjectPropertyAddress address = { inPropertyID, scope, inChannel };
+    return AudioObjectSetPropertyData(inDevice, &address, 0, NULL, inPropertyDataSize, inPropertyData);
+}
+
+OSStatus PaMacCore_AudioDeviceGetPropertySize(
+    AudioDeviceID         inDevice,
+    UInt32                inChannel,
+    Boolean               isInput,
+    AudioDevicePropertyID inPropertyID,
+    UInt32*               outSize)
+{
+    AudioObjectPropertyScope scope = isInput ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput;
+    AudioObjectPropertyAddress address = { inPropertyID, scope, inChannel };
+    return AudioObjectGetPropertyDataSize(inDevice, &address, 0, NULL, outSize);
+}
+
+OSStatus PaMacCore_AudioDeviceAddPropertyListener(
+    AudioDeviceID                   inDevice,
+    UInt32                          inChannel,
+    Boolean                         isInput,
+    AudioDevicePropertyID           inPropertyID,
+    AudioObjectPropertyListenerProc inProc,
+    void*                           inClientData)
+{
+    AudioObjectPropertyScope scope = isInput ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput;
+    AudioObjectPropertyAddress address = { inPropertyID, scope, inChannel };
+    return AudioObjectAddPropertyListener(inDevice, &address, inProc, inClientData);
+}
+
+OSStatus PaMacCore_AudioDeviceRemovePropertyListener(
+    AudioDeviceID                   inDevice,
+    UInt32                          inChannel,
+    Boolean                         isInput,
+    AudioDevicePropertyID           inPropertyID,
+    AudioObjectPropertyListenerProc inProc,
+    void*                           inClientData)
+{
+    AudioObjectPropertyScope scope = isInput ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput;
+    AudioObjectPropertyAddress address = { inPropertyID, scope, inChannel };
+    return AudioObjectRemovePropertyListener(inDevice, &address, inProc, inClientData);
+}
+
+OSStatus PaMacCore_AudioStreamGetProperty(
+    AudioStreamID         inStream,
+    UInt32                inChannel,
+    AudioDevicePropertyID inPropertyID,
+    UInt32*               ioPropertyDataSize,
+    void*                 outPropertyData)
+{
+    AudioObjectPropertyAddress address = { inPropertyID, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
+    return AudioObjectGetPropertyData(inStream, &address, 0, NULL, ioPropertyDataSize, outPropertyData);
+}
+
 PaError PaMacCore_SetUnixError( int err, int line )
 {
    PaError ret;
@@ -148,12 +241,6 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
         result = paInternalError; break;
     case kAudioUnitErr_TooManyFramesToProcess:
         errorText = "Audio Unit: Too Many Frames";
-        result = paInternalError; break;
-    case kAudioUnitErr_IllegalInstrument:
-        errorText = "Audio Unit: Illegal Instrument";
-        result = paInternalError; break;
-    case kAudioUnitErr_InstrumentTypeNotFound:
-        errorText = "Audio Unit: Instrument Type Not Found";
         result = paInternalError; break;
     case kAudioUnitErr_InvalidFile:
         errorText = "Audio Unit: Invalid File";
@@ -308,11 +395,10 @@ long computeRingBufferSize( const PaStreamParameters *inputParameters,
  */
 
 OSStatus propertyProc(
-    AudioDeviceID inDevice, 
-    UInt32 inChannel, 
-    Boolean isInput, 
-    AudioDevicePropertyID inPropertyID, 
-    void* inClientData )
+    AudioObjectID inObjectID,
+    UInt32 inNumberAddresses,
+    const AudioObjectPropertyAddress* inAddresses,
+    void* inClientData)
 {
    // this is where we would set the condition variable
    return noErr;
@@ -340,8 +426,8 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
    UInt32 outPropertyDataSize = inPropertyDataSize;
 
    /* First, see if it already has that value. If so, return. */
-   macErr = AudioDeviceGetProperty( inDevice, inChannel,
-                                 isInput, inPropertyID, 
+   macErr = PaMacCore_AudioDeviceGetProperty( inDevice, inChannel,
+                                 isInput, inPropertyID,
                                  &outPropertyDataSize, outPropertyData );
    if( macErr ) {
       memset( outPropertyData, 0, inPropertyDataSize );
@@ -357,7 +443,7 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
 
    /* If we were using a cond variable, we'd do something useful here,
       but for now, this is just to make 10.6 happy. */
-   macErr = AudioDeviceAddPropertyListener( inDevice, inChannel, isInput,
+   macErr = PaMacCore_AudioDeviceAddPropertyListener( inDevice, inChannel, isInput,
                                    inPropertyID, propertyProc,
                                    NULL ); 
    if( macErr )
@@ -365,7 +451,7 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
       goto failMac;
 
    /* set property */
-   macErr  = AudioDeviceSetProperty( inDevice, NULL, inChannel,
+   macErr  = PaMacCore_AudioDeviceSetProperty( inDevice, NULL, inChannel,
                                  isInput, inPropertyID,
                                  inPropertyDataSize, inPropertyData );
    if( macErr )
@@ -380,8 +466,8 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
    memcpy( &tv2, &tv1, sizeof( struct timeval ) );
    while( tv2.tv_sec - tv1.tv_sec < 30 ) {
       /* now read the property back out */
-      macErr = AudioDeviceGetProperty( inDevice, inChannel,
-                                    isInput, inPropertyID, 
+      macErr = PaMacCore_AudioDeviceGetProperty( inDevice, inChannel,
+                                    isInput, inPropertyID,
                                     &outPropertyDataSize, outPropertyData );
       if( macErr ) {
          memset( outPropertyData, 0, inPropertyDataSize );
@@ -389,7 +475,7 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
       }
       /* and compare... */
       if( 0==memcmp( outPropertyData, inPropertyData, outPropertyDataSize ) ) {
-         AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc );
+         PaMacCore_AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc, NULL);
          return paNoError;
       }
       /* No match yet, so let's sleep and try again. */
@@ -397,12 +483,12 @@ PaError AudioDeviceSetPropertyNowAndWaitForChange(
       gettimeofday( &tv2, NULL );
    }
    DBUG( ("Timeout waiting for device setting.\n" ) );
-   
-   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc );
+
+   PaMacCore_AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc, NULL );
    return paNoError;
 
  failMac:
-   AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc );
+   PaMacCore_AudioDeviceRemovePropertyListener( inDevice, inChannel, isInput, inPropertyID, propertyProc, NULL );
    return ERR( macErr );
 }
 
@@ -428,7 +514,7 @@ PaError setBestSampleRateForDevice( const AudioDeviceID device,
    int i=0;
    Float64 max  = -1; /*the maximum rate available*/
    Float64 best = -1; /*the lowest sample rate still greater than desired rate*/
-   VDBUG(("Setting sample rate for device %ld to %g.\n",device,(float)desiredSrate));
+   VDBUG(("Setting sample rate for device %ld to %g.\n",(long)device,(float)desiredSrate));
 
    /* -- try setting the sample rate -- */
    srate = 0;
@@ -448,15 +534,15 @@ PaError setBestSampleRateForDevice( const AudioDeviceID device,
       return paInvalidSampleRate;
 
    /* -- generate a list of available sample rates -- */
-   err = AudioDeviceGetPropertyInfo( device, 0, isInput,
+   err = PaMacCore_AudioDeviceGetPropertySize( device, 0, isInput,
                                 kAudioDevicePropertyAvailableNominalSampleRates,
-                                &propsize, NULL );
+                                &propsize );
    if( err )
       return ERR( err );
    ranges = (AudioValueRange *)calloc( 1, propsize );
    if( !ranges )
       return paInsufficientMemory;
-   err = AudioDeviceGetProperty( device, 0, isInput,
+   err = PaMacCore_AudioDeviceGetProperty( device, 0, isInput,
                                 kAudioDevicePropertyAvailableNominalSampleRates,
                                 &propsize, ranges );
    if( err )
@@ -536,10 +622,10 @@ PaError setBestFramesPerBuffer( const AudioDeviceID device,
     }
 
     /* -- try and set exact FPB -- */
-    err = AudioDeviceSetProperty( device, NULL, 0, isInput,
+    err = PaMacCore_AudioDeviceSetProperty( device, NULL, 0, isInput,
                                  kAudioDevicePropertyBufferFrameSize,
                                  propsize, &requestedFramesPerBuffer);
-    err = AudioDeviceGetProperty( device, 0, isInput,
+    err = PaMacCore_AudioDeviceGetProperty( device, 0, isInput,
                            kAudioDevicePropertyBufferFrameSize,
                            &propsize, actualFramesPerBuffer);
     if( err )
@@ -554,7 +640,7 @@ PaError setBestFramesPerBuffer( const AudioDeviceID device,
     
     // Clip requested value against legal range for the device.
     propsize = sizeof(AudioValueRange);
-    err = AudioDeviceGetProperty( device, 0, isInput,
+    err = PaMacCore_AudioDeviceGetProperty( device, 0, isInput,
                                 kAudioDevicePropertyBufferFrameSizeRange,
                                 &propsize, &range );
     if( err )
@@ -572,11 +658,11 @@ PaError setBestFramesPerBuffer( const AudioDeviceID device,
     
    /* --- set the buffer size (ignore errors) -- */
     propsize = sizeof( UInt32 );
-   err = AudioDeviceSetProperty( device, NULL, 0, isInput,
+   err = PaMacCore_AudioDeviceSetProperty( device, NULL, 0, isInput,
                                  kAudioDevicePropertyBufferFrameSize,
                                  propsize, &requestedFramesPerBuffer );
    /* --- read the property to check that it was set -- */
-   err = AudioDeviceGetProperty( device, 0, isInput,
+   err = PaMacCore_AudioDeviceGetProperty( device, 0, isInput,
                                  kAudioDevicePropertyBufferFrameSize,
                                  &propsize, actualFramesPerBuffer );
 
@@ -606,13 +692,13 @@ static int xRunListSize;
 static pthread_mutex_t xrunMutex;
 
 OSStatus xrunCallback(
-    AudioDeviceID inDevice, 
-    UInt32 inChannel, 
-    Boolean isInput, 
-    AudioDevicePropertyID inPropertyID, 
-    void* inClientData)
+    AudioObjectID inDevice,
+    UInt32 inNumberAddresses,
+    const AudioObjectPropertyAddress* inAddresses,
+    void * inClientData)
 {
    PaMacXRunListNode *node = (PaMacXRunListNode *) inClientData;
+   bool isInput = inAddresses->mScope == kAudioDevicePropertyScopeInput;
 
    int ret = pthread_mutex_trylock( &xrunMutex ) ;
 
