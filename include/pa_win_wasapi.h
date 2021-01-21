@@ -551,7 +551,7 @@ PaError PaWasapi_SetStreamStateHandler( PaStream *pStream, PaWasapiStreamStateCa
  @param  bOutput TRUE (1) for output (render), FALSE (0) for input (capture).
 
  @return Error code indicating success or failure. Will return paIncompatibleStreamHostApi if library is not compiled
-         for UWP/WinRT platform. If Id is longer than PA_WASAPI_DEVICE_ID_LEN characters paBufferTooBig will 
+         for UWP/WinRT platform. If Id is longer than PA_WASAPI_DEVICE_ID_LEN characters paBufferTooBig will
          be returned.
 */
 PaError PaWasapiWinrt_SetDefaultDeviceId( const unsigned short *pId, int bOutput );
@@ -559,11 +559,11 @@ PaError PaWasapiWinrt_SetDefaultDeviceId( const unsigned short *pId, int bOutput
 
 /** Populate the device list.
 
-    By default the implementation will rely on DEVINTERFACE_AUDIO_RENDER and DEVINTERFACE_AUDIO_CAPTURE as 
-    default devices. If device Id is provided by PaWasapiWinrt_SetDefaultDeviceId() then those 
+    By default the implementation will rely on DEVINTERFACE_AUDIO_RENDER and DEVINTERFACE_AUDIO_CAPTURE as
+    default devices. If device Id is provided by PaWasapiWinrt_SetDefaultDeviceId() then those
     device Ids will be used as default and only devices for the device list.
 
-    By populating the device list you can provide an additional available audio devices of the system to PA 
+    By populating the device list you can provide an additional available audio devices of the system to PA
     which are obtainable by:
     Windows::Devices::Enumeration::DeviceInformation::FindAllAsync(selector) where selector is obtainable by
     Windows::Media::Devices::MediaDevice::GetAudioRenderSelector() or
@@ -571,14 +571,14 @@ PaError PaWasapiWinrt_SetDefaultDeviceId( const unsigned short *pId, int bOutput
 
     After the call completes, memory referenced by pointers can be freed, as implementation keeps its own copy.
 
-    You must call PaWasapi_UpdateDeviceList() to update the internal device list of the implementation after 
+    You must call PaWasapi_UpdateDeviceList() to update the internal device list of the implementation after
     calling this function.
 
     See an example in the IMPORTANT notes.
 
  @note   UWP/WinRT platform only.
 
- @param  pId     Array of device Ids, pointer to the array of pointers of 16-bit Unicode string (WCHAR). If NULL 
+ @param  pId     Array of device Ids, pointer to the array of pointers of 16-bit Unicode string (WCHAR). If NULL
                  and count is also 0 then device Ids will be reset to the default. Required.
  @param  pName   Array of device Names, pointer to the array of pointers of 16-bit Unicode string (WCHAR). Optional.
  @param  pRole   Array of device Roles, see PaWasapiDeviceRole and PaWasapi_GetDeviceRole() for more details. Optional.
@@ -587,11 +587,11 @@ PaError PaWasapiWinrt_SetDefaultDeviceId( const unsigned short *pId, int bOutput
  @param  bOutput TRUE (1) for output (render), FALSE (0) for input (capture).
 
  @return Error code indicating success or failure. Will return paIncompatibleStreamHostApi if library is not compiled
-         for UWP/WinRT platform. If Id is longer than PA_WASAPI_DEVICE_ID_LEN characters paBufferTooBig will 
-         be returned. If Name is longer than PA_WASAPI_DEVICE_NAME_LEN characters paBufferTooBig will 
+         for UWP/WinRT platform. If Id is longer than PA_WASAPI_DEVICE_ID_LEN characters paBufferTooBig will
+         be returned. If Name is longer than PA_WASAPI_DEVICE_NAME_LEN characters paBufferTooBig will
          be returned.
 */
-PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsigned short **pName, 
+PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsigned short **pName,
     const PaWasapiDeviceRole *pRole, unsigned int count, int bOutput );
 
 
@@ -676,11 +676,11 @@ PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsi
 
     UWP/WinRT:
 
-        This platform has number of limitations which do not allow to enumerate audio devices without 
+        This platform has number of limitations which do not allow to enumerate audio devices without
         an additional external help. Enumeration is possible though from C++/CX, check the related API
         Windows::Devices::Enumeration::DeviceInformation::FindAllAsync().
 
-        The main limitation is an absence of the device enumeration from inside the PA's implementation. 
+        The main limitation is an absence of the device enumeration from inside the PA's implementation.
         This problem can be solved by using the following functions:
 
         PaWasapiWinrt_SetDefaultDeviceId() - to set default input/output device,
@@ -706,7 +706,7 @@ PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsi
         }
 
         PaWasapiWinrt_SetDefaultDeviceId((const UINT16 *)default_device_id.c_str(), !capture);
-        PaWasapiWinrt_PopulateDeviceList(ids.data(), names.data(), role.data(), count, !capture);        
+        PaWasapiWinrt_PopulateDeviceList(ids.data(), names.data(), role.data(), count, !capture);
         PaWasapi_UpdateDeviceList();
 
         ----------------
