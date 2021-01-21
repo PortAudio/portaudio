@@ -514,14 +514,14 @@ static PaError QueryInputWaveFormatEx( int deviceId, WAVEFORMATEX *waveFormatEx 
             return paNoError;
         case MMSYSERR_ALLOCATED:    /* Specified resource is already allocated. */
             return paDeviceUnavailable;
-        case MMSYSERR_NODRIVER:        /* No device driver is present. */
+        case MMSYSERR_NODRIVER:     /* No device driver is present. */
             return paDeviceUnavailable;
         case MMSYSERR_NOMEM:        /* Unable to allocate or lock memory. */
             return paInsufficientMemory;
         case WAVERR_BADFORMAT:      /* Attempted to open with an unsupported waveform-audio format. */
             return paSampleFormatNotSupported;
 
-        case MMSYSERR_BADDEVICEID:    /* Specified device identifier is out of range. */
+        case MMSYSERR_BADDEVICEID:  /* Specified device identifier is out of range. */
             /* falls through */
         default:
             PA_MME_SET_LAST_WAVEIN_ERROR( mmresult );
@@ -540,14 +540,14 @@ static PaError QueryOutputWaveFormatEx( int deviceId, WAVEFORMATEX *waveFormatEx
             return paNoError;
         case MMSYSERR_ALLOCATED:    /* Specified resource is already allocated. */
             return paDeviceUnavailable;
-        case MMSYSERR_NODRIVER:        /* No device driver is present. */
+        case MMSYSERR_NODRIVER:     /* No device driver is present. */
             return paDeviceUnavailable;
         case MMSYSERR_NOMEM:        /* Unable to allocate or lock memory. */
             return paInsufficientMemory;
         case WAVERR_BADFORMAT:      /* Attempted to open with an unsupported waveform-audio format. */
             return paSampleFormatNotSupported;
 
-        case MMSYSERR_BADDEVICEID:    /* Specified device identifier is out of range. */
+        case MMSYSERR_BADDEVICEID:  /* Specified device identifier is out of range. */
             /* falls through */
         default:
             PA_MME_SET_LAST_WAVEOUT_ERROR( mmresult );
@@ -880,7 +880,7 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
          * device*ChannelCountIsKnown is false, OpenStream will try whatever
          * channel count you supply.
          * see also InitializeInputDeviceInfo() above.
-     */
+         */
 
         PA_DEBUG(("Pa_GetDeviceInfo: Num output channels reported as %d! Changed to 2.\n", woc.wChannels ));
         deviceInfo->maxOutputChannels = 2;
@@ -932,11 +932,11 @@ See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprec
     }
     else if(osvi.dwMajorVersion >= 5)
     {
-        *defaultLowLatency  = PA_MME_WIN_WDM_DEFAULT_LATENCY_;
+        *defaultLowLatency = PA_MME_WIN_WDM_DEFAULT_LATENCY_;
     }
     else
     {
-        *defaultLowLatency  = PA_MME_WIN_9X_DEFAULT_LATENCY_;
+        *defaultLowLatency = PA_MME_WIN_9X_DEFAULT_LATENCY_;
     }
 
     *defaultHighLatency = *defaultLowLatency * 2;
@@ -1005,7 +1005,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     inputDeviceCount = waveInGetNumDevs();
     if( inputDeviceCount > 0 )
-        maximumPossibleDeviceCount += inputDeviceCount + 1;    /* assume there is a WAVE_MAPPER */
+        maximumPossibleDeviceCount += inputDeviceCount + 1;     /* assume there is a WAVE_MAPPER */
 
     outputDeviceCount = waveOutGetNumDevs();
     if( outputDeviceCount > 0 )
@@ -1356,14 +1356,14 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     /*
-            - if a full duplex stream is requested, check that the combination
-                of input and output parameters is supported
+        - if a full duplex stream is requested, check that the combination
+            of input and output parameters is supported
 
-            - check that the device supports sampleRate
+        - check that the device supports sampleRate
 
-            for mme all we can do is test that the input and output devices
-            support the requested sample rate and number of channels. we
-            cannot test for full duplex compatibility.
+        for mme all we can do is test that the input and output devices
+        support the requested sample rate and number of channels. we
+        cannot test for full duplex compatibility.
     */
 
     return paFormatIsSupported;
@@ -1710,7 +1710,7 @@ static PaError CalculateBufferSettings(
                     userFramesPerBuffer,
                     PA_MME_MIN_HOST_OUTPUT_BUFFER_COUNT_,
                     (unsigned long)(PA_MME_MAX_HOST_BUFFER_SECS_ * sampleRate), /* in frames. preferred maximum */
-                    (PA_MME_MAX_HOST_BUFFER_BYTES_ / hostOutputFrameSizeBytes),  /* in frames. a hard limit. note truncation due to
+                    (PA_MME_MAX_HOST_BUFFER_BYTES_ / hostOutputFrameSizeBytes), /* in frames. a hard limit. note truncation due to
                                                                                  division is intentional here to limit max bytes */
                     hostFramesPerOutputBuffer,
                     hostOutputBufferCount );
@@ -1905,14 +1905,14 @@ static PaError InitializeWaveHandles( PaWinMmeHostApiRepresentation *winMmeHostA
                     case MMSYSERR_ALLOCATED:    /* Specified resource is already allocated. */
                         result = paDeviceUnavailable;
                         break;
-                    case MMSYSERR_NODRIVER:        /* No device driver is present. */
+                    case MMSYSERR_NODRIVER:     /* No device driver is present. */
                         result = paDeviceUnavailable;
                         break;
                     case MMSYSERR_NOMEM:        /* Unable to allocate or lock memory. */
                         result = paInsufficientMemory;
                         break;
 
-                    case MMSYSERR_BADDEVICEID:    /* Specified device identifier is out of range. */
+                    case MMSYSERR_BADDEVICEID:  /* Specified device identifier is out of range. */
                         /* falls through */
 
                     case WAVERR_BADFORMAT:      /* Attempted to open with an unsupported waveform-audio format. */
@@ -2156,7 +2156,7 @@ struct PaWinMmeStream
     HANDLE processingThread;
     PA_THREAD_ID processingThreadId;
 
-    char throttleProcessingThreadOnOverload; /* 0 -> don't throtte, non-0 -> throttle */
+    char throttleProcessingThreadOnOverload;    /* 0 -> don't throtte, non-0 -> throttle */
     int processingThreadPriority;
     int highThreadPriority;
     int throttledThreadPriority;
@@ -2164,10 +2164,10 @@ struct PaWinMmeStream
 
     int isStopped;
     volatile int isActive;
-    volatile int stopProcessing; /* stop thread once existing buffers have been returned */
-    volatile int abortProcessing; /* stop thread immediately */
+    volatile int stopProcessing;    /* stop thread once existing buffers have been returned */
+    volatile int abortProcessing;   /* stop thread immediately */
 
-    DWORD allBuffersDurationMs; /* used to calculate timeouts */
+    DWORD allBuffersDurationMs;     /* used to calculate timeouts */
 };
 
 /* updates deviceCount if PaWinMmeUseMultipleDevices is used */
@@ -2331,7 +2331,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     unsigned long framesPerHostOutputBuffer;
     unsigned long hostOutputBufferCount;
     unsigned long framesPerBufferProcessorCall;
-    PaWinMmeDeviceAndChannelCount *inputDevices = 0;  /* contains all devices and channel counts as local host api ids, even when PaWinMmeUseMultipleDevices is not used */
+    PaWinMmeDeviceAndChannelCount *inputDevices = 0;    /* contains all devices and channel counts as local host api ids, even when PaWinMmeUseMultipleDevices is not used */
     unsigned long winMmeSpecificInputFlags = 0;
     unsigned long inputDeviceCount = 0;
     PaWinMmeDeviceAndChannelCount *outputDevices = 0;
