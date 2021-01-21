@@ -195,7 +195,7 @@ static void Float32_To_Int32(
         fstcw   savedFpuControlWord
         fldcw   fpuControlWord_
 
-        fld     int32Scaler_             // stack:  (int)0x7FFFFFFF
+        fld     int32Scaler_            // stack:  (int)0x7FFFFFFF
 
     Float32_To_Int32_loop:
 
@@ -282,7 +282,7 @@ static void Float32_To_Int32_Clip(
         fstcw   savedFpuControlWord
         fldcw   fpuControlWord_
 
-        fld     int32Scaler_             // stack:  (int)0x7FFFFFFF
+        fld     int32Scaler_            // stack:  (int)0x7FFFFFFF
 
     Float32_To_Int32_Clip_loop:
 
@@ -311,7 +311,7 @@ static void Float32_To_Int32_Clip(
 
     Float32_To_Int32_Clip_stored:
 
-        //add     edi, ebx                // increment destination ptr
+        //add     edi, ebx              // increment destination ptr
         lea     edi, [edi+ebx]
 
         cmp     esi, ecx                // has src ptr reached end?
@@ -435,7 +435,7 @@ static void Float32_To_Int32_DitherClip(
         shr     edx, PA_DITHER_SHIFT_
         mov     ditherRandSeed2, eax
         shr     eax, PA_DITHER_SHIFT_
-        //add     eax, edx                // eax -> current
+        //add     eax, edx              // eax -> current
         lea     eax, [eax+edx]
         mov     edx, ditherPrevious
         neg     edx
@@ -543,7 +543,7 @@ static void Float32_To_Int24(
         fstcw   savedFpuControlWord
         fldcw   fpuControlWord_
 
-        fld     int24Scaler_             // stack:  (int)0x7FFFFF
+        fld     int24Scaler_            // stack:  (int)0x7FFFFF
 
     Float32_To_Int24_loop:
 
@@ -561,7 +561,7 @@ static void Float32_To_Int24(
         //mov     byte ptr [edi+2], DH
         mov     word ptr [edi+1], DX
 
-        //add     edi, ebx                // increment destination ptr
+        //add     edi, ebx              // increment destination ptr
         lea     edi, [edi+ebx]
 
         cmp     esi, ecx                // has src ptr reached end?
@@ -640,7 +640,7 @@ static void Float32_To_Int24_Clip(
         fstcw   savedFpuControlWord
         fldcw   fpuControlWord_
 
-        fld     int24Scaler_             // stack:  (int)0x7FFFFF
+        fld     int24Scaler_            // stack:  (int)0x7FFFFF
 
     Float32_To_Int24_Clip_loop:
 
@@ -675,7 +675,7 @@ static void Float32_To_Int24_Clip(
         //mov     byte ptr [edi+2], DH
         mov     word ptr [edi+1], DX
 
-        //add     edi, ebx                // increment destination ptr
+        //add     edi, ebx              // increment destination ptr
         lea     edi, [edi+ebx]
 
         cmp     esi, ecx                // has src ptr reached end?
@@ -809,7 +809,7 @@ static void Float32_To_Int24_DitherClip(
         shr     edx, PA_DITHER_SHIFT_
         mov     ditherRandSeed2, eax
         shr     eax, PA_DITHER_SHIFT_
-        //add     eax, edx                // eax -> current
+        //add     eax, edx              // eax -> current
         lea     eax, [eax+edx]
         mov     edx, ditherPrevious
         neg     edx
@@ -841,7 +841,7 @@ static void Float32_To_Int24_DitherClip(
         //mov     byte ptr [edi+2], DH
         mov     word ptr [edi+1], DX
 
-        //add     edi, ebx                // increment destination ptr
+        //add     edi, ebx              // increment destination ptr
         lea     edi, [edi+ebx]
 
         cmp     esi, ecx                // has src ptr reached end?
@@ -1151,8 +1151,8 @@ static void Float32_To_Int16_DitherClip(
         shr     edx, PA_DITHER_SHIFT_
         mov     ditherRandSeed2, eax
         shr     eax, PA_DITHER_SHIFT_
-        //add     eax, edx                // eax -> current
-        lea     eax, [eax+edx]            // current = randSeed1>>x + randSeed2>>x
+        //add     eax, edx              // eax -> current
+        lea     eax, [eax+edx]          // current = randSeed1>>x + randSeed2>>x
         mov     edx, ditherPrevious
         neg     edx
         lea     edx, [eax+edx]          // highpass = current - previous

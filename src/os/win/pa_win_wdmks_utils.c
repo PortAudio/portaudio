@@ -46,7 +46,7 @@
 #ifndef _INC_MMREG
     #define _INC_MMREG                      // for STATIC_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
 #endif
-#include <winioctl.h>                        // MinGW32 does not define this automatically
+#include <winioctl.h>                       // MinGW32 does not define this automatically
 
 #if defined(__GNUC__)
 
