@@ -46,3 +46,6 @@ portaudio-2.0.pc
 
 # Visual Studio CMake build output folder 
 out/
+
+# Visual Studio CMake settings file
+CMakeSettings.json
