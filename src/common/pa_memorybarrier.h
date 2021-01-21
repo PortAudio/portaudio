@@ -30,13 +30,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -71,32 +71,32 @@
 #elif defined(__GNUC__)
     /* GCC >= 4.1 has built-in intrinsics. We'll use those */
 #   if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 1)
-#      define PaUtil_FullMemoryBarrier()  __sync_synchronize()
-#      define PaUtil_ReadMemoryBarrier()  __sync_synchronize()
-#      define PaUtil_WriteMemoryBarrier() __sync_synchronize()
+#       define PaUtil_FullMemoryBarrier()  __sync_synchronize()
+#       define PaUtil_ReadMemoryBarrier()  __sync_synchronize()
+#       define PaUtil_WriteMemoryBarrier() __sync_synchronize()
     /* as a fallback, GCC understands volatile asm and "memory" to mean it
      * should not reorder memory read/writes */
     /* Note that it is not clear that any compiler actually defines __PPC__,
      * it can probably removed safely. */
 #   elif defined( __ppc__ ) || defined( __powerpc__) || defined( __PPC__ )
-#      define PaUtil_FullMemoryBarrier()  asm volatile("sync":::"memory")
-#      define PaUtil_ReadMemoryBarrier()  asm volatile("sync":::"memory")
-#      define PaUtil_WriteMemoryBarrier() asm volatile("sync":::"memory")
+#       define PaUtil_FullMemoryBarrier()  asm volatile("sync":::"memory")
+#       define PaUtil_ReadMemoryBarrier()  asm volatile("sync":::"memory")
+#       define PaUtil_WriteMemoryBarrier() asm volatile("sync":::"memory")
 #   elif defined( __i386__ ) || defined( __i486__ ) || defined( __i586__ ) || \
-         defined( __i686__ ) || defined( __x86_64__ )
-#      define PaUtil_FullMemoryBarrier()  asm volatile("mfence":::"memory")
-#      define PaUtil_ReadMemoryBarrier()  asm volatile("lfence":::"memory")
-#      define PaUtil_WriteMemoryBarrier() asm volatile("sfence":::"memory")
+            defined( __i686__ ) || defined( __x86_64__ )
+#       define PaUtil_FullMemoryBarrier()  asm volatile("mfence":::"memory")
+#       define PaUtil_ReadMemoryBarrier()  asm volatile("lfence":::"memory")
+#       define PaUtil_WriteMemoryBarrier() asm volatile("sfence":::"memory")
 #   else
-#      ifdef ALLOW_SMP_DANGERS
-#         warning Memory barriers not defined on this system or system unknown
-#         warning For SMP safety, you should fix this.
-#         define PaUtil_FullMemoryBarrier()
-#         define PaUtil_ReadMemoryBarrier()
-#         define PaUtil_WriteMemoryBarrier()
-#      else
-#         error Memory barriers are not defined on this system. You can still compile by defining ALLOW_SMP_DANGERS, but SMP safety will not be guaranteed.
-#      endif
+#       ifdef ALLOW_SMP_DANGERS
+#           warning Memory barriers not defined on this system or system unknown
+#           warning For SMP safety, you should fix this.
+#           define PaUtil_FullMemoryBarrier()
+#           define PaUtil_ReadMemoryBarrier()
+#           define PaUtil_WriteMemoryBarrier()
+#       else
+#           error Memory barriers are not defined on this system. You can still compile by defining ALLOW_SMP_DANGERS, but SMP safety will not be guaranteed.
+#       endif
 #   endif
 #elif (_MSC_VER >= 1400) && !defined(_WIN32_WCE)
 #   include <intrin.h>
@@ -117,12 +117,12 @@
 #   define PaUtil_WriteMemoryBarrier() _asm { lock add    [esp], 0 }
 #else
 #   ifdef ALLOW_SMP_DANGERS
-#      warning Memory barriers not defined on this system or system unknown
-#      warning For SMP safety, you should fix this.
-#      define PaUtil_FullMemoryBarrier()
-#      define PaUtil_ReadMemoryBarrier()
-#      define PaUtil_WriteMemoryBarrier()
+#       warning Memory barriers not defined on this system or system unknown
+#       warning For SMP safety, you should fix this.
+#       define PaUtil_FullMemoryBarrier()
+#       define PaUtil_ReadMemoryBarrier()
+#       define PaUtil_WriteMemoryBarrier()
 #   else
-#      error Memory barriers are not defined on this system. You can still compile by defining ALLOW_SMP_DANGERS, but SMP safety will not be guaranteed.
+#       error Memory barriers are not defined on this system. You can still compile by defining ALLOW_SMP_DANGERS, but SMP safety will not be guaranteed.
 #   endif
 #endif
