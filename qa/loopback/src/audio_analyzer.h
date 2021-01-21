@@ -101,7 +101,7 @@ void PaQa_EraseBuffer( float *buffer, int numFrames, int samplesPerFrame );
 void PaQa_MixSine( PaQaSineGenerator *generator, float *buffer, int numSamples, int stride );
 
 void PaQa_WriteSine( float *buffer, int numSamples, int stride,
-                    double frequency, double amplitude );
+                     double frequency, double amplitude );
 
 /**
  * Generate a signal with a sharp edge in the middle that can be recognized despite some phase shift.
@@ -158,7 +158,7 @@ int PaQa_WriteSilence( PaQaRecording *recording, int numSamples );
 int PaQa_RecordFreeze( PaQaRecording *recording, int numSamples );
 
 double PaQa_CorrelateSine( PaQaRecording *recording, double frequency, double frameRate,
-                          int startFrame, int numSamples, double *phasePtr );
+                           int startFrame, int numSamples, double *phasePtr );
 
 double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numSamples, double tolerance  );
 
@@ -167,8 +167,8 @@ double PaQa_FindFirstMatch( PaQaRecording *recording, float *buffer, int numSamp
  * its average slope at the zero crossings.
  */
 double PaQa_MeasureSineAmplitudeBySlope( PaQaRecording *recording,
-                                        double frequency, double frameRate,
-                                        int startFrame, int numFrames );
+                                         double frequency, double frameRate,
+                                         int startFrame, int numFrames );
 
 double PaQa_MeasureRootMeanSquare( float *buffer, int numFrames );
 

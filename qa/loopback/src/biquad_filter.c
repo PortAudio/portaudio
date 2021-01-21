@@ -4,9 +4,10 @@
 #include "biquad_filter.h"
 
 /**
- *    Unit_BiquadFilter implements a second order IIR filter.
-    Here is the equation that we use for this filter:
-     y(n) = a0*x(n) + a1*x(n-1)  + a2*x(n-2) - b1*y(n-1)  - b2*y(n-2)
+ *  Unit_BiquadFilter implements a second order IIR filter.
+ *
+ *  Here is the equation that we use for this filter:
+ *      y(n) = a0*x(n) + a1*x(n-1)  + a2*x(n-2) - b1*y(n-1)  - b2*y(n-2)
  *
  * @author (C) 2002 Phil Burk, SoftSynth.com, All Rights Reserved
  */

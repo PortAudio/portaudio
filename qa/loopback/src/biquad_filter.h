@@ -3,7 +3,7 @@
 
 
 /**
- *    Unit_BiquadFilter implements a second order IIR filter.
+ * Unit_BiquadFilter implements a second order IIR filter.
  *
  * @author (C) 2002 Phil Burk, SoftSynth.com, All Rights Reserved
  */
@@ -18,7 +18,7 @@ typedef struct BiquadFilter_s
     double      yn1;
     double      yn2;
 
-    double      a0;    // coefficients
+    double      a0;     // coefficients
     double      a1;
     double      a2;
 

@@ -285,8 +285,8 @@ double PaQa_MeasureCrossingSlope( float *buffer, int numFrames )
  *
  */
 double PaQa_MeasureSineAmplitudeBySlope( PaQaRecording *recording,
-                          double frequency, double frameRate,
-                        int startFrame, int numFrames )
+                                         double frequency, double frameRate,
+                                         int startFrame, int numFrames )
 {
     float *buffer = &recording->buffer[startFrame];
     double measuredSlope = PaQa_MeasureCrossingSlope( buffer, numFrames );
@@ -297,7 +297,7 @@ double PaQa_MeasureSineAmplitudeBySlope( PaQaRecording *recording,
 
 /*==========================================================================================*/
 double PaQa_CorrelateSine( PaQaRecording *recording, double frequency, double frameRate,
-                          int startFrame, int numFrames, double *phasePtr )
+                           int startFrame, int numFrames, double *phasePtr )
 {
     double magnitude = 0.0;
     int numLeft = numFrames;
