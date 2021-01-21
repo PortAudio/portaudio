@@ -221,16 +221,16 @@ clean:
 distclean: clean
 	$(RM) config.log config.status Makefile libtool portaudio-2.0.pc
 
-%.o: %.c $(MAKEFILE) $(PAINC)
+%.o: %.c $(MAKEFILE) $(PAINC) lib-stamp
 	$(CC) -c $(CFLAGS) $< -o $@
 
-%.lo: %.c $(MAKEFILE) $(PAINC)
+%.lo: %.c $(MAKEFILE) $(PAINC) lib-stamp
 	$(LIBTOOL) --mode=compile $(CC) -c $(CFLAGS) $< -o $@
 
-%.lo: %.cpp $(MAKEFILE) $(PAINC)
+%.lo: %.cpp $(MAKEFILE) $(PAINC) lib-stamp
 	$(LIBTOOL) --mode=compile --tag=CXX $(CXX) -c $(CXXFLAGS) $< -o $@
 
-%.o: %.cpp $(MAKEFILE) $(PAINC)
+%.o: %.cpp $(MAKEFILE) $(PAINC) lib-stamp
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 %.o: %.asm
