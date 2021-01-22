@@ -7,8 +7,8 @@
 /* Compiler settings for endpointvolume.idl:
     Oicf, W1, Zp8, env=Win32 (32b run)
     protocol : dce , ms_ext, c_ext, robust
-    error checks: allocation ref bounds_check enum stub_data 
-    VC __declspec() decoration level: 
+    error checks: allocation ref bounds_check enum stub_data
+    VC __declspec() decoration level:
          __declspec(uuid()), __declspec(selectany), __declspec(novtable)
          DECLSPEC_UUID(), MIDL_INTERFACE()
 */
@@ -46,24 +46,24 @@
 #pragma once
 #endif
 
-/* Forward Declarations */ 
+/* Forward Declarations */
 
 #ifndef __IAudioEndpointVolumeCallback_FWD_DEFINED__
 #define __IAudioEndpointVolumeCallback_FWD_DEFINED__
 typedef interface IAudioEndpointVolumeCallback IAudioEndpointVolumeCallback;
-#endif 	/* __IAudioEndpointVolumeCallback_FWD_DEFINED__ */
+#endif  /* __IAudioEndpointVolumeCallback_FWD_DEFINED__ */
 
 
 #ifndef __IAudioEndpointVolume_FWD_DEFINED__
 #define __IAudioEndpointVolume_FWD_DEFINED__
 typedef interface IAudioEndpointVolume IAudioEndpointVolume;
-#endif 	/* __IAudioEndpointVolume_FWD_DEFINED__ */
+#endif  /* __IAudioEndpointVolume_FWD_DEFINED__ */
 
 
 #ifndef __IAudioMeterInformation_FWD_DEFINED__
 #define __IAudioMeterInformation_FWD_DEFINED__
 typedef interface IAudioMeterInformation IAudioMeterInformation;
-#endif 	/* __IAudioMeterInformation_FWD_DEFINED__ */
+#endif  /* __IAudioMeterInformation_FWD_DEFINED__ */
 
 
 /* header files for imported files */
@@ -72,11 +72,11 @@ typedef interface IAudioMeterInformation IAudioMeterInformation;
 
 #ifdef __cplusplus
 extern "C"{
-#endif 
+#endif
 
 
 /* interface __MIDL_itf_endpointvolume_0000_0000 */
-/* [local] */ 
+/* [local] */
 
 typedef struct AUDIO_VOLUME_NOTIFICATION_DATA
     {
@@ -85,7 +85,7 @@ typedef struct AUDIO_VOLUME_NOTIFICATION_DATA
     float fMasterVolume;
     UINT nChannels;
     float afChannelVolumes[ 1 ];
-    } 	AUDIO_VOLUME_NOTIFICATION_DATA;
+    }   AUDIO_VOLUME_NOTIFICATION_DATA;
 
 typedef struct AUDIO_VOLUME_NOTIFICATION_DATA *PAUDIO_VOLUME_NOTIFICATION_DATA;
 
@@ -101,44 +101,44 @@ extern RPC_IF_HANDLE __MIDL_itf_endpointvolume_0000_0000_v0_0_s_ifspec;
 #define __IAudioEndpointVolumeCallback_INTERFACE_DEFINED__
 
 /* interface IAudioEndpointVolumeCallback */
-/* [unique][helpstring][nonextensible][uuid][local][object] */ 
+/* [unique][helpstring][nonextensible][uuid][local][object] */
 
 
 EXTERN_C const IID IID_IAudioEndpointVolumeCallback;
 
 #if defined(__cplusplus) && !defined(CINTERFACE)
-    
+
     MIDL_INTERFACE("657804FA-D6AD-4496-8A60-352752AF4F89")
     IAudioEndpointVolumeCallback : public IUnknown
     {
     public:
-        virtual HRESULT STDMETHODCALLTYPE OnNotify( 
+        virtual HRESULT STDMETHODCALLTYPE OnNotify(
             PAUDIO_VOLUME_NOTIFICATION_DATA pNotify) = 0;
-        
+
     };
-    
-#else 	/* C style interface */
+
+#else   /* C style interface */
 
     typedef struct IAudioEndpointVolumeCallbackVtbl
     {
         BEGIN_INTERFACE
-        
-        HRESULT ( STDMETHODCALLTYPE *QueryInterface )( 
+
+        HRESULT ( STDMETHODCALLTYPE *QueryInterface )(
             IAudioEndpointVolumeCallback * This,
             /* [in] */ REFIID riid,
-            /* [iid_is][out] */ 
+            /* [iid_is][out] */
             __RPC__deref_out  void **ppvObject);
-        
-        ULONG ( STDMETHODCALLTYPE *AddRef )( 
+
+        ULONG ( STDMETHODCALLTYPE *AddRef )(
             IAudioEndpointVolumeCallback * This);
-        
-        ULONG ( STDMETHODCALLTYPE *Release )( 
+
+        ULONG ( STDMETHODCALLTYPE *Release )(
             IAudioEndpointVolumeCallback * This);
-        
-        HRESULT ( STDMETHODCALLTYPE *OnNotify )( 
+
+        HRESULT ( STDMETHODCALLTYPE *OnNotify )(
             IAudioEndpointVolumeCallback * This,
             PAUDIO_VOLUME_NOTIFICATION_DATA pNotify);
-        
+
         END_INTERFACE
     } IAudioEndpointVolumeCallbackVtbl;
 
@@ -147,262 +147,262 @@ EXTERN_C const IID IID_IAudioEndpointVolumeCallback;
         CONST_VTBL struct IAudioEndpointVolumeCallbackVtbl *lpVtbl;
     };
 
-    
+
 
 #ifdef COBJMACROS
 
 
-#define IAudioEndpointVolumeCallback_QueryInterface(This,riid,ppvObject)	\
-    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) ) 
+#define IAudioEndpointVolumeCallback_QueryInterface(This,riid,ppvObject)    \
+    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) )
 
-#define IAudioEndpointVolumeCallback_AddRef(This)	\
-    ( (This)->lpVtbl -> AddRef(This) ) 
+#define IAudioEndpointVolumeCallback_AddRef(This)   \
+    ( (This)->lpVtbl -> AddRef(This) )
 
-#define IAudioEndpointVolumeCallback_Release(This)	\
-    ( (This)->lpVtbl -> Release(This) ) 
+#define IAudioEndpointVolumeCallback_Release(This)  \
+    ( (This)->lpVtbl -> Release(This) )
 
 
-#define IAudioEndpointVolumeCallback_OnNotify(This,pNotify)	\
-    ( (This)->lpVtbl -> OnNotify(This,pNotify) ) 
+#define IAudioEndpointVolumeCallback_OnNotify(This,pNotify) \
+    ( (This)->lpVtbl -> OnNotify(This,pNotify) )
 
 #endif /* COBJMACROS */
 
 
-#endif 	/* C style interface */
+#endif  /* C style interface */
 
 
 
 
-#endif 	/* __IAudioEndpointVolumeCallback_INTERFACE_DEFINED__ */
+#endif  /* __IAudioEndpointVolumeCallback_INTERFACE_DEFINED__ */
 
 
 #ifndef __IAudioEndpointVolume_INTERFACE_DEFINED__
 #define __IAudioEndpointVolume_INTERFACE_DEFINED__
 
 /* interface IAudioEndpointVolume */
-/* [unique][helpstring][nonextensible][uuid][local][object] */ 
+/* [unique][helpstring][nonextensible][uuid][local][object] */
 
 
 EXTERN_C const IID IID_IAudioEndpointVolume;
 
 #if defined(__cplusplus) && !defined(CINTERFACE)
-    
+
     MIDL_INTERFACE("5CDF2C82-841E-4546-9722-0CF74078229A")
     IAudioEndpointVolume : public IUnknown
     {
     public:
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE RegisterControlChangeNotify( 
-            /* [in] */ 
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE RegisterControlChangeNotify(
+            /* [in] */
             __in  IAudioEndpointVolumeCallback *pNotify) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE UnregisterControlChangeNotify( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE UnregisterControlChangeNotify(
+            /* [in] */
             __in  IAudioEndpointVolumeCallback *pNotify) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelCount( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelCount(
+            /* [out] */
             __out  UINT *pnChannelCount) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetMasterVolumeLevel( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetMasterVolumeLevel(
+            /* [in] */
             __in  float fLevelDB,
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetMasterVolumeLevelScalar( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetMasterVolumeLevelScalar(
+            /* [in] */
             __in  float fLevel,
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMasterVolumeLevel( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMasterVolumeLevel(
+            /* [out] */
             __out  float *pfLevelDB) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMasterVolumeLevelScalar( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMasterVolumeLevelScalar(
+            /* [out] */
             __out  float *pfLevel) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetChannelVolumeLevel( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetChannelVolumeLevel(
+            /* [in] */
             __in  UINT nChannel,
             float fLevelDB,
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetChannelVolumeLevelScalar( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetChannelVolumeLevelScalar(
+            /* [in] */
             __in  UINT nChannel,
             float fLevel,
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelVolumeLevel( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelVolumeLevel(
+            /* [in] */
             __in  UINT nChannel,
-            /* [out] */ 
+            /* [out] */
             __out  float *pfLevelDB) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelVolumeLevelScalar( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelVolumeLevelScalar(
+            /* [in] */
             __in  UINT nChannel,
-            /* [out] */ 
+            /* [out] */
             __out  float *pfLevel) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetMute( 
-            /* [in] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE SetMute(
+            /* [in] */
             __in  BOOL bMute,
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMute( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMute(
+            /* [out] */
             __out  BOOL *pbMute) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetVolumeStepInfo( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetVolumeStepInfo(
+            /* [out] */
             __out  UINT *pnStep,
-            /* [out] */ 
+            /* [out] */
             __out  UINT *pnStepCount) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE VolumeStepUp( 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE VolumeStepUp(
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE VolumeStepDown( 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE VolumeStepDown(
             /* [unique][in] */ LPCGUID pguidEventContext) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE QueryHardwareSupport( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE QueryHardwareSupport(
+            /* [out] */
             __out  DWORD *pdwHardwareSupportMask) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetVolumeRange( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetVolumeRange(
+            /* [out] */
             __out  float *pflVolumeMindB,
-            /* [out] */ 
+            /* [out] */
             __out  float *pflVolumeMaxdB,
-            /* [out] */ 
+            /* [out] */
             __out  float *pflVolumeIncrementdB) = 0;
-        
+
     };
-    
-#else 	/* C style interface */
+
+#else   /* C style interface */
 
     typedef struct IAudioEndpointVolumeVtbl
     {
         BEGIN_INTERFACE
-        
-        HRESULT ( STDMETHODCALLTYPE *QueryInterface )( 
+
+        HRESULT ( STDMETHODCALLTYPE *QueryInterface )(
             IAudioEndpointVolume * This,
             /* [in] */ REFIID riid,
-            /* [iid_is][out] */ 
+            /* [iid_is][out] */
             __RPC__deref_out  void **ppvObject);
-        
-        ULONG ( STDMETHODCALLTYPE *AddRef )( 
+
+        ULONG ( STDMETHODCALLTYPE *AddRef )(
             IAudioEndpointVolume * This);
-        
-        ULONG ( STDMETHODCALLTYPE *Release )( 
+
+        ULONG ( STDMETHODCALLTYPE *Release )(
             IAudioEndpointVolume * This);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *RegisterControlChangeNotify )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *RegisterControlChangeNotify )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  IAudioEndpointVolumeCallback *pNotify);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *UnregisterControlChangeNotify )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *UnregisterControlChangeNotify )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  IAudioEndpointVolumeCallback *pNotify);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelCount )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelCount )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  UINT *pnChannelCount);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetMasterVolumeLevel )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetMasterVolumeLevel )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  float fLevelDB,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetMasterVolumeLevelScalar )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetMasterVolumeLevelScalar )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  float fLevel,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMasterVolumeLevel )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMasterVolumeLevel )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  float *pfLevelDB);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMasterVolumeLevelScalar )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMasterVolumeLevelScalar )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  float *pfLevel);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetChannelVolumeLevel )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetChannelVolumeLevel )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  UINT nChannel,
             float fLevelDB,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetChannelVolumeLevelScalar )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetChannelVolumeLevelScalar )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  UINT nChannel,
             float fLevel,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelVolumeLevel )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelVolumeLevel )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  UINT nChannel,
-            /* [out] */ 
+            /* [out] */
             __out  float *pfLevelDB);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelVolumeLevelScalar )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelVolumeLevelScalar )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  UINT nChannel,
-            /* [out] */ 
+            /* [out] */
             __out  float *pfLevel);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetMute )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *SetMute )(
             IAudioEndpointVolume * This,
-            /* [in] */ 
+            /* [in] */
             __in  BOOL bMute,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMute )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMute )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  BOOL *pbMute);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetVolumeStepInfo )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetVolumeStepInfo )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  UINT *pnStep,
-            /* [out] */ 
+            /* [out] */
             __out  UINT *pnStepCount);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *VolumeStepUp )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *VolumeStepUp )(
             IAudioEndpointVolume * This,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *VolumeStepDown )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *VolumeStepDown )(
             IAudioEndpointVolume * This,
             /* [unique][in] */ LPCGUID pguidEventContext);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *QueryHardwareSupport )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *QueryHardwareSupport )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  DWORD *pdwHardwareSupportMask);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetVolumeRange )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetVolumeRange )(
             IAudioEndpointVolume * This,
-            /* [out] */ 
+            /* [out] */
             __out  float *pflVolumeMindB,
-            /* [out] */ 
+            /* [out] */
             __out  float *pflVolumeMaxdB,
-            /* [out] */ 
+            /* [out] */
             __out  float *pflVolumeIncrementdB);
-        
+
         END_INTERFACE
     } IAudioEndpointVolumeVtbl;
 
@@ -411,155 +411,155 @@ EXTERN_C const IID IID_IAudioEndpointVolume;
         CONST_VTBL struct IAudioEndpointVolumeVtbl *lpVtbl;
     };
 
-    
+
 
 #ifdef COBJMACROS
 
 
-#define IAudioEndpointVolume_QueryInterface(This,riid,ppvObject)	\
-    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) ) 
+#define IAudioEndpointVolume_QueryInterface(This,riid,ppvObject)    \
+    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) )
 
-#define IAudioEndpointVolume_AddRef(This)	\
-    ( (This)->lpVtbl -> AddRef(This) ) 
+#define IAudioEndpointVolume_AddRef(This)   \
+    ( (This)->lpVtbl -> AddRef(This) )
 
-#define IAudioEndpointVolume_Release(This)	\
-    ( (This)->lpVtbl -> Release(This) ) 
+#define IAudioEndpointVolume_Release(This)  \
+    ( (This)->lpVtbl -> Release(This) )
 
 
-#define IAudioEndpointVolume_RegisterControlChangeNotify(This,pNotify)	\
-    ( (This)->lpVtbl -> RegisterControlChangeNotify(This,pNotify) ) 
+#define IAudioEndpointVolume_RegisterControlChangeNotify(This,pNotify)  \
+    ( (This)->lpVtbl -> RegisterControlChangeNotify(This,pNotify) )
 
-#define IAudioEndpointVolume_UnregisterControlChangeNotify(This,pNotify)	\
-    ( (This)->lpVtbl -> UnregisterControlChangeNotify(This,pNotify) ) 
+#define IAudioEndpointVolume_UnregisterControlChangeNotify(This,pNotify)    \
+    ( (This)->lpVtbl -> UnregisterControlChangeNotify(This,pNotify) )
 
-#define IAudioEndpointVolume_GetChannelCount(This,pnChannelCount)	\
-    ( (This)->lpVtbl -> GetChannelCount(This,pnChannelCount) ) 
+#define IAudioEndpointVolume_GetChannelCount(This,pnChannelCount)   \
+    ( (This)->lpVtbl -> GetChannelCount(This,pnChannelCount) )
 
-#define IAudioEndpointVolume_SetMasterVolumeLevel(This,fLevelDB,pguidEventContext)	\
-    ( (This)->lpVtbl -> SetMasterVolumeLevel(This,fLevelDB,pguidEventContext) ) 
+#define IAudioEndpointVolume_SetMasterVolumeLevel(This,fLevelDB,pguidEventContext)  \
+    ( (This)->lpVtbl -> SetMasterVolumeLevel(This,fLevelDB,pguidEventContext) )
 
-#define IAudioEndpointVolume_SetMasterVolumeLevelScalar(This,fLevel,pguidEventContext)	\
-    ( (This)->lpVtbl -> SetMasterVolumeLevelScalar(This,fLevel,pguidEventContext) ) 
+#define IAudioEndpointVolume_SetMasterVolumeLevelScalar(This,fLevel,pguidEventContext)  \
+    ( (This)->lpVtbl -> SetMasterVolumeLevelScalar(This,fLevel,pguidEventContext) )
 
-#define IAudioEndpointVolume_GetMasterVolumeLevel(This,pfLevelDB)	\
-    ( (This)->lpVtbl -> GetMasterVolumeLevel(This,pfLevelDB) ) 
+#define IAudioEndpointVolume_GetMasterVolumeLevel(This,pfLevelDB)   \
+    ( (This)->lpVtbl -> GetMasterVolumeLevel(This,pfLevelDB) )
 
-#define IAudioEndpointVolume_GetMasterVolumeLevelScalar(This,pfLevel)	\
-    ( (This)->lpVtbl -> GetMasterVolumeLevelScalar(This,pfLevel) ) 
+#define IAudioEndpointVolume_GetMasterVolumeLevelScalar(This,pfLevel)   \
+    ( (This)->lpVtbl -> GetMasterVolumeLevelScalar(This,pfLevel) )
 
-#define IAudioEndpointVolume_SetChannelVolumeLevel(This,nChannel,fLevelDB,pguidEventContext)	\
-    ( (This)->lpVtbl -> SetChannelVolumeLevel(This,nChannel,fLevelDB,pguidEventContext) ) 
+#define IAudioEndpointVolume_SetChannelVolumeLevel(This,nChannel,fLevelDB,pguidEventContext)    \
+    ( (This)->lpVtbl -> SetChannelVolumeLevel(This,nChannel,fLevelDB,pguidEventContext) )
 
-#define IAudioEndpointVolume_SetChannelVolumeLevelScalar(This,nChannel,fLevel,pguidEventContext)	\
-    ( (This)->lpVtbl -> SetChannelVolumeLevelScalar(This,nChannel,fLevel,pguidEventContext) ) 
+#define IAudioEndpointVolume_SetChannelVolumeLevelScalar(This,nChannel,fLevel,pguidEventContext)    \
+    ( (This)->lpVtbl -> SetChannelVolumeLevelScalar(This,nChannel,fLevel,pguidEventContext) )
 
-#define IAudioEndpointVolume_GetChannelVolumeLevel(This,nChannel,pfLevelDB)	\
-    ( (This)->lpVtbl -> GetChannelVolumeLevel(This,nChannel,pfLevelDB) ) 
+#define IAudioEndpointVolume_GetChannelVolumeLevel(This,nChannel,pfLevelDB) \
+    ( (This)->lpVtbl -> GetChannelVolumeLevel(This,nChannel,pfLevelDB) )
 
-#define IAudioEndpointVolume_GetChannelVolumeLevelScalar(This,nChannel,pfLevel)	\
-    ( (This)->lpVtbl -> GetChannelVolumeLevelScalar(This,nChannel,pfLevel) ) 
+#define IAudioEndpointVolume_GetChannelVolumeLevelScalar(This,nChannel,pfLevel) \
+    ( (This)->lpVtbl -> GetChannelVolumeLevelScalar(This,nChannel,pfLevel) )
 
-#define IAudioEndpointVolume_SetMute(This,bMute,pguidEventContext)	\
-    ( (This)->lpVtbl -> SetMute(This,bMute,pguidEventContext) ) 
+#define IAudioEndpointVolume_SetMute(This,bMute,pguidEventContext)  \
+    ( (This)->lpVtbl -> SetMute(This,bMute,pguidEventContext) )
 
-#define IAudioEndpointVolume_GetMute(This,pbMute)	\
-    ( (This)->lpVtbl -> GetMute(This,pbMute) ) 
+#define IAudioEndpointVolume_GetMute(This,pbMute)   \
+    ( (This)->lpVtbl -> GetMute(This,pbMute) )
 
-#define IAudioEndpointVolume_GetVolumeStepInfo(This,pnStep,pnStepCount)	\
-    ( (This)->lpVtbl -> GetVolumeStepInfo(This,pnStep,pnStepCount) ) 
+#define IAudioEndpointVolume_GetVolumeStepInfo(This,pnStep,pnStepCount) \
+    ( (This)->lpVtbl -> GetVolumeStepInfo(This,pnStep,pnStepCount) )
 
-#define IAudioEndpointVolume_VolumeStepUp(This,pguidEventContext)	\
-    ( (This)->lpVtbl -> VolumeStepUp(This,pguidEventContext) ) 
+#define IAudioEndpointVolume_VolumeStepUp(This,pguidEventContext)   \
+    ( (This)->lpVtbl -> VolumeStepUp(This,pguidEventContext) )
 
-#define IAudioEndpointVolume_VolumeStepDown(This,pguidEventContext)	\
-    ( (This)->lpVtbl -> VolumeStepDown(This,pguidEventContext) ) 
+#define IAudioEndpointVolume_VolumeStepDown(This,pguidEventContext) \
+    ( (This)->lpVtbl -> VolumeStepDown(This,pguidEventContext) )
 
-#define IAudioEndpointVolume_QueryHardwareSupport(This,pdwHardwareSupportMask)	\
-    ( (This)->lpVtbl -> QueryHardwareSupport(This,pdwHardwareSupportMask) ) 
+#define IAudioEndpointVolume_QueryHardwareSupport(This,pdwHardwareSupportMask)  \
+    ( (This)->lpVtbl -> QueryHardwareSupport(This,pdwHardwareSupportMask) )
 
-#define IAudioEndpointVolume_GetVolumeRange(This,pflVolumeMindB,pflVolumeMaxdB,pflVolumeIncrementdB)	\
-    ( (This)->lpVtbl -> GetVolumeRange(This,pflVolumeMindB,pflVolumeMaxdB,pflVolumeIncrementdB) ) 
+#define IAudioEndpointVolume_GetVolumeRange(This,pflVolumeMindB,pflVolumeMaxdB,pflVolumeIncrementdB)    \
+    ( (This)->lpVtbl -> GetVolumeRange(This,pflVolumeMindB,pflVolumeMaxdB,pflVolumeIncrementdB) )
 
 #endif /* COBJMACROS */
 
 
-#endif 	/* C style interface */
+#endif  /* C style interface */
 
 
 
 
-#endif 	/* __IAudioEndpointVolume_INTERFACE_DEFINED__ */
+#endif  /* __IAudioEndpointVolume_INTERFACE_DEFINED__ */
 
 
 #ifndef __IAudioMeterInformation_INTERFACE_DEFINED__
 #define __IAudioMeterInformation_INTERFACE_DEFINED__
 
 /* interface IAudioMeterInformation */
-/* [unique][helpstring][nonextensible][uuid][local][object] */ 
+/* [unique][helpstring][nonextensible][uuid][local][object] */
 
 
 EXTERN_C const IID IID_IAudioMeterInformation;
 
 #if defined(__cplusplus) && !defined(CINTERFACE)
-    
+
     MIDL_INTERFACE("C02216F6-8C67-4B5B-9D00-D008E73E0064")
     IAudioMeterInformation : public IUnknown
     {
     public:
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetPeakValue( 
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetPeakValue(
             /* [out] */ float *pfPeak) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMeteringChannelCount( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetMeteringChannelCount(
+            /* [out] */
             __out  UINT *pnChannelCount) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelsPeakValues( 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE GetChannelsPeakValues(
             /* [in] */ UINT32 u32ChannelCount,
             /* [size_is][out] */ float *afPeakValues) = 0;
-        
-        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE QueryHardwareSupport( 
-            /* [out] */ 
+
+        virtual /* [helpstring] */ HRESULT STDMETHODCALLTYPE QueryHardwareSupport(
+            /* [out] */
             __out  DWORD *pdwHardwareSupportMask) = 0;
-        
+
     };
-    
-#else 	/* C style interface */
+
+#else   /* C style interface */
 
     typedef struct IAudioMeterInformationVtbl
     {
         BEGIN_INTERFACE
-        
-        HRESULT ( STDMETHODCALLTYPE *QueryInterface )( 
+
+        HRESULT ( STDMETHODCALLTYPE *QueryInterface )(
             IAudioMeterInformation * This,
             /* [in] */ REFIID riid,
-            /* [iid_is][out] */ 
+            /* [iid_is][out] */
             __RPC__deref_out  void **ppvObject);
-        
-        ULONG ( STDMETHODCALLTYPE *AddRef )( 
+
+        ULONG ( STDMETHODCALLTYPE *AddRef )(
             IAudioMeterInformation * This);
-        
-        ULONG ( STDMETHODCALLTYPE *Release )( 
+
+        ULONG ( STDMETHODCALLTYPE *Release )(
             IAudioMeterInformation * This);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetPeakValue )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetPeakValue )(
             IAudioMeterInformation * This,
             /* [out] */ float *pfPeak);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMeteringChannelCount )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetMeteringChannelCount )(
             IAudioMeterInformation * This,
-            /* [out] */ 
+            /* [out] */
             __out  UINT *pnChannelCount);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelsPeakValues )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *GetChannelsPeakValues )(
             IAudioMeterInformation * This,
             /* [in] */ UINT32 u32ChannelCount,
             /* [size_is][out] */ float *afPeakValues);
-        
-        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *QueryHardwareSupport )( 
+
+        /* [helpstring] */ HRESULT ( STDMETHODCALLTYPE *QueryHardwareSupport )(
             IAudioMeterInformation * This,
-            /* [out] */ 
+            /* [out] */
             __out  DWORD *pdwHardwareSupportMask);
-        
+
         END_INTERFACE
     } IAudioMeterInformationVtbl;
 
@@ -568,42 +568,42 @@ EXTERN_C const IID IID_IAudioMeterInformation;
         CONST_VTBL struct IAudioMeterInformationVtbl *lpVtbl;
     };
 
-    
+
 
 #ifdef COBJMACROS
 
 
-#define IAudioMeterInformation_QueryInterface(This,riid,ppvObject)	\
-    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) ) 
+#define IAudioMeterInformation_QueryInterface(This,riid,ppvObject)  \
+    ( (This)->lpVtbl -> QueryInterface(This,riid,ppvObject) )
 
-#define IAudioMeterInformation_AddRef(This)	\
-    ( (This)->lpVtbl -> AddRef(This) ) 
+#define IAudioMeterInformation_AddRef(This) \
+    ( (This)->lpVtbl -> AddRef(This) )
 
-#define IAudioMeterInformation_Release(This)	\
-    ( (This)->lpVtbl -> Release(This) ) 
+#define IAudioMeterInformation_Release(This)    \
+    ( (This)->lpVtbl -> Release(This) )
 
 
-#define IAudioMeterInformation_GetPeakValue(This,pfPeak)	\
-    ( (This)->lpVtbl -> GetPeakValue(This,pfPeak) ) 
+#define IAudioMeterInformation_GetPeakValue(This,pfPeak)    \
+    ( (This)->lpVtbl -> GetPeakValue(This,pfPeak) )
 
-#define IAudioMeterInformation_GetMeteringChannelCount(This,pnChannelCount)	\
-    ( (This)->lpVtbl -> GetMeteringChannelCount(This,pnChannelCount) ) 
+#define IAudioMeterInformation_GetMeteringChannelCount(This,pnChannelCount) \
+    ( (This)->lpVtbl -> GetMeteringChannelCount(This,pnChannelCount) )
 
-#define IAudioMeterInformation_GetChannelsPeakValues(This,u32ChannelCount,afPeakValues)	\
-    ( (This)->lpVtbl -> GetChannelsPeakValues(This,u32ChannelCount,afPeakValues) ) 
+#define IAudioMeterInformation_GetChannelsPeakValues(This,u32ChannelCount,afPeakValues) \
+    ( (This)->lpVtbl -> GetChannelsPeakValues(This,u32ChannelCount,afPeakValues) )
 
-#define IAudioMeterInformation_QueryHardwareSupport(This,pdwHardwareSupportMask)	\
-    ( (This)->lpVtbl -> QueryHardwareSupport(This,pdwHardwareSupportMask) ) 
+#define IAudioMeterInformation_QueryHardwareSupport(This,pdwHardwareSupportMask)    \
+    ( (This)->lpVtbl -> QueryHardwareSupport(This,pdwHardwareSupportMask) )
 
 #endif /* COBJMACROS */
 
 
-#endif 	/* C style interface */
+#endif  /* C style interface */
 
 
 
 
-#endif 	/* __IAudioMeterInformation_INTERFACE_DEFINED__ */
+#endif  /* __IAudioMeterInformation_INTERFACE_DEFINED__ */
 
 
 /* Additional Prototypes for ALL interfaces */
@@ -615,6 +615,3 @@ EXTERN_C const IID IID_IAudioMeterInformation;
 #endif
 
 #endif
-
-
-

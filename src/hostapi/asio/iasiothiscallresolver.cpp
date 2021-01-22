@@ -1,5 +1,5 @@
 /*
-	IASIOThiscallResolver.cpp see the comments in iasiothiscallresolver.h for
+    IASIOThiscallResolver.cpp see the comments in iasiothiscallresolver.h for
     the top level description - this comment describes the technical details of
     the implementation.
 
@@ -71,32 +71,32 @@
     (IUnknown functions)
     0   virtual HRESULT STDMETHODCALLTYPE (*QueryInterface)(REFIID riid, void **ppv) = 0;
     4   virtual ULONG STDMETHODCALLTYPE (*AddRef)() = 0;
-    8   virtual ULONG STDMETHODCALLTYPE (*Release)() = 0;      
+    8   virtual ULONG STDMETHODCALLTYPE (*Release)() = 0;
 
     (IASIO functions)
-    12	virtual ASIOBool (*init)(void *sysHandle) = 0;
-    16	virtual void (*getDriverName)(char *name) = 0;
-    20	virtual long (*getDriverVersion)() = 0;
-    24	virtual void (*getErrorMessage)(char *string) = 0;
-    28	virtual ASIOError (*start)() = 0;
-    32	virtual ASIOError (*stop)() = 0;
-    36	virtual ASIOError (*getChannels)(long *numInputChannels, long *numOutputChannels) = 0;
-    40	virtual ASIOError (*getLatencies)(long *inputLatency, long *outputLatency) = 0;
-    44	virtual ASIOError (*getBufferSize)(long *minSize, long *maxSize,
+    12  virtual ASIOBool (*init)(void *sysHandle) = 0;
+    16  virtual void (*getDriverName)(char *name) = 0;
+    20  virtual long (*getDriverVersion)() = 0;
+    24  virtual void (*getErrorMessage)(char *string) = 0;
+    28  virtual ASIOError (*start)() = 0;
+    32  virtual ASIOError (*stop)() = 0;
+    36  virtual ASIOError (*getChannels)(long *numInputChannels, long *numOutputChannels) = 0;
+    40  virtual ASIOError (*getLatencies)(long *inputLatency, long *outputLatency) = 0;
+    44  virtual ASIOError (*getBufferSize)(long *minSize, long *maxSize,
             long *preferredSize, long *granularity) = 0;
-    48	virtual ASIOError (*canSampleRate)(ASIOSampleRate sampleRate) = 0;
-    52	virtual ASIOError (*getSampleRate)(ASIOSampleRate *sampleRate) = 0;
-    56	virtual ASIOError (*setSampleRate)(ASIOSampleRate sampleRate) = 0;
-    60	virtual ASIOError (*getClockSources)(ASIOClockSource *clocks, long *numSources) = 0;
-    64	virtual ASIOError (*setClockSource)(long reference) = 0;
-    68	virtual ASIOError (*getSamplePosition)(ASIOSamples *sPos, ASIOTimeStamp *tStamp) = 0;
-    72	virtual ASIOError (*getChannelInfo)(ASIOChannelInfo *info) = 0;
-    76	virtual ASIOError (*createBuffers)(ASIOBufferInfo *bufferInfos, long numChannels,
+    48  virtual ASIOError (*canSampleRate)(ASIOSampleRate sampleRate) = 0;
+    52  virtual ASIOError (*getSampleRate)(ASIOSampleRate *sampleRate) = 0;
+    56  virtual ASIOError (*setSampleRate)(ASIOSampleRate sampleRate) = 0;
+    60  virtual ASIOError (*getClockSources)(ASIOClockSource *clocks, long *numSources) = 0;
+    64  virtual ASIOError (*setClockSource)(long reference) = 0;
+    68  virtual ASIOError (*getSamplePosition)(ASIOSamples *sPos, ASIOTimeStamp *tStamp) = 0;
+    72  virtual ASIOError (*getChannelInfo)(ASIOChannelInfo *info) = 0;
+    76  virtual ASIOError (*createBuffers)(ASIOBufferInfo *bufferInfos, long numChannels,
             long bufferSize, ASIOCallbacks *callbacks) = 0;
-    80	virtual ASIOError (*disposeBuffers)() = 0;
-    84	virtual ASIOError (*controlPanel)() = 0;
-    88	virtual ASIOError (*future)(long selector,void *opt) = 0;
-    92	virtual ASIOError (*outputReady)() = 0;
+    80  virtual ASIOError (*disposeBuffers)() = 0;
+    84  virtual ASIOError (*controlPanel)() = 0;
+    88  virtual ASIOError (*future)(long selector,void *opt) = 0;
+    92  virtual ASIOError (*outputReady)() = 0;
     };
 
     The numbers in the left column show the byte offset of each function ptr
@@ -128,7 +128,7 @@
     with MSVC, and requires that you ship the OpenASIO DLL with your
     application.
 
-    
+
     ACKNOWLEDGEMENTS
 
     Ross Bencina: worked out the thiscall details above, wrote the original
@@ -139,7 +139,7 @@
     Antti Silvast: converted the original calliasio to work with gcc and NASM
     by implementing the asm code in a separate file.
 
-	Fraser Adams: modified the original calliasio containing the Borland inline
+    Fraser Adams: modified the original calliasio containing the Borland inline
     asm to add inline asm for gcc i.e. Intel syntax for Borland and AT&T syntax
     for gcc. This seems a neater approach for gcc than to have a separate .asm
     file and it means that we only need one version of the thiscall patch.
@@ -186,7 +186,7 @@ extern IASIO* theAsioDriver;
 
 // The following macros define the inline assembler for BORLAND first then gcc
 
-#if defined(__BCPLUSPLUS__) || defined(__BORLANDC__)          
+#if defined(__BCPLUSPLUS__) || defined(__BORLANDC__)
 
 
 #define CALL_THISCALL_0( resultName, thisPtr, funcOffset )\
@@ -392,7 +392,7 @@ ULONG STDMETHODCALLTYPE IASIOThiscallResolver::AddRef()
 ULONG STDMETHODCALLTYPE IASIOThiscallResolver::Release()
 {
     assert( false ); // this function should never be called by the ASIO SDK.
-    
+
     return 1;
 }
 
@@ -474,7 +474,7 @@ ASIOError IASIOThiscallResolver::getSampleRate(ASIOSampleRate *sampleRate)
 }
 
 ASIOError IASIOThiscallResolver::setSampleRate(ASIOSampleRate sampleRate)
-{    
+{
     ASIOBool result;
     CALL_THISCALL_1_DOUBLE( result, that_, 56, sampleRate );
     return result;
@@ -562,11 +562,10 @@ ASIOError IASIOThiscallResolver::ASIOInit(ASIODriverInfo *info)
     // real driver because theAsioDriver is reset to zero in ASIOExit().
 
     // Delegate to the real ASIOInit
-	return ::ASIOInit(info);
+    return ::ASIOInit(info);
 }
 
 
 #endif /* !defined(_MSC_VER) */
 
 #endif /* Win32 */
-

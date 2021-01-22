@@ -16,4 +16,3 @@ typedef const PROPVARIANT *REFPROPVARIANT;
 WINOLEAPI PropVariantClear(PROPVARIANT *pvar);
 
 #endif /* _INC_PROPIDL_PA */
-

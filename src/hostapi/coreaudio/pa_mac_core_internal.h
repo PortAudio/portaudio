@@ -15,7 +15,7 @@
  * Olivier Tristan for feedback and testing
  * Glenn Zelniker and Z-Systems engineering for sponsoring the Blocking I/O
  * interface.
- * 
+ *
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
@@ -41,13 +41,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -120,10 +120,10 @@ typedef struct PaMacCoreDeviceProperties
     UInt32 bufferFrameSize;
     // UInt32 streamLatency; // Seems to be the same as deviceLatency!?
     UInt32 deviceLatency;
-    /* Current device sample rate. May change! 
-       These are initialized to the nominal device sample rate, 
-       and updated with the actual sample rate, when/where available. 
-       Note that these are the *device* sample rates, prior to any required 
+    /* Current device sample rate. May change!
+       These are initialized to the nominal device sample rate,
+       and updated with the actual sample rate, when/where available.
+       Note that these are the *device* sample rates, prior to any required
        SR conversion. */
     Float64 sampleRate;
     Float64 samplePeriod; // reciprocal
@@ -172,22 +172,22 @@ typedef struct PaMacCoreStream
     double sampleRate;
     PaMacCoreDeviceProperties  inputProperties;
     PaMacCoreDeviceProperties  outputProperties;
-    
-	/* data updated by main thread and notifications, protected by timingInformationMutex */
-	int timingInformationMutexIsInitialized;
-	pthread_mutex_t timingInformationMutex;
+
+    /* data updated by main thread and notifications, protected by timingInformationMutex */
+    int timingInformationMutexIsInitialized;
+    pthread_mutex_t timingInformationMutex;
 
     /* These are written by the PA thread or from CoreAudio callbacks. Protected by the mutex. */
     Float64 timestampOffsetCombined;
     Float64 timestampOffsetInputDevice;
     Float64 timestampOffsetOutputDevice;
-	
-	/* Offsets in seconds to be applied to Apple timestamps to convert them to PA timestamps.
+
+    /* Offsets in seconds to be applied to Apple timestamps to convert them to PA timestamps.
      * While the io proc is active, the following values are only accessed and manipulated by the ioproc */
     Float64 timestampOffsetCombined_ioProcCopy;
     Float64 timestampOffsetInputDevice_ioProcCopy;
     Float64 timestampOffsetOutputDevice_ioProcCopy;
-    
+
 }
 PaMacCoreStream;
 
