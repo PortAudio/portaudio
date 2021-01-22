@@ -704,4 +704,3 @@ int PaQa_AnalyseRecording( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
 error:
     return -1;
 }
-
