@@ -477,6 +477,16 @@ ENDIF()
 # Prepared for inclusion of test files
 OPTION(PA_BUILD_TESTS "Include test projects" OFF)
 IF(PA_BUILD_TESTS)
+  MACRO(ADD_TEST appl_name)
+    ADD_EXECUTABLE(${appl_name} "${appl_name}.c")
+    TARGET_LINK_LIBRARIES(${appl_name} portaudio_static)
+    TARGET_INCLUDE_DIRECTORIES(${appl_name} PRIVATE "${CMAKE_SOURCE_DIR}/src/common")
+    SET_TARGET_PROPERTIES(${appl_name}
+        PROPERTIES
+        FOLDER "Test"
+    )
+  ENDMACRO(ADD_TEST)
+
   SUBDIRS(test)
 ENDIF()
 
