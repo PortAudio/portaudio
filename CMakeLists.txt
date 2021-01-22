@@ -488,6 +488,7 @@ IF(PA_BUILD_TESTS)
   ENDMACRO(ADD_TEST)
 
   SUBDIRS(test)
+  SUBDIRS(qa)
 ENDIF()
 
 # Prepared for inclusion of test files
