@@ -42,7 +42,7 @@
 */
 
 /* Until May 2011 PA/DS has used a multimedia timer to perform the callback.
-   We're replacing this with a new implementation using a thread and a different timer mechanim.
+   We're replacing this with a new implementation using a thread and a different timer mechanism.
    Defining PA_WIN_DS_USE_WMME_TIMER uses the old (pre-May 2011) behavior.
 */
 //#define PA_WIN_DS_USE_WMME_TIMER
@@ -322,7 +322,7 @@ static double PaWinDS_GetMinSystemLatencySeconds( void )
 NOTE: GetVersionEx() is deprecated as of Windows 8.1 and can not be used to reliably detect
 versions of Windows higher than Windows 8 (due to manifest requirements for reporting higher versions).
 Microsoft recommends switching to VerifyVersionInfo (available on Win 2k and later), however GetVersionEx
-is is faster, for now we just disable the deprecation warning.
+is faster, for now we just disable the deprecation warning.
 See: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451(v=vs.85).aspx
 See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprecation-of-GetVe
 */

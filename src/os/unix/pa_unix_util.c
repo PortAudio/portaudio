@@ -231,7 +231,7 @@ PaError PaUtil_CancelThreading( PaUtilThreading *threading, int wait, PaError *e
 */
 pthread_t paUnixMainThread = 0;
 #else
-/*pthreads are opaque. We don't know that asigning it an int value
+/*pthreads are opaque. We don't know that assigning it an int value
   always makes sense, so we don't initialize it unless we have to.*/
 pthread_t paUnixMainThread = 0;
 #endif

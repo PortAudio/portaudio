@@ -332,7 +332,7 @@ typedef struct PaWasapiStreamInfo
     /** Specifies thread priority explicitly. Will be used only if paWinWasapiThreadPriority flag
        is specified.
 
-       Please note, if Input/Output streams are opened simultaniously (Full-Duplex mode)
+       Please note, if Input/Output streams are opened simultaneously (Full-Duplex mode)
        you shall specify same value for threadPriority or othervise one of the values will be used
        to setup thread priority.
     */

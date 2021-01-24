@@ -2200,7 +2200,7 @@ static OSStatus AudioIOProc( void *inRefCon,
    /*
    static int renderCount = 0;
    static int inputCount = 0;
-   printf( "-------------------  starting reder/input\n" );
+   printf( "-------------------  starting render/input\n" );
    if( isRender )
       printf("Render callback (%d):\t", ++renderCount);
    else

@@ -365,7 +365,7 @@ enum { WASAPI_PACKETS_PER_INPUT_BUFFER = 6 };
 // Mixer function
 typedef void (*MixMonoToStereoF) (void *__to, const void *__from, UINT32 count);
 
-// AVRT is the new "multimedia schedulling stuff"
+// AVRT is the new "multimedia scheduling stuff"
 #ifndef PA_WINRT
 typedef BOOL   (WINAPI *FAvRtCreateThreadOrderingGroup)  (PHANDLE,PLARGE_INTEGER,GUID*,PLARGE_INTEGER);
 typedef BOOL   (WINAPI *FAvRtDeleteThreadOrderingGroup)  (HANDLE);
@@ -3610,7 +3610,7 @@ static PaError ActivateAudioClientOutput(PaWasapiStream *stream)
     // Correct buffer to max size if it maxed out result of GetBufferSize
     stream->out.bufferSize = maxBufferSize;
 
-    // Get interface latency (actually uneeded as we calculate latency from the size of maxBufferSize)
+    // Get interface latency (actually unneeded as we calculate latency from the size of maxBufferSize)
     if (FAILED(hr = IAudioClient_GetStreamLatency(stream->out.clientParent, &stream->out.deviceLatency)))
     {
         LogHostError(hr);
@@ -3677,7 +3677,7 @@ static PaError ActivateAudioClientInput(PaWasapiStream *stream)
     // Correct buffer to max size if it maxed out result of GetBufferSize
     stream->in.bufferSize = maxBufferSize;
 
-    // Get interface latency (actually uneeded as we calculate latency from the size
+    // Get interface latency (actually unneeded as we calculate latency from the size
     // of maxBufferSize).
     if (FAILED(hr = IAudioClient_GetStreamLatency(stream->in.clientParent, &stream->in.deviceLatency)))
     {
