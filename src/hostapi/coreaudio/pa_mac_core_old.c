@@ -96,7 +96,7 @@ typedef struct PaMacCore_S
 //    HANDLE processingThread;
 //    DWORD processingThreadId;
     
-    char throttleProcessingThreadOnOverload; // 0 -> don't throtte, non-0 -> throttle
+    char throttleProcessingThreadOnOverload; // 0 -> don't throttle, non-0 -> throttle
     int processingThreadPriority;
     int highThreadPriority;
     int throttledThreadPriority;

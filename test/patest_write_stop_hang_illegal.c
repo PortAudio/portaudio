@@ -69,7 +69,7 @@ static float s_buffer[FRAMES_PER_BUFFER][2]; /* stereo output buffer */
  * illegal way, it may fail for reasons that are not PA bugs.
  */
 
-/* Wait for awhile then abort the stream. */
+/* Wait awhile then abort the stream. */
 void *stop_thread_proc(void *arg)
 {
     PaStream *stream = (PaStream *)arg;

@@ -192,7 +192,7 @@
 
 /* When client suggestedLatency could result in many host buffers, we aim to have around 8,
    based off Windows documentation that suggests that the kmixer uses 8 buffers. This choice
-   is somewhat arbitrary here, since we haven't observed significant stability degredation
+   is somewhat arbitrary here, since we haven't observed significant stability degradation
    with using either more, or less buffers.
 */
 #define PA_MME_TARGET_HOST_BUFFER_COUNT_    8
@@ -915,7 +915,7 @@ static void GetDefaultLatencies( PaTime *defaultLowLatency, PaTime *defaultHighL
 NOTE: GetVersionEx() is deprecated as of Windows 8.1 and can not be used to reliably detect
 versions of Windows higher than Windows 8 (due to manifest requirements for reporting higher versions).
 Microsoft recommends switching to VerifyVersionInfo (available on Win 2k and later), however GetVersionEx
-is is faster, for now we just disable the deprecation warning.
+is faster, for now we just disable the deprecation warning.
 See: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451(v=vs.85).aspx
 See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprecation-of-GetVe
 */
@@ -2156,7 +2156,7 @@ struct PaWinMmeStream
     HANDLE processingThread;
     PA_THREAD_ID processingThreadId;
 
-    char throttleProcessingThreadOnOverload;    /* 0 -> don't throtte, non-0 -> throttle */
+    char throttleProcessingThreadOnOverload;    /* 0 -> don't throttle, non-0 -> throttle */
     int processingThreadPriority;
     int highThreadPriority;
     int throttledThreadPriority;
