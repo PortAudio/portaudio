@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
 
     inputParameters.device = Pa_GetDefaultInputDevice();    /* default input device */
     if (inputParameters.device == paNoDevice) {
-        printf(stderr,"Error: No input default device.\n");
+        fprintf(stderr, "Error: No input default device.\n");
         goto done;
     }
     inputParameters.channelCount = 2;                       /* stereo input */
