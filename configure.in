@@ -234,12 +234,12 @@ case "${host_os}" in
               dnl as there *is* no /Developer, so we use -sdk to check
               dnl what SDKs are available and to get the full path of
               dnl the SDKs.
-              if xcodebuild -version -sdk macosx10.5 Path >/dev/null 2>&1 ; then
+              if xcrun --sdk macosx10.5 --show-sdk-path >/dev/null 2>&1 ; then
                  mac_version_min="-mmacosx-version-min=10.5"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.5 Path`"
+                 mac_sysroot="-isysroot $(xcrun --sdk macosx10.5 --show-sdk-path)"
               else
                  mac_version_min="-mmacosx-version-min=10.6"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx Path`"
+                 mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
               fi
            esac
 
