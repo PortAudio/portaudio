@@ -17,6 +17,7 @@ lib-stamp
 lib/*
 libtool
 portaudio-2.0.pc
+autom4te.cache/*
 
 # Precompiled Headers
 *.gch

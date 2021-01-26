@@ -15851,41 +15851,12 @@ case "${host_os}" in
               ;;
 
            *)
-                                                                                    if xcodebuild -version -sdk macosx10.5 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.5 Path`"
-              elif xcodebuild -version -sdk macosx10.6 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.6 Path`"
-              elif xcodebuild -version -sdk macosx10.7 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.7 Path`"
-              elif xcodebuild -version -sdk macosx10.8 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.8 Path`"
-              elif xcodebuild -version -sdk macosx10.9 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.9 Path`"
-              elif xcodebuild -version -sdk macosx10.10 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.10 Path`"
-              elif xcodebuild -version -sdk macosx10.11 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.11 Path`"
-              elif xcodebuild -version -sdk macosx10.12 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.12 Path`"
-              elif xcodebuild -version -sdk macosx10.13 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.13 Path`"
-              elif xcodebuild -version -sdk macosx10.14 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.14 Path`"
-              elif xcodebuild -version -sdk macosx10.15 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.15 Path`"
+                                                                                    if xcrun --sdk macosx10.5 --show-sdk-path >/dev/null 2>&1 ; then
+                 mac_version_min="-mmacosx-version-min=10.5"
+                 mac_sysroot="-isysroot $(xcrun --sdk macosx10.5 --show-sdk-path)"
               else
-                 as_fn_error $? "Could not find 10.5 to 10.13 SDK." "$LINENO" 5
+                 mac_version_min="-mmacosx-version-min=10.6"
+                 mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
               fi
            esac
 
