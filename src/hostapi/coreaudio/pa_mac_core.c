@@ -71,6 +71,10 @@
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
 
+#ifndef MAC_OS_X_VERSION_10_6
+#define MAC_OS_X_VERSION_10_6 1060
+#endif
+
 
 #ifdef __cplusplus
 extern "C"
