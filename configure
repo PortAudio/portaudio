@@ -15861,7 +15861,7 @@ case "${host_os}" in
            esac
 
                                  mac_arches=""
-           for arch in x86_64
+           for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"
               CFLAGS="$CFLAGS -arch $arch"
