@@ -15914,6 +15914,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
             CFLAGS="$CFLAGS -I$DXDIR/include -UPA_USE_DS -DPA_USE_DS=1"
+            INCLUDES="$INCLUDES pa_win_ds.h pa_win_waveformat.h"
         fi
 
         if [ "x$with_asio" = "xyes" ]; then
@@ -15922,6 +15923,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lm -lole32 -luuid"
             CFLAGS="$CFLAGS -ffast-math -fomit-frame-pointer -I\$(top_srcdir)/src/hostapi/asio -I$ASIODIR/host/pc -I$ASIODIR/common -I$ASIODIR/host -UPA_USE_ASIO -DPA_USE_ASIO=1 -DWINDOWS"
+            INCLUDES="$INCLUDES pa_asio.h"
 
                                                             CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0501 -DWINVER=0x0501"
 
@@ -15936,6 +15938,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
             CFLAGS="$CFLAGS -I$DXDIR/include -UPA_USE_WDMKS -DPA_USE_WDMKS=1"
+            INCLUDES="$INCLUDES pa_win_wdmks.h"
         fi
 
         if [ "x$with_wmme" = "xyes" ]; then
@@ -15943,6 +15946,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm"
             CFLAGS="$CFLAGS -UPA_USE_WMME -DPA_USE_WMME=1"
+            INCLUDES="$INCLUDES pa_win_wmme.h pa_win_waveformat.h"
         fi
 
         if [ "x$with_wasapi" = "xyes" ]; then
@@ -15950,6 +15954,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lole32"
             CFLAGS="$CFLAGS -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
+            INCLUDES="$INCLUDES pa_win_wasapi.h pa_win_waveformat.h"
         fi
         ;;
 
