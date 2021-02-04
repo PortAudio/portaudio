@@ -3257,4 +3257,3 @@ static signed long GetStreamWriteAvailable( PaStream* s )
 
     return 0;
 }
-
