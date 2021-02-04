@@ -240,4 +240,3 @@ void PaUtil_FreeAllAllocations( PaUtilAllocationGroup* group )
         group->allocations = 0;
     }
 }
-
