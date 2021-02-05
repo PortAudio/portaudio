@@ -733,7 +733,7 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
 	Gestalt(gestaltSystemVersionMinor, &minor);
 	
 	// Starting with 10.6 systems, the HAL notification thread is created internally
-	if (major == 10 && minor >= 6) {
+	if ( major > 10 || (major == 10 && minor >= 6) ) {
 		CFRunLoopRef theRunLoop = NULL;
 		AudioObjectPropertyAddress theAddress = { kAudioHardwarePropertyRunLoop, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
 		OSStatus osErr = AudioObjectSetPropertyData (kAudioObjectSystemObject, &theAddress, 0, NULL, sizeof(CFRunLoopRef), &theRunLoop);
