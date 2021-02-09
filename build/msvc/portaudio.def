@@ -56,3 +56,7 @@ PaWasapi_SetStreamStateHandler      @68
 PaWasapiWinrt_SetDefaultDeviceId    @67
 PaWasapiWinrt_PopulateDeviceList    @69
 PaWasapi_GetIMMDevice               @70
+PaWinMME_GetStreamInputHandleCount  @71
+PaWinMME_GetStreamInputHandle       @72
+PaWinMME_GetStreamOutputHandleCount @73
+PaWinMME_GetStreamOutputHandle      @74

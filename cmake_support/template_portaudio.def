@@ -59,3 +59,7 @@ PaUtil_SetDebugPrintFunction        @55
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapiWinrt_SetDefaultDeviceId    @67
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapiWinrt_PopulateDeviceList    @69
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapi_GetIMMDevice               @70
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamInputHandleCount  @71
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamInputHandle       @72
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamOutputHandleCount @73
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamOutputHandle      @74

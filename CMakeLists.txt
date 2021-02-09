@@ -197,6 +197,8 @@ IF(WIN32)
     SET(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} include/pa_win_wmme.h include/pa_win_waveformat.h)
     SET(PA_SOURCES ${PA_SOURCES} ${PA_WMME_SOURCES})
     SET(PA_LIBRARY_DEPENDENCIES ${PA_LIBRARY_DEPENDENCIES} ole32 uuid)
+  ELSE()
+    SET(DEF_EXCLUDE_WMME_SYMBOLS ";")
   ENDIF()
 
   # MinGW versions below 4.93, especially non MinGW-w64 distributions may
