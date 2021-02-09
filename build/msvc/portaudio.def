@@ -55,3 +55,4 @@ PaWasapi_GetJackDescription         @66
 PaWasapi_SetStreamStateHandler      @68
 PaWasapiWinrt_SetDefaultDeviceId    @67
 PaWasapiWinrt_PopulateDeviceList    @69
+PaWasapi_GetIMMDevice               @70

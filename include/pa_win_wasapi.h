@@ -437,6 +437,16 @@ int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDevic
 int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
 
 
+/** Get device IMMDevice pointer
+
+ @param device Device index.
+ @param pAudioClient Pointer to pointer of IMMDevice.
+
+ @return Error code indicating success or failure.
+*/
+PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice );
+
+
 /** Boost thread priority of calling thread (MMCSS).
 
     Use it for Blocking Interface only inside the thread which makes calls to Pa_WriteStream/Pa_ReadStream.
