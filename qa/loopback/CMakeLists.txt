@@ -1,4 +1,4 @@
-ADD_EXECUTABLE(paloopback
+add_executable(paloopback
     src/audio_analyzer.c
     src/biquad_filter.c
     src/paqa.c
@@ -6,5 +6,5 @@ ADD_EXECUTABLE(paloopback
     src/test_audio_analyzer.c
     src/write_wav.c
 )
-TARGET_INCLUDE_DIRECTORIES(paloopback PRIVATE ..)
-TARGET_LINK_LIBRARIES(paloopback portaudio)
+target_include_directories(paloopback PRIVATE ..)
+target_link_libraries(paloopback portaudio)
