@@ -1,5 +1,5 @@
-ADD_TEST(paqa_devs)
-ADD_TEST(paqa_errs)
-ADD_TEST(paqa_latency)
+add_test(paqa_devs)
+add_test(paqa_errs)
+add_test(paqa_latency)
 
-SUBDIRS(loopback)
+subdirs(loopback)

@@ -5,8 +5,9 @@ includedir=${prefix}/include
 
 Name: PortAudio
 Description: Portable audio I/O
-Requires:
-Version: @PA_PKGCONFIG_VERSION@
+Version: @CMAKE_PROJECT_VERSION_MAJOR@
 
-Libs: -L${libdir} -lportaudio @PA_PKGCONFIG_LDFLAGS@
-Cflags: -I${includedir} @PA_PKGCONFIG_CFLAGS@
+Libs: -L${libdir} -lportaudio
+Libs.private: @PKGCONFIG_LDFLAGS_PRIVATE@
+Cflags: -I${includedir} @PKGCONFIG_CFLAGS@
+Requires.private: @PKGCONFIG_REQUIRES_PRIVATE@
