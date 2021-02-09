@@ -58,3 +58,4 @@ PaUtil_SetDebugPrintFunction        @55
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapi_SetStreamStateHandler      @68
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapiWinrt_SetDefaultDeviceId    @67
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapiWinrt_PopulateDeviceList    @69
+@DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapi_GetIMMDevice               @70

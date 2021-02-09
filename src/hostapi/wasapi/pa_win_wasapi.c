@@ -2615,6 +2615,27 @@ int PaWasapi_GetDeviceRole( PaDeviceIndex device )
 }
 
 // ------------------------------------------------------------------------------------------
+int PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice )
+{
+        PaError ret;
+        PaDeviceIndex index;
+
+        PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
+        if (paWasapi == NULL)
+                return paNotInitialized;
+
+        ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
+        if (ret != paNoError)
+                return ret;
+
+        if ((UINT32)index >= paWasapi->deviceCount)
+                return paInvalidDevice;
+
+        *pIMMDevice = paWasapi->devInfo[ index ].device;
+        return paNoError;
+}
+
+// ------------------------------------------------------------------------------------------
 PaError PaWasapi_GetFramesPerHostBuffer( PaStream *pStream, unsigned int *pInput, unsigned int *pOutput )
 {
     PaWasapiStream *stream = (PaWasapiStream *)pStream;
