@@ -512,6 +512,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         int client_seen = FALSE;
         regmatch_t match_info;
         const char *port = jack_ports[port_index];
+        PA_DEBUG(( "JACK port found: %s\n", port ));
 
         /* extract the client name from the port name, using a regex
          * that parses the clientname:portname syntax */
@@ -628,6 +629,11 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
             }
             free(clientPorts);
         }
+
+        PA_DEBUG(( "Adding JACK device %s with %d input channels and %d output channels\n",
+                   client_names[client_index],
+                   curDevInfo->maxInputChannels,
+                   curDevInfo->maxOutputChannels ));
 
         /* Add this client to the list of devices */
         commonApi->deviceInfos[client_index] = curDevInfo;
