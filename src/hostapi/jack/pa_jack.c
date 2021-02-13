@@ -76,6 +76,7 @@
 static pthread_t mainThread_;
 static char *jackErr_ = NULL;
 static const char* clientName_ = "PortAudio";
+static const char* port_regex_suffix = ":.*";
 
 #define STRINGIZE_HELPER(expr) #expr
 #define STRINGIZE(expr) STRINGIZE_HELPER(expr)
@@ -451,6 +452,50 @@ BlockingWaitEmpty( PaStream *s )
 
 /* ---- jack driver ---- */
 
+void replace_string(char *string, size_t string_buffer_size, const char *to_find, const char *replacement)
+{
+    char *found_position = strstr(string, to_find);
+    while( found_position ) {
+        size_t original_length = strlen(string);
+        size_t found_length = strlen(to_find);
+        size_t replacement_length = strlen(replacement);
+
+        size_t destination_length = original_length - found_length + replacement_length;
+        if( destination_length >= string_buffer_size ) {
+            PaUtil_DebugPrint( "Cannot replace %s with %s in %s, buffer size is too small\n",
+                               to_find, replacement, string );
+            return;
+        }
+
+        memmove(found_position + replacement_length,
+                found_position + found_length,
+                // add 1 to include the \0 terminator
+                string + original_length - (found_position + found_length) + 1);
+        memcpy(found_position, replacement, replacement_length);
+
+        found_position = strstr(found_position + replacement_length, to_find);
+    }
+}
+
+void escape_regex_chars(char* string, size_t buffersize)
+{
+    // Escaping \ must be first because the following replacements insert \ chars into the string.
+    replace_string(string, buffersize, "\\", "\\\\");
+    replace_string(string, buffersize, "(", "\\(");
+    replace_string(string, buffersize, ")", "\\)");
+    replace_string(string, buffersize, "[", "\\[");
+    replace_string(string, buffersize, "]", "\\]");
+    replace_string(string, buffersize, "{", "\\{");
+    replace_string(string, buffersize, "}", "\\}");
+    replace_string(string, buffersize, "*", "\\*");
+    replace_string(string, buffersize, "+", "\\+");
+    replace_string(string, buffersize, "?", "\\?");
+    replace_string(string, buffersize, "|", "\\|");
+    replace_string(string, buffersize, "$", "\\$");
+    replace_string(string, buffersize, "^", "\\^");
+    replace_string(string, buffersize, ".", "\\.");
+}
+
 /* BuildDeviceList():
  *
  * The process of determining a list of PortAudio "devices" from
@@ -472,7 +517,11 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
 
     const char **jack_ports = NULL;
     char **client_names = NULL;
-    char *regex_pattern = NULL;
+    char *port_regex_string = NULL;
+    char *device_name_regex_escaped = NULL;
+    // In the worst case scenario, every character would be escaped, doubling the string size.
+    size_t device_name_regex_escaped_size = jack_client_name_size() * 2;
+    size_t port_regex_size = device_name_regex_escaped_size + strlen(port_regex_suffix);
     int port_index, client_index, i;
     double globalSampleRate;
     regex_t port_regex;
@@ -490,7 +539,9 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
      * associated with the previous list */
     PaUtil_FreeAllAllocations( jackApi->deviceInfoMemory );
 
-    regex_pattern = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, jack_client_name_size() + 3 );
+    port_regex_string = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, port_regex_size );
+    device_name_regex_escaped = PaUtil_GroupAllocateMemory(
+        jackApi->deviceInfoMemory, device_name_regex_escaped_size );
     tmp_client_name = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, jack_client_name_size() );
 
     /* We can only retrieve the list of clients indirectly, by first
@@ -585,11 +636,13 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
 
         /* To determine how many input and output channels are available,
          * we re-query jackd with more specific parameters. */
-
-        sprintf( regex_pattern, "%s:.*", client_names[client_index] );
+        strncpy( device_name_regex_escaped, client_names[client_index], device_name_regex_escaped_size );
+        escape_regex_chars( device_name_regex_escaped, device_name_regex_escaped_size );
+        strncpy( port_regex_string, device_name_regex_escaped, port_regex_size );
+        strncat( port_regex_string, port_regex_suffix, port_regex_size );
 
         /* ... what are your output ports (that we could input from)? */
-        clientPorts = jack_get_ports( jackApi->jack_client, regex_pattern,
+        clientPorts = jack_get_ports( jackApi->jack_client, port_regex_string,
                                      JACK_PORT_TYPE_FILTER, JackPortIsOutput);
         curDevInfo->maxInputChannels = 0;
         curDevInfo->defaultLowInputLatency = 0.;
@@ -610,7 +663,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         }
 
         /* ... what are your input ports (that we could output to)? */
-        clientPorts = jack_get_ports( jackApi->jack_client, regex_pattern,
+        clientPorts = jack_get_ports( jackApi->jack_client, port_regex_string,
                                      JACK_PORT_TYPE_FILTER, JackPortIsInput);
         curDevInfo->maxOutputChannels = 0;
         curDevInfo->defaultLowOutputLatency = 0.;
@@ -1086,8 +1139,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaJackHostApiRepresentation *jackHostApi = (PaJackHostApiRepresentation*)hostApi;
     PaJackStream *stream = NULL;
     char *port_string = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, jack_port_name_size() );
-    unsigned long regexSz = jack_client_name_size() + 3;
-    char *regex_pattern = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, regexSz );
+    // In the worst case every character would be escaped which would double the string length.
+    size_t regex_escaped_client_name_length = jack_client_name_size() * 2;
+    char *regex_escaped_client_name = PaUtil_GroupAllocateMemory(
+        jackHostApi->deviceInfoMemory, regex_escaped_client_name_length );
+    unsigned long regex_size = jack_client_name_size() * 2 + strlen(port_regex_suffix);
+    char *regex_pattern = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, regex_size );
     const char **jack_ports = NULL;
     /* int jack_max_buffer_size = jack_get_buffer_size( jackHostApi->jack_client ); */
     int i;
@@ -1245,7 +1302,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int err = 0;
 
         /* Get output ports of our capture device */
-        snprintf( regex_pattern, regexSz, "%s:.*", hostApi->deviceInfos[ inputParameters->device ]->name );
+        strncpy( regex_escaped_client_name,
+                 hostApi->deviceInfos[ inputParameters->device ]->name,
+                 regex_escaped_client_name_length );
+        escape_regex_chars( regex_escaped_client_name, regex_escaped_client_name_length );
+        strncpy( regex_pattern, regex_escaped_client_name, regex_size );
+        strncat( regex_pattern, port_regex_suffix, regex_size );
         UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
                                      JACK_PORT_TYPE_FILTER, JackPortIsOutput ), paUnanticipatedHostError );
         for( i = 0; i < inputChannelCount && jack_ports[i]; i++ )
@@ -1269,7 +1331,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int err = 0;
 
         /* Get input ports of our playback device */
-        snprintf( regex_pattern, regexSz, "%s:.*", hostApi->deviceInfos[ outputParameters->device ]->name );
+        strncpy( regex_escaped_client_name,
+                 hostApi->deviceInfos[ outputParameters->device ]->name,
+                 regex_escaped_client_name_length );
+        escape_regex_chars( regex_escaped_client_name, regex_escaped_client_name_length );
+        strncpy( regex_pattern, regex_escaped_client_name, regex_size );
+        strncat( regex_pattern, port_regex_suffix, regex_size );
         UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
                                      JACK_PORT_TYPE_FILTER, JackPortIsInput ), paUnanticipatedHostError );
         for( i = 0; i < outputChannelCount && jack_ports[i]; i++ )
@@ -1775,3 +1842,4 @@ PaError PaJack_GetClientName(const char** clientName)
 error:
     return result;
 }
+
