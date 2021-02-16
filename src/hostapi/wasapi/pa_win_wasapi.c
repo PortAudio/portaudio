@@ -1026,27 +1026,26 @@ static UINT32 ALIGN_NEXT_POW2(UINT32 v)
 // Aligns WASAPI buffer to 128 byte packet boundary. HD Audio will fail to play if buffer
 // is misaligned. This problem was solved in Windows 7 were AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED
 // is thrown although we must align for Vista anyway.
-static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nSamplesPerSec, UINT32 nBlockAlign,
-                                   ALIGN_FUNC pAlignFunc)
+static UINT32 AlignFramesPerBuffer(UINT32 nFrames, UINT32 nBlockAlign, ALIGN_FUNC pAlignFunc)
 {
 #define HDA_PACKET_SIZE (128)
 
-    long frame_bytes = nFrames * nBlockAlign;
-    long packets;
-    (void)nSamplesPerSec;
+    UINT32 bytes = nFrames * nBlockAlign;
+    UINT32 packets;
 
-    // align to packet size
-    frame_bytes = pAlignFunc(frame_bytes, HDA_PACKET_SIZE); // use ALIGN_FWD if bigger but safer period is more desired
+    // align to a HD Audio packet size
+    bytes = pAlignFunc(bytes, HDA_PACKET_SIZE);
 
     // atlest 1 frame must be available
-    if (frame_bytes < HDA_PACKET_SIZE)
-        frame_bytes = HDA_PACKET_SIZE;
+    if (bytes < HDA_PACKET_SIZE)
+        bytes = HDA_PACKET_SIZE;
 
-    nFrames      = frame_bytes / nBlockAlign;
-    packets      = frame_bytes / HDA_PACKET_SIZE;
+    packets = bytes / HDA_PACKET_SIZE;
+    bytes   = packets * HDA_PACKET_SIZE;
+    nFrames = bytes / nBlockAlign;
 
-    frame_bytes = packets * HDA_PACKET_SIZE;
-    nFrames     = frame_bytes / nBlockAlign;
+    // WASAPI frames are always aligned to at least 8
+    nFrames = ALIGN_FWD(nFrames, 8);
 
     return nFrames;
 
@@ -3161,27 +3160,33 @@ static PaUint32 _GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTime sug
 }
 
 // ------------------------------------------------------------------------------------------
-static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPerBuffer, UINT32 framesPerLatency, BOOL fullDuplex)
+static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPerBuffer, UINT32 framesPerLatency, 
+    BOOL fullDuplex, BOOL output)
 {
     // Count buffers (must be at least 1)
-    sub->buffers = (userFramesPerBuffer ? framesPerLatency / userFramesPerBuffer : 0);
+    sub->buffers = (userFramesPerBuffer != 0 ? framesPerLatency / userFramesPerBuffer : 1);
     if (sub->buffers == 0)
         sub->buffers = 1;
 
-    // Determine amount of buffers used:
-    // - Full-duplex mode will lead to period difference, thus only 1.
-    // - Input mode, only 1, as WASAPI allows extraction of only 1 packet.
-    // - For Shared mode we use double buffering.
+    // Determine number of buffers used:
+    // - Full-duplex mode will lead to period difference, thus only 1
+    // - Input mode, only 1, as WASAPI allows extraction of only 1 packet
+    // - For Shared mode we use double buffering
     if ((sub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) || fullDuplex)
     {
+        BOOL eventMode = ((sub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == AUDCLNT_STREAMFLAGS_EVENTCALLBACK);
+
         // Exclusive mode does not allow >1 buffers be used for Event interface, e.g. GetBuffer
         // call must acquire max buffer size and it all must be processed.
-        if (sub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK)
+        if (eventMode)
             sub->userBufferAndHostMatch = 1;
 
-        // Use paUtilBoundedHostBufferSize because exclusive mode will starve and produce
-        // bad quality of audio
-        sub->buffers = 1;
+        // Full-duplex or Event mode: prefer paUtilBoundedHostBufferSize because exclusive mode will starve 
+        // and produce glitchy audio
+        // Output Polling mode: prefer paUtilFixedHostBufferSize (buffers != 1) for polling mode is it allows 
+        // to consume user data by fixed size data chunks and thus lowers memory movement (less CPU usage)
+        if (fullDuplex || eventMode || !output)
+            sub->buffers = 1;
     }
 }
 
@@ -3195,7 +3200,7 @@ static void _CalculateAlignedPeriod(PaWasapiSubStream *pSub, UINT32 *nFramesPerL
     if (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
     {
         (*nFramesPerLatency) = AlignFramesPerBuffer((*nFramesPerLatency),
-            pSub->wavex.Format.nSamplesPerSec, pSub->wavex.Format.nBlockAlign, pAlignFunc);
+            pSub->wavex.Format.nBlockAlign, pAlignFunc);
     }
 
     // Calculate period
@@ -3205,7 +3210,7 @@ static void _CalculateAlignedPeriod(PaWasapiSubStream *pSub, UINT32 *nFramesPerL
 // ------------------------------------------------------------------------------------------
 static void _CalculatePeriodicity(PaWasapiSubStream *pSub, BOOL output, REFERENCE_TIME *periodicity)
 {
-    // Note: according Microsoft docs for IAudioClient::Initialize we can set periodicity of the buffer
+    // Note: according to Microsoft docs for IAudioClient::Initialize we can set periodicity of the buffer
     // only for Exclusive mode. By setting periodicity almost equal to the user buffer frames we can
     // achieve high quality (less glitchy) low-latency audio.
     if (pSub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE)
@@ -3216,7 +3221,7 @@ static void _CalculatePeriodicity(PaWasapiSubStream *pSub, BOOL output, REFERENC
         (*periodicity) = pSub->period;
 
         // Try make buffer ready for I/O once we request the buffer readiness for it. Only Polling mode
-        // because for Event mode buffer size and periodicity must be equal according Microsoft
+        // because for Event mode buffer size and periodicity must be equal according to Microsoft
         // documentation for IAudioClient::Initialize.
         //
         // TO-DO: try spread to capture and full-duplex cases (not tested and therefore disabled)
@@ -3230,7 +3235,7 @@ static void _CalculatePeriodicity(PaWasapiSubStream *pSub, BOOL output, REFERENC
             // Align frames backwards, so device will likely make buffer read ready when we are ready
             // to read it (our scheduling will wait for amount of millisoconds of frames_per_buffer)
             alignedFrames = AlignFramesPerBuffer(pSub->params.frames_per_buffer,
-                pSub->wavex.Format.nSamplesPerSec, pSub->wavex.Format.nBlockAlign, ALIGN_BWD);
+                pSub->wavex.Format.nBlockAlign, ALIGN_BWD);
 
             userPeriodicity = MakeHnsPeriod(alignedFrames, pSub->wavex.Format.nSamplesPerSec);
 
@@ -3429,7 +3434,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         }
     }
 
-    // Set device scheduling period (always 0 in Shared mode according Microsoft docs)
+    // Set device scheduling period (always 0 in Shared mode according to Microsoft docs)
     _CalculatePeriodicity(pSub, output, &eventPeriodicity);
 
     // Open the stream and associate it with an audio session
@@ -3483,7 +3488,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
                 goto done;
             }
 
-            // Set device scheduling period (always 0 in Shared mode according Microsoft docs)
+            // Set device scheduling period (always 0 in Shared mode according to Microsoft docs)
             _CalculatePeriodicity(pSub, output, &eventPeriodicity);
 
             // Open the stream and associate it with an audio session
@@ -3523,7 +3528,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
             goto done;
         }
 
-        // Set device scheduling period (always 0 in Shared mode according Microsoft docs)
+        // Set device scheduling period (always 0 in Shared mode according to Microsoft docs)
         _CalculatePeriodicity(pSub, output, &eventPeriodicity);
 
         // Open the stream and associate it with an audio session
@@ -3556,7 +3561,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
             goto done;
         }
 
-        // Set device scheduling period (always 0 in Shared mode according Microsoft docs)
+        // Set device scheduling period (always 0 in Shared mode according to Microsoft docs)
         _CalculatePeriodicity(pSub, output, &eventPeriodicity);
 
         // Open the stream and associate it with an audio session
@@ -3583,7 +3588,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
 
     // Recalculate buffers count
     _RecalculateBuffersCount(pSub, userFramesPerBuffer, MakeFramesFromHns(pSub->period, pSub->wavex.Format.nSamplesPerSec),
-        fullDuplex);
+        fullDuplex, output);
 
     // No error, client is successfully created
     (*pa_error) = paNoError;
@@ -3630,15 +3635,6 @@ static PaError ActivateAudioClientOutput(PaWasapiStream *stream)
 
     // Correct buffer to max size if it maxed out result of GetBufferSize
     stream->out.bufferSize = maxBufferSize;
-
-    // Get interface latency (actually unneeded as we calculate latency from the size of maxBufferSize)
-    if (FAILED(hr = IAudioClient_GetStreamLatency(stream->out.clientParent, &stream->out.deviceLatency)))
-    {
-        LogHostError(hr);
-        LogPaError(result = paInvalidDevice);
-        goto error;
-    }
-    //stream->out.latencySeconds = nano100ToSeconds(stream->out.deviceLatency);
 
     // Number of frames that are required at each period
     stream->out.framesPerHostCallback = maxBufferSize;
@@ -6085,7 +6081,7 @@ static UINT32 ConfigureLoopSleepTimeAndScheduler(PaWasapiStream *stream, ThreadI
     UINT32 userFramesOut = stream->out.framesPerBuffer;
 
     // Adjust polling time for non-paUtilFixedHostBufferSize, input stream is not adjustable as it is being
-    // polled according its packet length
+    // polled according to its packet length
     if (stream->bufferMode != paUtilFixedHostBufferSize)
     {
         userFramesOut = (stream->bufferProcessor.framesPerUserBuffer ? stream->bufferProcessor.framesPerUserBuffer :
