@@ -2525,73 +2525,7 @@ int PaWasapi_GetDeviceCurrentFormat( PaStream *pStream, void *pFormat, unsigned 
 }
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device )
-{
-    PaError ret;
-    PaWasapiHostApiRepresentation *paWasapi;
-    UINT32 size;
-    PaDeviceIndex index;
-
-    if (pFormat == NULL)
-        return paBadBufferPtr;
-    if (formatSize <= 0)
-        return paBufferTooSmall;
-
-    // Get API
-    paWasapi = _GetHostApi(&ret);
-    if (paWasapi == NULL)
-        return ret;
-
-    // Get device index
-    ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-    if (ret != paNoError)
-        return ret;
-
-    // Validate index
-    if ((UINT32)index >= paWasapi->deviceCount)
-        return paInvalidDevice;
-
-    size = min(formatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].DefaultFormat));
-    memcpy(pFormat, &paWasapi->devInfo[ index ].DefaultFormat, size);
-
-    return size;
-}
-
-// ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device )
-{
-    PaError ret;
-    PaWasapiHostApiRepresentation *paWasapi;
-    UINT32 size;
-    PaDeviceIndex index;
-
-    if (pFormat == NULL)
-        return paBadBufferPtr;
-    if (formatSize <= 0)
-        return paBufferTooSmall;
-
-    // Get API
-    paWasapi = _GetHostApi(&ret);
-    if (paWasapi == NULL)
-        return ret;
-
-    // Get device index
-    ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-    if (ret != paNoError)
-        return ret;
-
-    // Validate index
-    if ((UINT32)index >= paWasapi->deviceCount)
-        return paInvalidDevice;
-
-    size = min(formatSize, (UINT32)sizeof(paWasapi->devInfo[ index ].MixFormat));
-    memcpy(pFormat, &paWasapi->devInfo[ index ].MixFormat, size);
-
-    return size;
-}
-
-// ------------------------------------------------------------------------------------------
-int PaWasapi_GetDeviceRole( PaDeviceIndex device )
+static PaError _GetWasapiDeviceInfoByDeviceIndex( PaWasapiDeviceInfo **info, PaDeviceIndex device )
 {
     PaError ret;
     PaDeviceIndex index;
@@ -2602,36 +2536,93 @@ int PaWasapi_GetDeviceRole( PaDeviceIndex device )
         return paNotInitialized;
 
     // Get device index
-    ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-    if (ret != paNoError)
+    if ((ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep)) != paNoError)
         return ret;
 
     // Validate index
     if ((UINT32)index >= paWasapi->deviceCount)
         return paInvalidDevice;
 
-    return paWasapi->devInfo[ index ].formFactor;
+    (*info) = &paWasapi->devInfo[ index ];
+
+    return paNoError;
 }
 
 // ------------------------------------------------------------------------------------------
-int PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice )
+int PaWasapi_GetDeviceDefaultFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device )
 {
-        PaError ret;
-        PaDeviceIndex index;
+    PaError ret;
+    PaWasapiDeviceInfo *deviceInfo;
+    UINT32 size;
 
-        PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
-        if (paWasapi == NULL)
-                return paNotInitialized;
+    if (pFormat == NULL)
+        return paBadBufferPtr;
+    if (formatSize <= 0)
+        return paBufferTooSmall;
 
-        ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-        if (ret != paNoError)
-                return ret;
+    if ((ret = _GetWasapiDeviceInfoByDeviceIndex(&deviceInfo, device)) != paNoError)
+        return ret;
 
-        if ((UINT32)index >= paWasapi->deviceCount)
-                return paInvalidDevice;
+    size = min(formatSize, (UINT32)sizeof(deviceInfo->DefaultFormat));
+    memcpy(pFormat, &deviceInfo->DefaultFormat, size);
 
-        *pIMMDevice = paWasapi->devInfo[ index ].device;
-        return paNoError;
+    return size;
+}
+
+// ------------------------------------------------------------------------------------------
+int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDeviceIndex device )
+{
+    PaError ret;
+    PaWasapiDeviceInfo *deviceInfo;
+    UINT32 size;
+
+    if (pFormat == NULL)
+        return paBadBufferPtr;
+    if (formatSize <= 0)
+        return paBufferTooSmall;
+
+    if ((ret = _GetWasapiDeviceInfoByDeviceIndex(&deviceInfo, device)) != paNoError)
+        return ret;
+
+    size = min(formatSize, (UINT32)sizeof(deviceInfo->MixFormat));
+    memcpy(pFormat, &deviceInfo->MixFormat, size);
+
+    return size;
+}
+
+// ------------------------------------------------------------------------------------------
+int PaWasapi_GetDeviceRole( PaDeviceIndex device )
+{
+    PaError ret;
+    PaWasapiDeviceInfo *deviceInfo;
+
+    if ((ret = _GetWasapiDeviceInfoByDeviceIndex(&deviceInfo, device)) != paNoError)
+        return ret;
+
+    return deviceInfo->formFactor;
+}
+
+// ------------------------------------------------------------------------------------------
+PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice )
+{
+#ifndef PA_WINRT
+    PaError ret;
+    PaWasapiDeviceInfo *deviceInfo;
+
+    if (pIMMDevice == NULL)
+        return paBadBufferPtr;
+
+    if ((ret = _GetWasapiDeviceInfoByDeviceIndex(&deviceInfo, device)) != paNoError)
+        return ret;
+
+    (*pIMMDevice) = deviceInfo->device;
+
+    return paNoError;
+#else
+    (void)device;
+    (void)pIMMDevice;
+    return paIncompatibleStreamHostApi;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------
@@ -5197,7 +5188,7 @@ PaError PaWasapi_GetJackCount(PaDeviceIndex device, int *pJackCount)
 #ifndef PA_WINRT
     PaError ret;
     HRESULT hr = S_OK;
-    PaDeviceIndex index;
+    PaWasapiDeviceInfo *deviceInfo;
     IDeviceTopology *pDeviceTopology = NULL;
     IConnector *pConnFrom = NULL;
     IConnector *pConnTo = NULL;
@@ -5205,24 +5196,14 @@ PaError PaWasapi_GetJackCount(PaDeviceIndex device, int *pJackCount)
     IKsJackDescription *pJackDesc = NULL;
     UINT jackCount = 0;
 
-    PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
-    if (paWasapi == NULL)
-        return paNotInitialized;
-
     if (pJackCount == NULL)
         return paUnanticipatedHostError;
 
-    // Get device index
-    ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-    if (ret != paNoError)
+    if ((ret = _GetWasapiDeviceInfoByDeviceIndex(&deviceInfo, device)) != paNoError)
         return ret;
 
-    // Validate index
-    if ((UINT32)index >= paWasapi->deviceCount)
-        return paInvalidDevice;
-
     // Get the endpoint device's IDeviceTopology interface
-    hr = IMMDevice_Activate(paWasapi->devInfo[index].device, &pa_IID_IDeviceTopology,
+    hr = IMMDevice_Activate(deviceInfo->device, &pa_IID_IDeviceTopology,
         CLSCTX_INPROC_SERVER, NULL, (void**)&pDeviceTopology);
     IF_FAILED_JUMP(hr, error);
 
@@ -5372,7 +5353,7 @@ PaError PaWasapi_GetJackDescription(PaDeviceIndex device, int jackIndex, PaWasap
 #ifndef PA_WINRT
     PaError ret;
     HRESULT hr = S_OK;
-    PaDeviceIndex index;
+    PaWasapiDeviceInfo *deviceInfo;
     IDeviceTopology *pDeviceTopology = NULL;
     IConnector *pConnFrom = NULL;
     IConnector *pConnTo = NULL;
@@ -5380,21 +5361,11 @@ PaError PaWasapi_GetJackDescription(PaDeviceIndex device, int jackIndex, PaWasap
     IKsJackDescription *pJackDesc = NULL;
     KSJACK_DESCRIPTION jack = { 0 };
 
-    PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
-    if (paWasapi == NULL)
-        return paNotInitialized;
-
-    // Get device index
-    ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-    if (ret != paNoError)
+    if ((ret = _GetWasapiDeviceInfoByDeviceIndex(&deviceInfo, device)) != paNoError)
         return ret;
 
-    // Validate index
-    if ((UINT32)index >= paWasapi->deviceCount)
-        return paInvalidDevice;
-
     // Get the endpoint device's IDeviceTopology interface
-    hr = IMMDevice_Activate(paWasapi->devInfo[index].device, &pa_IID_IDeviceTopology,
+    hr = IMMDevice_Activate(deviceInfo->device, &pa_IID_IDeviceTopology,
         CLSCTX_INPROC_SERVER, NULL, (void**)&pDeviceTopology);
     IF_FAILED_JUMP(hr, error);
 
