@@ -812,4 +812,3 @@ int removeFromXRunListenerList( void *stream )
     // failure
     return xRunListSize;
 }
-

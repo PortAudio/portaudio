@@ -636,4 +636,3 @@ signed long GetStreamWriteAvailable( PaStream* stream )
 
     return PaUtil_GetRingBufferWriteAvailable( &blio->outputRingBuffer );
 }
-
