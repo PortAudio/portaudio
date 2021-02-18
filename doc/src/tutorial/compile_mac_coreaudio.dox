@@ -3,7 +3,7 @@
 
 @section comp_mac_ca_1 Requirements
 
-* OS X 10.6 or later. PortAudio v19.7 currently only compiles and runs on OS X version 10.6 or later. Because of its heavy reliance on memory barriers, it's not clear how easy it would be to back-port PortAudio to OS X version 10.3. Leopard support requires the 2007 snapshot or later.
+* OS X 10.6 or later. PortAudio v19.7 currently only compiles and runs on OS X version 10.6 or later.
 
 * Apple's Xcode and its related tools installed in the default location. There is no Xcode project for PortAudio.
 
