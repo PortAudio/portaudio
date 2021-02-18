@@ -3156,7 +3156,7 @@ static PaUint32 _GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTime sug
 }
 
 // ------------------------------------------------------------------------------------------
-static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPerBuffer, UINT32 framesPerLatency, 
+static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPerBuffer, UINT32 framesPerLatency,
     BOOL fullDuplex, BOOL output)
 {
     // Count buffers (must be at least 1)
@@ -3177,9 +3177,9 @@ static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPe
         if (eventMode)
             sub->userBufferAndHostMatch = 1;
 
-        // Full-duplex or Event mode: prefer paUtilBoundedHostBufferSize because exclusive mode will starve 
+        // Full-duplex or Event mode: prefer paUtilBoundedHostBufferSize because exclusive mode will starve
         // and produce glitchy audio
-        // Output Polling mode: prefer paUtilFixedHostBufferSize (buffers != 1) for polling mode is it allows 
+        // Output Polling mode: prefer paUtilFixedHostBufferSize (buffers != 1) for polling mode is it allows
         // to consume user data by fixed size data chunks and thus lowers memory movement (less CPU usage)
         if (fullDuplex || eventMode || !output)
             sub->buffers = 1;
