@@ -15848,6 +15848,7 @@ case "${host_os}" in
                  mac_version_min="-mmacosx-version-min=10.3"
                  mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
               fi
+              mac_arches="x86_64"
               ;;
 
            *)
@@ -15858,36 +15859,16 @@ case "${host_os}" in
                  mac_version_min="-mmacosx-version-min=10.6"
                  mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
               fi
+
+                                          mac_arches=""
+              for arch in x86_64 arm64
+              do
+                 if grep -q __${arch}__  $(xcrun --show-sdk-path)/usr/include/sys/cdefs.h; then
+                    mac_arches="$mac_arches -arch ${arch}"
+                 fi
+              done
            esac
 
-                                 mac_arches=""
-           for arch in x86_64 arm64
-           do
-              save_CFLAGS="$CFLAGS"
-              CFLAGS="$CFLAGS -arch $arch"
-              cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-return 0;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-
-                    if [ -z "$mac_arches" ] ; then
-                       mac_arches="-arch $arch"
-                    else
-                       mac_arches="$mac_arches -arch $arch"
-                    fi
-
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-              CFLAGS="$save_CFLAGS"
-           done
         else
            mac_arches=""
            mac_sysroot=""

@@ -226,6 +226,7 @@ case "${host_os}" in
                  mac_version_min="-mmacosx-version-min=10.3"
                  mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
               fi
+              mac_arches="x86_64"
               ;;
 
            *)
@@ -241,25 +242,18 @@ case "${host_os}" in
                  mac_version_min="-mmacosx-version-min=10.6"
                  mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
               fi
+
+              dnl Pick which architectures to build for based on whether
+              dnl the arch is defined in cdefs.h
+              mac_arches=""
+              for arch in x86_64 arm64
+              do
+                 if grep -q __${arch}__  $(xcrun --show-sdk-path)/usr/include/sys/cdefs.h; then
+                    mac_arches="$mac_arches -arch ${arch}"
+                 fi
+              done
            esac
 
-           dnl Pick which architectures to build for based on what
-           dnl the compiler supports.
-           mac_arches=""
-           for arch in x86_64 arm64
-           do
-              save_CFLAGS="$CFLAGS"
-              CFLAGS="$CFLAGS -arch $arch"
-              AC_TRY_COMPILE([], [return 0;],
-                 [
-                    if [[ -z "$mac_arches" ]] ; then
-                       mac_arches="-arch $arch"
-                    else
-                       mac_arches="$mac_arches -arch $arch"
-                    fi
-                 ])
-              CFLAGS="$save_CFLAGS"
-           done
         else
            mac_arches=""
            mac_sysroot=""
