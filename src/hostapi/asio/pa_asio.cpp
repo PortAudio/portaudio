@@ -1897,7 +1897,7 @@ static PaError ValidateAsioSpecificStreamInfo(
         {
         case 1:
             /* NOTE: V1 structure's size is smaller by one pointer. */
-            if( streamInfo->size < sizeof( PaAsioStreamInfo ) - sizeof(PaAsio_MessageCallback) )
+            if( streamInfo->size < sizeof( PaAsioStreamInfo ) - sizeof(PaAsio_MessageCallback*) )
                 return paIncompatibleHostApiSpecificStreamInfo;
             break;
             
