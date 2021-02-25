@@ -11,6 +11,15 @@ dnl Init autoconf and make sure configure is being called
 dnl from the right directory
 AC_INIT([include/portaudio.h])
 
+dnl This is is for testing compilation on Mac OS
+PAMAC_TEST_PROGRAM="
+  /* cdefs.h checks for supported architectures. */
+  #include <sys/cdefs.h>
+  int main() {
+      return 0;
+  }
+"
+
 dnl Define build, build_cpu, build_vendor, build_os
 AC_CANONICAL_BUILD
 dnl Define host, host_cpu, host_vendor, host_os
@@ -244,13 +253,14 @@ case "${host_os}" in
            esac
 
            dnl Pick which architectures to build for based on what
-           dnl the compiler supports.
+           dnl the compiler and SDK supports.
            mac_arches=""
            for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"
               CFLAGS="$CFLAGS -arch $arch"
-              AC_TRY_COMPILE([], [return 0;],
+              AC_COMPILE_IFELSE(
+                 [AC_LANG_SOURCE([$PAMAC_TEST_PROGRAM])],
                  [
                     if [[ -z "$mac_arches" ]] ; then
                        mac_arches="-arch $arch"
