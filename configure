@@ -15848,7 +15848,7 @@ case "${host_os}" in
                  mac_version_min="-mmacosx-version-min=10.3"
                  mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
               fi
-              mac_arches="x86_64"
+              mac_arches="-arch x86_64"
               ;;
 
            *)
