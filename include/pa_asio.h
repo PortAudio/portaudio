@@ -80,8 +80,9 @@ typedef void (*PaAsioResetRequestCallback)();
 
  @param callback The function to call on ASIO reset request.  This is called
  when the driver's buffer size has changed or it needs a reset, usually in
- response to a user changing the configuration.  Pass NULL to unregister a
- callback.
+ response to a user changing the configuration.  Call Pa_Terminate followed by
+ Pa_Initialize to have the changes reflected in Portaudio's API.  Pass NULL to
+ unregister a callback.
 */
 void PaAsio_RegisterResetRequestCallback( PaAsioResetRequestCallback callback );
 
