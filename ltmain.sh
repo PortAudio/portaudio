@@ -602,7 +602,7 @@ func_quote_for_eval ()
 
     case $func_quote_for_eval_unquoted_result in
       # Double-quote args containing shell metacharacters to delay
-      # word splitting, command substitution and and variable
+      # word splitting, command substitution and variable
       # expansion for a subsequent eval.
       # Many Bourne shells cannot handle close brackets correctly
       # in scan sets, so we specify it separately.

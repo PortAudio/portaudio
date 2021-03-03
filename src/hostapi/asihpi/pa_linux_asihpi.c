@@ -199,27 +199,27 @@
         /* If HPI error occurred */ \
         if( UNLIKELY( hpiError ) ) \
         { \
-	    char szError[256]; \
-	    HPI_GetErrorText( hpiError, szError ); \
-	    PA_DEBUG(( "HPI error %d occurred: %s\n", hpiError, szError )); \
-	    /* This message will always be displayed, even if debug info is disabled */ \
+        char szError[256]; \
+        HPI_GetErrorText( hpiError, szError ); \
+        PA_DEBUG(( "HPI error %d occurred: %s\n", hpiError, szError )); \
+        /* This message will always be displayed, even if debug info is disabled */ \
             PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
             if( (paError) == paUnanticipatedHostError ) \
-	    { \
-	        PA_DEBUG(( "Host error description: %s\n", szError )); \
-	        /* PaUtil_SetLastHostErrorInfo should only be used in the main thread */ \
-	        if( pthread_equal( pthread_self(), paUnixMainThread ) ) \
+        { \
+            PA_DEBUG(( "Host error description: %s\n", szError )); \
+            /* PaUtil_SetLastHostErrorInfo should only be used in the main thread */ \
+            if( pthread_equal( pthread_self(), paUnixMainThread ) ) \
                 { \
-		    PaUtil_SetLastHostErrorInfo( paInDevelopment, hpiError, szError ); \
+            PaUtil_SetLastHostErrorInfo( paInDevelopment, hpiError, szError ); \
                 } \
-	    } \
-	    /* If paNoError is specified, continue as usual */ \
+        } \
+        /* If paNoError is specified, continue as usual */ \
             /* (useful if you only want to print out the debug messages above) */ \
-	    if( (paError) < 0 ) \
-	    { \
-	        result = (paError); \
-	        goto error; \
-	    } \
+        if( (paError) < 0 ) \
+        { \
+            result = (paError); \
+            goto error; \
+        } \
         } \
     } while( 0 );
 
@@ -231,9 +231,9 @@
         PA_DEBUG(( "HPI error %d occurred: %s\n", hpiError, szError )); \
         /* PaUtil_SetLastHostErrorInfo should only be used in the main thread */ \
         if( pthread_equal( pthread_self(), paUnixMainThread ) ) \
-	{ \
-	    PaUtil_SetLastHostErrorInfo( paInDevelopment, (hpiErrorCode), szError ); \
-	} \
+    { \
+        PaUtil_SetLastHostErrorInfo( paInDevelopment, (hpiErrorCode), szError ); \
+    } \
     } while( 0 );
 
 /* Defaults */
@@ -556,7 +556,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
             continue;
         }
         hpiError = HPI_AdapterGetInfo( NULL, idx, &outStreams, &inStreams,
-					&version, &serial, &type );
+                                       &version, &serial, &type );
         /* Skip to next device on failure */
         if( hpiError )
         {
@@ -738,7 +738,7 @@ PaError PaAsiHpi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
          * interface and paNoError */
         PA_DEBUG(( "Could not open HPI interface\n" ));
 
-	*hostApi = NULL;
+        *hostApi = NULL;
         return paNoError;
     }
     else
@@ -1584,7 +1584,7 @@ static PaError PaAsiHpi_SetupBuffers( PaAsiHpiStreamComponent *streamComp, uint3
             /* If BBM not supported, foreground transfers will be used, but not a show-stopper */
             /* Anything else is an error */
             else if (( hpiError != HPI_ERROR_INVALID_OPERATION ) &&
-		     ( hpiError != HPI_ERROR_INVALID_FUNC ))
+                    ( hpiError != HPI_ERROR_INVALID_FUNC ))
             {
                 PA_ASIHPI_REPORT_ERROR_( hpiError );
                 result = paUnanticipatedHostError;

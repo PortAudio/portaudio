@@ -11,6 +11,15 @@ dnl Init autoconf and make sure configure is being called
 dnl from the right directory
 AC_INIT([include/portaudio.h])
 
+dnl This is is for testing compilation on Mac OS
+PAMAC_TEST_PROGRAM="
+  /* cdefs.h checks for supported architectures. */
+  #include <sys/cdefs.h>
+  int main() {
+      return 0;
+  }
+"
+
 dnl Define build, build_cpu, build_vendor, build_os
 AC_CANONICAL_BUILD
 dnl Define host, host_cpu, host_vendor, host_os
@@ -205,7 +214,7 @@ case "${host_os}" in
         AC_DEFINE(PA_USE_COREAUDIO,1)
 
         CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Wno-deprecated -Werror"
-        LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework Carbon"
+        LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices"
 
         if test "x$enable_mac_universal" = "xyes" ; then
            case `xcodebuild -version | sed -n 's/Xcode \(.*\)/\1/p'` in
@@ -234,52 +243,24 @@ case "${host_os}" in
               dnl as there *is* no /Developer, so we use -sdk to check
               dnl what SDKs are available and to get the full path of
               dnl the SDKs.
-              if xcodebuild -version -sdk macosx10.5 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.5 Path`"
-              elif xcodebuild -version -sdk macosx10.6 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.6 Path`"
-              elif xcodebuild -version -sdk macosx10.7 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.7 Path`"
-              elif xcodebuild -version -sdk macosx10.8 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.8 Path`"
-              elif xcodebuild -version -sdk macosx10.9 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.9 Path`"
-              elif xcodebuild -version -sdk macosx10.10 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.10 Path`"
-              elif xcodebuild -version -sdk macosx10.11 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.11 Path`"
-              elif xcodebuild -version -sdk macosx10.12 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.12 Path`"
-              elif xcodebuild -version -sdk macosx10.13 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.13 Path`"
-              elif xcodebuild -version -sdk macosx10.14 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.14 Path`"
-              elif xcodebuild -version -sdk macosx10.15 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.15 Path`"
+              if xcrun --sdk macosx10.5 --show-sdk-path >/dev/null 2>&1 ; then
+                 mac_version_min="-mmacosx-version-min=10.5"
+                 mac_sysroot="-isysroot $(xcrun --sdk macosx10.5 --show-sdk-path)"
               else
-                 AC_MSG_ERROR([Could not find 10.5 to 10.13 SDK.])
+                 mac_version_min="-mmacosx-version-min=10.6"
+                 mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
               fi
            esac
 
            dnl Pick which architectures to build for based on what
-           dnl the compiler supports.
+           dnl the compiler and SDK supports.
            mac_arches=""
-           for arch in x86_64
+           for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"
               CFLAGS="$CFLAGS -arch $arch"
-              AC_TRY_COMPILE([], [return 0;],
+              AC_COMPILE_IFELSE(
+                 [AC_LANG_SOURCE([$PAMAC_TEST_PROGRAM])],
                  [
                     if [[ -z "$mac_arches" ]] ; then
                        mac_arches="-arch $arch"
@@ -316,6 +297,7 @@ case "${host_os}" in
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
             CFLAGS="$CFLAGS -I$DXDIR/include -UPA_USE_DS -DPA_USE_DS=1"
+            INCLUDES="$INCLUDES pa_win_ds.h pa_win_waveformat.h"
         fi
 
         if [[ "x$with_asio" = "xyes" ]]; then
@@ -324,6 +306,7 @@ case "${host_os}" in
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lm -lole32 -luuid"
             CFLAGS="$CFLAGS -ffast-math -fomit-frame-pointer -I\$(top_srcdir)/src/hostapi/asio -I$ASIODIR/host/pc -I$ASIODIR/common -I$ASIODIR/host -UPA_USE_ASIO -DPA_USE_ASIO=1 -DWINDOWS"
+            INCLUDES="$INCLUDES pa_asio.h"
 
             dnl Setting the windows version flags below resolves a conflict between Interlocked*
             dnl definitions in mingw winbase.h and Interlocked* hacks in ASIO SDK combase.h
@@ -342,6 +325,7 @@ case "${host_os}" in
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
             CFLAGS="$CFLAGS -I$DXDIR/include -UPA_USE_WDMKS -DPA_USE_WDMKS=1"
+            INCLUDES="$INCLUDES pa_win_wdmks.h"
         fi
 
         if [[ "x$with_wmme" = "xyes" ]]; then
@@ -349,6 +333,7 @@ case "${host_os}" in
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm"
             CFLAGS="$CFLAGS -UPA_USE_WMME -DPA_USE_WMME=1"
+            INCLUDES="$INCLUDES pa_win_wmme.h pa_win_waveformat.h"
         fi
 
         if [[ "x$with_wasapi" = "xyes" ]]; then
@@ -356,6 +341,7 @@ case "${host_os}" in
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lole32"
             CFLAGS="$CFLAGS -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
+            INCLUDES="$INCLUDES pa_win_wasapi.h pa_win_waveformat.h"
         fi
         ;;
 

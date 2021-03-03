@@ -64,7 +64,7 @@ the extent to which PA will attempt to "play nice" and to what extent it
 will interrupt other apps to improve performance. For example, if 44100 Hz
 sample rate is requested but the device is set at 48000 Hz, PA can either
 change the device for optimal playback ("Pro" mode), which may interrupt
-other programs playing back audio, or simple use a sample-rate coversion,
+other programs playing back audio, or simple use a sample-rate conversion,
 which allows for friendlier sharing of the device ("Play Nice" mode).
 
 Additionally, the user may define a "channel mapping" by calling
