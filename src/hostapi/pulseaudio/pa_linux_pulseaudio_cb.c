@@ -550,7 +550,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                         PA_STREAM_ADJUST_LATENCY |
                                         PA_STREAM_AUTO_TIMING_UPDATE |
                                         PA_STREAM_NO_REMIX_CHANNELS |
-                                        PA_STREAM_NO_REMAP_CHANNELS,
+                                        PA_STREAM_NO_REMAP_CHANNELS |
+                                        PA_STREAM_DONT_MOVE,
                                         NULL,
                                         NULL );
 
@@ -592,7 +593,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                   PA_STREAM_ADJUST_LATENCY |
                                   PA_STREAM_AUTO_TIMING_UPDATE |
                                   PA_STREAM_NO_REMIX_CHANNELS |
-                                  PA_STREAM_NO_REMAP_CHANNELS );
+                                  PA_STREAM_NO_REMAP_CHANNELS |
+                                  PA_STREAM_DONT_MOVE);
         pa_stream_set_underflow_callback( stream->inStream,
                                           PaPulseAudio_StreamUnderflowCb,
                                           stream);
