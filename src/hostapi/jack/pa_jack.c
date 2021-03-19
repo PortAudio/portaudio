@@ -452,48 +452,36 @@ BlockingWaitEmpty( PaStream *s )
 
 /* ---- jack driver ---- */
 
-static void replace_string(char *string, size_t string_buffer_size, const char *to_find, const char *replacement)
+/* copy null terminated string source to destination, escaping regex characters with '\\' in the process */
+static void copy_string_and_escape_regex_chars( char *destination, const char *source, size_t destbuffersize )
 {
-    char *found_position = strstr(string, to_find);
-    while( found_position ) {
-        size_t original_length = strlen(string);
-        size_t found_length = strlen(to_find);
-        size_t replacement_length = strlen(replacement);
+    assert( destination != source );
+    assert( destbuffersize > 0 );
 
-        size_t destination_length = original_length - found_length + replacement_length;
-        if( destination_length >= string_buffer_size ) {
-            PaUtil_DebugPrint( "Cannot replace %s with %s in %s, buffer size is too small\n",
-                               to_find, replacement, string );
-            return;
+    char *dest = destination;
+    /* dest_stop is the last location that we can null-terminate the string */
+    char *dest_stop = destination + (destbuffersize - 1);
+
+    const char *src = source;
+
+    while ( *src != '\0' && dest != dest_stop )
+    {
+        const char c = *src;
+        if ( strchr( "\\()[]{}*+?|$^.", c ) != NULL )
+        {
+            if( (dest + 1) == dest_stop )
+                break; /* only proceed if we can write both c and the escape */
+
+            *dest = '\\';
+            dest++;
         }
+        *dest = c;
+        dest++;
 
-        memmove(found_position + replacement_length,
-                found_position + found_length,
-                // add 1 to include the \0 terminator
-                string + original_length - (found_position + found_length) + 1);
-        memcpy(found_position, replacement, replacement_length);
-
-        found_position = strstr(found_position + replacement_length, to_find);
+        src++;
     }
-}
 
-static void escape_regex_chars(char* string, size_t buffersize)
-{
-    // Escaping \ must be first because the following replacements insert \ chars into the string.
-    replace_string(string, buffersize, "\\", "\\\\");
-    replace_string(string, buffersize, "(", "\\(");
-    replace_string(string, buffersize, ")", "\\)");
-    replace_string(string, buffersize, "[", "\\[");
-    replace_string(string, buffersize, "]", "\\]");
-    replace_string(string, buffersize, "{", "\\{");
-    replace_string(string, buffersize, "}", "\\}");
-    replace_string(string, buffersize, "*", "\\*");
-    replace_string(string, buffersize, "+", "\\+");
-    replace_string(string, buffersize, "?", "\\?");
-    replace_string(string, buffersize, "|", "\\|");
-    replace_string(string, buffersize, "$", "\\$");
-    replace_string(string, buffersize, "^", "\\^");
-    replace_string(string, buffersize, ".", "\\.");
+    *dest = '\0';
 }
 
 /* BuildDeviceList():
@@ -637,8 +625,9 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
 
         /* To determine how many input and output channels are available,
          * we re-query jackd with more specific parameters. */
-        strncpy( device_name_regex_escaped, client_names[client_index], device_name_regex_escaped_size );
-        escape_regex_chars( device_name_regex_escaped, device_name_regex_escaped_size );
+        copy_string_and_escape_regex_chars( device_name_regex_escaped,
+                            client_names[client_index],
+                            device_name_regex_escaped_size );
         strncpy( port_regex_string, device_name_regex_escaped, port_regex_size );
         strncat( port_regex_string, port_regex_suffix, port_regex_size );
 
@@ -1304,10 +1293,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int err = 0;
 
         /* Get output ports of our capture device */
-        strncpy( regex_escaped_client_name,
+        copy_string_and_escape_regex_chars( regex_escaped_client_name,
                  hostApi->deviceInfos[ inputParameters->device ]->name,
                  regex_escaped_client_name_length );
-        escape_regex_chars( regex_escaped_client_name, regex_escaped_client_name_length );
         strncpy( regex_pattern, regex_escaped_client_name, regex_size );
         strncat( regex_pattern, port_regex_suffix, regex_size );
         UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
@@ -1333,10 +1321,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int err = 0;
 
         /* Get input ports of our playback device */
-        strncpy( regex_escaped_client_name,
+        copy_string_and_escape_regex_chars( regex_escaped_client_name,
                  hostApi->deviceInfos[ outputParameters->device ]->name,
                  regex_escaped_client_name_length );
-        escape_regex_chars( regex_escaped_client_name, regex_escaped_client_name_length );
         strncpy( regex_pattern, regex_escaped_client_name, regex_size );
         strncat( regex_pattern, port_regex_suffix, regex_size );
         UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
