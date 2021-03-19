@@ -520,7 +520,8 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     char *port_regex_string = NULL;
     char *device_name_regex_escaped = NULL;
     // In the worst case scenario, every character would be escaped, doubling the string size.
-    size_t device_name_regex_escaped_size = jack_client_name_size() * 2;
+    // Add 1 for null terminator.
+    size_t device_name_regex_escaped_size = jack_client_name_size() * 2 + 1;
     size_t port_regex_size = device_name_regex_escaped_size + strlen(port_regex_suffix);
     int port_index, client_index, i;
     double globalSampleRate;
@@ -1140,10 +1141,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaJackStream *stream = NULL;
     char *port_string = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, jack_port_name_size() );
     // In the worst case every character would be escaped which would double the string length.
-    size_t regex_escaped_client_name_length = jack_client_name_size() * 2;
+    // Add 1 for null terminator
+    size_t regex_escaped_client_name_length = jack_client_name_size() * 2 + 1;
     char *regex_escaped_client_name = PaUtil_GroupAllocateMemory(
         jackHostApi->deviceInfoMemory, regex_escaped_client_name_length );
-    unsigned long regex_size = jack_client_name_size() * 2 + strlen(port_regex_suffix);
+    unsigned long regex_size = jack_client_name_size() * 2 + 1 + strlen(port_regex_suffix);
     char *regex_pattern = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, regex_size );
     const char **jack_ports = NULL;
     /* int jack_max_buffer_size = jack_get_buffer_size( jackHostApi->jack_client ); */
