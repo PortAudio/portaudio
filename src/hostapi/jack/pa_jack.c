@@ -452,7 +452,7 @@ BlockingWaitEmpty( PaStream *s )
 
 /* ---- jack driver ---- */
 
-void replace_string(char *string, size_t string_buffer_size, const char *to_find, const char *replacement)
+static void replace_string(char *string, size_t string_buffer_size, const char *to_find, const char *replacement)
 {
     char *found_position = strstr(string, to_find);
     while( found_position ) {
@@ -477,7 +477,7 @@ void replace_string(char *string, size_t string_buffer_size, const char *to_find
     }
 }
 
-void escape_regex_chars(char* string, size_t buffersize)
+static void escape_regex_chars(char* string, size_t buffersize)
 {
     // Escaping \ must be first because the following replacements insert \ chars into the string.
     replace_string(string, buffersize, "\\", "\\\\");
