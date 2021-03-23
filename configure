@@ -2539,6 +2539,14 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+PAMAC_TEST_PROGRAM="
+  /* cdefs.h checks for supported architectures. */
+  #include <sys/cdefs.h>
+  int main() {
+      return 0;
+  }
+"
+
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
   if test -f "$ac_dir/install-sh"; then
@@ -15867,14 +15875,7 @@ case "${host_os}" in
               CFLAGS="$CFLAGS -arch $arch"
               cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
-
-int
-main ()
-{
-return 0;
-  ;
-  return 0;
-}
+$PAMAC_TEST_PROGRAM
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
 
