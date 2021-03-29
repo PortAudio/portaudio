@@ -506,7 +506,6 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     const char **jack_ports = NULL;
     char **client_names = NULL;
     char *port_regex_string = NULL;
-    char *device_name_regex_escaped = NULL;
     // In the worst case scenario, every character would be escaped, doubling the string size.
     // Add 1 for null terminator.
     size_t device_name_regex_escaped_size = jack_client_name_size() * 2 + 1;
@@ -529,8 +528,6 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     PaUtil_FreeAllAllocations( jackApi->deviceInfoMemory );
 
     port_regex_string = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, port_regex_size );
-    device_name_regex_escaped = PaUtil_GroupAllocateMemory(
-        jackApi->deviceInfoMemory, device_name_regex_escaped_size );
     tmp_client_name = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, jack_client_name_size() );
 
     /* We can only retrieve the list of clients indirectly, by first
@@ -625,10 +622,9 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
 
         /* To determine how many input and output channels are available,
          * we re-query jackd with more specific parameters. */
-        copy_string_and_escape_regex_chars( device_name_regex_escaped,
+        copy_string_and_escape_regex_chars( port_regex_string,
                             client_names[client_index],
                             device_name_regex_escaped_size );
-        strncpy( port_regex_string, device_name_regex_escaped, port_regex_size );
         strncat( port_regex_string, port_regex_suffix, port_regex_size );
 
         /* ... what are your output ports (that we could input from)? */
@@ -1131,10 +1127,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     char *port_string = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, jack_port_name_size() );
     // In the worst case every character would be escaped which would double the string length.
     // Add 1 for null terminator
-    size_t regex_escaped_client_name_length = jack_client_name_size() * 2 + 1;
-    char *regex_escaped_client_name = PaUtil_GroupAllocateMemory(
-        jackHostApi->deviceInfoMemory, regex_escaped_client_name_length );
-    unsigned long regex_size = jack_client_name_size() * 2 + 1 + strlen(port_regex_suffix);
+    size_t regex_escaped_client_name_size = jack_client_name_size() * 2 + 1;
+    unsigned long regex_size = regex_escaped_client_name_size + strlen(port_regex_suffix);
     char *regex_pattern = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, regex_size );
     const char **jack_ports = NULL;
     /* int jack_max_buffer_size = jack_get_buffer_size( jackHostApi->jack_client ); */
@@ -1293,10 +1287,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int err = 0;
 
         /* Get output ports of our capture device */
-        copy_string_and_escape_regex_chars( regex_escaped_client_name,
+        copy_string_and_escape_regex_chars( regex_pattern,
                  hostApi->deviceInfos[ inputParameters->device ]->name,
-                 regex_escaped_client_name_length );
-        strncpy( regex_pattern, regex_escaped_client_name, regex_size );
+                 regex_escaped_client_name_size );
         strncat( regex_pattern, port_regex_suffix, regex_size );
         UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
                                      JACK_PORT_TYPE_FILTER, JackPortIsOutput ), paUnanticipatedHostError );
@@ -1321,10 +1314,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         int err = 0;
 
         /* Get input ports of our playback device */
-        copy_string_and_escape_regex_chars( regex_escaped_client_name,
+        copy_string_and_escape_regex_chars( regex_pattern,
                  hostApi->deviceInfos[ outputParameters->device ]->name,
-                 regex_escaped_client_name_length );
-        strncpy( regex_pattern, regex_escaped_client_name, regex_size );
+                 regex_escaped_client_name_size );
         strncat( regex_pattern, port_regex_suffix, regex_size );
         UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
                                      JACK_PORT_TYPE_FILTER, JackPortIsInput ), paUnanticipatedHostError );
