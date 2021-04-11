@@ -452,7 +452,7 @@ void PaPulseAudio_SourceListCb( pa_context * c,
 void PaPulseAudio_StreamStateCb( pa_stream * s,
                                  void *userdata )
 {
-    const pa_buffer_attr *a;
+    const pa_buffer_attr *l_SBufferAttr = NULL;
     /* If you need debug pring enable these
      * char cmt[PA_CHANNEL_MAP_SNPRINT_MAX], sst[PA_SAMPLE_SPEC_SNPRINT_MAX];
      */
@@ -475,7 +475,22 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
             break;
 
         case PA_STREAM_READY:
-             break;
+            if (!(l_SBufferAttr = pa_stream_get_buffer_attr(s)))
+            {
+                PA_DEBUG( ("Portaudio %s: Can get buffer attr: '%s'\n",
+                           __FUNCTION__,
+                           pa_strerror(pa_context_errno(pa_stream_get_context(s) ) ) ) );
+                PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_StreamStateCb: Can't get Stream pa_buffer_attr" );
+            }
+            else
+            {
+                PA_DEBUG( ("%s: Buffer metrics: maxlength=%u, tlength=%u, prebuf=%u, minreq=%u, fragsize=%u\n",
+                           __FUNCTION__,
+                           l_SBufferAttr->maxlength, l_SBufferAttr->tlength, l_SBufferAttr->prebuf,
+                           l_SBufferAttr->minreq, l_SBufferAttr->maxlength, l_SBufferAttr->fragsize) );
+            }
+            break;
 
         case PA_STREAM_FAILED:
         default:
@@ -999,6 +1014,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inSampleSpec.rate = sampleRate;
         stream->inSampleSpec.channels = inputChannelCount;
+        stream->latency = inputParameters->suggestedLatency;
 
         if( !pa_sample_spec_valid(&stream->inSampleSpec) )
         {
@@ -1105,6 +1121,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->outSampleSpec.rate = sampleRate;
         stream->outSampleSpec.channels = outputChannelCount;
         stream->outputChannelCount = outputChannelCount;
+        stream->latency = outputParameters->suggestedLatency;
 
         /* Really who has mono output anyway but whom I'm to judge? */
         if( stream->outSampleSpec.channels == 1 )

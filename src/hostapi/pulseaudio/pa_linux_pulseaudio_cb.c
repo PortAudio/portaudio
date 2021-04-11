@@ -494,10 +494,18 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     /* Ready the processor */
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
-    stream->latency = 20000;
+    /* Adjust latencies if that is wanted
+     * https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/Developer/Clients/LatencyControl/
+     *
+     * tlength is for Playback
+     * fragsize if for Record
+     */
+    stream->bufferAttr.maxlength = (uint32_t)-1;
+    stream->bufferAttr.tlength = pa_usec_to_bytes((pa_usec_t)stream->latency, &stream->outSampleSpec);
+    stream->bufferAttr.prebuf = (uint32_t)-1;
+    stream->bufferAttr.minreq = (uint32_t)-1;
+    stream->bufferAttr.fragsize = pa_usec_to_bytes((pa_usec_t)stream->latency, &stream->outSampleSpec);
     stream->outputUnderflows = 0;
-    stream->bufferAttr.fragsize = (uint32_t) - 1;
-    stream->bufferAttr.prebuf = (uint32_t) - 1;
 
     if( stream->outStream != NULL )
     {
@@ -520,15 +528,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         }
         else
         {
-            stream->bufferAttr.maxlength =
-                pa_usec_to_bytes( stream->latency,
-                                  &stream->outSampleSpec );
-            stream->bufferAttr.minreq = pa_usec_to_bytes( 0,
-                                                          &stream->outSampleSpec );
-            stream->bufferAttr.tlength =
-                pa_usec_to_bytes( stream->latency,
-                                  &stream->outSampleSpec );
-
             PA_UNLESS( stream->outBuffer =
                        PaUtil_AllocateMemory( PULSEAUDIO_BUFFER_SIZE ),
                        paInsufficientMemory );
@@ -568,12 +567,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->inStream != NULL )
     {
-        stream->bufferAttr.maxlength =
-            pa_usec_to_bytes(stream->latency, &stream->inSampleSpec);
-        stream->bufferAttr.minreq = pa_usec_to_bytes(0, &stream->inSampleSpec);
-        stream->bufferAttr.tlength =
-            pa_usec_to_bytes(stream->latency, &stream->inSampleSpec);
-
         PA_UNLESS(stream->inBuffer =
                   PaUtil_AllocateMemory(PULSEAUDIO_BUFFER_SIZE),
                   paInsufficientMemory);
