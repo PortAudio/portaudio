@@ -626,6 +626,7 @@ ELSE()
     ENDIF()
     IF(PA_USE_PULSEAUDIO)
       SET(PA_PRIVATE_INCLUDE_PATHS ${PA_PRIVATE_INCLUDE_PATHS} ${PulseAudio_INCLUDE_DIRS})
+      SET(PA_PUBLIC_INCLUDES ${PA_PUBLIC_INCLUDES} include/pa_linux_pulseaudio.h)
       SET(PA_PULSEAUDIO_SOURCES src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
                                 src/hostapi/pulseaudio/pa_linux_pulseaudio.c
                                 src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
