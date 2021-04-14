@@ -234,38 +234,17 @@ void PaPulseAudio_ServerInfoCb( pa_context *c,
   PaError result = paNoError;
   const char *l_strName = NULL;
 
-  l_ptrHostApi->pulseaudioDefaultSource[0] = '\0';
-  l_ptrHostApi->pulseaudioDefaultSink[0] = '\0';
-
   if( !c  || !i )
   {
       PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                          "PaPulseAudio_ServerInfoCb: Invalid context or can't get server info" );
-      pa_threaded_mainloop_signal(l_ptrHostApi->mainloop, 0);
+      pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
       return;
   }
 
+  l_ptrHostApi->pulseaudioDefaultSampleSpec = i->sample_spec;
 
-  if( i->default_sink_name != NULL )
-  {
-    /* Make sure there is '\0' is at the end of string with using snprintf */
-    snprintf( l_ptrHostApi->pulseaudioDefaultSink,
-              PAPULSEAUDIO_MAX_DEVICENAME,
-              "%s",
-              i->default_sink_name );
-  }
-
-  if( i->default_source_name != NULL )
-  {
-    /* Make sure there is '\0' is at the end of string with using snprintf */
-    snprintf( l_ptrHostApi->pulseaudioDefaultSource,
-              PAPULSEAUDIO_MAX_DEVICENAME,
-              "%s",
-              i->default_source_name );
-  }
-
-  pa_threaded_mainloop_signal( l_ptrHostApi->mainloop,
-                               0 );
+  pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
 }
 
 
@@ -300,6 +279,11 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
        return paInsufficientMemory;
     }
 
+    if( hostapi->deviceCount >= PAPULSEAUDIO_MAX_DEVICECOUNT )
+    {
+        return paDeviceUnavailable;
+    }
+
     snprintf( hostapi->pulseaudioDeviceNames[hostapi->deviceCount],
               l_iRealNameSize,
               "%s",
@@ -309,26 +293,6 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
               "%s",
               PaPulseAudio_SinkSourceName );
 
-    if( !strncmp( PaPulseAudio_SinkSourceNameDesc,
-                  hostapi->pulseaudioDefaultSource,
-                  PAPULSEAUDIO_MAX_DEVICENAME ) )
-    {
-        hostapi->inheritedHostApiRep.info.defaultInputDevice =
-            hostapi->deviceCount;
-    }
-
-    if( !strncmp( PaPulseAudio_SinkSourceNameDesc,
-                  hostapi->pulseaudioDefaultSink,
-                  PAPULSEAUDIO_MAX_DEVICENAME ) )
-    {
-        hostapi->inheritedHostApiRep.info.defaultOutputDevice =
-            hostapi->deviceCount;
-    }
-
-    if( hostapi->deviceCount >= PAPULSEAUDIO_MAX_DEVICECOUNT )
-    {
-        return paDeviceUnavailable;
-    }
 
     hostapi->deviceInfoArray[hostapi->deviceCount].name = l_strLocalName;
 
@@ -627,6 +591,44 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     }
 
     pa_operation_unref( l_ptrOperation );
+
+    // Add the "Default" sink at index 0
+    if( _PaPulseAudio_AddAudioDevice( l_ptrPulseAudioHostApi,
+                                      "Default",
+                                      "The PulseAudio default sink",
+                                      0,
+                                      PA_CHANNELS_MAX,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      l_ptrPulseAudioHostApi->pulseaudioDefaultSampleSpec.rate ) != paNoError )
+    {
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_SinkListCb: Can't add device. Maximum amount reached!" );
+    } else {
+        l_ptrPulseAudioHostApi->inheritedHostApiRep.info.defaultOutputDevice =
+                l_ptrPulseAudioHostApi->deviceCount - 1;
+    }
+
+    // Add the "Default" source at index 1
+    if( _PaPulseAudio_AddAudioDevice( l_ptrPulseAudioHostApi,
+                                      "Default",
+                                      "The PulseAudio default source",
+                                      PA_CHANNELS_MAX,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      l_ptrPulseAudioHostApi->pulseaudioDefaultSampleSpec.rate ) != paNoError )
+    {
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_SinkListCb: Can't add device. Maximum amount reached!" );
+    } else {
+        l_ptrPulseAudioHostApi->inheritedHostApiRep.info.defaultInputDevice =
+                l_ptrPulseAudioHostApi->deviceCount - 1;
+    }
 
     /* List PulseAudio sinks. If found callback: PaPulseAudio_SinkListCb */
     l_ptrOperation =

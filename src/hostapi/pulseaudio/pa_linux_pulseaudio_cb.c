@@ -558,18 +558,39 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                                                         outDevice]) );
             }
 
-            pa_stream_connect_playback( stream->outStream,
-                                        l_ptrPulseAudioHostApi->
-                                        pulseaudioDeviceNames[stream->outDevice],
-                                        &stream->bufferAttr,
-                                        PA_STREAM_INTERPOLATE_TIMING |
-                                        PA_STREAM_ADJUST_LATENCY |
-                                        PA_STREAM_AUTO_TIMING_UPDATE |
-                                        PA_STREAM_NO_REMIX_CHANNELS |
-                                        PA_STREAM_NO_REMAP_CHANNELS |
-                                        PA_STREAM_DONT_MOVE,
-                                        NULL,
-                                        NULL );
+            PaDeviceIndex defaultOutputDevice;
+            PaError result = PaUtil_DeviceIndexToHostApiDeviceIndex(
+                    &defaultOutputDevice,
+                    l_ptrPulseAudioHostApi->inheritedHostApiRep.info.defaultOutputDevice,
+                    &(l_ptrPulseAudioHostApi->inheritedHostApiRep) );
+            if(result == paNoError && stream->outDevice == defaultOutputDevice )
+            {
+                pa_stream_connect_playback( stream->outStream,
+                                            NULL,
+                                            &stream->bufferAttr,
+                                            PA_STREAM_INTERPOLATE_TIMING |
+                                            PA_STREAM_ADJUST_LATENCY |
+                                            PA_STREAM_AUTO_TIMING_UPDATE,
+                                            NULL,
+                                            NULL );
+
+            }
+            else
+            {
+
+                pa_stream_connect_playback( stream->outStream,
+                                            l_ptrPulseAudioHostApi->
+                                            pulseaudioDeviceNames[stream->outDevice],
+                                            &stream->bufferAttr,
+                                            PA_STREAM_INTERPOLATE_TIMING |
+                                            PA_STREAM_ADJUST_LATENCY |
+                                            PA_STREAM_AUTO_TIMING_UPDATE |
+                                            PA_STREAM_NO_REMIX_CHANNELS |
+                                            PA_STREAM_NO_REMAP_CHANNELS |
+                                            PA_STREAM_DONT_MOVE,
+                                            NULL,
+                                            NULL );
+            }
 
             pa_stream_set_underflow_callback( stream->outStream,
                                               PaPulseAudio_StreamUnderflowCb,
@@ -601,16 +622,33 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                                                     inDevice]));
         }
 
-        pa_stream_connect_record( stream->inStream,
-                                  l_ptrPulseAudioHostApi->
-                                  pulseaudioDeviceNames[stream->inDevice],
-                                  &stream->bufferAttr,
-                                  PA_STREAM_INTERPOLATE_TIMING |
-                                  PA_STREAM_ADJUST_LATENCY |
-                                  PA_STREAM_AUTO_TIMING_UPDATE |
-                                  PA_STREAM_NO_REMIX_CHANNELS |
-                                  PA_STREAM_NO_REMAP_CHANNELS |
-                                  PA_STREAM_DONT_MOVE);
+        PaDeviceIndex defaultInputDevice;
+        PaError result = PaUtil_DeviceIndexToHostApiDeviceIndex(
+                &defaultInputDevice,
+                l_ptrPulseAudioHostApi->inheritedHostApiRep.info.defaultInputDevice,
+                &(l_ptrPulseAudioHostApi->inheritedHostApiRep) );
+        if ( result == paNoError && stream->inDevice == defaultInputDevice )
+        {
+            pa_stream_connect_record( stream->inStream,
+                                      NULL,
+                                      &stream->bufferAttr,
+                                      PA_STREAM_INTERPOLATE_TIMING |
+                                      PA_STREAM_ADJUST_LATENCY |
+                                      PA_STREAM_AUTO_TIMING_UPDATE);
+        }
+        else 
+        {
+            pa_stream_connect_record( stream->inStream,
+                                      l_ptrPulseAudioHostApi->
+                                      pulseaudioDeviceNames[stream->inDevice],
+                                      &stream->bufferAttr,
+                                      PA_STREAM_INTERPOLATE_TIMING |
+                                      PA_STREAM_ADJUST_LATENCY |
+                                      PA_STREAM_AUTO_TIMING_UPDATE |
+                                      PA_STREAM_NO_REMIX_CHANNELS |
+                                      PA_STREAM_NO_REMAP_CHANNELS |
+                                      PA_STREAM_DONT_MOVE);
+        }
         pa_stream_set_underflow_callback( stream->inStream,
                                           PaPulseAudio_StreamUnderflowCb,
                                           stream);

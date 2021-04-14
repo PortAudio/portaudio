@@ -96,8 +96,7 @@ typedef struct
     PaHostApiIndex hostApiIndex;
     PaDeviceInfo deviceInfoArray[PAPULSEAUDIO_MAX_DEVICECOUNT];
     char *pulseaudioDeviceNames[PAPULSEAUDIO_MAX_DEVICECOUNT];
-    char pulseaudioDefaultSource[PAPULSEAUDIO_MAX_DEVICENAME];
-    char pulseaudioDefaultSink[PAPULSEAUDIO_MAX_DEVICENAME];
+    pa_sample_spec pulseaudioDefaultSampleSpec;
 
     /* PulseAudio stuff goes here */
     pa_threaded_mainloop *mainloop;
