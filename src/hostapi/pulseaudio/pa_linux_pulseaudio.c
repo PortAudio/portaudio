@@ -1321,7 +1321,7 @@ static void RenameStreamCb(pa_stream *s, int success, void *userdata)
                                  0 );
 }
 
-PaError PaPulseAudio_RenameStream( PaStream *s, char *streamName )
+PaError PaPulseAudio_RenameStream( PaStream *s, const char *streamName )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
     PaError result = paNoError;

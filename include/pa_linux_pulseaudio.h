@@ -52,7 +52,7 @@ extern "C" {
 
 /** Renames opened stream. */
 
-void PaPulseAudio_RenameStream( PaStream *s, char *streamName );
+void PaPulseAudio_RenameStream( PaStream *s, const char *streamName );
 
 #ifdef __cplusplus
 }
