@@ -128,7 +128,7 @@ typedef struct PaPulseAudio_Stream
     pa_usec_t outStreamTime;
     pa_buffer_attr bufferAttr;
     int outputUnderflows;
-    int latency;
+    double latency;
     int outputChannelCount;
 
     int callbackMode;       /* bool: are we running in callback mode? */

@@ -501,10 +501,10 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
      * fragsize if for Record
      */
     stream->bufferAttr.maxlength = (uint32_t)-1;
-    stream->bufferAttr.tlength = pa_usec_to_bytes((pa_usec_t)stream->latency, &stream->outSampleSpec);
+    stream->bufferAttr.tlength = pa_usec_to_bytes((pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->outSampleSpec);
     stream->bufferAttr.prebuf = (uint32_t)-1;
     stream->bufferAttr.minreq = (uint32_t)-1;
-    stream->bufferAttr.fragsize = pa_usec_to_bytes((pa_usec_t)stream->latency, &stream->outSampleSpec);
+    stream->bufferAttr.fragsize = pa_usec_to_bytes((pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->inSampleSpec);
     stream->outputUnderflows = 0;
 
     if( stream->outStream != NULL )
