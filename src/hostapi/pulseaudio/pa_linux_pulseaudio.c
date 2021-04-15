@@ -1321,24 +1321,44 @@ static void RenameStreamCb(pa_stream *s, int success, void *userdata)
                                  0 );
 }
 
-PaError PaPulseAudio_RenameStream( PaStream *s, const char *streamName )
+PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
     PaError result = paNoError;
-    
+    pa_operation *op = NULL;
+
+    assert(stream->inStream != NULL);
+
     pa_threaded_mainloop_lock(stream->mainloop);
-    if (stream->inStream != NULL)
-    {
-        pa_stream_set_name(stream->inStream, streamName, RenameStreamCb, stream);
-    }
-    else if (stream->outStream != NULL)
-    {
-        pa_stream_set_name(stream->outStream, streamName, RenameStreamCb, stream);
-    }
+    op = pa_stream_set_name(stream->inStream, streamName, RenameStreamCb, stream);
     pa_threaded_mainloop_unlock(stream->mainloop);
 
     /* Wait for completion. */
-    pa_threaded_mainloop_wait( stream->mainloop );
+    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+    {
+        pa_threaded_mainloop_wait( stream->mainloop );
+    }
+
+    return result;
+}
+
+PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
+{
+    PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
+    PaError result = paNoError;
+    pa_operation *op = NULL;
+    
+    assert(stream->outStream != NULL);
+    
+    pa_threaded_mainloop_lock(stream->mainloop);
+    pa_stream_set_name(stream->outStream, streamName, RenameStreamCb, stream);
+    pa_threaded_mainloop_unlock(stream->mainloop);
+
+    /* Wait for completion. */
+    while (pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+    {
+        pa_threaded_mainloop_wait( stream->mainloop );
+    }
 
     return result;
 }

@@ -1,5 +1,5 @@
-#ifndef PA_LINUX_PORTAUDIO_H
-#define PA_LINUX_PORTAUDIO_H
+#ifndef PA_LINUX_PULSEAUDIO_H
+#define PA_LINUX_PULSEAUDIO_H
 
 /*
  * $Id$
@@ -52,7 +52,8 @@ extern "C" {
 
 /** Renames opened stream. */
 
-void PaPulseAudio_RenameStream( PaStream *s, const char *streamName );
+PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName );
+PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName );
 
 #ifdef __cplusplus
 }
