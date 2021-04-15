@@ -474,6 +474,9 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
+
+    PaUtil_FreeMemory( stream->sourceStreamName );
+    PaUtil_FreeMemory( stream->sinkStreamName );
     PaUtil_FreeMemory(stream);
 
     return result;

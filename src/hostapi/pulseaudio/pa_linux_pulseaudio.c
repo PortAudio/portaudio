@@ -133,20 +133,6 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     /* Make sure we have NULL all struct first */
     memset(ptr, 0x00, sizeof(PaPulseAudio_HostApiRepresentation));
 
-    /* Allocate memory for source and sink names. */
-    ptr->sourceStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio source"));
-    ptr->sinkStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio sink"));
-    if ( !ptr->sourceStreamName || !ptr->sinkStreamName )
-    {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_HostApiRepresentation: Can't allocate stream names");
-        goto fail;
-    }
-
-    /* Copy initial stream names to memory. */
-    strcpy( ptr->sourceStreamName, "Portaudio source" );
-    strcpy( ptr->sinkStreamName, "Portaudio sink" );
- 
     ptr->mainloop = pa_threaded_mainloop_new();
 
     if( !ptr->mainloop )
@@ -216,16 +202,6 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
     if( ptr->mainloop )
     {
         pa_threaded_mainloop_free( ptr->mainloop );
-    }
-
-    if ( ptr->sourceStreamName )
-    {
-        PaUtil_FreeMemory( ptr->sourceStreamName );
-    }
-
-    if ( ptr->sinkStreamName )
-    {
-        PaUtil_FreeMemory( ptr->sinkStreamName );
     }
 
     PaUtil_FreeMemory( ptr );
@@ -976,6 +952,19 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         goto error;
     }
 
+    /* Allocate memory for source and sink names. */
+    stream->sourceStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio source"));
+    stream->sinkStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio sink"));
+    if ( !stream->sourceStreamName || !stream->sinkStreamName )
+    {
+        result = paInsufficientMemory;
+        goto error;
+    }
+
+    /* Copy initial stream names to memory. */
+    strcpy( stream->sourceStreamName, "Portaudio source" );
+    strcpy( stream->sinkStreamName, "Portaudio sink" );
+ 
     stream->isActive = 0;
     stream->isStopped = 1;
 
@@ -1286,6 +1275,16 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( stream )
     {
+        if ( stream->sourceStreamName )
+        {
+            PaUtil_FreeMemory( stream->sourceStreamName );
+        }
+
+        if ( stream->sinkStreamName )
+        {
+            PaUtil_FreeMemory( stream->sinkStreamName );
+        }
+
         PaUtil_FreeMemory(stream);
     }
 
