@@ -1344,6 +1344,15 @@ static void RenameStreamCb(pa_stream *s, int success, void *userdata)
                                  0 );
 }
 
+/**
+ * Renames the PulseAudio description for the source that is opened
+ * by PortAudio.
+ *
+ * @param s The PortAudio stream to operate on.
+ * @param streamName The new name/description of the source.
+ * 
+ * @return paNoError on success or the error encountered otherwise.
+ */
 PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
@@ -1379,6 +1388,15 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     return result;
 }
 
+/**
+ * Renames the PulseAudio description for the sink that is opened
+ * by PortAudio.
+ *
+ * @param s The PortAudio stream to operate on.
+ * @param streamName The new name/description of the sink.
+ * 
+ * @return paNoError on success or the error encountered otherwise.
+ */
 PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
