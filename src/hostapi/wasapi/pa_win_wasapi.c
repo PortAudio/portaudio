@@ -168,12 +168,14 @@
         #include <oleidl.h>
         #include <objidl.h>
     #else
-        typedef struct _BYTE_BLOB
-        {
-            unsigned long clSize;
-            unsigned char abData[ 1 ];
-        }     BYTE_BLOB;
-        typedef /* [unique] */  __RPC_unique_pointer BYTE_BLOB *UP_BYTE_BLOB;
+        #ifndef _BLOB_DEFINED
+            typedef struct _BYTE_BLOB
+            {
+                unsigned long clSize;
+                unsigned char abData[ 1 ];
+            }     BYTE_BLOB;
+            typedef /* [unique] */  __RPC_unique_pointer BYTE_BLOB *UP_BYTE_BLOB;
+        #endif
         typedef LONGLONG REFERENCE_TIME;
         #define NONAMELESSUNION
     #endif
