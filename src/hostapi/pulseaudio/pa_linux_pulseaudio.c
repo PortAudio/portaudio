@@ -133,6 +133,20 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     /* Make sure we have NULL all struct first */
     memset(ptr, 0x00, sizeof(PaPulseAudio_HostApiRepresentation));
 
+    /* Allocate memory for source and sink names. */
+    ptr->sourceStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio source"));
+    ptr->sinkStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio sink"));
+    if ( !ptr->sourceStreamName || !ptr->sinkStreamName )
+    {
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
+                                          "PaPulseAudio_HostApiRepresentation: Can't allocate stream names");
+        goto fail;
+    }
+
+    /* Copy initial stream names to memory. */
+    strcpy( ptr->sourceStreamName, "Portaudio source" );
+    strcpy( ptr->sinkStreamName, "Portaudio sink" );
+ 
     ptr->mainloop = pa_threaded_mainloop_new();
 
     if( !ptr->mainloop )
@@ -202,6 +216,16 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
     if( ptr->mainloop )
     {
         pa_threaded_mainloop_free( ptr->mainloop );
+    }
+
+    if ( ptr->sourceStreamName )
+    {
+        PaUtil_FreeMemory( ptr->sourceStreamName );
+    }
+
+    if ( ptr->sinkStreamName )
+    {
+        PaUtil_FreeMemory( ptr->sinkStreamName );
     }
 
     PaUtil_FreeMemory( ptr );
@@ -1026,7 +1050,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inStream =
             pa_stream_new( l_ptrPulseAudioHostApi->context,
-                           "Portaudio source",
+                           stream->sourceStreamName,
                            &stream->inSampleSpec,
                            NULL );
 
@@ -1139,7 +1163,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->outStream =
             pa_stream_new( l_ptrPulseAudioHostApi->context,
-                           "Portaudio sink",
+                           stream->sinkStreamName,
                            &stream->outSampleSpec,
                            NULL );
 
@@ -1327,9 +1351,20 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     PaError result = paNoError;
     pa_operation *op = NULL;
 
+    /* Reallocate stream name in memory. */
+    char *newStreamName = (char*)PaUtil_AllocateMemory(strlen(streamName));
+    if ( !newStreamName )
+    {
+        return paInsufficientMemory;
+    }
+    strcpy(newStreamName, streamName);
+
+    PaUtil_FreeMemory( stream->sourceStreamName );
+    stream->sourceStreamName = newStreamName;
+
     if ( stream->inStream == NULL )
     {
-        return paInvalidDevice;
+        return result;
     }
 
     pa_threaded_mainloop_lock( stream->mainloop );
@@ -1351,9 +1386,20 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     PaError result = paNoError;
     pa_operation *op = NULL;
     
+    /* Reallocate stream name in memory. */
+    char *newStreamName = (char*)PaUtil_AllocateMemory(strlen(streamName));
+    if ( !newStreamName )
+    {
+        return paInsufficientMemory;
+    }
+    strcpy(newStreamName, streamName);
+
+    PaUtil_FreeMemory( stream->sinkStreamName );
+    stream->sinkStreamName = newStreamName;
+
     if ( stream->outStream == NULL )
     {
-        return paInvalidDevice;
+        return result;
     }
 
     pa_threaded_mainloop_lock( stream->mainloop );

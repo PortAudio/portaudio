@@ -141,6 +141,9 @@ typedef struct PaPulseAudio_Stream
     PaDeviceIndex inDevice;
     PaDeviceIndex outDevice;
 
+    char *sinkStreamName;
+    char *sourceStreamName;
+
     void *outBuffer;
     void *inBuffer;
 
