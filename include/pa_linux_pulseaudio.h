@@ -50,9 +50,26 @@
 extern "C" {
 #endif
 
-/** Renames opened stream. */
-
+/**
+ * Renames the PulseAudio description for the source that is opened
+ * by PortAudio.
+ *
+ * @param s The PortAudio stream to operate on.
+ * @param streamName The new name/description of the source.
+ * 
+ * @return paNoError on success or the error encountered otherwise.
+ */
 PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName );
+
+/**
+ * Renames the PulseAudio description for the sink that is opened
+ * by PortAudio.
+ *
+ * @param s The PortAudio stream to operate on.
+ * @param streamName The new name/description of the sink.
+ * 
+ * @return paNoError on success or the error encountered otherwise.
+ */
 PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName );
 
 #ifdef __cplusplus
