@@ -4,7 +4,7 @@
 /*
  * $Id$
  * PortAudio Portable Real-Time Audio Library
- * ALSA-specific extensions
+ * PulseAudio-specific extensions
  *
  * Copyright (c) 1999-2000 Ross Bencina and Phil Burk
  *
