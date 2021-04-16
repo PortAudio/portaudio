@@ -1399,7 +1399,7 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     stream->sinkStreamName = newStreamName;
 
     pa_threaded_mainloop_lock( stream->mainloop );
-    pa_stream_set_name( stream->outStream, streamName, RenameStreamCb, stream );
+    op = pa_stream_set_name( stream->outStream, streamName, RenameStreamCb, stream );
     pa_threaded_mainloop_unlock( stream->mainloop );
 
     /* Wait for completion. */
