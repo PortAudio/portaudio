@@ -1357,7 +1357,7 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
         return paInsufficientMemory;
     }
     memset(newStreamName, 0, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
-    strncpy(newStreamName, streamName, PAPULSEAUDIO_MAX_DEVICENAME);
+    strncpy(newStreamName, streamName, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME));
 
     PaUtil_FreeMemory( stream->sourceStreamName );
     stream->sourceStreamName = newStreamName;
@@ -1393,7 +1393,7 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
         return paInsufficientMemory;
     }
     memset(newStreamName, 0, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
-    strncpy(newStreamName, streamName, PAPULSEAUDIO_MAX_DEVICENAME);
+    strncpy(newStreamName, streamName, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME));
 
     PaUtil_FreeMemory( stream->sinkStreamName );
     stream->sinkStreamName = newStreamName;
