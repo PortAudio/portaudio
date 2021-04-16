@@ -1368,10 +1368,10 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     pa_threaded_mainloop_unlock( stream->mainloop );
 
     /* Wait for completion. */
-    do
+    while (pa_operation_get_state( op ) == PA_OPERATION_RUNNING)
     {
         pa_threaded_mainloop_wait( stream->mainloop );
-    } while (op && pa_operation_get_state( op ) == PA_OPERATION_RUNNING);
+    }
 
     return result;
 }
@@ -1405,10 +1405,10 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     pa_threaded_mainloop_unlock( stream->mainloop );
 
     /* Wait for completion. */
-    do
+    while (pa_operation_get_state( op ) == PA_OPERATION_RUNNING)
     {
         pa_threaded_mainloop_wait( stream->mainloop );
-    } while (op && pa_operation_get_state( op ) == PA_OPERATION_RUNNING);
+    }
 
     return result;
 }
