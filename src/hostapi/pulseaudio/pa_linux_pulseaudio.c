@@ -1275,16 +1275,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( stream )
     {
-        if ( stream->sourceStreamName )
-        {
-            PaUtil_FreeMemory( stream->sourceStreamName );
-        }
-
-        if ( stream->sinkStreamName )
-        {
-            PaUtil_FreeMemory( stream->sinkStreamName );
-        }
-
+        PaUtil_FreeMemory( stream->sourceStreamName );
+        PaUtil_FreeMemory( stream->sinkStreamName );
         PaUtil_FreeMemory(stream);
     }
 
