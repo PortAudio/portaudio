@@ -501,28 +501,28 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
      * fragsize if for Record
      */
     stream->bufferAttr.maxlength = (uint32_t)-1;
-    if( stream->outStream != NULL ) 
-    {
-        stream->bufferAttr.tlength = pa_usec_to_bytes((pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->outSampleSpec);
-    }
-    else
-    {
-         stream->bufferAttr.tlength = 0;
-    } 
+    /* @TODO There is mixed documentation on this!
+     *
+     * API documentation tlength and fragsize
+     * should be '(uint32_t)-1' also but as '0' works
+     * but it breaks something this should be
+     * done as in documentation:
+     * https://freedesktop.org/software/pulseaudio/doxygen/structpa__buffer__attr.html
+     */
+    stream->bufferAttr.tlength = 0;
+    stream->bufferAttr.fragsize = 0;
     stream->bufferAttr.prebuf = (uint32_t)-1;
     stream->bufferAttr.minreq = (uint32_t)-1;
-    if( stream->inStream != NULL ) 
-    {
-        stream->bufferAttr.fragsize = pa_usec_to_bytes((pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->inSampleSpec);
-    }
-    else
-    {
-        stream->bufferAttr.fragsize = 0; 
-    }
     stream->outputUnderflows = 0;
 
     if( stream->outStream != NULL )
     {
+        /* Only change tlength if latency if more than Zero */
+        if( stream->latency > 0 )
+        {
+            stream->bufferAttr.tlength = pa_usec_to_bytes( (pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->outSampleSpec );
+        }
+
         /* Just keep on trucking if we are just corked*/
         if( pa_stream_get_state( stream->outStream ) == PA_STREAM_READY
             && pa_stream_is_corked( stream->outStream ) )
@@ -581,6 +581,12 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->inStream != NULL )
     {
+        /* Only change fragsize if latency if more than Zero */
+        if ( stream->latency > 0 )
+        {
+            stream->bufferAttr.fragsize = pa_usec_to_bytes( (pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->inSampleSpec );
+        }
+
         PA_UNLESS(stream->inBuffer =
                   PaUtil_AllocateMemory(PULSEAUDIO_BUFFER_SIZE),
                   paInsufficientMemory);
