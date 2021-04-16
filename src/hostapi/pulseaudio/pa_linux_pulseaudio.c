@@ -953,8 +953,11 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     /* Allocate memory for source and sink names. */
-    stream->sourceStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio source"));
-    stream->sinkStreamName = (char*)PaUtil_AllocateMemory(strlen("Portaudio sink"));
+    char defaultSourceStreamName[] = "Portaudio source";
+    char defaultSinkStreamName[] = "Portaudio sink";
+
+    stream->sourceStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSourceStreamName));
+    stream->sinkStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSinkStreamName));
     if ( !stream->sourceStreamName || !stream->sinkStreamName )
     {
         result = paInsufficientMemory;
@@ -962,8 +965,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     /* Copy initial stream names to memory. */
-    strcpy( stream->sourceStreamName, "Portaudio source" );
-    strcpy( stream->sinkStreamName, "Portaudio sink" );
+    strcpy( stream->sourceStreamName, defaultSourceStreamName );
+    strcpy( stream->sinkStreamName, defaultSinkStreamName );
  
     stream->isActive = 0;
     stream->isStopped = 1;
