@@ -1351,9 +1351,11 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     }
 
     /* Reallocate stream name in memory. */
+    pa_threaded_mainloop_lock( stream->mainloop );
     char *newStreamName = (char*)PaUtil_AllocateMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
     if ( !newStreamName )
     {
+        pa_threaded_mainloop_unlock( stream->mainloop );
         return paInsufficientMemory;
     }
     memset(newStreamName, 0, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
@@ -1362,7 +1364,6 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     PaUtil_FreeMemory( stream->sourceStreamName );
     stream->sourceStreamName = newStreamName;
 
-    pa_threaded_mainloop_lock( stream->mainloop );
     op = pa_stream_set_name( stream->inStream, streamName, RenameStreamCb, stream );
     pa_threaded_mainloop_unlock( stream->mainloop );
 
@@ -1387,9 +1388,11 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     }
 
     /* Reallocate stream name in memory. */
+    pa_threaded_mainloop_lock( stream->mainloop );
     char *newStreamName = (char*)PaUtil_AllocateMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
     if ( !newStreamName )
     {
+        pa_threaded_mainloop_unlock( stream->mainloop );
         return paInsufficientMemory;
     }
     memset(newStreamName, 0, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
@@ -1397,8 +1400,7 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
 
     PaUtil_FreeMemory( stream->sinkStreamName );
     stream->sinkStreamName = newStreamName;
-
-    pa_threaded_mainloop_lock( stream->mainloop );
+    
     op = pa_stream_set_name( stream->outStream, streamName, RenameStreamCb, stream );
     pa_threaded_mainloop_unlock( stream->mainloop );
 
