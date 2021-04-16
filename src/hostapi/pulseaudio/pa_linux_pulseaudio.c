@@ -965,8 +965,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     /* Copy initial stream names to memory. */
-    strcpy( stream->sourceStreamName, defaultSourceStreamName );
-    strcpy( stream->sinkStreamName, defaultSinkStreamName );
+    memcpy( stream->sourceStreamName, defaultSourceStreamName, sizeof(defaultSourceStreamName) );
+    memcpy( stream->sinkStreamName, defaultSinkStreamName, sizeof(defaultSinkStreamName) );
  
     stream->isActive = 0;
     stream->isStopped = 1;
