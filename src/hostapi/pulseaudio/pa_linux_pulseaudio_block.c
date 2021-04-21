@@ -140,6 +140,11 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
 
             l_iRet = 0;
 
+            if( l_ptrOperation == NULL )
+            {
+                return paInsufficientMemory;
+            }
+
             while( pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING )
             {
                 l_iRet ++;
