@@ -953,8 +953,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     /* Allocate memory for source and sink names. */
-    char defaultSourceStreamName[] = "Portaudio source";
-    char defaultSinkStreamName[] = "Portaudio sink";
+    const char defaultSourceStreamName[] = "Portaudio source";
+    const char defaultSinkStreamName[] = "Portaudio sink";
 
     stream->sourceStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSourceStreamName));
     stream->sinkStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSinkStreamName));
