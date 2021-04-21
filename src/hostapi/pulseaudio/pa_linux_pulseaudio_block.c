@@ -206,6 +206,6 @@ signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * s )
         return 0;
     }
 
-    return (PaUtil_GetRingBufferReadAvailable(&l_ptrStream->outputRing) /
+    return (PaUtil_GetRingBufferWriteAvailable(&l_ptrStream->outputRing) /
             l_ptrStream->outputFrameSize);
 }
