@@ -156,6 +156,31 @@ typedef struct PaPulseAudio_Stream
 }
 PaPulseAudio_Stream;
 
+/* PulseAudio Error checking macro */
+#define PA_PULSEAUDIO_IS_ERROR(pastream, errorCode) \
+    if( !(pastream) || \
+        !(pastream)->context || \
+        !PA_CONTEXT_IS_GOOD( pa_context_get_state( (pastream)->context ) ) || \
+        ( (pastream)->outStream && \
+        !PA_STREAM_IS_GOOD( pa_stream_get_state( (pastream)->outStream ) ) ) || \
+        ( (pastream)->inStream && \
+        !PA_STREAM_IS_GOOD( pa_stream_get_state( (pastream)->inStream ) ) ) ) \
+    { \
+        if( !(pastream) || \
+            ( (pastream)->context && \
+              pa_context_get_state( (pastream)->context ) == PA_CONTEXT_FAILED ) || \
+            ( (pastream)->outStream && \
+              pa_stream_get_state( (pastream)->outStream ) == PA_STREAM_FAILED ) || \
+            ( (pastream)->inStream && \
+               pa_stream_get_state( (pastream)->inStream ) == PA_STREAM_FAILED ) ) \
+            { \
+                return errorCode; \
+            } \
+    } \
+    if( !pastream->isActive || pastream->isStopped ) \
+    { \
+            return paStreamIsStopped; \
+    }
 PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                  PaHostApiIndex index );
 

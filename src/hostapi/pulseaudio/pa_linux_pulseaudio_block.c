@@ -70,17 +70,28 @@ PaError PaPulseAudio_ReadStreamBlock( PaStream * s,
     uint8_t *l_ptrData = (uint8_t *) buffer;
     long l_lLength = (frames * l_ptrStream->inputFrameSize);
 
-    pa_threaded_mainloop_lock( l_ptrStream->mainloop );
-    while( l_lLength > 0)
+    while( l_lLength > 0 )
     {
+        PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
+
+        pa_threaded_mainloop_lock( l_ptrStream->mainloop );
         long l_read = PaUtil_ReadRingBuffer( &l_ptrStream->inputRing, l_ptrData,
                                              l_lLength );
         l_ptrData += l_read;
         l_lLength -= l_read;
         if( l_lLength > 0 )
             pa_threaded_mainloop_wait( l_ptrStream->mainloop );
+
+        pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
+
+        if( l_lLength > 0 )
+        {
+            /* Sleep small amount of time not burn CPU
+            * we block anyway so this is bearable
+            */
+            usleep(100);
+        }
     }
-    pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
     return paNoError;
 }
 
@@ -102,6 +113,8 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
 
     while( l_lLength > 0)
     {
+        PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
+
         pa_threaded_mainloop_lock( l_ptrStream->mainloop );
         l_lWritable = pa_stream_writable_size( l_ptrStream->outStream );
         pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
@@ -125,8 +138,19 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
                                                            NULL );
             pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
-            while( pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING)
+            l_iRet = 0;
+
+            while( pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING )
             {
+                l_iRet ++;
+                PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
+
+                /* As this shouldn never happen it's error if it does */
+                if( l_iRet >= 10000 )
+                {
+                    return paStreamIsStopped;
+                }
+
                 usleep(100);
             }
 
@@ -134,6 +158,7 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
 
             pa_operation_unref( l_ptrOperation );
             l_ptrOperation = NULL;
+
             pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
 
             l_ptrData += l_lWritable;
