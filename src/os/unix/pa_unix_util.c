@@ -160,7 +160,11 @@ PaTime PaUtil_GetTime( void )
     return mach_absolute_time() * machSecondsConversionScaler_;
 #elif defined(HAVE_CLOCK_GETTIME)
     struct timespec tp;
+#if defined(CLOCK_MONOTONIC)
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+#else
     clock_gettime(CLOCK_REALTIME, &tp);
+#endif
     return (PaTime)(tp.tv_sec + tp.tv_nsec * 1e-9);
 #else
     struct timeval tv;
