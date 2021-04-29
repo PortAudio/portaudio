@@ -15846,29 +15846,9 @@ case "${host_os}" in
         LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices"
 
         if test "x$enable_mac_universal" = "xyes" ; then
-           case `xcodebuild -version | sed -n 's/Xcode \(.*\)/\1/p'` in
-
-           3.0|3.1)
-                                                                                                                              if [ -d /Developer/SDKs/MacOSX10.5.sdk ] ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.5.sdk"
-              else
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
-              fi
-              ;;
-
-           *)
-                                                                                    if xcrun --sdk macosx10.5 --show-sdk-path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.5"
-                 mac_sysroot="-isysroot $(xcrun --sdk macosx10.5 --show-sdk-path)"
-              else
-                 mac_version_min="-mmacosx-version-min=10.6"
-                 mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
-              fi
-           esac
-
-                                 mac_arches=""
+           mac_version_min="-mmacosx-version-min=10.6"
+           mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
+           mac_arches=""
            for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"

@@ -71,11 +71,6 @@
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
 
-#ifndef MAC_OS_X_VERSION_10_6
-#define MAC_OS_X_VERSION_10_6 1060
-#endif
-
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -726,19 +721,11 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
 
     VVDBUG(("PaMacCore_Initialize(): hostApiIndex=%d\n", hostApiIndex));
 
-    SInt32 major;
-    SInt32 minor;
-    Gestalt(gestaltSystemVersionMajor, &major);
-    Gestalt(gestaltSystemVersionMinor, &minor);
-
-    // Starting with 10.6 systems, the HAL notification thread is created internally
-    if ( major > 10 || (major == 10 && minor >= 6) ) {
-        CFRunLoopRef theRunLoop = NULL;
-        AudioObjectPropertyAddress theAddress = { kAudioHardwarePropertyRunLoop, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
-        OSStatus osErr = AudioObjectSetPropertyData (kAudioObjectSystemObject, &theAddress, 0, NULL, sizeof(CFRunLoopRef), &theRunLoop);
-        if (osErr != noErr) {
-            goto error;
-        }
+    CFRunLoopRef theRunLoop = NULL;
+    AudioObjectPropertyAddress theAddress = { kAudioHardwarePropertyRunLoop, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
+    OSStatus osErr = AudioObjectSetPropertyData (kAudioObjectSystemObject, &theAddress, 0, NULL, sizeof(CFRunLoopRef), &theRunLoop);
+    if (osErr != noErr) {
+        goto error;
     }
 
     unixErr = initializeXRunListenerList();
@@ -1180,13 +1167,8 @@ static PaError OpenAndSetupOneAudioUnit(
         const double sampleRate,
         void *refCon )
 {
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
     AudioComponentDescription desc;
     AudioComponent comp;
-#else
-    ComponentDescription desc;
-    Component comp;
-#endif
     /*An Apple TN suggests using CAStreamBasicDescription, but that is C++*/
     AudioStreamBasicDescription desiredFormat;
     OSStatus result = noErr;
@@ -1253,11 +1235,7 @@ static PaError OpenAndSetupOneAudioUnit(
     desc.componentFlags        = 0;
     desc.componentFlagsMask    = 0;
     /* -- find the component -- */
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
     comp = AudioComponentFindNext( NULL, &desc );
-#else
-    comp = FindNextComponent( NULL, &desc );
-#endif
     if( !comp )
     {
         DBUG( ( "AUHAL component not found." ) );
@@ -1266,11 +1244,7 @@ static PaError OpenAndSetupOneAudioUnit(
         return paUnanticipatedHostError;
     }
     /* -- open it -- */
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
     result = AudioComponentInstanceNew( comp, audioUnit );
-#else
-    result = OpenAComponent( comp, audioUnit );
-#endif
     if( result )
     {
         DBUG( ( "Failed to open AUHAL component." ) );
@@ -1619,11 +1593,7 @@ static PaError OpenAndSetupOneAudioUnit(
 
 error:
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
     AudioComponentInstanceDispose( *audioUnit );
-#else
-    CloseComponent( *audioUnit );
-#endif
     *audioUnit = NULL;
     if( result )
         return PaMacCore_SetError( result, line, 1 );
@@ -2679,21 +2649,13 @@ static PaError CloseStream( PaStream* s )
         }
         if( stream->outputUnit && stream->outputUnit != stream->inputUnit ) {
             AudioUnitUninitialize( stream->outputUnit );
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
             AudioComponentInstanceDispose( stream->outputUnit );
-#else
-            CloseComponent( stream->outputUnit );
-#endif
         }
         stream->outputUnit = NULL;
         if( stream->inputUnit )
         {
             AudioUnitUninitialize( stream->inputUnit );
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
             AudioComponentInstanceDispose( stream->inputUnit );
-#else
-            CloseComponent( stream->inputUnit );
-#endif
             stream->inputUnit = NULL;
         }
         if( stream->inputRingBuffer.buffer )
