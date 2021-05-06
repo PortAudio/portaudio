@@ -274,11 +274,16 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
 {
     PaError result = paNoError;
     pthread_attr_t attr;
+    pthread_condattr_t cattr;
     int started = 0;
 
     memset( self, 0, sizeof (PaUnixThread) );
     PaUnixMutex_Initialize( &self->mtx );
-    PA_ASSERT_CALL( pthread_cond_init( &self->cond, NULL ), 0 );
+    PA_ASSERT_CALL( pthread_condattr_init( &cattr ), 0 );
+#if defined(CLOCK_MONOTONIC)
+    PA_ASSERT_CALL( pthread_condattr_setclock( &cattr, CLOCK_MONOTONIC ), 0 );
+#endif
+    PA_ASSERT_CALL( pthread_cond_init( &self->cond, &cattr), 0 );
 
     self->parentWaiting = 0 != waitForChild;
 
