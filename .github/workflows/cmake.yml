@@ -19,7 +19,7 @@ jobs:
             os: ubuntu-latest
             install_dir: ~/portaudio
             dependencies_extras: mingw-w64
-            cmake_extras: -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake
+            cmake_extras: -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-w64-mingw32.cmake
           - name: Windows
             os: windows-latest
             install_dir: C:\portaudio
