@@ -27,7 +27,7 @@ jobs:
             cmake_options:
               -DASIO=ON
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
-              -DCMAKE_TOOLCHAIN_FILE=cmake/i686-w64-mingw32.cmake
+              -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-w64-mingw32.cmake
           - name: Windows MSVC
             os: windows-latest
             install_dir: C:\portaudio
