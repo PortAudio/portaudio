@@ -447,11 +447,11 @@ static void DumpDeviceProperties( AudioDeviceID macCoreDeviceId,
 {
     PaError err;
     int i;
-    UInt32 propSize;
-    UInt32 deviceLatency;
-    UInt32 streamLatency;
-    UInt32 bufferFrames;
-    UInt32 safetyOffset;
+    UInt32 propSize = 0;
+    UInt32 deviceLatency = 0;
+    UInt32 streamLatency = 0;
+    UInt32 bufferFrames = 0;
+    UInt32 safetyOffset = 0;
     AudioStreamID streamIDs[128];
 
     printf("\n======= latency query : macCoreDeviceId = %d, isInput %d =======\n", (int)macCoreDeviceId, isInput );
