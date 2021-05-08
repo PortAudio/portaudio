@@ -4616,11 +4616,13 @@ error:
 
 PaError PaAlsa_GetStreamInputCard( PaStream* s, int* card )
 {
-    PaAlsaStream *stream;
+    PaAlsaStream *stream = NULL;
     PaError result = paNoError;
     snd_pcm_info_t* pcmInfo;
 
     PA_ENSURE( GetAlsaStreamPointer( s, &stream ) );
+
+    if (stream == NULL) return paBadStreamPtr;
 
     /* XXX: More descriptive error? */
     PA_UNLESS( stream->capture.pcm, paDeviceUnavailable );
@@ -4635,11 +4637,13 @@ error:
 
 PaError PaAlsa_GetStreamOutputCard( PaStream* s, int* card )
 {
-    PaAlsaStream *stream;
+    PaAlsaStream *stream = NULL;
     PaError result = paNoError;
     snd_pcm_info_t* pcmInfo;
 
     PA_ENSURE( GetAlsaStreamPointer( s, &stream ) );
+
+    if (stream == NULL) return paBadStreamPtr;
 
     /* XXX: More descriptive error? */
     PA_UNLESS( stream->playback.pcm, paDeviceUnavailable );
