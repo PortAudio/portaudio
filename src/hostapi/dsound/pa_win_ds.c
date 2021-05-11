@@ -2039,6 +2039,9 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         PaSampleFormat nativeInputFormats = paInt16;
         /* PaSampleFormat nativeFormats = paUInt8 | paInt16 | paInt24 | paInt32 | paFloat32; */
 
+        if (userData && *((int*)userData) == 24)
+            nativeInputFormats = paInt24;
+
         hostInputSampleFormat =
             PaUtil_SelectClosestAvailableFormat( nativeInputFormats, inputParameters->sampleFormat );
     }
