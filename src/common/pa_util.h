@@ -133,18 +133,17 @@ void PaUtil_FreeMemory( void *block );
 */
 int PaUtil_CountCurrentlyAllocatedBlocks( void );
 
+/** Return the system time in seconds. Used to implement CPU load functions
+
+ @see PaUtil_InitializeClock
+*/
+void PaUtil_InitializeClock( void );
+
 
 /** Initialize the clock used by PaUtil_GetTime(). Call this before calling
  PaUtil_GetTime.
 
  @see PaUtil_GetTime
-*/
-void PaUtil_InitializeClock( void );
-
-
-/** Return the system time in seconds. Used to implement CPU load functions
-
- @see PaUtil_InitializeClock
 */
 double PaUtil_GetTime( void );
 
