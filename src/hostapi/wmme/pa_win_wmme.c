@@ -1729,7 +1729,7 @@ static PaError CalculateBufferSettings(
 
                 if( *hostFramesPerOutputBuffer != *hostFramesPerInputBuffer )
                 {
-                    if( hostFramesPerInputBuffer < hostFramesPerOutputBuffer )
+                    if( *hostFramesPerInputBuffer < *hostFramesPerOutputBuffer )
                     {
                         *hostFramesPerOutputBuffer = *hostFramesPerInputBuffer;
 
