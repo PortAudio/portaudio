@@ -1280,7 +1280,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
         char *cardName;
         int devIdx = -1;
         snd_ctl_t *ctl;
-        char buf[50];
+        char buf[66];
 
         snprintf( alsaCardName, sizeof (alsaCardName), "hw:%d", cardIdx );
 
