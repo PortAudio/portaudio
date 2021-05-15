@@ -121,7 +121,7 @@ static bool ensureChannelNameSize( int size )
    return true;
 }
 /*
- * Function declared in pa_mac_core.h. retrives channel names.
+ * Function declared in pa_mac_core.h. retrieves channel names.
  */
 const char *PaMacCore_GetChannelName( int device, int channelIndex, bool input )
 {
@@ -1173,8 +1173,13 @@ static PaError OpenAndSetupOneAudioUnit(
                                    const double sampleRate,
                                    void *refCon )
 {
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+    AudioComponentDescription desc;
+    AudioComponent comp;
+#else
     ComponentDescription desc;
     Component comp;
+#endif
     /*An Apple TN suggests using CAStreamBasicDescription, but that is C++*/
     AudioStreamBasicDescription desiredFormat;
     OSStatus result = noErr;
@@ -1245,7 +1250,11 @@ static PaError OpenAndSetupOneAudioUnit(
     desc.componentFlags        = 0;
     desc.componentFlagsMask    = 0;
     /* -- find the component -- */
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+    comp = AudioComponentFindNext( NULL, &desc );
+#else
     comp = FindNextComponent( NULL, &desc );
+#endif
     if( !comp )
     {
        DBUG( ( "AUHAL component not found." ) );
@@ -1254,7 +1263,11 @@ static PaError OpenAndSetupOneAudioUnit(
        return paUnanticipatedHostError;
     }
     /* -- open it -- */
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+    result = AudioComponentInstanceNew( comp, audioUnit );
+#else
     result = OpenAComponent( comp, audioUnit );
+#endif
     if( result )
     {
        DBUG( ( "Failed to open AUHAL component." ) );
@@ -1345,7 +1358,7 @@ static PaError OpenAndSetupOneAudioUnit(
     /*  set device format first, but only touch the device if the user asked */
     if( inStreamParams ) {
        /*The callback never calls back if we don't set the FPB */
-       /*This seems wierd, because I would think setting anything on the device
+       /*This seems weird, because I would think setting anything on the device
          would be disruptive.*/
        paResult = setBestFramesPerBuffer( *audioDevice, FALSE,
                                           requestedFramesPerBuffer,
@@ -1363,7 +1376,7 @@ static PaError OpenAndSetupOneAudioUnit(
     }
     if( outStreamParams && !inStreamParams ) {
        /*The callback never calls back if we don't set the FPB */
-       /*This seems wierd, because I would think setting anything on the device
+       /*This seems weird, because I would think setting anything on the device
          would be disruptive.*/
        paResult = setBestFramesPerBuffer( *audioDevice, TRUE,
                                           requestedFramesPerBuffer,
@@ -1607,7 +1620,12 @@ static PaError OpenAndSetupOneAudioUnit(
 #undef ERR_WRAP
 
     error:
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+       AudioComponentInstanceDispose( *audioUnit );
+#else
        CloseComponent( *audioUnit );
+#endif
        *audioUnit = NULL;
        if( result )
           return PaMacCore_SetError( result, line, 1 );
@@ -1740,7 +1758,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         inputChannelCount = 0;
-        inputSampleFormat = hostInputSampleFormat = paFloat32; /* Surpress 'uninitialised var' warnings. */
+        inputSampleFormat = hostInputSampleFormat = paFloat32; /* Suppress 'uninitialised var' warnings. */
     }
 
     if( outputParameters )
@@ -1770,7 +1788,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         outputChannelCount = 0;
-        outputSampleFormat = hostOutputSampleFormat = paFloat32; /* Surpress 'uninitialized var' warnings. */
+        outputSampleFormat = hostOutputSampleFormat = paFloat32; /* Suppress 'uninitialized var' warnings. */
     }
 
     /* validate platform specific flags */
@@ -2164,8 +2182,8 @@ static OSStatus AudioIOProc( void *inRefCon,
     
    /* -----------------------------------------------------------------*\
       This output may be useful for debugging,
-      But printing durring the callback is a bad enough idea that
-      this is not enabled by enableing the usual debugging calls.
+      But printing during the callback is a bad enough idea that
+      this is not enabled by enabling the usual debugging calls.
    \* -----------------------------------------------------------------*/
    /*
    static int renderCount = 0;
@@ -2604,7 +2622,7 @@ stop_stream:
 static PaError CloseStream( PaStream* s )
 {
     /* This may be called from a failed OpenStream.
-       Therefore, each piece of info is treated seperately. */
+       Therefore, each piece of info is treated separately. */
     PaError result = paNoError;
     PaMacCoreStream *stream = (PaMacCoreStream*)s;
 
@@ -2645,13 +2663,21 @@ static PaError CloseStream( PaStream* s )
        }
        if( stream->outputUnit && stream->outputUnit != stream->inputUnit ) {
           AudioUnitUninitialize( stream->outputUnit );
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+          AudioComponentInstanceDispose( stream->outputUnit );
+#else
           CloseComponent( stream->outputUnit );
+#endif
        }
        stream->outputUnit = NULL;
        if( stream->inputUnit )
        {
           AudioUnitUninitialize( stream->inputUnit );
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+          AudioComponentInstanceDispose( stream->inputUnit );
+#else
           CloseComponent( stream->inputUnit );
+#endif
           stream->inputUnit = NULL;
        }
        if( stream->inputRingBuffer.buffer )

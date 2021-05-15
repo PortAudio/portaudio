@@ -891,7 +891,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
 		printf( "OK" );
 	}
 
-    // Print the # errors so far to make it easier to see where the error occured.
+    // Print the # errors so far to make it easier to see where the error occurred.
 	printf( " - #errs = %d\n", g_testsFailed );
 
 	PaQa_TeardownLoopbackContext( &loopbackContext );
@@ -1304,7 +1304,7 @@ static int CheckLoopbackAndScan( UserOptions *userOptions,
 /**
  * Scan every combination of output to input device.
  * If a loopback is found the analyse the combination.
- * The scan can be overriden using the -i and -o command line options.
+ * The scan can be overridden using the -i and -o command line options.
  */
 static int ScanForLoopback(UserOptions *userOptions)
 {

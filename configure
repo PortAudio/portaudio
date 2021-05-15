@@ -723,6 +723,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -746,6 +747,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_alsa
+with_sndio
 with_jack
 with_oss
 with_asihpi
@@ -821,6 +823,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE}'
@@ -1073,6 +1076,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1210,7 +1222,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1363,6 +1375,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1409,6 +1422,7 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-alsa             Enable support for ALSA [autodetect]
+  --with-sndio            Enable support for sndio [autodetect]
   --with-jack             Enable support for JACK [autodetect]
   --with-oss              Enable support for OSS [autodetect]
   --with-asihpi           Enable support for ASIHPI [autodetect]
@@ -2672,6 +2686,13 @@ test -n "$target_alias" &&
 # Check whether --with-alsa was given.
 if test "${with_alsa+set}" = set; then :
   withval=$with_alsa; with_alsa=$withval
+fi
+
+
+
+# Check whether --with-sndio was given.
+if test "${with_sndio+set}" = set; then :
+  withval=$with_sndio; with_sndio=$withval
 fi
 
 
@@ -15313,6 +15334,51 @@ else
 fi
 
 fi
+have_sndio=no
+if test "x$with_sndio" != "xno"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for sio_open in -lsndio" >&5
+$as_echo_n "checking for sio_open in -lsndio... " >&6; }
+if ${ac_cv_lib_sndio_sio_open+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lsndio  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char sio_open ();
+int
+main ()
+{
+return sio_open ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_sndio_sio_open=yes
+else
+  ac_cv_lib_sndio_sio_open=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_sndio_sio_open" >&5
+$as_echo "$ac_cv_lib_sndio_sio_open" >&6; }
+if test "x$ac_cv_lib_sndio_sio_open" = xyes; then :
+  have_sndio=yes
+else
+  have_sndio=no
+fi
+
+fi
 have_asihpi=no
 if test "x$with_asihpi" != "xno"; then
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for HPI_SubSysCreate in -lhpi" >&5
@@ -15828,7 +15894,7 @@ case "${host_os}" in
         if test "x$enable_mac_universal" = "xyes" ; then
            case `xcodebuild -version | sed -n 's/Xcode \(.*\)/\1/p'` in
 
-           12*|3.0|3.1)
+           3.0|3.1)
                                                                                                                               if [ -d /Developer/SDKs/MacOSX10.5.sdk ] ; then
                  mac_version_min="-mmacosx-version-min=10.3"
                  mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.5.sdk"
@@ -15866,13 +15932,19 @@ case "${host_os}" in
               elif xcodebuild -version -sdk macosx10.13 Path >/dev/null 2>&1 ; then
                  mac_version_min="-mmacosx-version-min=10.4"
                  mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.13 Path`"
+              elif xcodebuild -version -sdk macosx10.14 Path >/dev/null 2>&1 ; then
+                 mac_version_min="-mmacosx-version-min=10.4"
+                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.14 Path`"
+              elif xcodebuild -version -sdk macosx10.15 Path >/dev/null 2>&1 ; then
+                 mac_version_min="-mmacosx-version-min=10.4"
+                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.15 Path`"
               else
                  as_fn_error $? "Could not find 10.5 to 10.13 SDK." "$LINENO" 5
               fi
            esac
 
                                  mac_arches=""
-           for arch in i386 x86_64 ppc ppc64
+           for arch in x86_64
            do
               save_CFLAGS="$CFLAGS"
               CFLAGS="$CFLAGS -arch $arch"
@@ -15960,7 +16032,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             add_objects src/hostapi/wasapi/pa_win_wasapi.o src/common/pa_ringbuffer.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_coinitialize.o src/os/win/pa_win_waveformat.o
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lole32"
-            CFLAGS="$CFLAGS -I\$(top_srcdir)/src/hostapi/wasapi/mingw-include -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
+            CFLAGS="$CFLAGS -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
         fi
         ;;
 
@@ -16185,6 +16257,14 @@ fi
            OTHER_OBJS="$OTHER_OBJS src/hostapi/alsa/pa_linux_alsa.o"
            INCLUDES="$INCLUDES pa_linux_alsa.h"
            $as_echo "#define PA_USE_ALSA 1" >>confdefs.h
+
+        fi
+
+        if [ "$have_sndio" = "yes" ] && [ "$with_sndio" != "no" ] ; then
+           DLL_LIBS="$DLL_LIBS -lsndio"
+           LIBS="$LIBS -lsndio"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/sndio/pa_sndio.o"
+           $as_echo "#define PA_USE_SNDIO 1" >>confdefs.h
 
         fi
 
@@ -18820,10 +18900,12 @@ $as_echo "
      *)
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result:
   OSS ......................... $have_oss
+  sndio........................ $have_sndio
   JACK ........................ $have_jack
 " >&5
 $as_echo "
   OSS ......................... $have_oss
+  sndio........................ $have_sndio
   JACK ........................ $have_jack
 " >&6; }
         ;;

@@ -1,0 +1,36 @@
+BUILDING PORTAUDIO
+
+Just use cmake:
+
+$ cmake
+$ make
+# make install
+
+BUILDING ON WINDOWS USING VISUAL STUDIO
+
+Modern versions of Visual Studio have native CMake support, which should work
+out-of-the-box. Simply open the CMakeLists.txt file in Visual Studio and hit
+build.
+
+BUILDING ON WINDOWS USING mingw-w64
+
+Starting from a fresh, up-to-date msys2 install:
+
+$ pacman -S mingw-w64-i686-cmake make mingw-w64-i686-gcc
+$ cmake -G "MSYS Makefiles"
+$ make
+
+CROSS-COMPILING FROM DEBIAN TO WINDOWS USING mingw-w64
+
+# apt-get install cmake make mingw-w64 mingw-w64-tools
+
+You will need to write a CMake toolchain file with the following contents:
+
+  SET(CMAKE_SYSTEM_NAME Windows)
+  SET(CMAKE_C_COMPILER i686-w64-mingw32-gcc)
+  SET(CMAKE_CXX_COMPILER i686-w64-mingw32-g++)
+
+Then:
+
+$ cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/toolchain/file
+$ make

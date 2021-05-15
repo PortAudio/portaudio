@@ -58,7 +58,7 @@
  RDB20020417 - stopped counting WAVE_MAPPER when there were no real devices
                refactoring, renaming and fixed a few edge case bugs
  RDB20020531 - converted to V19 framework
- ** NOTE  maintanance history is now stored in CVS **
+ ** NOTE  maintenance history is now stored in CVS **
 */
 
 /** @file
@@ -192,7 +192,7 @@
 
 /* When client suggestedLatency could result in many host buffers, we aim to have around 8, 
    based off Windows documentation that suggests that the kmixer uses 8 buffers. This choice
-   is somewhat arbitrary here, since we havn't observed significant stability degredation 
+   is somewhat arbitrary here, since we haven't observed significant stability degredation 
    with using either more, or less buffers.     
 */
 #define PA_MME_TARGET_HOST_BUFFER_COUNT_    8
@@ -667,13 +667,16 @@ static void DetectDefaultSampleRate( PaWinMmeDeviceInfo *winMmeDeviceInfo, int w
 
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static int QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels )
+static int QueryWaveInKSFilterMaxChannels( UINT waveInDeviceId, int *maxChannels )
 {
     void *devicePath;
     DWORD devicePathSize;
     int result = 0;
 
-    if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
+    /* pass UINT ID via punned HWAVEIN, as per DRV_QUERYDEVICEINTERFACESIZE documentation */
+    HWAVEIN hDeviceId = (HWAVEIN)((UINT_PTR)waveInDeviceId);
+
+    if( waveInMessage(hDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
             (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
         return 0;
 
@@ -682,7 +685,7 @@ static int QueryWaveInKSFilterMaxChannels( int waveInDeviceId, int *maxChannels 
         return 0;
 
     /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path, although this is undocumented */
-    if( waveInMessage((HWAVEIN)waveInDeviceId, DRV_QUERYDEVICEINTERFACE,
+    if( waveInMessage(hDeviceId, DRV_QUERYDEVICEINTERFACE,
             (DWORD_PTR)devicePath, devicePathSize ) == MMSYSERR_NOERROR )
     {
         int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( devicePath, /* isInput= */ 1  );
@@ -797,13 +800,16 @@ error:
 
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
-static int QueryWaveOutKSFilterMaxChannels( int waveOutDeviceId, int *maxChannels )
+static int QueryWaveOutKSFilterMaxChannels( UINT waveOutDeviceId, int *maxChannels )
 {
     void *devicePath;
     DWORD devicePathSize;
     int result = 0;
 
-    if( waveOutMessage((HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
+    /* pass UINT ID via punned HWAVEOUT, as per DRV_QUERYDEVICEINTERFACESIZE documentation */
+    HWAVEOUT hDeviceId = (HWAVEOUT)((UINT_PTR)waveOutDeviceId);
+
+    if( waveOutMessage(hDeviceId, DRV_QUERYDEVICEINTERFACESIZE,
             (DWORD_PTR)&devicePathSize, 0 ) != MMSYSERR_NOERROR )
         return 0;
 
@@ -812,7 +818,7 @@ static int QueryWaveOutKSFilterMaxChannels( int waveOutDeviceId, int *maxChannel
         return 0;
 
     /* apparently DRV_QUERYDEVICEINTERFACE returns a unicode interface path, although this is undocumented */
-    if( waveOutMessage((HWAVEOUT)waveOutDeviceId, DRV_QUERYDEVICEINTERFACE,
+    if( waveOutMessage(hDeviceId, DRV_QUERYDEVICEINTERFACE,
             (DWORD_PTR)devicePath, devicePathSize ) == MMSYSERR_NOERROR )
     {
         int count = PaWin_WDMKS_QueryFilterMaximumChannelCount( devicePath, /* isInput= */ 0  );
@@ -1017,11 +1023,11 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     /* the following calls assume that if wave*Message fails the preferred device parameter won't be modified */
     preferredDeviceStatusFlags = 0;
     waveInPreferredDevice = -1;
-    waveInMessage( (HWAVEIN)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveInPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
+    waveInMessage( (HWAVEIN)((UINT_PTR)WAVE_MAPPER), DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveInPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
 
     preferredDeviceStatusFlags = 0;
     waveOutPreferredDevice = -1;
-    waveOutMessage( (HWAVEOUT)WAVE_MAPPER, DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
+    waveOutMessage( (HWAVEOUT)((UINT_PTR)WAVE_MAPPER), DRVM_MAPPER_PREFERRED_GET, (DWORD_PTR)&waveOutPreferredDevice, (DWORD_PTR)&preferredDeviceStatusFlags );
 
     maximumPossibleDeviceCount = 0;
 
@@ -2563,7 +2569,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->primeStreamUsingCallback = ( (streamFlags&paPrimeOutputBuffersUsingStreamCallback) && streamCallback ) ? 1 : 0;
 
     /* time to sleep when throttling due to >100% cpu usage.
-        -a quater of a buffer's duration */
+        -a quarter of a buffer's duration */
     stream->throttledSleepMsecs =
             (unsigned long)(stream->bufferProcessor.framesPerHostBuffer *
              stream->bufferProcessor.samplePeriod * .25 * 1000);
@@ -2886,7 +2892,7 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
         if( waitResult == WAIT_FAILED )
         {
             result = paUnanticipatedHostError;
-            /** @todo FIXME/REVIEW: can't return host error info from an asyncronous thread. see http://www.portaudio.com/trac/ticket/143 */
+            /** @todo FIXME/REVIEW: can't return host error info from an asynchronous thread. see http://www.portaudio.com/trac/ticket/143 */
             done = 1;
         }
         else if( waitResult == WAIT_TIMEOUT )
@@ -3161,7 +3167,7 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
                             if( outputUnderflow && !done && !stream->stopProcessing )
                             {
                                 /* Recover from underflow in the case where the
-                                    underflow occured while processing the buffer
+                                    underflow occurred while processing the buffer
                                     we just finished */
 
                                 result = CatchUpOutputBuffers( stream );
@@ -3359,7 +3365,7 @@ static PaError StartStream( PaStream *s )
                 }
             }   
 
-            /* we queue all channels of a single buffer frame (accross all
+            /* we queue all channels of a single buffer frame (across all
                 devices, because some multidevice multichannel drivers work
                 better this way */
             for( j=0; j<stream->output.deviceCount; ++j )

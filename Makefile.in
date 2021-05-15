@@ -144,6 +144,7 @@ SRC_DIRS = \
 	src/hostapi/asio \
 	src/hostapi/coreaudio \
 	src/hostapi/dsound \
+	src/hostapi/sndio \
 	src/hostapi/jack \
 	src/hostapi/oss \
 	src/hostapi/wasapi \

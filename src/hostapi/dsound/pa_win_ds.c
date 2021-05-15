@@ -58,7 +58,7 @@
 
 
 /*
-  Use the earliest version of DX required, no need to polute the namespace
+  Use the earliest version of DX required, no need to pollute the namespace
 */
 #ifdef PAWIN_USE_DIRECTSOUNDFULLDUPLEXCREATE
 #define DIRECTSOUND_VERSION 0x0800
@@ -667,7 +667,7 @@ static GUID pawin_IID_IKsPropertySet =
     property, and the other is using DSPROPERTY_DIRECTSOUNDDEVICE_ENUMERATE.
     I tried both methods and only the second worked. I found two postings on the
     net from people who had the same problem with the first method, so I think the method used here is 
-    more common/likely to work. The probem is that IKsPropertySet_Get returns S_OK
+    more common/likely to work. The problem is that IKsPropertySet_Get returns S_OK
     but the fields of the device description are not filled in.
 
     The mechanism we use works by registering an enumeration callback which is called for 
@@ -757,7 +757,7 @@ static double defaultSampleRateSearchOrder_[] =
 /************************************************************************************
 ** Extract capabilities from an output device, and add it to the device info list
 ** if successful. This function assumes that there is enough room in the
-** device info list to accomodate all entries.
+** device info list to accommodate all entries.
 **
 ** The device will not be added to the device list if any errors are encountered.
 */
@@ -1014,7 +1014,7 @@ static PaError AddOutputDeviceInfoFromDirectSound(
 /************************************************************************************
 ** Extract capabilities from an input device, and add it to the device info list
 ** if successful. This function assumes that there is enough room in the
-** device info list to accomodate all entries.
+** device info list to accommodate all entries.
 **
 ** The device will not be added to the device list if any errors are encountered.
 */
@@ -2255,7 +2255,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         /*  create half duplex buffers. also used for full-duplex streams which didn't 
             succeed when using the full duplex API. that could happen because
-            DX8 or greater isnt installed, the i/o devices aren't the same 
+            DX8 or greater isn't installed, the i/o devices aren't the same 
             physical device. etc.
         */
 
@@ -2798,7 +2798,7 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
 
 #else
 
-    /* tick using WaitForSingleObject timout */
+    /* tick using WaitForSingleObject timeout */
     while ( WaitForSingleObject( stream->processingCompleted, timerPeriodMs ) == WAIT_TIMEOUT )
     {
         TimerCallback( 0, 0, (DWORD_PTR)pArg, 0, 0 );

@@ -71,6 +71,8 @@
 #include "pa_ringbuffer.h"
 #include "pa_debugprint.h"
 
+#include "pa_jack.h"
+
 static pthread_t mainThread_;
 static char *jackErr_ = NULL;
 static const char* clientName_ = "PortAudio";
