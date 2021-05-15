@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
     data.phase = 0;
     data.sampsToGo = SAMPLE_RATE * 20;        /* 20 seconds. */
 
-    /* initialise portaudio subsytem */
+    /* initialise portaudio subsystem */
     err = Pa_Initialize();
 
     inputParameters.device = Pa_GetDefaultInputDevice();    /* default input device */
@@ -179,7 +179,7 @@ done:
 
     if( err != paNoError )
     {
-        fprintf( stderr, "An error occured while using portaudio\n" );
+        fprintf( stderr, "An error occurred while using portaudio\n" );
         if( err == paUnanticipatedHostError )
         {
             fprintf( stderr, " unanticipated host error.\n");

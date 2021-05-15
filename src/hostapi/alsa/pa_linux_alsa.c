@@ -844,7 +844,6 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     double * defaultLowLatency, * defaultHighLatency, * defaultSampleRate =
         &devInfo->baseDeviceInfo.defaultSampleRate;
     double defaultSr = *defaultSampleRate;
-    int dir;
 
     assert( pcm );
 
@@ -922,7 +921,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     alsaBufferFrames = 512;
     alsaPeriodFrames = 128;
     ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, &dir ), paUnanticipatedHostError );
+    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, NULL ), paUnanticipatedHostError );
     *defaultLowLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
 
     /* Base the high latency case on values four times larger */
@@ -932,7 +931,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
     ENSURE_( SetApproximateSampleRate( pcm, hwParams, defaultSr ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, &dir ), paUnanticipatedHostError );
+    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, NULL ), paUnanticipatedHostError );
     *defaultHighLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
 
     *minChannels = (int)minChans;
@@ -1068,6 +1067,10 @@ static int IgnorePlugin( const char *pluginId )
     static const char *ignoredPlugins[] = {"hw", "plughw", "plug", "dsnoop", "tee",
         "file", "null", "shm", "cards", "rate_convert", NULL};
     int i = 0;
+
+    if( getenv( "PA_ALSA_IGNORE_ALL_PLUGINS" ) && atoi( getenv( "PA_ALSA_IGNORE_ALL_PLUGINS") ) )
+        return 1;
+
     while( ignoredPlugins[i] )
     {
         if( !strcmp( pluginId, ignoredPlugins[i] ) )
@@ -1329,6 +1332,8 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
                     paInsufficientMemory );
             snprintf( deviceName, len, "%s: %s (%s)", cardName, infoName, buf );
 
+            PA_DEBUG(( "%s: Found device [%d]: %s\n", __FUNCTION__, numDeviceNames, deviceName ));
+
             ++numDeviceNames;
             if( !hwDevInfos || numDeviceNames > maxDeviceNames )
             {
@@ -1452,7 +1457,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
 
         PA_ENSURE( FillInDevInfo( alsaApi, hwInfo, blocking, devInfo, &devIdx ) );
     }
-    assert( devIdx < numDeviceNames );
+    assert( devIdx <= numDeviceNames );
     /* Now inspect 'dmix' and 'default' plugins */
     for( i = 0; i < numDeviceNames; ++i )
     {
@@ -1957,7 +1962,7 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
 {
     /* Configuration consists of setting all of ALSA's parameters.
      * These parameters come in two flavors: hardware parameters
-     * and software paramters.  Hardware parameters will affect
+     * and software parameters.  Hardware parameters will affect
      * the way the device is initialized, software parameters
      * affect the way ALSA interacts with me, the user-level client.
      */
@@ -1971,7 +1976,7 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
 
     /* self->framesPerPeriod = framesPerHostBuffer; */
 
-    /* ... fill up the configuration space with all possibile
+    /* ... fill up the configuration space with all possible
      * combinations of parameters this device will accept */
     ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
 
@@ -2156,7 +2161,7 @@ static PaError PaAlsaStream_Initialize( PaAlsaStream *self, PaAlsaHostApiReprese
 
     self->framesPerUserBuffer = framesPerUserBuffer;
     self->neverDropInput = streamFlags & paNeverDropInput;
-    /* XXX: Ignore paPrimeOutputBuffersUsingStreamCallback untill buffer priming is fully supported in pa_process.c */
+    /* XXX: Ignore paPrimeOutputBuffersUsingStreamCallback until buffer priming is fully supported in pa_process.c */
     /*
     if( outParams & streamFlags & paPrimeOutputBuffersUsingStreamCallback )
         self->primeBuffers = 1;
@@ -2384,7 +2389,7 @@ static PaError PaAlsaStreamComponent_DetermineFramesPerBuffer( PaAlsaStreamCompo
                 {
                     framesPerHostBuffer *= 2;
                 }
-                /* One extra period is preferrable to one less (should be more robust) */
+                /* One extra period is preferable to one less (should be more robust) */
                 if( bufferSize / framesPerHostBuffer < numPeriods )
                 {
                     framesPerHostBuffer /= 2;
@@ -3199,7 +3204,7 @@ static int SetApproximateSampleRate( snd_pcm_t *pcm, snd_pcm_hw_params_t *hwPara
     ENSURE_( alsa_snd_pcm_hw_params_set_rate_near( pcm, hwParams, &setRate, NULL ), paUnanticipatedHostError );
     /* The value actually set will be put in 'setRate' (may be way off); check the deviation as a proportion
      * of the requested-rate with reference to the max-deviate-ratio (larger values allow less deviation) */
-    deviation = abs( setRate - reqRate );
+    deviation = abs( (int)setRate - (int)reqRate );
     if( deviation > 0 && deviation * RATE_MAX_DEVIATE_RATIO > reqRate )
         result = paInvalidSampleRate;
 
@@ -3634,14 +3639,15 @@ error:
  */
 static PaError PaAlsaStreamComponent_BeginPolling( PaAlsaStreamComponent* self, struct pollfd* pfds )
 {
-    PaError result = paNoError;
-    int ret = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
-    (void)ret;  /* Prevent unused variable warning if asserts are turned off */
-    assert( ret == self->nfds );
-
+    int nfds = alsa_snd_pcm_poll_descriptors( self->pcm, pfds, self->nfds );
+    /* If alsa returns anything else, like -EPIPE return */
+    if( nfds != self->nfds )
+    {
+        return paUnanticipatedHostError;
+    }
     self->ready = 0;
 
-    return result;
+    return paNoError;
 }
 
 /** Examine results from poll().
@@ -3798,14 +3804,24 @@ static PaError PaAlsaStream_WaitForFrames( PaAlsaStream *self, unsigned long *fr
         if( pollCapture )
         {
             capturePfds = self->pfds;
-            PA_ENSURE( PaAlsaStreamComponent_BeginPolling( &self->capture, capturePfds ) );
+            PaError res = PaAlsaStreamComponent_BeginPolling( &self->capture, capturePfds );
+            if( res != paNoError)
+            {
+              xrun = 1;
+              goto end;
+            }
             totalFds += self->capture.nfds;
         }
         if( pollPlayback )
         {
             /* self->pfds is in effect an array of fds; if necessary, index past the capture fds */
             playbackPfds = self->pfds + (pollCapture ? self->capture.nfds : 0);
-            PA_ENSURE( PaAlsaStreamComponent_BeginPolling( &self->playback, playbackPfds ) );
+            PaError res = PaAlsaStreamComponent_BeginPolling( &self->playback, playbackPfds );
+            if( res != paNoError)
+            {
+              xrun = 1;
+              goto end;
+            }
             totalFds += self->playback.nfds;
         }
 
@@ -4181,7 +4197,7 @@ error:
  * directly is obtained from ALSA, we then request as much directly accessible memory as possible within this amount
  * from ALSA. The buffer memory is registered with the PA buffer processor and processing is carried out with
  * PaUtil_EndBufferProcessing. Finally, the number of processed frames is reported to ALSA. The processing can
- * happen in several iterations untill we have consumed the known number of available frames (or an xrun is detected).
+ * happen in several iterations until we have consumed the known number of available frames (or an xrun is detected).
  */
 static void *CallbackThreadFunc( void *userData )
 {
@@ -4267,7 +4283,7 @@ static void *CallbackThreadFunc( void *userData )
             /* There is still buffered output that needs to be processed */
         }
 
-        /* Wait for data to become available, this comes down to polling the ALSA file descriptors untill we have
+        /* Wait for data to become available, this comes down to polling the ALSA file descriptors until we have
          * a number of available frames.
          */
         PA_ENSURE( PaAlsaStream_WaitForFrames( stream, &framesAvail, &xrun ) );
