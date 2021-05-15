@@ -44,6 +44,7 @@
 
 PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+PaError PaSndio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 PaError PaOSS_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 /* Added for IRIX, Pieter, oct 2, 2003: */
 PaError PaSGI_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
@@ -82,7 +83,11 @@ PaUtilHostApiInitializer *paHostApiInitializers[] =
 #if PA_USE_JACK
         PaJack_Initialize,
 #endif
-                    /* Added for IRIX, Pieter, oct 2, 2003: */
+
+#if PA_USE_SNDIO
+        PaSndio_Initialize,
+#endif
+
 #if PA_USE_SGI 
         PaSGI_Initialize,
 #endif
