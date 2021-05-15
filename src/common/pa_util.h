@@ -29,13 +29,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -65,7 +65,7 @@ struct PaUtilHostApiRepresentation;
  host api specific extension functions which aren't passed a rep pointer
  by pa_front.c.
 
- @param hostApi A pointer to a host API represenation pointer. Apon success
+ @param hostApi A pointer to a host API representation pointer. Upon success
  this will receive the requested representation pointer.
 
  @param type A valid host API type identifier.
@@ -79,7 +79,7 @@ PaError PaUtil_GetHostApiRepresentation( struct PaUtilHostApiRepresentation **ho
 
 
 /** Convert a PortAudio device index into a host API specific device index.
- @param hostApiDevice Pointer to a device index, on success this will recieve the
+ @param hostApiDevice Pointer to a device index, on success this will receive the
  converted device index value.
  @param device The PortAudio device index to convert.
  @param hostApi The host api which the index should be converted for.
@@ -112,7 +112,7 @@ void PaUtil_SetLastHostErrorInfo( PaHostApiTypeId hostApiType, long errorCode,
         const char *errorText );
 
 
-        
+
 /* the following functions are implemented in a platform platform specific
  .c file
 */
@@ -121,7 +121,7 @@ void PaUtil_SetLastHostErrorInfo( PaHostApiTypeId hostApiType, long errorCode,
 void *PaUtil_AllocateMemory( long size );
 
 
-/** Realease block if non-NULL. block may be NULL */
+/** Release block if non-NULL. block may be NULL */
 void PaUtil_FreeMemory( void *block );
 
 

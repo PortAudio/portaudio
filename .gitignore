@@ -17,6 +17,7 @@ lib-stamp
 lib/*
 libtool
 portaudio-2.0.pc
+autom4te.cache/*
 
 # Precompiled Headers
 *.gch
@@ -40,3 +41,12 @@ portaudio-2.0.pc
 *.exe
 *.out
 *.app
+
+# Visual Studio 2017/2019 state folder
+.vs/
+
+# Visual Studio CMake build output folder 
+out/
+
+# Visual Studio CMake settings file
+CMakeSettings.json

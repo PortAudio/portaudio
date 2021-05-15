@@ -723,6 +723,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -821,6 +822,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE}'
@@ -1073,6 +1075,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1210,7 +1221,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1363,6 +1374,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -2526,6 +2538,14 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
+
+PAMAC_TEST_PROGRAM="
+  /* cdefs.h checks for supported architectures. */
+  #include <sys/cdefs.h>
+  int main() {
+      return 0;
+  }
+"
 
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
@@ -15823,66 +15843,19 @@ case "${host_os}" in
 
 
         CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Wno-deprecated -Werror"
-        LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework Carbon"
+        LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices"
 
         if test "x$enable_mac_universal" = "xyes" ; then
-           case `xcodebuild -version | sed -n 's/Xcode \(.*\)/\1/p'` in
-
-           12*|3.0|3.1)
-                                                                                                                              if [ -d /Developer/SDKs/MacOSX10.5.sdk ] ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.5.sdk"
-              else
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
-              fi
-              ;;
-
-           *)
-                                                                                    if xcodebuild -version -sdk macosx10.5 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.5 Path`"
-              elif xcodebuild -version -sdk macosx10.6 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.6 Path`"
-              elif xcodebuild -version -sdk macosx10.7 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.7 Path`"
-              elif xcodebuild -version -sdk macosx10.8 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.8 Path`"
-              elif xcodebuild -version -sdk macosx10.9 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.9 Path`"
-              elif xcodebuild -version -sdk macosx10.10 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.10 Path`"
-              elif xcodebuild -version -sdk macosx10.11 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.11 Path`"
-              elif xcodebuild -version -sdk macosx10.12 Path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.4"
-                 mac_sysroot="-isysroot `xcodebuild -version -sdk macosx10.12 Path`"
-              else
-                 as_fn_error $? "Could not find 10.5 to 10.12 SDK." "$LINENO" 5
-              fi
-           esac
-
-                                 mac_arches=""
-           for arch in i386 x86_64 ppc ppc64
+           mac_version_min="-mmacosx-version-min=10.6"
+           mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
+           mac_arches=""
+           for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"
               CFLAGS="$CFLAGS -arch $arch"
               cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
-
-int
-main ()
-{
-return 0;
-  ;
-  return 0;
-}
+$PAMAC_TEST_PROGRAM
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
 
@@ -15922,6 +15895,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
             CFLAGS="$CFLAGS -I$DXDIR/include -UPA_USE_DS -DPA_USE_DS=1"
+            INCLUDES="$INCLUDES pa_win_ds.h pa_win_waveformat.h"
         fi
 
         if [ "x$with_asio" = "xyes" ]; then
@@ -15930,6 +15904,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lm -lole32 -luuid"
             CFLAGS="$CFLAGS -ffast-math -fomit-frame-pointer -I\$(top_srcdir)/src/hostapi/asio -I$ASIODIR/host/pc -I$ASIODIR/common -I$ASIODIR/host -UPA_USE_ASIO -DPA_USE_ASIO=1 -DWINDOWS"
+            INCLUDES="$INCLUDES pa_asio.h"
 
                                                             CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0501 -DWINVER=0x0501"
 
@@ -15944,6 +15919,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             #VC98="\"/c/Program Files/Microsoft Visual Studio/VC98/Include\""
             #CFLAGS="$CFLAGS -I$VC98 -DPA_NO_WMME -DPA_NO_ASIO"
             CFLAGS="$CFLAGS -I$DXDIR/include -UPA_USE_WDMKS -DPA_USE_WDMKS=1"
+            INCLUDES="$INCLUDES pa_win_wdmks.h"
         fi
 
         if [ "x$with_wmme" = "xyes" ]; then
@@ -15951,13 +15927,15 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm"
             CFLAGS="$CFLAGS -UPA_USE_WMME -DPA_USE_WMME=1"
+            INCLUDES="$INCLUDES pa_win_wmme.h pa_win_waveformat.h"
         fi
 
         if [ "x$with_wasapi" = "xyes" ]; then
             add_objects src/hostapi/wasapi/pa_win_wasapi.o src/common/pa_ringbuffer.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_coinitialize.o src/os/win/pa_win_waveformat.o
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
             DLL_LIBS="${DLL_LIBS} -lwinmm -lole32"
-            CFLAGS="$CFLAGS -I\$(top_srcdir)/src/hostapi/wasapi/mingw-include -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
+            CFLAGS="$CFLAGS -UPA_USE_WASAPI -DPA_USE_WASAPI=1"
+            INCLUDES="$INCLUDES pa_win_wasapi.h pa_win_waveformat.h"
         fi
         ;;
 

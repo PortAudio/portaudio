@@ -1,7 +1,7 @@
 /** @file paex_read_write_wire.c
-	@ingroup examples_src
-	@brief Tests full duplex blocking I/O by passing input straight to output.
-	@author Bjorn Roche. XO Audio LLC for Z-Systems Engineering.
+    @ingroup examples_src
+    @brief Tests full duplex blocking I/O by passing input straight to output.
+    @author Bjorn Roche. XO Audio LLC for Z-Systems Engineering.
     @author based on code by: Phil Burk  http://www.softsynth.com
     @author based on code by: Ross Bencina rossb@audiomulch.com
 */
@@ -95,6 +95,7 @@ int main(void)
     char *sampleBlock = NULL;
     int i;
     int numBytes;
+    int numChannels;
 
     printf("patest_read_write_wire.c\n"); fflush(stdout);
     printf("sizeof(int) = %lu\n", sizeof(int)); fflush(stdout);
@@ -117,7 +118,7 @@ int main(void)
     printf( "     LL: %g s\n", outputInfo->defaultLowOutputLatency );
     printf( "     HL: %g s\n", outputInfo->defaultHighOutputLatency );
 
-    int numChannels = inputInfo->maxInputChannels < outputInfo->maxOutputChannels
+    numChannels = inputInfo->maxInputChannels < outputInfo->maxOutputChannels
             ? inputInfo->maxInputChannels : outputInfo->maxOutputChannels;
     printf( "Num channels = %d.\n", numChannels );
 
@@ -178,27 +179,26 @@ int main(void)
 xrun:
     printf("err = %d\n", err); fflush(stdout);
     if( stream ) {
-       Pa_AbortStream( stream );
-       Pa_CloseStream( stream );
+        Pa_AbortStream( stream );
+        Pa_CloseStream( stream );
     }
     free( sampleBlock );
     Pa_Terminate();
     if( err & paInputOverflow )
-       fprintf( stderr, "Input Overflow.\n" );
+        fprintf( stderr, "Input Overflow.\n" );
     if( err & paOutputUnderflow )
-       fprintf( stderr, "Output Underflow.\n" );
+        fprintf( stderr, "Output Underflow.\n" );
     return -2;
 error1:
     free( sampleBlock );
 error2:
     if( stream ) {
-       Pa_AbortStream( stream );
-       Pa_CloseStream( stream );
+        Pa_AbortStream( stream );
+        Pa_CloseStream( stream );
     }
     Pa_Terminate();
-    fprintf( stderr, "An error occured while using the portaudio stream\n" );
+    fprintf( stderr, "An error occurred while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
     return -1;
 }
-

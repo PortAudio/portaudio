@@ -1,7 +1,7 @@
 /** @file paex_record_file.c
-	@ingroup examples_src
-	@brief Record input into a file, then playback recorded data from file (Windows only at the moment) 
-	@author Robert Bielik
+    @ingroup examples_src
+    @brief Record input into a file, then playback recorded data from file (Windows only at the moment)
+    @author Robert Bielik
 */
 /*
  * $Id: paex_record_file.c 1752 2011-09-08 03:21:55Z philburk $
@@ -31,13 +31,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -51,6 +51,11 @@
 #include <windows.h>
 #include <process.h>
 #endif
+
+static ring_buffer_size_t rbs_min(ring_buffer_size_t a, ring_buffer_size_t b)
+{
+    return (a < b) ? a : b;
+}
 
 /* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
 #define FILE_NAME       "audio_data.raw"
@@ -243,7 +248,7 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     ring_buffer_size_t elementsWriteable = PaUtil_GetRingBufferWriteAvailable(&data->ringBuffer);
-    ring_buffer_size_t elementsToWrite = min(elementsWriteable, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
+    ring_buffer_size_t elementsToWrite = rbs_min(elementsWriteable, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
     const SAMPLE *rptr = (const SAMPLE*)inputBuffer;
 
     (void) outputBuffer; /* Prevent unused variable warnings. */
@@ -268,7 +273,7 @@ static int playCallback( const void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     ring_buffer_size_t elementsToPlay = PaUtil_GetRingBufferReadAvailable(&data->ringBuffer);
-    ring_buffer_size_t elementsToRead = min(elementsToPlay, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
+    ring_buffer_size_t elementsToRead = rbs_min(elementsToPlay, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
     SAMPLE* wptr = (SAMPLE*)outputBuffer;
 
     (void) inputBuffer; /* Prevent unused variable warnings. */
@@ -428,12 +433,12 @@ int main(void)
             }
             if( err < 0 ) goto done;
         }
-        
+
         err = Pa_CloseStream( stream );
         if( err != paNoError ) goto done;
 
         fclose(data.file);
-        
+
         printf("Done.\n"); fflush(stdout);
     }
 
@@ -443,11 +448,10 @@ done:
         PaUtil_FreeMemory( data.ringBufferData );
     if( err != paNoError )
     {
-        fprintf( stderr, "An error occured while using the portaudio stream\n" );
+        fprintf( stderr, "An error occurred while using the portaudio stream\n" );
         fprintf( stderr, "Error number: %d\n", err );
         fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
         err = 1;          /* Always return 0 or 1, but no other return codes. */
     }
     return err;
 }
-

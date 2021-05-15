@@ -28,13 +28,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -53,14 +53,20 @@ extern "C"
 {
 #endif /* __cplusplus */
 
-    /* Setup flags */
+    /** Flags to indicate valid fields in PaWinWDMKSInfo.
+     @see PaWinWDMKSInfo
+     @version Available as of 19.5.0.
+    */
     typedef enum PaWinWDMKSFlags
     {
-        /* Makes WDMKS use the supplied latency figures instead of relying on the frame size reported
-           by the WaveCyclic device. Use at own risk! */
+        /** Makes WDMKS use the supplied latency figures instead of relying on the frame size reported
+         by the WaveCyclic device. Use at own risk!
+        */
         paWinWDMKSOverrideFramesize   = (1 << 0),
 
-        /* Makes WDMKS (output stream) use the given channelMask instead of the default */
+        /** Makes WDMKS (output stream) use the given channelMask instead of the default.
+          @version Available as of 19.5.0.
+        */
         paWinWDMKSUseGivenChannelMask = (1 << 1),
 
     } PaWinWDMKSFlags;
@@ -69,11 +75,20 @@ extern "C"
         unsigned long size;             /**< sizeof(PaWinWDMKSInfo) */
         PaHostApiTypeId hostApiType;    /**< paWDMKS */
         unsigned long version;          /**< 1 */
+
+        /** Flags indicate which fields are valid.
+         @see PaWinWDMKSFlags
+         @version Available as of 19.5.0.
+        */
         unsigned long flags;
 
-        /* The number of packets to use for WaveCyclic devices, range is [2, 8]. Set to zero for default value of 2. */
+        /** The number of packets to use for WaveCyclic devices, range is [2, 8]. Set to zero for default value of 2. */
         unsigned noOfPackets;
-        /* If paWinWDMKSUseGivenChannelMask bit is set in flags, use this as channelMask instead of default */
+
+        /** If paWinWDMKSUseGivenChannelMask bit is set in flags, use this as channelMask instead of default.
+         @see PaWinWDMKSFlags
+         @version Available as of 19.5.0.
+        */
         unsigned channelMask;
     } PaWinWDMKSInfo;
 
@@ -119,4 +134,4 @@ extern "C"
 }
 #endif /* __cplusplus */
 
-#endif /* PA_WIN_DS_H */                                  
+#endif /* PA_WIN_DS_H */
