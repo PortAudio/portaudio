@@ -38,6 +38,7 @@ Pa_GetStreamReadAvailable           @31
 Pa_GetStreamWriteAvailable          @32
 Pa_GetSampleSize                    @33
 Pa_Sleep                            @34
+Pa_GetVersionInfo                   @35
 @DEF_EXCLUDE_ASIO_SYMBOLS@PaAsio_GetAvailableBufferSizes      @50
 @DEF_EXCLUDE_ASIO_SYMBOLS@PaAsio_ShowControlPanel             @51
 @DEF_EXCLUDE_X86_PLAIN_CONVERTERS@PaUtil_InitializeX86PlainConverters @52
