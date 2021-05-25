@@ -458,7 +458,7 @@ IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib)
-  INSTALL(EXPORT portaudio-targets FILE "portaudioTargets.cmake" DESTINATION "lib/cmake/portaudio")
+  INSTALL(EXPORT portaudio-targets NAMESPACE "portaudio::" FILE "portaudioTargets.cmake" DESTINATION "lib/cmake/portaudio")
   EXPORT(TARGETS ${PA_TARGETS} FILE "${PROJECT_BINARY_DIR}/cmake/portaudio/portaudioTargets.cmake")
   INSTALL(FILES "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake"
                 "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake"
