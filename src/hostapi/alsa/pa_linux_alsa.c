@@ -4620,6 +4620,7 @@ PaError PaAlsa_GetStreamInputCard( PaStream* s, int* card )
     PaError result = paNoError;
     snd_pcm_info_t* pcmInfo;
 
+    stream = NULL;
     PA_ENSURE( GetAlsaStreamPointer( s, &stream ) );
 
     /* XXX: More descriptive error? */
@@ -4639,6 +4640,7 @@ PaError PaAlsa_GetStreamOutputCard( PaStream* s, int* card )
     PaError result = paNoError;
     snd_pcm_info_t* pcmInfo;
 
+    stream = NULL;
     PA_ENSURE( GetAlsaStreamPointer( s, &stream ) );
 
     /* XXX: More descriptive error? */
