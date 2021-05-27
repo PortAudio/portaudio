@@ -64,6 +64,7 @@ typedef struct
     double           left_phase;
     double           right_phase;
     volatile PaTime  outTime;
+    volatile long    frameCount;
 }
 paTestData;
 
@@ -105,6 +106,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 
     data->left_phase = left_phase;
     data->right_phase = right_phase;
+    data->frameCount += framesPerBuffer;
 
     return paContinue;
 }
@@ -124,8 +126,8 @@ static void ReportStreamTime( PaStream *stream, paTestData *data )
     else
     {
         latency = outTime - streamTime;
-        printf("Stream time = %8.4f, outTime = %8.4f, latency = %8.4f\n",
-            streamTime, outTime, latency );
+        printf("Stream time = %8.4f, outTime = %8.4f, latency = %8.4f, frames = %ld\n",
+            streamTime, outTime, latency, data->frameCount );
     }
     fflush(stdout);
 }
@@ -137,12 +139,11 @@ int main(void)
     PaStreamParameters outputParameters;
     PaStream *stream;
     PaError err;
-    paTestData data;
+    paTestData data = {0};
     PaTime startTime;
+    long maxFrameCount;
 
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
-
-    data.left_phase = data.right_phase = 0;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -175,12 +176,19 @@ int main(void)
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
 
+    /* Record time at start so we can stop after a few seconds. */
     startTime = Pa_GetStreamTime( stream );
-
+    maxFrameCount = SAMPLE_RATE * NUM_SECONDS; /* Twice as long. */
     do
     {
         ReportStreamTime( stream, &data );
         Pa_Sleep(100);
+        /* Check the frameCount in case the StreamTime is dead. */
+        if ( data.frameCount > maxFrameCount ) {
+            fprintf( stderr, "Time not advancing fast enough!\n" );
+            err = paTimedOut;
+            goto error;
+        }
     } while( (Pa_GetStreamTime( stream ) - startTime) < (NUM_SECONDS/2) );
 
     /* Stop sound for 2 seconds. */
