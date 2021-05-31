@@ -440,29 +440,31 @@ ENDIF()
 OPTION(PA_DISABLE_INSTALL "Disable targets install and uninstall (for embedded builds)" OFF)
 
 IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
+  INCLUDE(GNUInstallDirs)
   INCLUDE(CMakePackageConfigHelpers)
 
   CONFIGURE_PACKAGE_CONFIG_FILE(cmake_support/portaudioConfig.cmake.in ${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake
-    INSTALL_DESTINATION "lib/cmake/portaudio"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio"
     NO_CHECK_REQUIRED_COMPONENTS_MACRO)
   WRITE_BASIC_PACKAGE_VERSION_FILE(${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake
     VERSION ${PA_VERSION}
     COMPATIBILITY SameMajorVersion)
   CONFIGURE_FILE(cmake_support/portaudio-2.0.pc.in ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc @ONLY)
-  INSTALL(FILES README.md DESTINATION share/doc/portaudio)
-  INSTALL(FILES LICENSE.txt DESTINATION share/doc/portaudio)
-  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION lib/pkgconfig)
-  INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION include)
+  INSTALL(FILES README.md DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+  INSTALL(FILES LICENSE.txt DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+  INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
   INSTALL(TARGETS ${PA_TARGETS}
     EXPORT portaudio-targets
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib)
-  INSTALL(EXPORT portaudio-targets NAMESPACE "portaudio::" FILE "portaudioTargets.cmake" DESTINATION "lib/cmake/portaudio")
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  )
+  INSTALL(EXPORT portaudio-targets NAMESPACE "portaudio::" FILE "portaudioTargets.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio")
   EXPORT(TARGETS ${PA_TARGETS} FILE "${PROJECT_BINARY_DIR}/cmake/portaudio/portaudioTargets.cmake")
   INSTALL(FILES "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake"
                 "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake"
-    DESTINATION "lib/cmake/portaudio")
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio")
 
   IF (NOT TARGET uninstall)
     CONFIGURE_FILE(
