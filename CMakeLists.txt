@@ -99,6 +99,7 @@ if(WIN32)
     target_sources(portaudio PRIVATE src/os/win/pa_x86_plain_converters.c)
   else()
     target_compile_definitions(portaudio PRIVATE _WIN32_WINNT=0x0501 WINVER=0x0501)
+    set(DEF_EXCLUDE_X86_PLAIN_CONVERTERS ";")
   endif()
 
   target_compile_definitions(portaudio PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -139,6 +140,8 @@ if(WIN32)
       src/hostapi/asio/iasiothiscallresolver.cpp
       "${ASIO_SOURCE_FILES}"
     )
+  else()
+    set(DEF_EXCLUDE_ASIO_SYMBOLS ";")
   endif()
 
   option(DIRECTSOUND "Enable support for DirectSound" ON)
@@ -170,6 +173,8 @@ if(WIN32)
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_win_wasapi.h)
     target_compile_definitions(portaudio PRIVATE PA_USE_WASAPI=1)
     target_link_libraries(portaudio ole32 uuid)
+  else()
+    set(DEF_EXCLUDE_WASAPI_SYMBOLS ";")
   endif()
 
   option(WDMKS "Enable support for WDMKS" ON)
@@ -186,6 +191,11 @@ if(WIN32)
   option(WDMKS_DEVICE_INFO "Use WDM/KS API for device info" ON)
   if(WDMKS_DEVICE_INFO)
     target_compile_definitions(portaudio PRIVATE PAWIN_USE_WDMKS_DEVICE_INFO)
+  endif()
+
+  if(BUILD_SHARED_LIBS)
+    configure_file(cmake/windows_dll_exports.def.in ${CMAKE_CURRENT_BINARY_DIR}/windows_dll_exports.def @ONLY)
+    target_sources(portaudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/windows_dll_exports.def)
   endif()
 elseif(UNIX)
   target_sources(portaudio PRIVATE
@@ -309,7 +319,6 @@ set_target_properties(portaudio PROPERTIES
   PUBLIC_HEADER "${PORTAUDIO_PUBLIC_HEADERS}"
   MACOSX_FRAMEWORK_IDENTIFIER com.portaudio
   FRAMEWORK_VERSION A
-  WINDOWS_EXPORT_ALL_SYMBOLS TRUE
   VERSION ${PROJECT_VERSION}
   SOVERSION ${PROJECT_VERSION}
 )
