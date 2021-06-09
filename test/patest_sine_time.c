@@ -48,7 +48,9 @@
 #include "portaudio.h"
 #include "pa_util.h"
 
-#define NUM_SECONDS   (8)
+/* Total time. */
+#define NUM_SECONDS   (8.0)
+#define NUM_LOOPS     (2)
 #define SAMPLE_RATE   (44100)
 #define FRAMES_PER_BUFFER  (64)
 
@@ -63,7 +65,9 @@ typedef struct
 {
     double           left_phase;
     double           right_phase;
+    volatile PaTime  latency;
     volatile PaTime  outTime;
+    volatile long    frameCount;
 }
 paTestData;
 
@@ -91,6 +95,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
     (void) inputBuffer;
 
     data->outTime = timeInfo->outputBufferDacTime;
+    data->latency = timeInfo->outputBufferDacTime - timeInfo->currentTime;
 
     for( i=0; i<framesPerBuffer; i++ )
     {
@@ -105,6 +110,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 
     data->left_phase = left_phase;
     data->right_phase = right_phase;
+    data->frameCount += framesPerBuffer;
 
     return paContinue;
 }
@@ -113,7 +119,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 static void ReportStreamTime( PaStream *stream, paTestData *data );
 static void ReportStreamTime( PaStream *stream, paTestData *data )
 {
-    PaTime  streamTime, latency, outTime;
+    PaTime  streamTime, outTime;
 
     streamTime = Pa_GetStreamTime( stream );
     outTime = data->outTime;
@@ -123,9 +129,8 @@ static void ReportStreamTime( PaStream *stream, paTestData *data )
     }
     else
     {
-        latency = outTime - streamTime;
-        printf("Stream time = %8.4f, outTime = %8.4f, latency = %8.4f\n",
-            streamTime, outTime, latency );
+        printf("Stream time = %8.4f, outTime = %8.4f, latency = %8.4f, frames = %ld\n",
+            streamTime, outTime, data->latency, data->frameCount );
     }
     fflush(stdout);
 }
@@ -137,12 +142,12 @@ int main(void)
     PaStreamParameters outputParameters;
     PaStream *stream;
     PaError err;
-    paTestData data;
+    paTestData data = {0};
     PaTime startTime;
+    long maxFrameCount;
+    double secondsPerLoop;
 
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
-
-    data.left_phase = data.right_phase = 0;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -168,52 +173,52 @@ int main(void)
               &data );
     if( err != paNoError ) goto error;
 
-    /* Watch until sound is halfway finished. */
-    printf("Play for %d seconds.\n", NUM_SECONDS/2 ); fflush(stdout);
+    for (int i = 0; i < 2; i++) {
+        secondsPerLoop = NUM_SECONDS / NUM_LOOPS;
+        /* Watch until sound loop is finished. */
+        printf("Play for %3.1f seconds.\n",  secondsPerLoop); fflush(stdout);
 
-    data.outTime = -1.0; /* mark time for callback as undefined */
-    err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
+        data.outTime = -1.0; /* mark time for callback as undefined */
+        data.frameCount = 0;
+        err = Pa_StartStream( stream );
+        if( err != paNoError ) goto error;
 
-    startTime = Pa_GetStreamTime( stream );
+        /* Record time at start so we can stop after a few seconds. */
+        startTime = Pa_GetStreamTime( stream );
+        maxFrameCount = SAMPLE_RATE * (secondsPerLoop + 2); /* Longer than expected. */
+        do
+        {
+            ReportStreamTime( stream, &data );
+            Pa_Sleep(100);
+            /* Check the frameCount in case the StreamTime is dead. */
+            if ( data.frameCount > maxFrameCount ) {
+                fprintf( stderr, "Time not advancing fast enough!\n" );
+                err = paTimedOut;
+                goto error;
+            }
+        } while( (Pa_GetStreamTime( stream ) - startTime) < secondsPerLoop );
 
-    do
-    {
-        ReportStreamTime( stream, &data );
-        Pa_Sleep(100);
-    } while( (Pa_GetStreamTime( stream ) - startTime) < (NUM_SECONDS/2) );
+        /* Stop sound for 2 seconds. */
+        err = Pa_StopStream( stream );
+        if( err != paNoError ) goto error;
 
-    /* Stop sound for 2 seconds. */
-    err = Pa_StopStream( stream );
-    if( err != paNoError ) goto error;
-
-    printf("Pause for 2 seconds.\n"); fflush(stdout);
-    Pa_Sleep( 2000 );
-
-    data.outTime = -1.0; /* mark time for callback as undefined */
-    err = Pa_StartStream( stream );
-    if( err != paNoError ) goto error;
-
-    startTime = Pa_GetStreamTime( stream );
-
-    printf("Play until sound is finished.\n"); fflush(stdout);
-    do
-    {
-        ReportStreamTime( stream, &data );
-        Pa_Sleep(100);
-    } while( (Pa_GetStreamTime( stream ) - startTime) < (NUM_SECONDS/2) );
+        if (i < (NUM_LOOPS - 1))
+        printf("Pause for 2 seconds.\n"); fflush(stdout);
+        Pa_Sleep( 2000 );
+    }
 
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto error;
 
     Pa_Terminate();
-    printf("Test finished.\n");
-    return err;
+    printf("Test PASSED.\n");
+    return 0;
 
 error:
     Pa_Terminate();
     fprintf( stderr, "An error occurred while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
-    return err;
+    printf("Test FAILED.\n");
+    return 1;
 }
