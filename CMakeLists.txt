@@ -6,12 +6,13 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 
+PROJECT(portaudio)
+
 # Check if the user is building PortAudio stand-alone or as part of a larger
 # project. If this is part of a larger project (i.e. the CMakeLists.txt has
 # been imported by some other CMakeLists.txt), we don't want to trump over
 # the top of that project's global settings.
 IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
-  PROJECT(portaudio)
 
   # CMAKE_CONFIGURATION_TYPES only exists for multi-config generators (like
   # Visual Studio or Xcode). For these projects, we won't define
