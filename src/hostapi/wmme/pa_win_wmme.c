@@ -329,13 +329,13 @@ static PaError CreateEventWithPaError( HANDLE *handle,
         LPSECURITY_ATTRIBUTES lpEventAttributes,
         BOOL bManualReset,
         BOOL bInitialState,
-        LPCTSTR lpName )
+        LPCWSTR lpName )
 {
     PaError result = paNoError;
 
     *handle = NULL;
 
-    *handle = CreateEvent( lpEventAttributes, bManualReset, bInitialState, lpName );
+    *handle = CreateEventW( lpEventAttributes, bManualReset, bInitialState, lpName );
     if( *handle == NULL )
     {
         result = paUnanticipatedHostError;
