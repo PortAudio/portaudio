@@ -78,9 +78,6 @@ static char *jackErr_ = NULL;
 static const char* clientName_ = "PortAudio";
 static const char* port_regex_suffix = ":.*";
 
-#define STRINGIZE_HELPER(expr) #expr
-#define STRINGIZE(expr) STRINGIZE_HELPER(expr)
-
 /* Check PaError */
 #define ENSURE_PA(expr) \
     do { \
@@ -93,7 +90,7 @@ static const char* port_regex_suffix = ":.*";
                 if (! err ) err = "unknown error"; \
                 PaUtil_SetLastHostErrorInfo( paJACK, -1, err ); \
             } \
-            PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = paErr; \
             goto error; \
         } \
@@ -109,7 +106,7 @@ static const char* port_regex_suffix = ":.*";
                 if (!err) err = "unknown error"; \
                 PaUtil_SetLastHostErrorInfo( paJACK, -1, err ); \
             } \
-            PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = (code); \
             goto error; \
         } \

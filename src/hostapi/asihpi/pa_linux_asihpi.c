@@ -175,7 +175,7 @@
         PaError paError = (expr); \
         if( UNLIKELY( paError < paNoError ) ) \
         { \
-            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = paError; \
             goto error; \
         } \
@@ -186,7 +186,7 @@
     do { \
         if( UNLIKELY( (expr) == 0 ) ) \
         { \
-            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = (paError); \
             goto error; \
         } \
@@ -203,7 +203,7 @@
         HPI_GetErrorText( hpiError, szError ); \
         PA_DEBUG(( "HPI error %d occurred: %s\n", hpiError, szError )); \
         /* This message will always be displayed, even if debug info is disabled */ \
-            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             if( (paError) == paUnanticipatedHostError ) \
         { \
             PA_DEBUG(( "Host error description: %s\n", szError )); \
