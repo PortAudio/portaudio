@@ -6,6 +6,8 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 
+include(GNUInstallDirs)
+
 # Check if the user is building PortAudio stand-alone or as part of a larger
 # project. If this is part of a larger project (i.e. the CMakeLists.txt has
 # been imported by some other CMakeLists.txt), we don't want to trump over
@@ -452,18 +454,18 @@ IF(NOT PA_OUTPUT_OSX_FRAMEWORK AND NOT PA_DISABLE_INSTALL)
   CONFIGURE_FILE(cmake_support/portaudio-2.0.pc.in ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc @ONLY)
   INSTALL(FILES README.md DESTINATION share/doc/portaudio)
   INSTALL(FILES LICENSE.txt DESTINATION share/doc/portaudio)
-  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION lib/pkgconfig)
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
   INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION include)
   INSTALL(TARGETS ${PA_TARGETS}
     EXPORT portaudio-targets
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib)
-  INSTALL(EXPORT portaudio-targets FILE "portaudioTargets.cmake" DESTINATION "lib/cmake/portaudio")
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  INSTALL(EXPORT portaudio-targets FILE "portaudioTargets.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio")
   EXPORT(TARGETS ${PA_TARGETS} FILE "${PROJECT_BINARY_DIR}/cmake/portaudio/portaudioTargets.cmake")
   INSTALL(FILES "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfig.cmake"
                 "${CMAKE_BINARY_DIR}/cmake/portaudio/portaudioConfigVersion.cmake"
-    DESTINATION "lib/cmake/portaudio")
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio")
 
   IF (NOT TARGET uninstall)
     CONFIGURE_FILE(
