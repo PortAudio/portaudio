@@ -45,8 +45,8 @@
  format to another.
 */
 
-
 #include "portaudio.h"  /* for PaSampleFormat */
+#include "pa_lib.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -104,7 +104,7 @@ typedef void PaUtilConverter(
     If the source and destination formats are the same, a function which
     copies data of the appropriate size will be returned.
 */
-PaUtilConverter* PaUtil_SelectConverter( PaSampleFormat sourceFormat,
+PA_LIB_API PaUtilConverter* PaUtil_SelectConverter( PaSampleFormat sourceFormat,
         PaSampleFormat destinationFormat, PaStreamFlags flags );
 
 

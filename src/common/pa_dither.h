@@ -44,8 +44,8 @@
  @brief Functions for generating dither noise
 */
 
+#include "pa_lib.h"
 #include "pa_types.h"
-
 
 #ifdef __cplusplus
 extern "C"
@@ -66,7 +66,7 @@ typedef struct PaUtilTriangularDitherGenerator{
 
 
 /** @brief Initialize dither state */
-void PaUtil_InitializeTriangularDitherState( PaUtilTriangularDitherGenerator *ditherState );
+PA_LIB_API void PaUtil_InitializeTriangularDitherState( PaUtilTriangularDitherGenerator *ditherState );
 
 
 /**

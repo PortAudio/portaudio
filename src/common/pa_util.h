@@ -50,6 +50,7 @@
 
 
 #include "portaudio.h"
+#include "pa_lib.h"
 
 /** Preprocessor Utilities
 */
@@ -125,11 +126,11 @@ void PaUtil_SetLastHostErrorInfo( PaHostApiTypeId hostApiType, long errorCode,
 */
 
 /** Allocate size bytes, guaranteed to be aligned to a FIXME byte boundary */
-void *PaUtil_AllocateMemory( long size );
+PA_LIB_API void *PaUtil_AllocateMemory( long size );
 
 
 /** Release block if non-NULL. block may be NULL */
-void PaUtil_FreeMemory( void *block );
+PA_LIB_API void PaUtil_FreeMemory( void *block );
 
 
 /** Return the number of currently allocated blocks. This function can be
@@ -153,7 +154,7 @@ void PaUtil_InitializeClock( void );
 
  @see PaUtil_InitializeClock
 */
-double PaUtil_GetTime( void );
+PA_LIB_API double PaUtil_GetTime( void );
 
 
 /* void Pa_Sleep( long msec );  must also be implemented in per-platform .c file */
