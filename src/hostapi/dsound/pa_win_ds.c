@@ -1555,30 +1555,30 @@ static HRESULT InitFullDuplexInputOutputBuffers( PaWinDsStream *stream,
 
         /* retrieve the pre ds 8 buffer interfaces which are used by the rest of the code */
 
-        hr = IUnknown_QueryInterface( pCaptureBuffer8, &IID_IDirectSoundCaptureBuffer, (LPVOID *)&stream->pDirectSoundInputBuffer );
+        hr = IDirectSoundCaptureBuffer8_QueryInterface( pCaptureBuffer8, &IID_IDirectSoundCaptureBuffer, (LPVOID *)&stream->pDirectSoundInputBuffer );
 
         if( hr == DS_OK )
-            hr = IUnknown_QueryInterface( pRenderBuffer8, &IID_IDirectSoundBuffer, (LPVOID *)&stream->pDirectSoundOutputBuffer );
+            hr = IDirectSoundBuffer8_QueryInterface( pRenderBuffer8, &IID_IDirectSoundBuffer, (LPVOID *)&stream->pDirectSoundOutputBuffer );
 
         /* release the ds 8 interfaces, we don't need them */
-        IUnknown_Release( pCaptureBuffer8 );
-        IUnknown_Release( pRenderBuffer8 );
+        IDirectSoundCaptureBuffer8_Release( pCaptureBuffer8 );
+        IDirectSoundBuffer8_Release( pRenderBuffer8 );
 
         if( !stream->pDirectSoundInputBuffer || !stream->pDirectSoundOutputBuffer ){
             /* couldn't get pre ds 8 interfaces for some reason. clean up. */
             if( stream->pDirectSoundInputBuffer )
             {
-                IUnknown_Release( stream->pDirectSoundInputBuffer );
+                IDirectSoundCaptureBuffer_Release( stream->pDirectSoundInputBuffer );
                 stream->pDirectSoundInputBuffer = NULL;
             }
 
             if( stream->pDirectSoundOutputBuffer )
             {
-                IUnknown_Release( stream->pDirectSoundOutputBuffer );
+                IDirectSoundBuffer_Release( stream->pDirectSoundOutputBuffer );
                 stream->pDirectSoundOutputBuffer = NULL;
             }
 
-            IUnknown_Release( stream->pDirectSoundFullDuplex8 );
+            IDirectSoundFullDuplex_Release( stream->pDirectSoundFullDuplex8 );
             stream->pDirectSoundFullDuplex8 = NULL;
         }
     }
