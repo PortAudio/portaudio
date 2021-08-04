@@ -57,6 +57,7 @@
 #include <errno.h>  /* EBUSY */
 #include <signal.h> /* sig_atomic_t */
 #include <math.h>
+#include <pthread.h>
 #include <semaphore.h>
 
 #include <jack/types.h>
