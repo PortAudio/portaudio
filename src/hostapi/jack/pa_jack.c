@@ -53,7 +53,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <errno.h>  /* EBUSY */
 #include <signal.h> /* sig_atomic_t */
 #include <math.h>
