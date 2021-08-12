@@ -272,37 +272,17 @@ elseif(UNIX)
       endif()
     endif()
 
-    option(OSS "Enable support for OSS" OFF)
+    # OSS is intentionally off by default to avoid confusing users of PortAudio
+    # applications. OSS builds but there are no devices available on modern
+    # Linux systems.
+    find_package(OSS)
+    cmake_dependent_option(OSS "Enable support for OSS" OFF "OSS_FOUND" OFF)
     if(OSS)
-      # OSS has no library to link, only a header
-      find_path(OSS_INCLUDE_DIR
-        NAMES sys/soundcard.h
-        DOC "OSS include directory")
-      if(OSS_INCLUDE_DIR)
-        target_compile_definitions(PortAudio PRIVATE HAVE_SYS_SOUNDCARD_H)
-      else()
-        find_path(OSS_INCLUDE_DIR
-          NAMES linux/soundcard.h
-          DOC "OSS include directory")
-        if(OSS_INCLUDE_DIR)
-          target_compile_definitions(PortAudio PRIVATE HAVE_LINUX_SOUNDCARD_H)
-        else()
-          find_path(OSS_INCLUDE_DIR
-            NAMES machine/soundcard.h
-            DOC "OSS include directory")
-          target_compile_definitions(PortAudio PRIVATE HAVE_MACHINE_SOUNDCARD_H)
-        endif()
-      endif()
-
-      mark_as_advanced(OSS_INCLUDE_DIR)
-      if(OSS_INCLUDE_DIR)
-        message(STATUS "Found OSS: ${OSS_INCLUDE_DIR}")
-        target_include_directories(PortAudio PRIVATE "${OSS_INCLUDE_DIR}")
-        target_sources(PortAudio PRIVATE src/hostapi/oss/pa_unix_oss.c)
-        target_compile_definitions(PortAudio PRIVATE PA_USE_OSS=1)
-      else()
-        message(FATAL_ERROR "OSS NOT found. Reconfigure CMake with -DOSS=OFF to build without OSS.")
-      endif()
+      target_sources(PortAudio PRIVATE src/hostapi/oss/pa_unix_oss.c)
+      target_compile_definitions(PortAudio PRIVATE PA_USE_OSS=1)
+      target_link_libraries(PortAudio PRIVATE OSS::oss)
+      # The FindOSS.cmake module does not need to be installed like the JACK modules because it
+      # does not link any library; it only adds an include directory and compile definition.
     endif()
   endif()
 endif()
