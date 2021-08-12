@@ -185,6 +185,8 @@ if(WIN32)
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_win_wmme.h)
     target_compile_definitions(PortAudio PRIVATE PA_USE_WMME=1)
     target_link_libraries(PortAudio PRIVATE ole32 uuid)
+  else()
+    set(DEF_EXCLUDE_WMME_SYMBOLS ";")
   endif()
 
   option(WASAPI "Enable support for WASAPI" ON)
