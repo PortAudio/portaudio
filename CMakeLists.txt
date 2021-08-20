@@ -150,6 +150,27 @@ if(PA_USE_JACK)
   install(FILES cmake/modules/FindJACK.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
 endif()
 
+# PulseAudio is mostly for Linux
+
+find_package(PULSEAUDIO)
+cmake_dependent_option(PULSEAUDIO "Enable support for PulseAudio general purpose sound server" ON PULSEAUDIO_FOUND OFF)
+if(PULSEAUDIO)
+  target_link_libraries(PortAudio PRIVATE ${PULSEAUDIO_LIBRARIES})
+  target_sources(PortAudio PRIVATE src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
+    src/hostapi/pulseaudio/pa_linux_pulseaudio.c
+    src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
+
+  set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" src/hostapi/pulseaudio/pa_linux_pulseaudio_block_internal.h
+    src/hostapi/pulseaudio/pa_linux_pulseaudio_internal.h
+    src/hostapi/pulseaudio/pa_linux_pulseaudio_cb_internal.h)
+
+  target_compile_definitions(PortAudio PRIVATE PA_USE_PULSEAUDIO=1)
+  set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} pulseaudio")
+
+  # needed for PortAudioConfig.cmake so `find_package(PortAudio)` works in downstream projects
+  install(FILES cmake/modules/FindPULSEAUDIO.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
+endif()
+
 if(WIN32)
   target_sources(PortAudio PRIVATE
     src/os/win/pa_win_coinitialize.c
