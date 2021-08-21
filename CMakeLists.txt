@@ -162,10 +162,7 @@ if(PULSEAUDIO)
     src/hostapi/pulseaudio/pa_linux_pulseaudio.c
     src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
 
-  set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}"
-    src/hostapi/pulseaudio/pa_linux_pulseaudio_block_internal.h
-    src/hostapi/pulseaudio/pa_linux_pulseaudio_internal.h
-    src/hostapi/pulseaudio/pa_linux_pulseaudio_cb_internal.h)
+  set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_linux_pulseaudio.h)
 
   target_compile_definitions(PortAudio PRIVATE PA_USE_PULSEAUDIO=1)
   set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} libpulse")
