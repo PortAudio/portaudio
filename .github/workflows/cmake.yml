@@ -18,7 +18,7 @@ jobs:
             dependencies_extras: libjack-dev
             cmake_generator: "Unix Makefiles"
             cmake_options:
-              -DOSS=ON
+              -DPA_USE_OSS=ON
           - name: Ubuntu MinGW
             os: ubuntu-latest
             install_dir: ~/portaudio
@@ -26,7 +26,7 @@ jobs:
             dependencies_extras: mingw-w64
             cmake_generator: "Unix Makefiles"
             cmake_options:
-              -DASIO=ON
+              -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
               -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-w64-mingw32.cmake
           - name: Windows MSVC
@@ -37,7 +37,7 @@ jobs:
             # asiosdk instead of asiosdk.zip.
             asio_sdk_cache_path: "asiosdk.zip"
             cmake_options:
-              -DASIO=ON
+              -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
           - name: Windows MinGW
             os: windows-latest
@@ -47,7 +47,7 @@ jobs:
             # asiosdk instead of asiosdk.zip.
             asio_sdk_cache_path: "asiosdk.zip"
             cmake_options:
-              -DASIO=ON
+              -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
           - name: macOS Clang
             os: macOS-latest
@@ -90,9 +90,9 @@ jobs:
            ${{ matrix.cmake_options }}
            -DCMAKE_INSTALL_PREFIX=${{ matrix.install_dir }}
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
-           -DSKELETON=ON
-           -DBUILD_TESTING=ON
-           -DBUILD_EXAMPLES=ON
+           -DPA_USE_SKELETON=ON
+           -DPA_BUILD_TESTS=ON
+           -DPA_BUILD_EXAMPLES=ON
            -S .
            -B build
     - name: build
