@@ -11,15 +11,29 @@ option(BUILD_EXAMPLES "Include example projects" OFF)
 
 add_library(PortAudio
   src/common/pa_allocation.c
+  src/common/pa_allocation.h
   src/common/pa_converters.c
+  src/common/pa_converters.h
   src/common/pa_cpuload.c
+  src/common/pa_cpuload.h
   src/common/pa_debugprint.c
+  src/common/pa_debugprint.h
   src/common/pa_dither.c
+  src/common/pa_dither.h
+  src/common/pa_endianness.h
   src/common/pa_front.c
+  src/common/pa_hostapi.h
+  src/common/pa_memorybarrier.h
   src/common/pa_process.c
+  src/common/pa_process.h
   src/common/pa_ringbuffer.c
+  src/common/pa_ringbuffer.h
   src/common/pa_stream.c
+  src/common/pa_stream.h
   src/common/pa_trace.c
+  src/common/pa_trace.h
+  src/common/pa_types.h
+  src/common/pa_util.h
 )
 target_include_directories(PortAudio PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -101,10 +115,14 @@ endif()
 
 if(WIN32)
   target_sources(PortAudio PRIVATE
+    src/os/win/pa_win_coinitialize.c
+    src/os/win/pa_win_coinitialize.h
     src/os/win/pa_win_hostapis.c
     src/os/win/pa_win_util.c
+    src/os/win/pa_win_util.h
     src/os/win/pa_win_waveformat.c
-    src/os/win/pa_win_coinitialize.c
+    src/os/win/pa_win_wdmks_utils.h
+    src/os/win/pa_x86_plain_converters.h
   )
   target_include_directories(PortAudio PRIVATE src/os/win)
   set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_win_waveformat.h)
@@ -159,6 +177,7 @@ if(WIN32)
     target_sources(PortAudio PRIVATE
       src/hostapi/asio/pa_asio.cpp
       src/hostapi/asio/iasiothiscallresolver.cpp
+      src/hostapi/asio/iasiothiscallresolver.h
     )
   else()
     set(DEF_EXCLUDE_ASIO_SYMBOLS ";")
@@ -169,6 +188,7 @@ if(WIN32)
     target_sources(PortAudio PRIVATE
       src/hostapi/dsound/pa_win_ds.c
       src/hostapi/dsound/pa_win_ds_dynlink.c
+      src/hostapi/dsound/pa_win_ds_dynlink.h
     )
     target_include_directories(PortAudio PRIVATE src/hostapi/dsound)
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_win_ds.h)
@@ -223,6 +243,7 @@ elseif(UNIX)
   target_sources(PortAudio PRIVATE
     src/os/unix/pa_unix_hostapis.c
     src/os/unix/pa_unix_util.c
+    src/os/unix/pa_unix_util.h
   )
   target_include_directories(PortAudio PRIVATE src/os/unix)
   target_link_libraries(PortAudio PRIVATE m)
@@ -234,7 +255,10 @@ elseif(UNIX)
     target_sources(PortAudio PRIVATE
       src/hostapi/coreaudio/pa_mac_core.c
       src/hostapi/coreaudio/pa_mac_core_blocking.c
+      src/hostapi/coreaudio/pa_mac_core_blocking.h
+      src/hostapi/coreaudio/pa_mac_core_internal.h
       src/hostapi/coreaudio/pa_mac_core_utilities.c
+      src/hostapi/coreaudio/pa_mac_core_utilities.h
     )
     target_include_directories(PortAudio PRIVATE src/hostapi/coreaudio)
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_mac_core.h)
@@ -288,6 +312,10 @@ elseif(UNIX)
     endif()
   endif()
 endif()
+
+# Add public headers to sources of PortAudio (used by some IDEs to list them in project tree)
+source_group("Public Header Files" FILES ${PORTAUDIO_PUBLIC_HEADERS})
+target_sources(PortAudio PRIVATE ${PORTAUDIO_PUBLIC_HEADERS})
 
 #
 # Installation
