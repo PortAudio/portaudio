@@ -16,6 +16,7 @@ jobs:
             cmake_options:
               -DPA_USE_OSS=ON
               -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+            werror_flags: "-Werror"
           - name: Ubuntu MinGW
             os: ubuntu-latest
             install_dir: ~/portaudio
