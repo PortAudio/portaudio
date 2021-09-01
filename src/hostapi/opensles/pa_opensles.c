@@ -50,6 +50,7 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <math.h>
+#include <malloc.h>
 #include <string.h>
 #include <time.h>
 
@@ -1041,6 +1042,7 @@ static void StreamProcessingCallback( void *userData )
                 (*stream->recorderItf)->SetRecordState( stream->recorderItf, SL_RECORDSTATE_STOPPED );
                 (*stream->inputBufferQueueItf)->Clear( stream->inputBufferQueueItf );
             }
+            PaUnixThreading_EXIT( paNoError );
             return;
         }
         else if( framesProcessed == 0 && !(stream->doAbort || stream->doStop) ) /* if AbortStream or StopStream weren't called, stop from the cb */
@@ -1060,7 +1062,8 @@ static void StreamProcessingCallback( void *userData )
             stream->isStopped = SL_BOOLEAN_TRUE;
             if( stream->streamRepresentation.streamFinishedCallback != NULL )
                 stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
-           return;
+            PaUnixThreading_EXIT( paNoError );
+            return;
         }
     }
 }
