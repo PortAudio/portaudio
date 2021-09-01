@@ -50,6 +50,7 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <math.h>
+#include <string.h>
 #include <time.h>
 
 #include <android/api-level.h>
