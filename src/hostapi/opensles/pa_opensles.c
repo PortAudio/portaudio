@@ -547,7 +547,6 @@ typedef struct OpenslesOutputStream
     SLPlayItf playerItf;
     SLAndroidSimpleBufferQueueItf outputBufferQueueItf;
     /* SLPrefetchStatusItf prefetchStatusItf; */
-    SLVolumeItf volumeItf;
     SLAndroidConfigurationItf outputConfigurationItf;
 
     sem_t outputSem;
@@ -836,17 +835,17 @@ static PaError InitializeOutputStream(PaOpenslesHostApiRepresentation *openslesH
 
     if( !stream->isBlocking )
     {
-        const SLInterfaceID ids[] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_VOLUME, SL_IID_ANDROIDCONFIGURATION };
-        const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
-        const unsigned interfaceCount = 3;
+        const SLInterfaceID ids[] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_ANDROIDCONFIGURATION };
+        const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
+        const unsigned interfaceCount = 2;
         slResult = (*openslesHostApi->slEngineItf)->CreateAudioPlayer(openslesHostApi->slEngineItf, &stream->outputStream->audioPlayer,
                                                                       &audioSrc, &audioSink, interfaceCount, ids, req);
     }
     else
     {
-        const SLInterfaceID ids[] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_VOLUME, SL_IID_ANDROIDCONFIGURATION };
-        const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
-        const unsigned interfaceCount = 3;
+        const SLInterfaceID ids[] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_ANDROIDCONFIGURATION };
+        const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
+        const unsigned interfaceCount = 2;
         slResult = (*openslesHostApi->slEngineItf)->CreateAudioPlayer( openslesHostApi->slEngineItf, &stream->outputStream->audioPlayer,
                                                                        &audioSrc, &audioSink, interfaceCount, ids, req );
     }
@@ -874,7 +873,6 @@ static PaError InitializeOutputStream(PaOpenslesHostApiRepresentation *openslesH
 
     (*stream->outputStream->audioPlayer)->GetInterface( stream->outputStream->audioPlayer, SL_IID_PLAY, &stream->outputStream->playerItf );
     (*stream->outputStream->audioPlayer)->GetInterface( stream->outputStream->audioPlayer, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &stream->outputStream->outputBufferQueueItf );
-    (*stream->outputStream->audioPlayer)->GetInterface( stream->outputStream->audioPlayer, SL_IID_VOLUME, &stream->outputStream->volumeItf );
 
     stream->outputStream->outputBuffers = (void **) PaUtil_AllocateMemory( numberOfBuffers * sizeof(SLint16 *) );
     for( i = 0; i < numberOfBuffers; ++i )
