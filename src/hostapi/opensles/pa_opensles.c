@@ -569,7 +569,6 @@ typedef struct OpenslesStream
     volatile SLboolean doStop;
     volatile SLboolean doAbort;
 
-    int callbackResult;
     sem_t outputSem;
     sem_t inputSem;
 
@@ -593,6 +592,7 @@ static PaError InitializeInputStream( PaOpenslesHostApiRepresentation *openslesH
 static void StreamProcessingCallback( void *userData );
 static void NotifyBufferFreeCallback( SLAndroidSimpleBufferQueueItf bufferQueueItf, void *userData );
 /* static void PrefetchStatusCallback( SLPrefetchStatusItf prefetchStatusItf, void *userData, SLuint32 event ); */
+static PaError End( OpenslesStream *stream, SLboolean markStopped );
 
 static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                            PaStream** s,
@@ -961,6 +961,8 @@ static void StreamProcessingCallback( void *userData )
     OpenslesStream *stream = (OpenslesStream*)userData;
     PaStreamCallbackTimeInfo timeInfo = {0,0,0};
     unsigned long framesProcessed = 0;
+    int callbackResult = paContinue;
+    SLboolean markStopped = SL_BOOLEAN_TRUE;
     struct timespec timeSpec;
 
     while( 1 )
@@ -975,12 +977,6 @@ static void StreamProcessingCallback( void *userData )
         timeInfo.inputBufferAdcTime = (PaTime)(stream->framesPerHostCallback
                                                 / stream->streamRepresentation.streamInfo.sampleRate
                                                 + timeInfo.currentTime);
-
-        /* check if StopStream or AbortStream was called */
-        if( stream->doStop )
-            stream->callbackResult = paComplete;
-        else if( stream->doAbort )
-            stream->callbackResult = paAbort;
 
         PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
         PaUtil_BeginBufferProcessing( &stream->bufferProcessor, &timeInfo, stream->cbFlags );
@@ -1000,11 +996,17 @@ static void StreamProcessingCallback( void *userData )
                                                 (void*) ((SLint16 **)stream->inputBuffers)[stream->currentInputBuffer], 0 );
         }
 
+        /* check if StopStream or AbortStream was called */
+        if( stream->doStop )
+            callbackResult = paComplete;
+        else if( stream->doAbort )
+            callbackResult = paAbort;
+
         /* continue processing user buffers if cbresult is pacontinue or if cbresult is  pacomplete and userbuffers aren't empty yet  */
-        if( stream->callbackResult == paContinue
-            || ( stream->callbackResult == paComplete
+        if( callbackResult == paContinue
+            || ( callbackResult == paComplete
                  && !PaUtil_IsBufferProcessorOutputEmpty( &stream->bufferProcessor )) )
-            framesProcessed = PaUtil_EndBufferProcessing( &stream->bufferProcessor, &stream->callbackResult );
+            framesProcessed = PaUtil_EndBufferProcessing( &stream->bufferProcessor, &callbackResult );
 
         /* enqueue a buffer only when there are frames to be processed,
          * this will be 0 when paComplete + empty buffers or paAbort
@@ -1029,45 +1031,25 @@ static void StreamProcessingCallback( void *userData )
             }
         }
 
-        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed);
+        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer, framesProcessed );
 
-        if( framesProcessed == 0 && stream->doStop ) /* StopStream was called */
+        if( stream->doAbort )
+            goto end;
+        if( framesProcessed == 0 && ( stream->doStop || PaUnixThread_StopRequested( &stream->streamThread ) ) )
+            goto end;
+
+        if( callbackResult != paContinue )
         {
-            if( stream->hasOutput )
-            {
-                (*stream->playerItf)->SetPlayState( stream->playerItf, SL_PLAYSTATE_STOPPED );
-                (*stream->outputBufferQueueItf)->Clear( stream->outputBufferQueueItf );
-
-            }
-            if( stream->hasInput )
-            {
-                (*stream->recorderItf)->SetRecordState( stream->recorderItf, SL_RECORDSTATE_STOPPED );
-                (*stream->inputBufferQueueItf)->Clear( stream->inputBufferQueueItf );
-            }
-            PaUnixThreading_EXIT( paNoError );
-            return;
-        }
-        else if( framesProcessed == 0 && !(stream->doAbort || stream->doStop) ) /* if AbortStream or StopStream weren't called, stop from the cb */
-        {
-            if( stream->hasOutput )
-            {
-                (*stream->playerItf)->SetPlayState( stream->playerItf, SL_PLAYSTATE_STOPPED );
-                (*stream->outputBufferQueueItf)->Clear( stream->outputBufferQueueItf );
-            }
-            if( stream->hasInput )
-            {
-                (*stream->recorderItf)->SetRecordState( stream->recorderItf, SL_RECORDSTATE_STOPPED );
-                (*stream->inputBufferQueueItf)->Clear( stream->inputBufferQueueItf );
-            }
-
-            stream->isActive = SL_BOOLEAN_FALSE;
-            stream->isStopped = SL_BOOLEAN_TRUE;
-            if( stream->streamRepresentation.streamFinishedCallback != NULL )
-                stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
-            PaUnixThreading_EXIT( paNoError );
-            return;
+            // User should still be able to call StopStream
+            markStopped = SL_BOOLEAN_FALSE;
+            goto end;
         }
     }
+ end:
+    End( stream, markStopped );
+ exit:
+    PaUnixThreading_EXIT( paNoError );
+
 }
 
 /* static void PrefetchStatusCallback( SLPrefetchStatusItf prefetchStatusItf, void *userData, SLuint32 event )
@@ -1176,7 +1158,6 @@ static PaError StartStream( PaStream *s )
     /* Start the processing thread */
     if( !stream->isBlocking )
     {
-        stream->callbackResult = paContinue;
         PaUnixThread_New(&stream->streamThread, (void*) StreamProcessingCallback,
                          (void *) stream, 0, 0);
     }
@@ -1204,39 +1185,16 @@ static PaError StopStream( PaStream *s )
 {
     PaError result = paNoError;
     OpenslesStream *stream = (OpenslesStream*)s;
-    SLAndroidSimpleBufferQueueState state;
 
     if( stream->isBlocking )
     {
-        if( stream->hasOutput )
-        {
-            do {
-                (*stream->outputBufferQueueItf)->GetState( stream->outputBufferQueueItf, &state);
-            } while( state.count > 0 );
-            (*stream->playerItf)->SetPlayState( stream->playerItf, SL_PLAYSTATE_STOPPED );
-            (*stream->outputBufferQueueItf)->Clear( stream->outputBufferQueueItf );
-        }
-        if( stream->hasInput )
-        {
-            do {
-                (*stream->inputBufferQueueItf)->GetState( stream->inputBufferQueueItf, &state);
-            } while( state.count > 0 );
-            (*stream->recorderItf)->SetRecordState( stream->recorderItf, SL_RECORDSTATE_STOPPED );
-            (*stream->inputBufferQueueItf)->Clear( stream->inputBufferQueueItf );
-        }
-        stream->isActive = SL_BOOLEAN_FALSE;
-        stream->isStopped = SL_BOOLEAN_TRUE;
+        result = End( stream, SL_BOOLEAN_TRUE );
     }
     else
     {
         stream->doStop = SL_BOOLEAN_TRUE;
         PaUnixThread_Terminate( &stream->streamThread, 1, &result );
     }
-
-    stream->isActive = SL_BOOLEAN_FALSE;
-    stream->isStopped = SL_BOOLEAN_TRUE;
-    if( stream->streamRepresentation.streamFinishedCallback != NULL )
-        stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
 
     return result;
 }
@@ -1246,20 +1204,55 @@ static PaError AbortStream( PaStream *s )
     PaError result = paNoError;
     OpenslesStream *stream = (OpenslesStream*)s;
 
-    if( !stream->isBlocking )
+    if( stream->isBlocking )
+    {
+        result = End( stream, SL_BOOLEAN_TRUE );
+    }
+    else
     {
         stream->doAbort = SL_BOOLEAN_TRUE;
-        PaUnixThread_Terminate( &stream->streamThread, 0, &result );
+        result = PaUnixThread_Terminate( &stream->streamThread, 0, &result );
     }
 
-    /* stop immediately so enqueue has no effect */
+    return result;
+}
+
+
+/* Called from StopStream or AbortStream if blocking; the callback if non-blocking */
+static PaError End( OpenslesStream *stream, SLboolean markStopped )
+{
+    PaError result = paNoError;
+    SLAndroidSimpleBufferQueueState state;
+
+    PaUtil_ResetCpuLoadMeasurer( &stream->cpuLoadMeasurer );
+
     if( stream->hasOutput )
+    {
+        if( stream->isBlocking )
+        {
+            do {
+                (*stream->outputBufferQueueItf)->GetState( stream->outputBufferQueueItf, &state );
+            } while( state.count > 0 );
+        }
         (*stream->playerItf)->SetPlayState( stream->playerItf, SL_PLAYSTATE_STOPPED );
-    if( stream->hasInput)
+        (*stream->outputBufferQueueItf)->Clear( stream->outputBufferQueueItf );
+
+    }
+    if( stream->hasInput )
+    {
+        if( stream->isBlocking )
+        {
+            do {
+                (*stream->inputBufferQueueItf)->GetState( stream->inputBufferQueueItf, &state );
+            } while( state.count > 0 );
+        }
         (*stream->recorderItf)->SetRecordState( stream->recorderItf, SL_RECORDSTATE_STOPPED );
+        (*stream->inputBufferQueueItf)->Clear( stream->inputBufferQueueItf );
+    }
 
     stream->isActive = SL_BOOLEAN_FALSE;
-    stream->isStopped = SL_BOOLEAN_TRUE;
+    if( markStopped )
+        stream->isStopped = SL_BOOLEAN_TRUE;
     if( stream->streamRepresentation.streamFinishedCallback != NULL )
         stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
 
