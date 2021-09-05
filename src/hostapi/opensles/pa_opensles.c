@@ -54,7 +54,6 @@
 #include <string.h>
 #include <time.h>
 
-#include <android/api-level.h>
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 
