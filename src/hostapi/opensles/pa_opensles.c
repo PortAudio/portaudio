@@ -56,6 +56,7 @@
 
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
+#include <android/log.h>
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -107,6 +108,7 @@ static PaError WriteStream( PaStream* stream, const void *buffer, unsigned long 
 static signed long GetStreamReadAvailable( PaStream* stream );
 static signed long GetStreamWriteAvailable( PaStream* stream );
 static unsigned long GetApproximateLowBufferSize();
+static PaError PaSampleFormatToSLAndroidFormat( PaSampleFormat format, SLuint32 *androidFormat );
 
 static unsigned long nativeBufferSize = 0;
 static unsigned numberOfBuffers = 2;
@@ -553,6 +555,7 @@ typedef struct OpenslesOutputStream
     void **outputBuffers;
     int currentOutputBuffer;
 
+    SLuint32 format;
     unsigned bytesPerSample;
 }
 OpenslesOutputStream;
@@ -569,6 +572,7 @@ typedef struct OpenslesInputStream
     void **inputBuffers;
     int currentInputBuffer;
 
+    SLuint32 format;
     unsigned bytesPerSample;
 }
 OpenslesInputStream;
@@ -624,6 +628,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     OpenslesStream *stream = 0;
     unsigned long framesPerHostBuffer; /* these may not be equivalent for all implementations */
     int inputChannelCount, outputChannelCount;
+    PaSampleFormat availableInputFormats, availableOutputFormat;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
 #if __ANDROID_API__ >= 14
@@ -659,7 +664,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 #endif
         }
 
-        hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat( paInt16, inputSampleFormat );
+        hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat( paInt16 | paUInt8, inputSampleFormat );
     }
     else
     {
@@ -697,7 +702,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if( IsOutputSampleRateSupported( openslesHostApi, sampleRate * 1000 ) != paNoError )
             return paInvalidSampleRate;
 
-        hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat( paInt16, outputSampleFormat );
+        if( __ANDROID_API__ >= 21 )
+            hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat( paInt16 | paUInt8 | paFloat32, outputSampleFormat );
+        else
+            hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat( paInt16 | paUInt8, outputSampleFormat );
     }
     else
     {
@@ -772,7 +780,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         stream->hasInput = SL_BOOLEAN_TRUE;
-        stream->inputStream->bytesPerSample = sizeof(SLint16);
+        stream->inputStream->bytesPerSample = Pa_GetSampleSize( hostInputSampleFormat );
+        ENSURE( PaSampleFormatToSLAndroidFormat(
+                    hostInputSampleFormat, &stream->inputStream->format ),
+                "Unsupported host input sample format" );
         stream->streamRepresentation.streamInfo.inputLatency =
             ((PaTime)PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor)
              + stream->framesPerHostCallback) / sampleRate;
@@ -791,7 +802,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         stream->hasOutput = SL_BOOLEAN_TRUE;
-        stream->outputStream->bytesPerSample = sizeof(SLint16);
+        stream->outputStream->bytesPerSample = Pa_GetSampleSize( hostOutputSampleFormat );
+        ENSURE( PaSampleFormatToSLAndroidFormat(
+                    hostOutputSampleFormat, &stream->outputStream->format ),
+                "Unsupported host output sample format" );
         stream->streamRepresentation.streamInfo.outputLatency =
             ((PaTime)PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor)
              + stream->framesPerHostCallback) / sampleRate;
@@ -822,9 +836,15 @@ static PaError InitializeOutputStream(PaOpenslesHostApiRepresentation *openslesH
     int i, j;
     const SLuint32 channelMasks[] = { SL_SPEAKER_FRONT_CENTER, SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT };
     SLDataLocator_AndroidSimpleBufferQueue outputBQLocator = { SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, numberOfBuffers };
+#if __ANDROID_API__ >= 21
+    SLAndroidDataFormat_PCM_EX  formatPcm = { SL_ANDROID_DATAFORMAT_PCM_EX, stream->bufferProcessor.outputChannelCount,
+                                              sampleRate * 1000.0, stream->outputStream->bytesPerSample * 8, stream->outputStream->bytesPerSample * 8,
+                                              channelMasks[stream->bufferProcessor.outputChannelCount - 1], SL_BYTEORDER_LITTLEENDIAN,  stream->outputStream->format};
+#else
     SLDataFormat_PCM  formatPcm = { SL_DATAFORMAT_PCM, stream->bufferProcessor.outputChannelCount,
-                                    sampleRate * 1000.0, SL_PCMSAMPLEFORMAT_FIXED_16, SL_PCMSAMPLEFORMAT_FIXED_16,
+                                    sampleRate * 1000.0, stream->outputStream->bytesPerSample * 8, stream->outputStream->bytesPerSample * 8,
                                     channelMasks[stream->bufferProcessor.outputChannelCount - 1], SL_BYTEORDER_LITTLEENDIAN };
+#endif
     SLDataSource audioSrc = { &outputBQLocator, &formatPcm };
 
     (*openslesHostApi->slEngineItf)->CreateOutputMix( openslesHostApi->slEngineItf, &stream->outputStream->outputMixObject, 0, NULL, NULL );
@@ -873,7 +893,7 @@ static PaError InitializeOutputStream(PaOpenslesHostApiRepresentation *openslesH
     (*stream->outputStream->audioPlayer)->GetInterface( stream->outputStream->audioPlayer, SL_IID_PLAY, &stream->outputStream->playerItf );
     (*stream->outputStream->audioPlayer)->GetInterface( stream->outputStream->audioPlayer, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &stream->outputStream->outputBufferQueueItf );
 
-    stream->outputStream->outputBuffers = (void **) PaUtil_AllocateMemory( numberOfBuffers * sizeof(SLint16 *) );
+    stream->outputStream->outputBuffers = (void **) PaUtil_AllocateMemory( numberOfBuffers * stream->outputStream->bytesPerSample );
     for( i = 0; i < numberOfBuffers; ++i )
     {
         stream->outputStream->outputBuffers[i] = (void*) PaUtil_AllocateMemory( stream->framesPerHostCallback * stream->outputStream->bytesPerSample
@@ -921,11 +941,16 @@ static PaError InitializeInputStream( PaOpenslesHostApiRepresentation *openslesH
                                            SL_DEFAULTDEVICEID_AUDIOINPUT, NULL};
     SLDataSource audioSrc = {&inputLocator, NULL};
 
+#if __ANDROID_API__ >= 21
+    SLAndroidDataFormat_PCM_EX  formatPcm = { SL_ANDROID_DATAFORMAT_PCM_EX, stream->bufferProcessor.inputChannelCount,
+                                              sampleRate * 1000.0, stream->inputStream->bytesPerSample * 8, stream->inputStream->bytesPerSample * 8,
+                                              channelMasks[stream->bufferProcessor.inputChannelCount - 1], SL_BYTEORDER_LITTLEENDIAN,  stream->inputStream->format};
+#else
     SLDataFormat_PCM  formatPcm = { SL_DATAFORMAT_PCM, stream->bufferProcessor.inputChannelCount,
-                                    sampleRate * 1000.0, SL_PCMSAMPLEFORMAT_FIXED_16,
-                                    SL_PCMSAMPLEFORMAT_FIXED_16,
+                                    sampleRate * 1000.0, stream->inputStream->bytesPerSample * 8, stream->inputStream->bytesPerSample * 8,
                                     channelMasks[stream->bufferProcessor.inputChannelCount - 1],
                                     SL_BYTEORDER_LITTLEENDIAN };
+#endif
 
     SLDataLocator_AndroidSimpleBufferQueue inputBQLocator = { SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
                                                               numberOfBuffers };
@@ -953,7 +978,12 @@ static PaError InitializeInputStream( PaOpenslesHostApiRepresentation *openslesH
     slResult = (*stream->inputStream->audioRecorder)->Realize( stream->inputStream->audioRecorder, SL_BOOLEAN_FALSE );
     if( slResult != SL_RESULT_SUCCESS )
     {
-        (*stream->inputStream->audioRecorder)->Destroy( stream->inputStream->audioRecorder );
+        /* TODO bug?
+         * When Realize fails (for instance because of app permissions) the AudioRecorder should be destroyed to prevent leaks.
+         * this should work but causes a segmentation fault.
+         * Only noticed this for AudioRecorder so far.
+         */
+         /* (*stream->inputStream->audioRecorder)->Destroy( stream->inputStream->audioRecorder ); */
         result = paUnanticipatedHostError;
         goto error;
     }
@@ -965,7 +995,7 @@ static PaError InitializeInputStream( PaOpenslesHostApiRepresentation *openslesH
                                             SL_IID_RECORD,
                                             &stream->inputStream->recorderItf );
 
-    stream->inputStream->inputBuffers = (void **) PaUtil_AllocateMemory( numberOfBuffers * sizeof(SLint16 *) );
+    stream->inputStream->inputBuffers = (void **) PaUtil_AllocateMemory( numberOfBuffers * stream->inputStream->bytesPerSample );
     for( i = 0; i < numberOfBuffers; ++i )
     {
         stream->inputStream->inputBuffers[i] = (void*) PaUtil_AllocateMemory( stream->framesPerHostCallback
@@ -1020,14 +1050,14 @@ static void StreamProcessingCallback( void *userData )
             sem_wait( &stream->outputStream->outputSem );
             PaUtil_SetOutputFrameCount( &stream->bufferProcessor, 0 );
             PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor, 0,
-                                                 (void*) ((SLint16 **)stream->outputStream->outputBuffers)[stream->outputStream->currentOutputBuffer], 0 );
+                                                 (void*) (stream->outputStream->outputBuffers)[stream->outputStream->currentOutputBuffer], 0 );
         }
         if( stream->hasInput )
         {
             sem_wait( &stream->inputStream->inputSem );
             PaUtil_SetInputFrameCount( &stream->bufferProcessor, 0 );
             PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor, 0,
-                                                (void*) ((SLint16 **)stream->inputStream->inputBuffers)[stream->inputStream->currentInputBuffer], 0 );
+                                                (void*) (stream->inputStream->inputBuffers)[stream->inputStream->currentInputBuffer], 0 );
         }
 
         /* check if StopStream or AbortStream was called */
@@ -1403,6 +1433,29 @@ static unsigned long GetApproximateLowBufferSize()
         return 256;
     else
         return 192;
+}
+
+static PaError PaSampleFormatToSLAndroidFormat( PaSampleFormat format, SLuint32 *androidFormat )
+{
+    switch( format ) {
+#if __ANDROID_API__ >= 21
+    case paInt16:
+        (*androidFormat) = SL_ANDROID_PCM_REPRESENTATION_SIGNED_INT;
+        return paNoError;
+    case paUInt8:
+        (*androidFormat) = SL_ANDROID_PCM_REPRESENTATION_UNSIGNED_INT;
+        return paNoError;
+    case paFloat32:
+        (*androidFormat) = SL_ANDROID_PCM_REPRESENTATION_FLOAT;
+        return paNoError;
+    default:
+        return paUnanticipatedHostError;
+#else /* SLAndroidDataFormat_PCM_EX not used before 21*/
+    default:
+        (*androidFormat) = 0;
+        return paNoError;
+#endif
+    }
 }
 
 void PaOpenSLES_SetNativeBufferSize( unsigned long bufferSize )
