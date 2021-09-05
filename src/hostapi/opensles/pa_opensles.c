@@ -560,12 +560,14 @@ typedef struct OpenslesStream
     SLAndroidConfigurationItf inputConfigurationItf;
 
     SLboolean isBlocking;
-    SLboolean isStopped;
-    SLboolean isActive;
-    SLboolean doStop;
-    SLboolean doAbort;
     SLboolean hasOutput;
     SLboolean hasInput;
+
+    // Used between callback thread and main thread while it's running
+    volatile SLboolean isStopped;
+    volatile SLboolean isActive;
+    volatile SLboolean doStop;
+    volatile SLboolean doAbort;
 
     int callbackResult;
     sem_t outputSem;
