@@ -11,6 +11,9 @@ jobs:
 
     runs-on: ubuntu-latest
     name: Ubuntu
+    env:
+      CFLAGS: "-Werror"
+      CXXFLAGS: "-Werror"
 
     steps:
     - uses: actions/checkout@v2
