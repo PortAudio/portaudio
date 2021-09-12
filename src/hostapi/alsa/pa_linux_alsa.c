@@ -79,6 +79,11 @@
 
 #include "pa_linux_alsa.h"
 
+/* Allow this to build on the BSDs if alsalib is found */
+#ifndef ESTRPIPE
+    #define ESTRPIPE EPIPE
+#endif
+
 /* Add missing define (for compatibility with older ALSA versions) */
 #ifndef SND_PCM_TSTAMP_ENABLE
     #define SND_PCM_TSTAMP_ENABLE SND_PCM_TSTAMP_MMAP
