@@ -41,6 +41,10 @@ AC_ARG_WITH(oss,
             AS_HELP_STRING([--with-oss], [Enable support for OSS @<:@autodetect@:>@]),
             [with_oss=$withval])
 
+AC_ARG_WITH(sun,
+            AS_HELP_STRING([--with-sun], [Enable support for Sun/NetBSD @<:@autodetect@:>@]),
+            [with_sun=$withval])
+
 AC_ARG_WITH(asihpi,
             AS_HELP_STRING([--with-asihpi], [Enable support for ASIHPI @<:@autodetect@:>@]),
             [with_asihpi=$withval])
@@ -140,6 +144,10 @@ if test "x$with_oss" != "xno"; then
     if test "x$have_oss" = "xyes"; then
         AC_CHECK_LIB(ossaudio, _oss_ioctl, have_libossaudio=yes, have_libossaudio=no)
     fi
+fi
+have_sun=no
+if test "x$with_sun" != "xno"; then
+    AC_CHECK_HEADERS([sys/audioio.h], [have_sun=yes])
 fi
 have_jack=no
 if test "x$with_jack" != "xno"; then
@@ -386,6 +394,11 @@ case "${host_os}" in
            AC_DEFINE(PA_USE_OSS,1)
         fi
 
+        if [[ "$with_sun" != "no" ]] ; then
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/sun/pa_unix_sun.o"
+           AC_DEFINE(PA_USE_SUN,1)
+        fi
+
         if [[ "$have_asihpi" = "yes" ] && [ "$with_asihpi" != "no" ]] ; then
            LIBS="$LIBS -lhpi"
            DLL_LIBS="$DLL_LIBS -lhpi"
@@ -473,6 +486,7 @@ case "$target_os" in
      *)
 	AC_MSG_RESULT([
   OSS ......................... $have_oss
+  Sun/NetBSD .................. $have_sun
   JACK ........................ $have_jack
 ])
         ;;

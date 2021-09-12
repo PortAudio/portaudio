@@ -146,6 +146,7 @@ SRC_DIRS = \
 	src/hostapi/dsound \
 	src/hostapi/jack \
 	src/hostapi/oss \
+	src/hostapi/sun \
 	src/hostapi/skeleton \
 	src/hostapi/wasapi \
 	src/hostapi/wdmks \
