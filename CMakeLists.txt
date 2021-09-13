@@ -311,7 +311,7 @@ elseif(UNIX)
       # does not link any library; it only adds an include directory and compile definition.
     endif()
 
-    CHECK_INCLUDE_FILE(sys/audioio.h HAVE_SYS_AUDIOIO_H)
+    check_include_file(sys/audioio.h HAVE_SYS_AUDIOIO_H)
     cmake_dependent_option(SUN "Enable support for Sun/NetBSD Audio" ON "SUN_FOUND" SUN)
     if(SUN AND HAVE_SYS_AUDIOIO_H)
       target_sources(PortAudio PRIVATE src/hostapi/sun/pa_unix_sun.c)
