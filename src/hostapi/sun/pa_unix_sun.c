@@ -97,6 +97,11 @@
 #define AUDIO_ENCODING_SLINEAR AUDIO_ENCODING_LINEAR
 #endif
 
+// AUDIO_GETBUFINFO is simply an optimization
+#ifndef AUDIO_GETBUFINFO
+#define AUDIO_GETBUFINFO AUDIO_GETINFO
+#endif
+
 PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 static void Terminate( struct PaUtilHostApiRepresentation *hostApi );
 static bool AttemptEncoding( int fd, int encoding, int precision, bool record );
@@ -228,7 +233,7 @@ PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
         }
 #endif
 
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
         AUDIO_INITINFO(&info);
         if( dev->maxOutputChannels > 0 )
         {
@@ -614,7 +619,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->record.frameSize = (info.record.precision / 8) * info.record.channels;
         stream->record.bufferSize = framesPerBuffer;
 
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
         inputLatency = (info.blocksize / stream->record.frameSize) +
             PaUtil_GetBufferProcessorInputLatencyFrames( &stream->bufferProcessor ) / sampleRate;
 #else
@@ -623,7 +628,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         if( framesPerBuffer == paFramesPerBufferUnspecified )
         {
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
             stream->record.bufferSize = info.blocksize / stream->record.frameSize;
 #else
             stream->record.bufferSize = SUN_DEFAULT_FRAMES;
@@ -671,7 +676,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->play.frameSize = (info.play.precision / 8) * info.play.channels;
         stream->play.bufferSize = framesPerBuffer;
 
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
         outputLatency = (info.blocksize / stream->play.frameSize) +
             PaUtil_GetBufferProcessorOutputLatencyFrames( &stream->bufferProcessor ) / sampleRate;
 #else
@@ -680,7 +685,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         if( framesPerBuffer == paFramesPerBufferUnspecified )
         {
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
             stream->play.bufferSize = info.blocksize / stream->play.frameSize;
 #else
             stream->play.bufferSize = SUN_DEFAULT_FRAMES;
@@ -1019,7 +1024,7 @@ static PaError WriteStream( PaStream* s,
 static signed long GetStreamReadAvailable( PaStream* s )
 {
     PaSunStream *stream = (PaSunStream*)s;
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
     struct audio_info info;
 
     if( ioctl(stream->record.fd, AUDIO_GETBUFINFO, &info) == -1 )
@@ -1046,7 +1051,7 @@ static signed long GetStreamWriteAvailable( PaStream* s )
     PaSunStream *stream = (PaSunStream*)s;
     struct audio_info info;
 
-#ifdef AUDIO_GETBUFINFO
+#ifndef __sun
     if( ioctl(stream->play.fd, AUDIO_GETBUFINFO, &info) == -1 )
         return paDeviceUnavailable;
 
