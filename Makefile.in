@@ -142,11 +142,11 @@ SRC_DIRS = \
 	src/hostapi/alsa \
 	src/hostapi/asihpi \
 	src/hostapi/asio \
+	src/hostapi/audioio \
 	src/hostapi/coreaudio \
 	src/hostapi/dsound \
 	src/hostapi/jack \
 	src/hostapi/oss \
-	src/hostapi/sun \
 	src/hostapi/skeleton \
 	src/hostapi/wasapi \
 	src/hostapi/wdmks \

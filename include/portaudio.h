@@ -288,7 +288,7 @@ typedef enum PaHostApiTypeId
     paJACK=12,
     paWASAPI=13,
     paAudioScienceHPI=14,
-    paSun=15
+    paAudioIO=15
 } PaHostApiTypeId;
 
 

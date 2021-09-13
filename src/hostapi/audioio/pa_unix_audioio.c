@@ -2,7 +2,7 @@
  * $Id$
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
- * Sun implementation by:
+ * Solaris/NetBSD implementation by:
  *   Nia Alarie
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -65,32 +65,32 @@
 #include "pa_cpuload.h"
 #include "pa_process.h"
 
-#ifndef SUN_MAX_DEVICES
-#define SUN_MAX_DEVICES    (32)
+#ifndef AUDIOIO_MAX_DEVICES
+#define AUDIOIO_MAX_DEVICES    (32)
 #endif
 
-#ifndef SUN_DEFAULT_FRAMES
-#define SUN_DEFAULT_FRAMES (128)
+#ifndef AUDIOIO_DEFAULT_FRAMES
+#define AUDIOIO_DEFAULT_FRAMES (128)
 #endif
 
-#ifndef SUN_DEFAULT_MAX_CHANNELS
+#ifndef AUDIOIO_DEFAULT_MAX_CHANNELS
 # ifdef __NetBSD__
-#  define SUN_DEFAULT_MAX_CHANNELS (12)
+#  define AUDIOIO_DEFAULT_MAX_CHANNELS (12)
 # else
-#  define SUN_DEFAULT_MAX_CHANNELS (2)
+#  define AUDIOIO_DEFAULT_MAX_CHANNELS (2)
 # endif
 #endif
 
-#ifndef SUN_DEV_PREFIX
+#ifndef AUDIOIO_DEV_PREFIX
 # ifdef __sun
-#  define SUN_DEV_PREFIX   "/dev/sound/"
+#  define AUDIOIO_DEV_PREFIX   "/dev/sound/"
 # else
-#  define SUN_DEV_PREFIX   "/dev/audio"
+#  define AUDIOIO_DEV_PREFIX   "/dev/audio"
 # endif
 #endif
 
-#ifndef SUN_DEV_DEFAULT
-#define SUN_DEV_DEFAULT    "/dev/audio"
+#ifndef AUDIOIO_DEV_DEFAULT
+#define AUDIOIO_DEV_DEFAULT    "/dev/audio"
 #endif
 
 #ifndef AUDIO_ENCODING_SLINEAR
@@ -102,11 +102,11 @@
 #define AUDIO_GETBUFINFO AUDIO_GETINFO
 #endif
 
-PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
 static void Terminate( struct PaUtilHostApiRepresentation *hostApi );
 static bool AttemptEncoding( int fd, int encoding, int precision, bool record );
 static PaSampleFormat GetSupportedEncodings( int fd, bool record );
-static PaError PaFormatToSunFormat( PaSampleFormat fmt, struct audio_prinfo *info );
+static PaError PaFormatToAudioIOFormat( PaSampleFormat fmt, struct audio_prinfo *info );
 static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
                                   const PaStreamParameters *inputParameters,
                                   const PaStreamParameters *outputParameters,
@@ -133,7 +133,7 @@ static PaError WriteStream( PaStream* stream, const void *buffer, unsigned long 
 static signed long GetStreamReadAvailable( PaStream* stream );
 static signed long GetStreamWriteAvailable( PaStream* stream );
 
-/* PaSunHostApiRepresentation - host api datastructure specific to this implementation */
+/* PaAudioIOHostApiRepresentation - host api datastructure specific to this implementation */
 
 typedef struct
 {
@@ -142,22 +142,22 @@ typedef struct
     PaUtilStreamInterface blockingStreamInterface;
     PaUtilAllocationGroup *allocations;
 }
-PaSunHostApiRepresentation;
+PaAudioIOHostApiRepresentation;
 
 
-PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
+PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
     PaError result = paNoError;
     int fd = -1, i, deviceCount = 0;
-    PaSunHostApiRepresentation *sunHostApi;
+    PaAudioIOHostApiRepresentation *audioIOHostApi;
     PaUtilHostApiRepresentation *common;
 
-    PA_UNLESS( sunHostApi = calloc(1, sizeof(PaSunHostApiRepresentation)), paInsufficientMemory );
+    PA_UNLESS( audioIOHostApi = calloc(1, sizeof(PaAudioIOHostApiRepresentation)), paInsufficientMemory );
 
-    common = &sunHostApi->inheritedHostApiRep;
+    common = &audioIOHostApi->inheritedHostApiRep;
     common->info.structVersion = 1;
-    common->info.type = paSun;
-    common->info.name = "Sun Audio";
+    common->info.type = paAudioIO;
+    common->info.name = "AudioIO";
 
     common->Terminate = Terminate;
     common->OpenStream = OpenStream;
@@ -166,16 +166,16 @@ PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
     common->info.defaultInputDevice =
     common->info.defaultOutputDevice = paNoDevice;
 
-    PA_UNLESS( sunHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
+    PA_UNLESS( audioIOHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
 
     if( (common->deviceInfos = PaUtil_GroupAllocateMemory(
-         sunHostApi->allocations, sizeof(PaDeviceInfo *) * SUN_MAX_DEVICES)) == NULL )
+         audioIOHostApi->allocations, sizeof(PaDeviceInfo *) * AUDIOIO_MAX_DEVICES)) == NULL )
     {
         result = paInsufficientMemory;
         goto error;
     }
 
-    for( i=0; i < SUN_MAX_DEVICES; ++i )
+    for( i=0; i < AUDIOIO_MAX_DEVICES; ++i )
     {
         PaDeviceInfo *dev;
         struct audio_info hwfmt, info;
@@ -183,9 +183,9 @@ PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
         int props;
 
         if( i > 0 )
-            (void)snprintf(path, sizeof(path), SUN_DEV_PREFIX "%d", i - 1);
+            (void)snprintf(path, sizeof(path), AUDIOIO_DEV_PREFIX "%d", i - 1);
         else
-            (void)snprintf(path, sizeof(path), SUN_DEV_DEFAULT);
+            (void)snprintf(path, sizeof(path), AUDIOIO_DEV_DEFAULT);
 
         fd = open(path, O_WRONLY | O_NONBLOCK);
         if (fd < 0)
@@ -193,18 +193,18 @@ PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
         if (fd < 0)
             continue;
 
-        PA_UNLESS(dev = PaUtil_GroupAllocateMemory(sunHostApi->allocations, sizeof(PaDeviceInfo)), paInsufficientMemory);
+        PA_UNLESS(dev = PaUtil_GroupAllocateMemory(audioIOHostApi->allocations, sizeof(PaDeviceInfo)), paInsufficientMemory);
 
         dev->structVersion = 2;
         dev->hostApi = hostApiIndex;
 
-        PA_UNLESS(dev->name = PaUtil_GroupAllocateMemory(sunHostApi->allocations, sizeof(path)), paInsufficientMemory);
+        PA_UNLESS(dev->name = PaUtil_GroupAllocateMemory(audioIOHostApi->allocations, sizeof(path)), paInsufficientMemory);
 
         memcpy((char *)dev->name, path, sizeof(path));
 
         dev->defaultSampleRate = 48000.;
 
-        dev->maxInputChannels = dev->maxOutputChannels = SUN_DEFAULT_MAX_CHANNELS;
+        dev->maxInputChannels = dev->maxOutputChannels = AUDIOIO_DEFAULT_MAX_CHANNELS;
 
         dev->defaultLowInputLatency =
         dev->defaultLowOutputLatency =
@@ -285,13 +285,13 @@ PaError PaSun_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
 
     *hostApi = common;
 
-    PaUtil_InitializeStreamInterface( &sunHostApi->callbackStreamInterface, CloseStream, StartStream,
+    PaUtil_InitializeStreamInterface( &audioIOHostApi->callbackStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
                                       GetStreamTime, GetStreamCpuLoad,
                                       PaUtil_DummyRead, PaUtil_DummyWrite,
                                       PaUtil_DummyGetReadAvailable, PaUtil_DummyGetWriteAvailable );
 
-    PaUtil_InitializeStreamInterface( &sunHostApi->blockingStreamInterface, CloseStream, StartStream,
+    PaUtil_InitializeStreamInterface( &audioIOHostApi->blockingStreamInterface, CloseStream, StartStream,
                                       StopStream, AbortStream, IsStreamStopped, IsStreamActive,
                                       GetStreamTime, PaUtil_DummyGetCpuLoad,
                                       ReadStream, WriteStream, GetStreamReadAvailable, GetStreamWriteAvailable );
@@ -301,14 +301,14 @@ error:
     if( fd != -1 )
         close(fd);
 
-    if( sunHostApi )
+    if( audioIOHostApi )
     {
-        if( sunHostApi->allocations )
+        if( audioIOHostApi->allocations )
         {
-            PaUtil_FreeAllAllocations( sunHostApi->allocations );
-            PaUtil_DestroyAllocationGroup( sunHostApi->allocations );
+            PaUtil_FreeAllAllocations( audioIOHostApi->allocations );
+            PaUtil_DestroyAllocationGroup( audioIOHostApi->allocations );
         }
-        free( sunHostApi );
+        free( audioIOHostApi );
     }
     return result;
 }
@@ -316,16 +316,16 @@ error:
 
 static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 {
-    PaSunHostApiRepresentation *sunHostApi = (PaSunHostApiRepresentation*)hostApi;
+    PaAudioIOHostApiRepresentation *audioIOHostApi = (PaAudioIOHostApiRepresentation*)hostApi;
 
-    if( sunHostApi )
+    if( audioIOHostApi )
     {
-        if( sunHostApi->allocations )
+        if( audioIOHostApi->allocations )
         {
-            PaUtil_FreeAllAllocations( sunHostApi->allocations );
-            PaUtil_DestroyAllocationGroup( sunHostApi->allocations );
+            PaUtil_FreeAllAllocations( audioIOHostApi->allocations );
+            PaUtil_DestroyAllocationGroup( audioIOHostApi->allocations );
         }
-        free( sunHostApi );
+        free( audioIOHostApi );
     }
 }
 
@@ -450,15 +450,15 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 
 error:
     if( result == paInvalidChannelCount )
-        PA_DEBUG(("PaSun %s: Invalid channels %d in %d out\n", __FUNCTION__, inputChannelCount, outputChannelCount));
+        PA_DEBUG(("PaAudioIO %s: Invalid channels %d in %d out\n", __FUNCTION__, inputChannelCount, outputChannelCount));
     if( result == paInvalidSampleRate )
-        PA_DEBUG(("PaSun %s: Invalid sample rate %d Hz\n", __FUNCTION__, (int)sampleRate));
+        PA_DEBUG(("PaAudioIO %s: Invalid sample rate %d Hz\n", __FUNCTION__, (int)sampleRate));
     if( fd != -1 )
         close(fd);
     return result;
 }
 
-typedef struct PaSunComponent
+typedef struct PaAudioIOComponent
 {
     int fd;
     char name[16];
@@ -468,22 +468,22 @@ typedef struct PaSunComponent
     unsigned int channels;
     unsigned int frameSize; /* precision in bytes * channel count */
 }
-PaSunComponent;
+PaAudioIOComponent;
 
-typedef struct PaSunStream
+typedef struct PaAudioIOStream
 {
     PaUtilStreamRepresentation streamRepresentation;
     PaUtilCpuLoadMeasurer cpuLoadMeasurer;
     PaUtilBufferProcessor bufferProcessor;
     PaUtilThreading threading;
-    PaSunComponent play, record;
+    PaAudioIOComponent play, record;
     bool active, stopped;
     bool neverDropInput;
     uint64_t framesProcessed;
     uint64_t eof;
     double sampleRate;
 }
-PaSunStream;
+PaAudioIOStream;
 
 /* see pa_hostapi.h for a list of validity guarantees made about OpenStream parameters */
 
@@ -498,8 +498,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                            void *userData )
 {
     PaError result = paNoError;
-    PaSunHostApiRepresentation *sunHostApi = (PaSunHostApiRepresentation*)hostApi;
-    PaSunStream *stream = 0;
+    PaAudioIOHostApiRepresentation *audioIOHostApi = (PaAudioIOHostApiRepresentation*)hostApi;
+    PaAudioIOStream *stream = 0;
     unsigned long framesPerHostBuffer = framesPerBuffer; /* these may not be equivalent for all implementations */
     int inputChannelCount, outputChannelCount;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
@@ -566,7 +566,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         outputSampleFormat = hostOutputSampleFormat = paInt16; /* Surpress 'uninitialized var' warnings. */
     }
 
-    PA_UNLESS(stream = calloc( 1, sizeof(PaSunStream) ), paInsufficientMemory);
+    PA_UNLESS(stream = calloc( 1, sizeof(PaAudioIOStream) ), paInsufficientMemory);
 
     stream->play.fd = stream->record.fd = -1;
     stream->stopped = true;
@@ -576,7 +576,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         if( inputParameters->device == outputParameters->device )
         {
-            PA_DEBUG(("PaSun %s: Opening device %s in full duplex\n", __FUNCTION__, indev->name));
+            PA_DEBUG(("PaAudioIO %s: Opening device %s in full duplex\n", __FUNCTION__, indev->name));
             PA_UNLESS( (stream->play.fd = open(indev->name, O_RDWR)) != -1, paDeviceUnavailable );
             stream->record.fd = stream->play.fd;
         }
@@ -593,7 +593,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             PaUtil_SelectClosestAvailableFormat( GetSupportedEncodings(stream->record.fd, true), inputSampleFormat );
 
         AUDIO_INITINFO(&info);
-        if( PaFormatToSunFormat(hostInputSampleFormat, &info.record ) != paNoError ||
+        if( PaFormatToAudioIOFormat(hostInputSampleFormat, &info.record ) != paNoError ||
             ioctl(stream->record.fd, AUDIO_SETINFO, &info) < 0 )
         {
             result = paSampleFormatNotSupported;
@@ -610,7 +610,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         PA_UNLESS( ioctl(stream->record.fd, AUDIO_GETINFO, &info) != -1, paDeviceUnavailable );
 
-        PA_DEBUG(("PaSun %s: %u-bit %u-channel recording stream at %u Hz\n", __FUNCTION__,
+        PA_DEBUG(("PaAudioIO %s: %u-bit %u-channel recording stream at %u Hz\n", __FUNCTION__,
             info.record.precision, info.record.channels, info.record.sample_rate));
 
         sampleRate = info.record.sample_rate;
@@ -631,7 +631,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 #ifndef __sun
             stream->record.bufferSize = info.blocksize / stream->record.frameSize;
 #else
-            stream->record.bufferSize = SUN_DEFAULT_FRAMES;
+            stream->record.bufferSize = AUDIOIO_DEFAULT_FRAMES;
 #endif
             framesPerBuffer = framesPerHostBuffer = stream->record.bufferSize;
         }
@@ -650,7 +650,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             PaUtil_SelectClosestAvailableFormat( GetSupportedEncodings(stream->play.fd, false), outputSampleFormat );
 
         AUDIO_INITINFO(&info);
-        if( PaFormatToSunFormat(hostOutputSampleFormat, &info.play ) != paNoError ||
+        if( PaFormatToAudioIOFormat(hostOutputSampleFormat, &info.play ) != paNoError ||
             ioctl(stream->play.fd, AUDIO_SETINFO, &info) < 0 )
         {
             result = paSampleFormatNotSupported;
@@ -667,7 +667,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         PA_UNLESS( ioctl(stream->play.fd, AUDIO_GETINFO, &info) != -1, paDeviceUnavailable );
 
-        PA_DEBUG(("PaSun %s: %u-bit %u-channel playback stream at %u Hz\n", __FUNCTION__,
+        PA_DEBUG(("PaAudioIO %s: %u-bit %u-channel playback stream at %u Hz\n", __FUNCTION__,
             info.play.precision, info.play.channels, info.play.sample_rate));
 
         sampleRate = info.play.sample_rate;
@@ -688,7 +688,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 #ifndef __sun
             stream->play.bufferSize = info.blocksize / stream->play.frameSize;
 #else
-            stream->play.bufferSize = SUN_DEFAULT_FRAMES;
+            stream->play.bufferSize = AUDIOIO_DEFAULT_FRAMES;
 #endif
             framesPerBuffer = framesPerHostBuffer = stream->play.bufferSize;
         }
@@ -701,12 +701,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( streamCallback )
     {
         PaUtil_InitializeStreamRepresentation( &stream->streamRepresentation,
-                                               &sunHostApi->callbackStreamInterface, streamCallback, userData );
+                                               &audioIOHostApi->callbackStreamInterface, streamCallback, userData );
     }
     else
     {
         PaUtil_InitializeStreamRepresentation( &stream->streamRepresentation,
-                                               &sunHostApi->blockingStreamInterface, streamCallback, userData );
+                                               &audioIOHostApi->blockingStreamInterface, streamCallback, userData );
     }
 
     PA_ENSURE( PaUtil_InitializeThreading( &stream->threading ) );
@@ -749,10 +749,10 @@ error:
     return result;
 }
 
-static void *PaSun_AudioThreadProc( void *userData )
+static void *PaAudioIO_AudioThreadProc( void *userData )
 {
     PaError result = paNoError;
-    PaSunStream *stream = (PaSunStream*)userData;
+    PaAudioIOStream *stream = (PaAudioIOStream*)userData;
     PaStreamCallbackTimeInfo timeInfo = {0,0,0};
     int callbackResult;
     struct audio_info info;
@@ -837,7 +837,7 @@ static void *PaSun_AudioThreadProc( void *userData )
 error:
     PaUtil_ResetCpuLoadMeasurer( &stream->cpuLoadMeasurer );
     stream->active = false;
-    PA_DEBUG(("PaSun %s: Thread exited\n", __FUNCTION__));
+    PA_DEBUG(("PaAudioIO %s: Thread exited\n", __FUNCTION__));
     pthread_exit( NULL );
 }
 
@@ -848,7 +848,7 @@ error:
 static PaError CloseStream( PaStream* s )
 {
     PaError result = paNoError;
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     PaUtil_TerminateThreading ( &stream->threading );
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
@@ -871,7 +871,7 @@ static PaError CloseStream( PaStream* s )
 static PaError StartStream( PaStream *s )
 {
     PaError result = paNoError;
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
@@ -879,7 +879,7 @@ static PaError StartStream( PaStream *s )
     stream->stopped = false;
 
     if( stream->bufferProcessor.streamCallback )
-        PA_ENSURE( PaUtil_StartThreading( &stream->threading, &PaSun_AudioThreadProc, stream ) );
+        PA_ENSURE( PaUtil_StartThreading( &stream->threading, &PaAudioIO_AudioThreadProc, stream ) );
 
 error:
     return result;
@@ -889,7 +889,7 @@ error:
 static PaError StopStream( PaStream *s )
 {
     PaError result = paNoError;
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     stream->stopped = true;
 
@@ -910,7 +910,7 @@ static PaError AbortStream( PaStream *s )
 
 static PaError IsStreamStopped( PaStream *s )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     return stream->stopped;
 }
@@ -918,7 +918,7 @@ static PaError IsStreamStopped( PaStream *s )
 
 static PaError IsStreamActive( PaStream *s )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     return stream->active;
 }
@@ -926,7 +926,7 @@ static PaError IsStreamActive( PaStream *s )
 
 static PaTime GetStreamTime( PaStream *s )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     return stream->framesProcessed / stream->sampleRate;
 }
@@ -934,7 +934,7 @@ static PaTime GetStreamTime( PaStream *s )
 
 static double GetStreamCpuLoad( PaStream* s )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 
     return PaUtil_GetCpuLoad( &stream->cpuLoadMeasurer );
 }
@@ -950,7 +950,7 @@ static PaError ReadStream( PaStream* s,
                            void *buffer,
                            unsigned long frames )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
     void *chanbufs = buffer;
     unsigned wantframes, wantbytes;
 
@@ -986,7 +986,7 @@ static PaError WriteStream( PaStream* s,
                             const void *buffer,
                             unsigned long frames )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
     const void *chanbufs = buffer;
     unsigned nbytes;
     unsigned long gotframes;
@@ -1023,7 +1023,7 @@ static PaError WriteStream( PaStream* s,
 
 static signed long GetStreamReadAvailable( PaStream* s )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
 #ifndef __sun
     struct audio_info info;
 
@@ -1041,14 +1041,14 @@ static signed long GetStreamReadAvailable( PaStream* s )
     if( poll(pfd, 1, 0) == -1 )
         return paDeviceUnavailable;
 
-    return (pfd[0].revents & POLLIN) ? SUN_DEFAULT_FRAMES : 0;
+    return (pfd[0].revents & POLLIN) ? AUDIOIO_DEFAULT_FRAMES : 0;
 #endif
 }
 
 
 static signed long GetStreamWriteAvailable( PaStream* s )
 {
-    PaSunStream *stream = (PaSunStream*)s;
+    PaAudioIOStream *stream = (PaAudioIOStream*)s;
     struct audio_info info;
 
 #ifndef __sun
@@ -1063,11 +1063,11 @@ static signed long GetStreamWriteAvailable( PaStream* s )
     if( (stream->eof - info.play.eof) > 2 )
         return 0;
 
-    return SUN_DEFAULT_FRAMES;
+    return AUDIOIO_DEFAULT_FRAMES;
 #endif
 }
 
-static PaError PaFormatToSunFormat( PaSampleFormat fmt, struct audio_prinfo *info )
+static PaError PaFormatToAudioIOFormat( PaSampleFormat fmt, struct audio_prinfo *info )
 {
     PaError err = paNoError;
 
