@@ -211,16 +211,6 @@ PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
         dev->defaultHighInputLatency =
         dev->defaultHighOutputLatency = .04;
 
-#ifdef AUDIO_GETPROPS
-        if( ioctl(fd, AUDIO_GETPROPS, &props) != -1 )
-        {
-            if( (props & AUDIO_PROP_PLAYBACK) == 0 )
-                dev->maxOutputChannels = 0;
-            if( (props & AUDIO_PROP_CAPTURE) == 0 )
-                dev->maxInputChannels = 0;
-        }
-#endif
-
 #ifdef AUDIO_GETFORMAT
         if( ioctl(fd, AUDIO_GETFORMAT, &hwfmt) != -1 )
         {
@@ -230,6 +220,16 @@ PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
                 dev->maxOutputChannels = hwfmt.play.channels;
             dev->defaultSampleRate = (dev->maxOutputChannels > 0) ?
                 hwfmt.play.sample_rate : hwfmt.record.sample_rate;
+        }
+#endif
+
+#ifdef AUDIO_GETPROPS
+        if( ioctl(fd, AUDIO_GETPROPS, &props) != -1 )
+        {
+            if( (props & AUDIO_PROP_PLAYBACK) == 0 )
+                dev->maxOutputChannels = 0;
+            if( (props & AUDIO_PROP_CAPTURE) == 0 )
+                dev->maxInputChannels = 0;
         }
 #endif
 
