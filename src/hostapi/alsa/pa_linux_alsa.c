@@ -3512,10 +3512,18 @@ static PaError PaAlsaStreamComponent_EndProcessing( PaAlsaStreamComponent *self,
     if( self->canMmap )
         res = alsa_snd_pcm_mmap_commit( self->pcm, self->offset, numFrames );
 
-    if( res == -EPIPE || res == -ESTRPIPE )
+    if( res == -EPIPE )
     {
         *xrun = 1;
     }
+    // ESTRPIPE is provided by the Linux kernel headers, and is unavailable
+    // on the BSDs, which can still use alsalib.
+#if defined(ESTRPIPE) && ESTRPIPE != EPIPE
+    else if( res == -ESTRPIPE )
+    {
+        *xrun = 1;
+    }
+#endif
     else
     {
         ENSURE_( res, paUnanticipatedHostError );
@@ -4082,11 +4090,20 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
             }
             res = alsa_snd_pcm_readn( self->pcm, bufs, *numFrames );
         }
-        if( res == -EPIPE || res == -ESTRPIPE )
+        if( res == -EPIPE )
         {
             *xrun = 1;
             *numFrames = 0;
         }
+        // ESTRPIPE is provided by the Linux kernel headers, and is unavailable
+        // on the BSDs, which can still use alsalib.
+#if defined(ESTRPIPE) && ESTRPIPE != EPIPE
+        else if( res == -ESTRPIPE )
+        {
+            *xrun = 1;
+            *numFrames = 0;
+        }
+#endif
     }
 
 end:
