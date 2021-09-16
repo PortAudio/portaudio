@@ -53,7 +53,7 @@
 				InlineFunctionExpansion="1"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\..\src\common;..\..\include;.\;..\..\src\os\win"
+				AdditionalIncludeDirectories="..\src\common;..\include;.\;..\src\os\win"
 				PreprocessorDefinitions="WIN32;NDEBUG;_USRDLL;PA_ENABLE_DEBUG_OUTPUT;_CRT_SECURE_NO_DEPRECATE;PAWIN_USE_WDMKS_DEVICE_INFO;PA_USE_ASIO=0;PA_USE_DS=0;PA_USE_WMME=1;PA_USE_WASAPI=1;PA_USE_WDMKS=1"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -151,7 +151,7 @@
 				InlineFunctionExpansion="1"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\..\src\common;..\..\include;.\;..\..\src\os\win"
+				AdditionalIncludeDirectories="..\src\common;..\include;.\;..\src\os\win"
 				PreprocessorDefinitions="_WIN64;NDEBUG;_USRDLL;PA_ENABLE_DEBUG_OUTPUT;_CRT_SECURE_NO_DEPRECATE;PAWIN_USE_WDMKS_DEVICE_INFO;PA_USE_ASIO=0;PA_USE_DS=0;PA_USE_WMME=1;PA_USE_WASAPI=1;PA_USE_WDMKS=1"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -246,7 +246,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..\src\common;..\..\include;.\;..\..\src\os\win"
+				AdditionalIncludeDirectories="..\src\common;..\include;.\;..\src\os\win"
 				PreprocessorDefinitions="WIN32;_DEBUG;_USRDLL;PA_ENABLE_DEBUG_OUTPUT;_CRT_SECURE_NO_DEPRECATE;PAWIN_USE_WDMKS_DEVICE_INFO;PA_USE_ASIO=0;PA_USE_DS=0;PA_USE_WMME=1;PA_USE_WASAPI=1;PA_USE_WDMKS=1"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -342,7 +342,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..\src\common,..\..\include,.\,..\..\src\os\win"
+				AdditionalIncludeDirectories="..\src\common,..\include,.\,..\src\os\win"
 				PreprocessorDefinitions="_WIN64;_DEBUG;_USRDLL;PA_ENABLE_DEBUG_OUTPUT;_CRT_SECURE_NO_DEPRECATE;PAWIN_USE_WDMKS_DEVICE_INFO;PA_USE_ASIO=0;PA_USE_DS=0;PA_USE_WMME=1;PA_USE_WASAPI=1;PA_USE_WDMKS=1"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -441,7 +441,7 @@
 				InlineFunctionExpansion="1"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\..\src\common;..\..\include;.\;..\..\src\os\win"
+				AdditionalIncludeDirectories="..\src\common;..\include;.\;..\src\os\win"
 				PreprocessorDefinitions="WIN32;NDEBUG;_USRDLL;PA_ENABLE_DEBUG_OUTPUT;_CRT_SECURE_NO_DEPRECATE;PAWIN_USE_WDMKS_DEVICE_INFO;PA_USE_ASIO=0;PA_USE_DS=0;PA_USE_WMME=1;PA_USE_WASAPI=1;PA_USE_WDMKS=1"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -539,7 +539,7 @@
 				InlineFunctionExpansion="1"
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
-				AdditionalIncludeDirectories="..\..\src\common;..\..\include;.\;..\..\src\os\win"
+				AdditionalIncludeDirectories="..\src\common;..\include;.\;..\src\os\win"
 				PreprocessorDefinitions="_WIN64;NDEBUG;_USRDLL;PA_ENABLE_DEBUG_OUTPUT;_CRT_SECURE_NO_DEPRECATE;PAWIN_USE_WDMKS_DEVICE_INFO;PA_USE_ASIO=0;PA_USE_DS=0;PA_USE_WMME=1;PA_USE_WASAPI=1;PA_USE_WDMKS=1"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -613,7 +613,7 @@
 				Name="common"
 				>
 				<File
-					RelativePath="..\..\src\common\pa_allocation.c"
+					RelativePath="..\src\common\pa_allocation.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -671,7 +671,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_converters.c"
+					RelativePath="..\src\common\pa_converters.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -729,7 +729,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_cpuload.c"
+					RelativePath="..\src\common\pa_cpuload.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -787,7 +787,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_debugprint.c"
+					RelativePath="..\src\common\pa_debugprint.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -845,7 +845,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_dither.c"
+					RelativePath="..\src\common\pa_dither.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -903,7 +903,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_front.c"
+					RelativePath="..\src\common\pa_front.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -961,7 +961,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\hostapi\skeleton\pa_hostapi_skeleton.c"
+					RelativePath="..\src\hostapi\skeleton\pa_hostapi_skeleton.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -1019,7 +1019,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_process.c"
+					RelativePath="..\src\common\pa_process.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -1077,7 +1077,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_ringbuffer.c"
+					RelativePath="..\src\common\pa_ringbuffer.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -1135,7 +1135,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_stream.c"
+					RelativePath="..\src\common\pa_stream.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -1193,7 +1193,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\src\common\pa_trace.c"
+					RelativePath="..\src\common\pa_trace.c"
 					>
 					<FileConfiguration
 						Name="Release|Win32"
@@ -1258,14 +1258,14 @@
 					Name="ASIO"
 					>
 					<File
-						RelativePath="..\..\src\hostapi\asio\pa_asio.cpp"
+						RelativePath="..\src\hostapi\asio\pa_asio.cpp"
 						>
 						<FileConfiguration
 							Name="Release|Win32"
 							>
 							<Tool
 								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+								AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 								PreprocessorDefinitions=""
 							/>
 						</FileConfiguration>
@@ -1274,7 +1274,7 @@
 							>
 							<Tool
 								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+								AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 								PreprocessorDefinitions=""
 							/>
 						</FileConfiguration>
@@ -1283,7 +1283,7 @@
 							>
 							<Tool
 								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+								AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 								PreprocessorDefinitions=""
 							/>
 						</FileConfiguration>
@@ -1292,7 +1292,7 @@
 							>
 							<Tool
 								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+								AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 								PreprocessorDefinitions=""
 							/>
 						</FileConfiguration>
@@ -1301,7 +1301,7 @@
 							>
 							<Tool
 								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+								AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 								PreprocessorDefinitions=""
 							/>
 						</FileConfiguration>
@@ -1310,7 +1310,7 @@
 							>
 							<Tool
 								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+								AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 								PreprocessorDefinitions=""
 							/>
 						</FileConfiguration>
@@ -1319,14 +1319,14 @@
 						Name="ASIOSDK"
 						>
 						<File
-							RelativePath="..\..\src\hostapi\asio\ASIOSDK\common\asio.cpp"
+							RelativePath="..\src\hostapi\asio\ASIOSDK\common\asio.cpp"
 							>
 							<FileConfiguration
 								Name="Release|Win32"
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1335,7 +1335,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1344,7 +1344,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1353,7 +1353,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1362,7 +1362,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1371,20 +1371,20 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
 						</File>
 						<File
-							RelativePath="..\..\src\hostapi\asio\ASIOSDK\host\asiodrivers.cpp"
+							RelativePath="..\src\hostapi\asio\ASIOSDK\host\asiodrivers.cpp"
 							>
 							<FileConfiguration
 								Name="Release|Win32"
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1393,7 +1393,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1402,7 +1402,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1411,7 +1411,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1420,7 +1420,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1429,20 +1429,20 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
 						</File>
 						<File
-							RelativePath="..\..\src\hostapi\asio\ASIOSDK\host\pc\asiolist.cpp"
+							RelativePath="..\src\hostapi\asio\ASIOSDK\host\pc\asiolist.cpp"
 							>
 							<FileConfiguration
 								Name="Release|Win32"
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1451,7 +1451,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1460,7 +1460,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1469,7 +1469,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1478,7 +1478,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1487,7 +1487,7 @@
 								>
 								<Tool
 									Name="VCCLCompilerTool"
-									AdditionalIncludeDirectories="..\..\src\hostapi\asio\ASIOSDK\host;..\..\src\hostapi\asio\ASIOSDK\host\pc;..\..\src\hostapi\asio\ASIOSDK\common"
+									AdditionalIncludeDirectories="..\src\hostapi\asio\ASIOSDK\host;..\src\hostapi\asio\ASIOSDK\host\pc;..\src\hostapi\asio\ASIOSDK\common"
 									PreprocessorDefinitions=""
 								/>
 							</FileConfiguration>
@@ -1498,7 +1498,7 @@
 					Name="dsound"
 					>
 					<File
-						RelativePath="..\..\src\hostapi\dsound\pa_win_ds.c"
+						RelativePath="..\src\hostapi\dsound\pa_win_ds.c"
 						>
 						<FileConfiguration
 							Name="Release|Win32"
@@ -1556,7 +1556,7 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\src\hostapi\dsound\pa_win_ds_dynlink.c"
+						RelativePath="..\src\hostapi\dsound\pa_win_ds_dynlink.c"
 						>
 						<FileConfiguration
 							Name="Release|Win32"
@@ -1618,7 +1618,7 @@
 					Name="wmme"
 					>
 					<File
-						RelativePath="..\..\src\hostapi\wmme\pa_win_wmme.c"
+						RelativePath="..\src\hostapi\wmme\pa_win_wmme.c"
 						>
 						<FileConfiguration
 							Name="Release|Win32"
@@ -1680,7 +1680,7 @@
 					Name="wasapi"
 					>
 					<File
-						RelativePath="..\..\src\hostapi\wasapi\pa_win_wasapi.c"
+						RelativePath="..\src\hostapi\wasapi\pa_win_wasapi.c"
 						>
 					</File>
 				</Filter>
@@ -1688,7 +1688,7 @@
 					Name="wdmks"
 					>
 					<File
-						RelativePath="..\..\src\hostapi\wdmks\pa_win_wdmks.c"
+						RelativePath="..\src\hostapi\wdmks\pa_win_wdmks.c"
 						>
 					</File>
 				</Filter>
@@ -1700,69 +1700,11 @@
 					Name="win"
 					>
 					<File
-						RelativePath="..\..\src\os\win\pa_win_coinitialize.c"
+						RelativePath="..\src\os\win\pa_win_coinitialize.c"
 						>
 					</File>
 					<File
-						RelativePath="..\..\src\os\win\pa_win_hostapis.c"
-						>
-						<FileConfiguration
-							Name="Release|Win32"
-							>
-							<Tool
-								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories=""
-								PreprocessorDefinitions=""
-							/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="Release|x64"
-							>
-							<Tool
-								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories=""
-								PreprocessorDefinitions=""
-							/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="Debug|Win32"
-							>
-							<Tool
-								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories=""
-								PreprocessorDefinitions=""
-							/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="Debug|x64"
-							>
-							<Tool
-								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories=""
-								PreprocessorDefinitions=""
-							/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="ReleaseMinDependency|Win32"
-							>
-							<Tool
-								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories=""
-								PreprocessorDefinitions=""
-							/>
-						</FileConfiguration>
-						<FileConfiguration
-							Name="ReleaseMinDependency|x64"
-							>
-							<Tool
-								Name="VCCLCompilerTool"
-								AdditionalIncludeDirectories=""
-								PreprocessorDefinitions=""
-							/>
-						</FileConfiguration>
-					</File>
-					<File
-						RelativePath="..\..\src\os\win\pa_win_util.c"
+						RelativePath="..\src\os\win\pa_win_hostapis.c"
 						>
 						<FileConfiguration
 							Name="Release|Win32"
@@ -1820,15 +1762,73 @@
 						</FileConfiguration>
 					</File>
 					<File
-						RelativePath="..\..\src\os\win\pa_win_waveformat.c"
+						RelativePath="..\src\os\win\pa_win_util.c"
+						>
+						<FileConfiguration
+							Name="Release|Win32"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+								AdditionalIncludeDirectories=""
+								PreprocessorDefinitions=""
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|x64"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+								AdditionalIncludeDirectories=""
+								PreprocessorDefinitions=""
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Debug|Win32"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+								AdditionalIncludeDirectories=""
+								PreprocessorDefinitions=""
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Debug|x64"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+								AdditionalIncludeDirectories=""
+								PreprocessorDefinitions=""
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="ReleaseMinDependency|Win32"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+								AdditionalIncludeDirectories=""
+								PreprocessorDefinitions=""
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="ReleaseMinDependency|x64"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+								AdditionalIncludeDirectories=""
+								PreprocessorDefinitions=""
+							/>
+						</FileConfiguration>
+					</File>
+					<File
+						RelativePath="..\src\os\win\pa_win_waveformat.c"
 						>
 					</File>
 					<File
-						RelativePath="..\..\src\os\win\pa_win_wdmks_utils.c"
+						RelativePath="..\src\os\win\pa_win_wdmks_utils.c"
 						>
 					</File>
 					<File
-						RelativePath="..\..\src\os\win\pa_x86_plain_converters.c"
+						RelativePath="..\src\os\win\pa_x86_plain_converters.c"
 						>
 						<FileConfiguration
 							Name="Release|Win32"
@@ -1902,27 +1902,27 @@
 			Filter="h;hpp;hxx;hm;inl"
 			>
 			<File
-				RelativePath="..\..\include\pa_asio.h"
+				RelativePath="..\include\pa_asio.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\include\pa_win_ds.h"
+				RelativePath="..\include\pa_win_ds.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\include\pa_win_wasapi.h"
+				RelativePath="..\include\pa_win_wasapi.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\include\pa_win_waveformat.h"
+				RelativePath="..\include\pa_win_waveformat.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\include\pa_win_wmme.h"
+				RelativePath="..\include\pa_win_wmme.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\include\portaudio.h"
+				RelativePath="..\include\portaudio.h"
 				>
 			</File>
 		</Filter>
