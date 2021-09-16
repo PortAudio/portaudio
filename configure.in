@@ -139,7 +139,7 @@ if test "x$with_asihpi" != "xno"; then
 fi
 have_audioio=no
 if test "x$with_audioio" != "xno"; then
-    AC_CHECK_HEADERS([sys/audioio.h], [have_audioio=yes])
+    AC_CHECK_HEADERS([sys/audioio.h], [have_audioio=yes], [have_audioio=no])
 fi
 have_libossaudio=no
 have_oss=no
@@ -377,7 +377,7 @@ case "${host_os}" in
            AC_DEFINE(PA_USE_ALSA,1)
         fi
 
-        if [[ "$with_audioio" != "no" ]] ; then
+        if [[ "$have_audioio" = "yes" ] && [ "$with_audioio" != "no" ]] ; then
            OTHER_OBJS="$OTHER_OBJS src/hostapi/audioio/pa_unix_audioio.o"
            AC_DEFINE(PA_USE_AUDIOIO,1)
         fi
