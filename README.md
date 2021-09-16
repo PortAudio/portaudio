@@ -36,6 +36,7 @@ Please feel free to join. See http://www.portaudio.com for details.
     src/hostapi/alsa        = Advanced Linux Sound Architecture (ALSA)
     src/hostapi/asihpi      = AudioScience HPI
     src/hostapi/asio        = ASIO for Windows and Macintosh
+    src/hostapi/audioio     = /dev/audio (Solaris/NetBSD Audio)
     src/hostapi/coreaudio   = Macintosh Core Audio for OS X
     src/hostapi/dsound      = Windows Direct Sound
     src/hostapi/jack        = JACK Audio Connection Kit

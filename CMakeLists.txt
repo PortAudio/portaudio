@@ -310,6 +310,13 @@ elseif(UNIX)
       # The FindOSS.cmake module does not need to be installed like the JACK modules because it
       # does not link any library; it only adds an include directory and compile definition.
     endif()
+
+    check_include_file(sys/audioio.h HAVE_SYS_AUDIOIO_H)
+    cmake_dependent_option(AUDIOIO "Enable support for Solaris/NetBSD audio" ON "HAVE_SYS_AUDIOIO_H" AUDIOIO)
+    if(AUDIOIO AND HAVE_SYS_AUDIOIO_H)
+      target_sources(PortAudio PRIVATE src/hostapi/audioio/pa_unix_audioio.c)
+      target_compile_definitions(PortAudio PRIVATE PA_USE_AUDIOIO=1)
+    endif()
   endif()
 endif()
 

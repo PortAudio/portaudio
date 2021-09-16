@@ -33,6 +33,10 @@ AC_ARG_WITH(alsa,
             AS_HELP_STRING([--with-alsa], [Enable support for ALSA @<:@autodetect@:>@]),
             [with_alsa=$withval])
 
+AC_ARG_WITH(audioio,
+            AS_HELP_STRING([--with-audioio], [Enable support for Solaris/NetBSD audio @<:@autodetect@:>@]),
+            [with_audioio=$withval])
+
 AC_ARG_WITH(jack,
             AS_HELP_STRING([--with-jack], [Enable support for JACK @<:@autodetect@:>@]),
             [with_jack=$withval])
@@ -132,6 +136,10 @@ fi
 have_asihpi=no
 if test "x$with_asihpi" != "xno"; then
     AC_CHECK_LIB(hpi, HPI_SubSysCreate, have_asihpi=yes, have_asihpi=no, -lm)
+fi
+have_audioio=no
+if test "x$with_audioio" != "xno"; then
+    AC_CHECK_HEADERS([sys/audioio.h], [have_audioio=yes])
 fi
 have_libossaudio=no
 have_oss=no
@@ -369,6 +377,11 @@ case "${host_os}" in
            AC_DEFINE(PA_USE_ALSA,1)
         fi
 
+        if [[ "$with_audioio" != "no" ]] ; then
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/audioio/pa_unix_audioio.o"
+           AC_DEFINE(PA_USE_AUDIOIO,1)
+        fi
+
         if [[ "$have_jack" = "yes" ] && [ "$with_jack" != "no" ]] ; then
            DLL_LIBS="$DLL_LIBS $JACK_LIBS"
            CFLAGS="$CFLAGS $JACK_CFLAGS"
@@ -472,6 +485,7 @@ case "$target_os" in
         ;;
      *)
 	AC_MSG_RESULT([
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
 ])
