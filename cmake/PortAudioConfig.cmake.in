@@ -8,11 +8,11 @@ include(CMakeFindDependencyMacro)
 
 find_dependency(Threads)
 
-if(@JACK@)
+if(@PA_USE_JACK@)
   find_dependency(Regex)
   find_dependency(JACK)
 endif()
 
-if(@ALSA@)
+if(@PA_USE_ALSA@)
   find_dependency(ALSA)
 endif()

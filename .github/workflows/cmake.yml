@@ -14,7 +14,7 @@ jobs:
             vcpkg_triplet: x64-linux
             cmake_generator: "Unix Makefiles"
             cmake_options:
-              -DOSS=ON
+              -DPA_USE_OSS=ON
               -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
           - name: Ubuntu MinGW
             os: ubuntu-latest
@@ -26,7 +26,7 @@ jobs:
             vcpkg_triplet: x64-mingw-static
             cmake_generator: "Unix Makefiles"
             cmake_options:
-              -DASIO=ON
+              -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
               -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-w64-mingw32.cmake
           - name: Windows MSVC
@@ -39,7 +39,7 @@ jobs:
             asio_sdk_cache_path: "asiosdk.zip"
             # Somehow CMake fails to find the toolchain file if a relative path is used on Windows.
             cmake_options:
-              -DASIO=ON
+              -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
               -DCMAKE_TOOLCHAIN_FILE=D:\a\portaudio\portaudio\vcpkg\scripts\buildsystems\vcpkg.cmake
           - name: Windows MinGW
@@ -52,7 +52,7 @@ jobs:
             asio_sdk_cache_path: "asiosdk.zip"
             # Somehow CMake fails to find the toolchain file if a relative path is used on Windows.
             cmake_options:
-              -DASIO=ON
+              -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
               -DCMAKE_TOOLCHAIN_FILE=D:\a\portaudio\portaudio\vcpkg\scripts\buildsystems\vcpkg.cmake
           - name: macOS Clang
@@ -105,9 +105,9 @@ jobs:
            -DCMAKE_INSTALL_PREFIX=${{ matrix.install_dir }}
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
-           -DSKELETON=ON
-           -DBUILD_TESTING=ON
-           -DBUILD_EXAMPLES=ON
+           -DPA_USE_SKELETON=ON
+           -DPA_BUILD_TESTS=ON
+           -DPA_BUILD_EXAMPLES=ON
            -S .
            -B build
     - name: build
