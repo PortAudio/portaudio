@@ -3,6 +3,8 @@
 
 @section comp_win_asiomsvc1 Portaudio Windows ASIO with MSVC
 
+<i><b>NOTE:</b>This page is for building PortAudio using the legacy MSVC project files located in the msvc// directory. You can also use the cmake build system.</i>
+
 This tutorial describes how to build PortAudio with ASIO support using MSVC *from scratch*, without an existing Visual Studio project. For instructions for building PortAudio (including ASIO support) using the bundled Visual Studio project file see the compiling instructions for \ref compile_windows.
 
 ASIO is a low latency audio API from Steinberg. To compile an ASIO
