@@ -1,6 +1,8 @@
 /** @page compile_windows Building PortAudio for Windows using Microsoft Visual Studio
 @ingroup tutorial
 
+<i><b>NOTE:</b>This page is for building PortAudio using the legacy MSVC project files located in the msvc// directory. You can also use the cmake build system.</i>
+
 Below is a list of steps to build PortAudio into a dll and lib file. The resulting dll file may contain all five current win32 PortAudio APIs: MME, DirectSound, WASAPI, WDM/KS and ASIO, depending on the preprocessor definitions set in step 9 below.
 
 PortAudio can be compiled using Visual C++ Express Edition which is available free from Microsoft. If you do not already have a C++ development environment, simply download and install. These instructions have been observed to succeed using Visual Studio 2010 as well.
@@ -11,7 +13,7 @@ PortAudio can be compiled using Visual C++ Express Edition which is available fr
 
 3) If you have Visual Studio 6.0, 7.0(VC.NET/2001) or 7.1(VC.2003), open portaudio.dsp and convert if needed.
 
-4) If you have Visual Studio 2005, Visual C++ 2008 Express Edition or Visual Studio 2010, open the portaudio.sln file located in build\\msvc\\. Doing so will open Visual Studio or Visual C++. Click "Finish" if a conversion wizard appears. The sln file contains four configurations: Win32 and Win64 in both Release and Debug variants.
+4) If you have Visual Studio 2005, Visual C++ 2008 Express Edition or Visual Studio 2010, open the portaudio.sln file located in msvc\\. Doing so will open Visual Studio or Visual C++. Click "Finish" if a conversion wizard appears. The sln file contains four configurations: Win32 and Win64 in both Release and Debug variants.
 
 @section comp_win1 For Visual Studio 2005, Visual C++ 2008 Express Edition or Visual Studio 2010
 
@@ -58,7 +60,7 @@ For each of these, the value of 0 indicates that support for this API should not
 
 As when setting Preprocessor definitions, building is a per-configuration per-platform process. Follow these instructions for each configuration/platform combination that you're interested in.
 
-10) From the Build menu click Build -> Build solution. For 32-bit compilations, the dll file created by this process (portaudio_x86.dll) can be found in the directory build\\msvc\\Win32\\Release. For 64-bit compilations, the dll file is called portaudio_x64.dll, and is found in the directory build\\msvc\\x64\\Release.
+10) From the Build menu click Build -> Build solution. For 32-bit compilations, the dll file created by this process (portaudio_x86.dll) can be found in the directory msvc\\Win32\\Release. For 64-bit compilations, the dll file is called portaudio_x64.dll, and is found in the directory msvc\\x64\\Release.
 
 11) Now, any project that requires portaudio can be linked with portaudio_x86.lib (or _x64) and include the relevant headers (portaudio.h, and/or pa_asio.h , pa_x86_plain_converters.h) You may want to add/remove some DLL entry points. At the time of writing the following 6 entries are not part of the official PortAudio API defined in portaudio.h:
 
