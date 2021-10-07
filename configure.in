@@ -377,7 +377,7 @@ case "${host_os}" in
            AC_DEFINE(PA_USE_ALSA,1)
         fi
 
-        if [[ "$with_audioio" != "no" ]] ; then
+        if [[ "$have_audioio" = "yes" ] && [ "$with_audioio" != "no" ]] ; then
            OTHER_OBJS="$OTHER_OBJS src/hostapi/audioio/pa_unix_audioio.o"
            AC_DEFINE(PA_USE_AUDIOIO,1)
         fi

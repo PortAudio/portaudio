@@ -747,6 +747,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_alsa
+with_audioio
 with_jack
 with_oss
 with_asihpi
@@ -1421,6 +1422,7 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-alsa             Enable support for ALSA [autodetect]
+  --with-audioio          Enable support for Solaris/NetBSD audio [autodetect]
   --with-jack             Enable support for JACK [autodetect]
   --with-oss              Enable support for OSS [autodetect]
   --with-asihpi           Enable support for ASIHPI [autodetect]
@@ -2692,6 +2694,13 @@ test -n "$target_alias" &&
 # Check whether --with-alsa was given.
 if test "${with_alsa+set}" = set; then :
   withval=$with_alsa; with_alsa=$withval
+fi
+
+
+
+# Check whether --with-audioio was given.
+if test "${with_audioio+set}" = set; then :
+  withval=$with_audioio; with_audioio=$withval
 fi
 
 
@@ -15378,6 +15387,21 @@ else
 fi
 
 fi
+have_audioio=no
+if test "x$with_audioio" != "xno"; then
+    for ac_header in sys/audioio.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/audioio.h" "ac_cv_header_sys_audioio_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_audioio_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_AUDIOIO_H 1
+_ACEOF
+ have_audioio=yes
+fi
+
+done
+
+fi
 have_libossaudio=no
 have_oss=no
 if test "x$with_oss" != "xno"; then
@@ -15848,7 +15872,8 @@ case "${host_os}" in
         if test "x$enable_mac_universal" = "xyes" ; then
            mac_version_min="-mmacosx-version-min=10.6"
            mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
-           mac_arches=""
+
+                                 mac_arches=""
            for arch in x86_64 arm64
            do
               save_CFLAGS="$CFLAGS"
@@ -16160,6 +16185,12 @@ fi
            OTHER_OBJS="$OTHER_OBJS src/hostapi/alsa/pa_linux_alsa.o"
            INCLUDES="$INCLUDES pa_linux_alsa.h"
            $as_echo "#define PA_USE_ALSA 1" >>confdefs.h
+
+        fi
+
+        if [ "$have_audioio" = "yes" ] && [ "$with_audioio" != "no" ] ; then
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/audioio/pa_unix_audioio.o"
+           $as_echo "#define PA_USE_AUDIOIO 1" >>confdefs.h
 
         fi
 
@@ -18794,10 +18825,12 @@ $as_echo "
         ;;
      *)
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result:
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
 " >&5
 $as_echo "
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
 " >&6; }
