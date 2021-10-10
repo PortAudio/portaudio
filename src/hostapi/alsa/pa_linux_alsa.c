@@ -241,7 +241,7 @@ _PA_DEFINE_FUNC(snd_output_stdio_attach);
 
 /* Redefine 'PA_ALSA_PATHNAME' to a different Alsa library name if desired. */
 #ifndef PA_ALSA_PATHNAME
-    #define PA_ALSA_PATHNAME "libasound.so"
+    #define PA_ALSA_PATHNAME "libasound.so.2"
 #endif
 static const char *g_AlsaLibName = PA_ALSA_PATHNAME;
 
