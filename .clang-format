@@ -1,0 +1,10 @@
+AlignTrailingComments: 'false'
+BinPackArguments: 'true'
+BinPackParameters: 'true'
+BreakBeforeBraces: Allman
+ColumnLimit: '120'
+IndentWidth: '4'
+SpaceBeforeParens: Never
+SpacesInParentheses: 'true'
+TabWidth: '4'
+UseTab: Never
