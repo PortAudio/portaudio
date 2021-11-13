@@ -63,7 +63,7 @@
 #if defined(__APPLE__)
 /* Support for stdatomic was added in XCode 7.
  * If you need to build on an older version, define PA_MAC_USE_OS_MEMORY_BARRIER.
- * TODO Find an automated way to check for stdatomic support. */
+ */
 #   if PA_MAC_USE_OS_MEMORY_BARRIER
 #       include <libkern/OSAtomic.h>
         /* Here are the memory barrier functions. Mac OS X only provides

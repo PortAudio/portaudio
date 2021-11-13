@@ -284,6 +284,14 @@ elseif(UNIX)
     )
     target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
     set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
+
+    include(CheckIncludeFiles)
+    check_include_files(stdatomic.h HAVE_STDATOMIC_H)
+    if(NOT HAVE_STDATOMIC_H)
+        target_compile_definitions(PortAudio PRIVATE PA_MAC_USE_OSS_MEMORY_BARRIER=1)
+        set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_MAC_USE_OSS_MEMORY_BARRIER=1")
+    endif()
+
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
   else()
