@@ -61,13 +61,24 @@
  ****************/
 
 #if defined(__APPLE__)
-#   include <libkern/OSAtomic.h>
-    /* Here are the memory barrier functions. Mac OS X only provides
-       full memory barriers, so the three types of barriers are the same,
-       however, these barriers are superior to compiler-based ones. */
-#   define PaUtil_FullMemoryBarrier()  OSMemoryBarrier()
-#   define PaUtil_ReadMemoryBarrier()  OSMemoryBarrier()
-#   define PaUtil_WriteMemoryBarrier() OSMemoryBarrier()
+/* Support for stdatomic was added in XCode 7.
+ * If you need to build on an older version, define PA_MAC_USE_OS_MEMORY_BARRIER.
+ * TODO Find an automated way to check for stdatomic support. */
+#   if PA_MAC_USE_OS_MEMORY_BARRIER
+#       include <libkern/OSAtomic.h>
+        /* Here are the memory barrier functions. Mac OS X only provides
+           full memory barriers, so the three types of barriers are the same,
+           however, these barriers are superior to compiler-based ones.
+           These were deprecated in MacOS 10.12. */
+#       define PaUtil_FullMemoryBarrier()  OSMemoryBarrier()
+#       define PaUtil_ReadMemoryBarrier()  OSMemoryBarrier()
+#       define PaUtil_WriteMemoryBarrier() OSMemoryBarrier()
+#   else
+#       include <stdatomic.h>
+#       define PaUtil_FullMemoryBarrier()  atomic_thread_fence(memory_order_acq_rel)
+#       define PaUtil_ReadMemoryBarrier()  atomic_thread_fence(memory_order_acquire)
+#       define PaUtil_WriteMemoryBarrier() atomic_thread_fence(memory_order_release)
+#   endif
 #elif defined(__GNUC__)
     /* GCC >= 4.1 has built-in intrinsics. We'll use those */
 #   if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 1)
