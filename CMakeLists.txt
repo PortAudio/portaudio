@@ -288,8 +288,7 @@ elseif(UNIX)
     include(CheckIncludeFiles)
     check_include_files(stdatomic.h HAVE_STDATOMIC_H)
     if(NOT HAVE_STDATOMIC_H)
-        target_compile_definitions(PortAudio PRIVATE PA_MAC_USE_OSS_MEMORY_BARRIER=1)
-        set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_MAC_USE_OSS_MEMORY_BARRIER=1")
+        target_compile_definitions(PortAudio PRIVATE PA_MAC_USE_OS_MEMORY_BARRIER=1)
     endif()
 
     set(PKGCONFIG_LDFLAGS_PRIVATE
