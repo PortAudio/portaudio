@@ -80,7 +80,9 @@ jobs:
     - name: checkout Git repository
       uses: actions/checkout@v2
     - name: "[Ubuntu] install dependencies"
-      run: sudo apt-get install libasound2-dev ${{ matrix.dependencies_extras }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install libasound2-dev ${{ matrix.dependencies_extras }}
       if: matrix.os == 'ubuntu-latest'
     - name: "[Windows/MinGW] set up ASIO SDK cache"
       uses: actions/cache@v2
