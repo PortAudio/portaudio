@@ -375,7 +375,8 @@ elseif(UNIX)
         src/hostapi/pulseaudio/pa_linux_pulseaudio.c
         src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
 
-      target_compile_definitions(PortAudio PRIVATE PA_USE_PULSEAUDIO=1)
+      target_compile_definitions(PortAudio PUBLIC PA_USE_PULSEAUDIO=1)
+      set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_PULSEAUDIO=1")
       set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} libpulse")
 
       # needed for PortAudioConfig.cmake so `find_package(PortAudio)` works in downstream projects
