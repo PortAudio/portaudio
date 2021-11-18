@@ -47,11 +47,15 @@
 */
 //#define PA_WIN_DS_USE_WMME_TIMER
 
+#if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0400)
+    #undef _WIN32_WINNT
+    #define _WIN32_WINNT 0x0400 /* required to get waitable timer APIs */
+#endif
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h> /* strlen() */
 
-#define _WIN32_WINNT 0x0400 /* required to get waitable timer APIs */
 #include <initguid.h> /* make sure ds guids get defined */
 #include <windows.h>
 #include <objbase.h>
