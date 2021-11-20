@@ -61,10 +61,9 @@
  ****************/
 
 #if defined(__APPLE__)
-/* Support for stdatomic was added in XCode 7.
- * If you need to build on an older version, define PA_MAC_USE_OS_MEMORY_BARRIER.
+/* Support for the atomic library was added in C11.
  */
-#   if PA_MAC_USE_OS_MEMORY_BARRIER
+#   if (__STDC_VERSION__ < 201112L) || defined(__STDC_NO_ATOMICS__)
 #       include <libkern/OSAtomic.h>
         /* Here are the memory barrier functions. Mac OS X only provides
            full memory barriers, so the three types of barriers are the same,

@@ -285,11 +285,8 @@ elseif(UNIX)
     target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
     set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
 
-    include(CheckIncludeFiles)
-    check_include_files(stdatomic.h HAVE_STDATOMIC_H)
-    if(NOT HAVE_STDATOMIC_H)
-        target_compile_definitions(PortAudio PRIVATE PA_MAC_USE_OS_MEMORY_BARRIER=1)
-    endif()
+    # Use C11 so that we can make use of atomic library and avoid deprecation errors.
+    target_compile_definitions(PortAudio PRIVATE std=c11)
 
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
