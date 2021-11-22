@@ -74,7 +74,7 @@
 #       define PaUtil_WriteMemoryBarrier() OSMemoryBarrier()
 #   else
 #       include <stdatomic.h>
-#       define PaUtil_FullMemoryBarrier()  atomic_thread_fence(memory_order_acq_rel)
+#       define PaUtil_FullMemoryBarrier()  atomic_thread_fence(memory_order_seq_cst)
 #       define PaUtil_ReadMemoryBarrier()  atomic_thread_fence(memory_order_acquire)
 #       define PaUtil_WriteMemoryBarrier() atomic_thread_fence(memory_order_release)
 #   endif
