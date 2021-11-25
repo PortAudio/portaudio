@@ -478,6 +478,9 @@ typedef struct PaWasapiDeviceInfo
 
     // Form-factor
     EndpointFormFactor formFactor;
+
+	// Loopback indicator
+	int loopBack;
 }
 PaWasapiDeviceInfo;
 
@@ -2112,6 +2115,60 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
 }
 
 // ------------------------------------------------------------------------------------------
+static PaDeviceInfo *AddLoopbacksToDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaDeviceInfo *deviceInfoArray, INT32 loopbackindex)
+{
+    PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
+    PaDeviceInfo *newDeviceInfoArray = NULL;
+    UINT32 deviceCount = paWasapi->deviceCount;
+    PaWasapiDeviceInfo *newDevInfo = NULL;
+
+    // deviceInfoArray
+    if ((newDeviceInfoArray = (PaDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+        sizeof(PaDeviceInfo) * (deviceCount + 1))) == NULL)
+    {
+        return NULL;
+    }
+    memcpy(newDeviceInfoArray, deviceInfoArray, sizeof(PaDeviceInfo) * deviceCount);
+    memcpy(newDeviceInfoArray + deviceCount, &deviceInfoArray[loopbackindex], sizeof(PaDeviceInfo));
+
+    // paWasapi->devInfo
+    if ((newDevInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+        sizeof(PaWasapiDeviceInfo) * (deviceCount + 1))) == NULL)
+    {
+        return NULL;
+    }
+    memcpy(newDevInfo, paWasapi->devInfo, sizeof(PaWasapiDeviceInfo) * deviceCount);
+    memcpy(newDevInfo + deviceCount, &paWasapi->devInfo[loopbackindex], sizeof(paWasapi->devInfo));
+    newDevInfo[deviceCount].loopBack = 1;
+    if ((paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+        sizeof(PaWasapiDeviceInfo) * (deviceCount + 1))) == NULL)
+    {
+        return NULL;
+    }
+    memcpy(paWasapi->devInfo, newDevInfo, sizeof(PaWasapiDeviceInfo) * (deviceCount + 1));
+
+    // loopback attributes
+    char *deviceName;
+    PaDeviceInfo *deviceInfo = &newDeviceInfoArray[deviceCount];
+    deviceName = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN +1);
+    if (deviceName == NULL)
+    {
+        return NULL;
+    }
+    _snprintf(deviceName, PA_WASAPI_DEVICE_NAME_LEN -1, "%s (loopback)", deviceInfo->name);
+    deviceInfo->name = deviceName;
+
+    deviceInfo->maxInputChannels			= deviceInfo->maxOutputChannels;
+    deviceInfo->defaultHighInputLatency		= deviceInfo->defaultHighOutputLatency;
+    deviceInfo->defaultLowInputLatency		= deviceInfo->defaultLowOutputLatency;
+    deviceInfo->maxOutputChannels			= 0;
+    deviceInfo->defaultHighOutputLatency	= 0;
+    deviceInfo->defaultLowOutputLatency		= 0;
+
+    return newDeviceInfoArray;
+}
+
+// ------------------------------------------------------------------------------------------
 static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostApiIndex hostApiIndex)
 {
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
@@ -2264,6 +2321,34 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 
         hostApi->deviceInfos[i] = deviceInfo;
         ++hostApi->info.deviceCount;
+    }
+
+    // check for loopbacks
+    UINT32 initialDevices = paWasapi->deviceCount;
+    for (i = 0; i < initialDevices; ++i) {
+        if (paWasapi->devInfo[i].flow == eRender) {
+            // need to add a loopback for this render device
+            if ((deviceInfoArray = AddLoopbacksToDeviceList(paWasapi, deviceInfoArray, i)) == NULL)
+            {
+                result = paInsufficientMemory;
+                goto error;
+            }
+            paWasapi->devInfo[paWasapi->deviceCount].loopBack = 1;
+            ++hostApi->info.deviceCount;
+            ++paWasapi->deviceCount;
+        }
+    }
+
+    // all loopbacks found, so write new devicelist to hostApi->deviceInfos
+    if ((hostApi->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+        sizeof(PaDeviceInfo *) * paWasapi->deviceCount)) == NULL)
+    {
+        result = paInsufficientMemory;
+        goto error;
+    }
+    for (i = 0; i < paWasapi->deviceCount; ++i)
+    {
+        hostApi->deviceInfos[i] = &deviceInfoArray[i];
     }
 
     // Fill the remaining slots with inactive device info
@@ -2637,6 +2722,28 @@ PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice )
     (void)pIMMDevice;
     return paIncompatibleStreamHostApi;
 #endif
+}
+
+int PaWasapi_IsLoopback( PaDeviceIndex nDevice )
+{
+	PaError ret;
+	PaDeviceIndex index;
+
+	// Get API
+	PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
+	if (paWasapi == NULL)
+		return paNotInitialized;
+
+	// Get device index
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	if (ret != paNoError)
+		return ret;
+
+	// Validate index
+	if ((UINT32)index >= paWasapi->deviceCount)
+		return paInvalidDevice;
+
+	return paWasapi->devInfo[ index ].loopBack;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3308,7 +3415,7 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
     if ((params->channelCount == 1) && (pSub->wavex.Format.nChannels == 2))
     {
         // select mixer
-        pSub->monoMixer = GetMonoToStereoMixer(&pSub->wavex, (pInfo->flow == eRender ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
+        pSub->monoMixer = GetMonoToStereoMixer(&pSub->wavex, (output ? MIX_DIR__1TO2 : MIX_DIR__2TO1_L));
         if (pSub->monoMixer == NULL)
         {
             (*pa_error) = paInvalidChannelCount;
@@ -3858,7 +3965,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             (stream->in.shareMode == AUDCLNT_SHAREMODE_SHARED) &&
             ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiAutoConvert)))
             stream->in.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
-
+        if (info->flow == eRender)
+            stream->in.streamFlags |= AUDCLNT_STREAMFLAGS_LOOPBACK;
         // Fill parameters for Audio Client creation
         stream->in.params.device_info       = info;
         stream->in.params.stream_params     = (*inputParameters);
