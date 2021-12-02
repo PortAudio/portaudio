@@ -284,6 +284,10 @@ elseif(UNIX)
     )
     target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
     set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
+
+    # Use C11 so that we can make use of atomic library and avoid deprecation errors.
+    set_property(TARGET PortAudio PROPERTY C_STANDARD 11)
+
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
   else()
