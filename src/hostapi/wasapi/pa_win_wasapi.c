@@ -601,9 +601,9 @@ typedef struct PaWasapiStream
     // must be volatile to avoid race condition on user query while
     // thread is being started
     volatile BOOL running;
-    BOOL stopped;
 
     // stream has not or is no longer started
+    BOOL stopped;
 
     PA_THREAD_ID dwThreadId;
     HANDLE hThread;
