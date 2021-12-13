@@ -150,7 +150,7 @@ int main(void);
 int main(void)
 {
     PaStreamParameters outputParameters;
-    PaStream *stream;
+    PaStream *stream = NULL;
     PaError err;
     TestData data;
     int i, j;
