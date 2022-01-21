@@ -9,23 +9,45 @@ IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
   ENDIF()
 ENDIF()
 
-add_library(portaudiocpp
-    src/BlockingStream
-    src/CallbackInterface
-    src/CallbackStream
-    src/CFunCallbackStream
-    src/CppFunCallbackStream
-    src/Device
-    src/DirectionSpecificStreamParameters
-    src/Exception
-    src/HostApi
-    src/InterfaceCallbackStream
-    src/MemFunCallbackStream
-    src/Stream
-    src/StreamParameters
-    src/System
-    src/SystemDeviceIterator
-    src/SystemHostApiIterator
+set(PA_CPP_SOURCES
+  src/BlockingStream.cxx
+  src/CallbackInterface.cxx
+  src/CallbackStream.cxx
+  src/CFunCallbackStream.cxx
+  src/CppFunCallbackStream.cxx
+  src/Device.cxx
+  src/DirectionSpecificStreamParameters.cxx
+  src/Exception.cxx
+  src/HostApi.cxx
+  src/InterfaceCallbackStream.cxx
+  src/MemFunCallbackStream.cxx
+  src/Stream.cxx
+  src/StreamParameters.cxx
+  src/System.cxx
+  src/SystemDeviceIterator.cxx
+  src/SystemHostApiIterator.cxx
+)
+
+set(PA_CPP_INCLUDES
+  include/AutoSystem.hxx
+  include/BlockingStream.hxx
+  include/CallbackInterface.hxx
+  include/CallbackStream.hxx
+  include/CFunCallbackStream.hxx
+  include/CppFunCallbackStream.hxx
+  include/Device.hxx
+  include/DirectionSpecificStreamParameters.hxx
+  include/Exception.hxx
+  include/HostApi.hxx
+  include/InterfaceCallbackStream.hxx
+  include/MemFunCallbackStream.hxx
+  include/PortAudioCpp.hxx
+  include/SampleDataFormat.hxx
+  include/Stream.hxx
+  include/StreamParameters.hxx
+  include/SystemDeviceIterator.hxx
+  include/SystemHostApiIterator.hxx
+  include/System.hxx
 )
 
 IF(WIN32)
@@ -44,6 +66,8 @@ IF(WIN32)
   endif()
 ENDIF(WIN32)
 
+add_library(portaudiocpp ${PA_CPP_SOURCES})
+
 target_link_libraries(portaudiocpp PUBLIC portaudio)
 target_include_directories(portaudiocpp PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
@@ -54,28 +78,7 @@ install(TARGETS portaudiocpp
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 
-install(FILES
-    include/AutoSystem.hxx
-    include/BlockingStream.hxx
-    include/CallbackInterface.hxx
-    include/CallbackStream.hxx
-    include/CFunCallbackStream.hxx
-    include/CppFunCallbackStream.hxx
-    include/Device.hxx
-    include/DirectionSpecificStreamParameters.hxx
-    include/Exception.hxx
-    include/HostApi.hxx
-    include/InterfaceCallbackStream.hxx
-    include/MemFunCallbackStream.hxx
-    include/PortAudioCpp.hxx
-    include/SampleDataFormat.hxx
-    include/Stream.hxx
-    include/StreamParameters.hxx
-    include/SystemDeviceIterator.hxx
-    include/SystemHostApiIterator.hxx
-    include/System.hxx
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp"
-)
+install(FILES ${PA_CPP_INCLUDES} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp")
 
 if(WIN32)
     install(FILES include/AsioDeviceAdapter.hxx DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp")
