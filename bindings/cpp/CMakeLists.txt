@@ -1,3 +1,14 @@
+IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
+  PROJECT(portaudiocpp)
+  CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
+  SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ../../cmake_support)
+  IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    MESSAGE(STATUS "Setting CMAKE_BUILD_TYPE type to 'Debug' as none was specified.")
+    SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+    SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
+  ENDIF()
+ENDIF()
+
 add_library(portaudiocpp
     src/BlockingStream
     src/CallbackInterface
@@ -16,6 +27,23 @@ add_library(portaudiocpp
     src/SystemDeviceIterator
     src/SystemHostApiIterator
 )
+
+IF(WIN32)
+  if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_LIST_DIR)
+    FIND_PACKAGE(ASIOSDK)
+    IF(ASIOSDK_FOUND)
+      OPTION(PA_USE_ASIO "Enable support for ASIO" ON)
+    ELSE()
+      OPTION(PA_USE_ASIO "Enable support for ASIO" OFF)
+    ENDIF()
+  endif()
+
+  if(PA_USE_ASIO)
+    list(APPEND PA_CPP_INCLUDES include/AsioDeviceAdapter.hxx)
+    list(APPEND PA_CPP_SOURCES src/AsioDeviceAdapter.cxx)
+  endif()
+ENDIF(WIN32)
+
 target_link_libraries(portaudiocpp PUBLIC portaudio)
 target_include_directories(portaudiocpp PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
@@ -48,7 +76,7 @@ install(FILES
     include/System.hxx
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp"
 )
-    
+
 if(WIN32)
     install(FILES include/AsioDeviceAdapter.hxx DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/portaudiocpp")
 endif()
