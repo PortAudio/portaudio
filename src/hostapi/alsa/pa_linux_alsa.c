@@ -2694,7 +2694,7 @@ static PaError PaAlsaStream_DetermineFramesPerBuffer( PaAlsaStream* self, double
     PA_UNLESS( framesPerHostBuffer != 0, paInternalError );
     self->maxFramesPerHostBuffer = framesPerHostBuffer;
 
-    if( (!self->playback.canMmap && self->playback.pcm) || !accurate )
+    if( (self->playback.pcm && !self->playback.canMmap) || !accurate )
     {
         /* Don't know the exact size per host buffer */
         *hostBufferSizeMode = paUtilBoundedHostBufferSize;
