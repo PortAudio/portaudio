@@ -480,7 +480,7 @@ typedef struct PaWasapiDeviceInfo
     EndpointFormFactor formFactor;
 
 	// Loopback indicator
-	int loopBack;
+	BOOL loopBack;
 }
 PaWasapiDeviceInfo;
 
@@ -2333,7 +2333,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
                 result = paInsufficientMemory;
                 goto error;
             }
-            paWasapi->devInfo[paWasapi->deviceCount].loopBack = 1;
+            paWasapi->devInfo[paWasapi->deviceCount].loopBack = TRUE;
             ++hostApi->info.deviceCount;
             ++paWasapi->deviceCount;
         }
@@ -3965,7 +3965,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             (stream->in.shareMode == AUDCLNT_SHAREMODE_SHARED) &&
             ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiAutoConvert)))
             stream->in.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
-        if (info->flow == eRender)
+        if (info->loopBack)
             stream->in.streamFlags |= AUDCLNT_STREAMFLAGS_LOOPBACK;
         // Fill parameters for Audio Client creation
         stream->in.params.device_info       = info;
