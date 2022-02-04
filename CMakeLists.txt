@@ -173,7 +173,7 @@ if(WIN32)
     endif()
   endif()
   if(PA_USE_ASIO AND TARGET ASIO::host)
-    target_link_libraries(PortAudio PRIVATE ASIO::host)
+    target_link_libraries(PortAudio PRIVATE "$<BUILD_INTERFACE:ASIO::host>")
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_asio.h)
     target_compile_definitions(PortAudio PUBLIC PA_USE_ASIO=1)
     set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_ASIO=1")
@@ -284,6 +284,10 @@ elseif(UNIX)
     )
     target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
     set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
+
+    # Use C11 so that we can make use of atomic library and avoid deprecation errors.
+    set_property(TARGET PortAudio PROPERTY C_STANDARD 11)
+
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
   else()
@@ -384,7 +388,7 @@ set_target_properties(PortAudio PROPERTIES
   FRAMEWORK_VERSION A
   WINDOWS_EXPORT_ALL_SYMBOLS TRUE
   VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION}
+  SOVERSION 2
 )
 install(TARGETS PortAudio
   EXPORT PortAudio-targets
