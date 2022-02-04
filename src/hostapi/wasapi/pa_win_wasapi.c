@@ -1,7 +1,7 @@
 /*
  * Portable Audio I/O Library WASAPI implementation
  * Copyright (c) 2006-2010 David Viens
- * Copyright (c) 2010-2019 Dmitry Kostjuchenko
+ * Copyright (c) 2010-2022 Dmitry Kostjuchenko
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2019 Ross Bencina, Phil Burk
@@ -367,6 +367,7 @@ enum { WASAPI_PACKETS_PER_INPUT_BUFFER = 6 };
 
 #define SAFE_CLOSE(h) if ((h) != NULL) { CloseHandle((h)); (h) = NULL; }
 #define SAFE_RELEASE(punk) if ((punk) != NULL) { (punk)->lpVtbl->Release((punk)); (punk) = NULL; }
+#define SAFE_ADDREF(punk) if ((punk) != NULL) { (punk)->lpVtbl->AddRef((punk)); }
 
 // Mixer function
 typedef void (*MixMonoToStereoF) (void *__to, const void *__from, UINT32 count);
@@ -479,14 +480,14 @@ typedef struct PaWasapiDeviceInfo
     // Form-factor
     EndpointFormFactor formFactor;
 
-	// Loopback indicator
+	// Loopback state (TRUE if device acts as loopback)
 	BOOL loopBack;
 }
 PaWasapiDeviceInfo;
 
 // ------------------------------------------------------------------------------------------
 /* PaWasapiHostApiRepresentation - host api datastructure specific to this implementation */
-typedef struct
+typedef struct PaWasapiHostApiRepresentation
 {
     PaUtilHostApiRepresentation inheritedHostApiRep;
     PaUtilStreamInterface       callbackStreamInterface;
@@ -2074,22 +2075,21 @@ error:
 }
 
 // ------------------------------------------------------------------------------------------
-static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paWasapi)
+static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paWasapi, UINT32 deviceCount)
 {
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaDeviceInfo *deviceInfoArray = NULL;
 
     if ((paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
-        sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount)) == NULL)
+        sizeof(PaWasapiDeviceInfo) * deviceCount)) == NULL)
     {
         return NULL;
     }
-    memset(paWasapi->devInfo, 0, sizeof(PaWasapiDeviceInfo) * paWasapi->deviceCount);
+    memset(paWasapi->devInfo, 0, sizeof(PaWasapiDeviceInfo) * deviceCount);
 
-    if (paWasapi->deviceCount != 0)
+    if (deviceCount != 0)
     {
         UINT32 i;
-        UINT32 deviceCount = paWasapi->deviceCount;
     #if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
         if (deviceCount < PA_WASAPI_MAX_CONST_DEVICE_COUNT)
             deviceCount = PA_WASAPI_MAX_CONST_DEVICE_COUNT;
@@ -2116,57 +2116,91 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
 }
 
 // ------------------------------------------------------------------------------------------
-static PaDeviceInfo *AddLoopbacksToDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaDeviceInfo *deviceInfoArray, INT32 loopbackindex)
+#ifndef PA_WINRT
+static UINT32 GetDeviceListDeviceCount(IMMDeviceCollection *pEndPoints, EDataFlow filterFlow)
 {
-    PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
-    PaDeviceInfo *newDeviceInfoArray = NULL;
-    UINT32 deviceCount = paWasapi->deviceCount;
-    PaWasapiDeviceInfo *newDevInfo = NULL;
+    HRESULT hr;
+    UINT32 deviceCount;
+    IMMDevice *device;
+    IMMEndpoint *endpoint;
+    EDataFlow flow;
+    UINT32 ret = 0;
 
-    // deviceInfoArray
-    if ((newDeviceInfoArray = (PaDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
-        sizeof(PaDeviceInfo) * (deviceCount + 1))) == NULL)
+    hr = IMMDeviceCollection_GetCount(pEndPoints, &deviceCount);
+    IF_FAILED_JUMP(hr, error);
+
+    for (UINT32 i = 0; i < deviceCount; ++i)
     {
-        return NULL;
-    }
-    memcpy(newDeviceInfoArray, deviceInfoArray, sizeof(PaDeviceInfo) * deviceCount);
-    memcpy(newDeviceInfoArray + deviceCount, &deviceInfoArray[loopbackindex], sizeof(PaDeviceInfo));
+        hr = IMMDeviceCollection_Item((IMMDeviceCollection *)pEndPoints, i, &device);
+        IF_FAILED_JUMP(hr, error);
 
-    // paWasapi->devInfo
-    if ((newDevInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
-        sizeof(PaWasapiDeviceInfo) * (deviceCount + 1))) == NULL)
-    {
-        return NULL;
-    }
-    memcpy(newDevInfo, paWasapi->devInfo, sizeof(PaWasapiDeviceInfo) * deviceCount);
-    memcpy(newDevInfo + deviceCount, &paWasapi->devInfo[loopbackindex], sizeof(paWasapi->devInfo));
-    newDevInfo[deviceCount].loopBack = 1;
-    if ((paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
-        sizeof(PaWasapiDeviceInfo) * (deviceCount + 1))) == NULL)
-    {
-        return NULL;
-    }
-    memcpy(paWasapi->devInfo, newDevInfo, sizeof(PaWasapiDeviceInfo) * (deviceCount + 1));
+        if (SUCCEEDED(hr = IMMDevice_QueryInterface(device, &pa_IID_IMMEndpoint, (void **)&endpoint)))
+        {
+            if (SUCCEEDED(hr = IMMEndpoint_GetDataFlow(endpoint, &flow)))
+                ret += (flow == filterFlow);
 
-    // loopback attributes
-    char *deviceName;
-    PaDeviceInfo *deviceInfo = &newDeviceInfoArray[deviceCount];
-    deviceName = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN +1);
-    if (deviceName == NULL)
-    {
-        return NULL;
+            SAFE_RELEASE(endpoint);
+        }
+
+        SAFE_RELEASE(device);
     }
-    _snprintf(deviceName, PA_WASAPI_DEVICE_NAME_LEN -1, "%s (loopback)", deviceInfo->name);
-    deviceInfo->name = deviceName;
 
-    deviceInfo->maxInputChannels			= deviceInfo->maxOutputChannels;
-    deviceInfo->defaultHighInputLatency		= deviceInfo->defaultHighOutputLatency;
-    deviceInfo->defaultLowInputLatency		= deviceInfo->defaultLowOutputLatency;
-    deviceInfo->maxOutputChannels			= 0;
-    deviceInfo->defaultHighOutputLatency	= 0;
-    deviceInfo->defaultLowOutputLatency		= 0;
+    return ret;
 
-    return newDeviceInfoArray;
+error:
+
+    return 0;
+}
+#else
+static UINT32 GetDeviceListDeviceCount(const PaWasapiHostApiRepresentation *paWasapi, 
+    const PaWasapiWinrtDeviceListContext *deviceListContext, EDataFlow filterFlow)
+{
+    UINT32 i, ret = 0;
+
+    for (i = 0; i < paWasapi->deviceCount; ++i)
+        ret += (deviceListContext->devices[i].flow == filterFlow);
+
+    return ret;
+}
+#endif
+
+// ------------------------------------------------------------------------------------------
+static BOOL FillLooopbackDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, PaDeviceInfo *loopbackDeviceInfo,
+    PaWasapiDeviceInfo *loopbackWasapiInfo, const PaDeviceInfo *deviceInfo, const PaWasapiDeviceInfo *wasapiInfo)
+{
+// Loopback device name identificator
+// note: Some projects depend on loopback device detection by device name, do not change!
+#define PA_WASAPI_LOOPBACK_NAME_IDENTIFICATOR "[Loopback]"
+
+    memcpy(loopbackDeviceInfo, deviceInfo, sizeof(*loopbackDeviceInfo));
+    memcpy(loopbackWasapiInfo, wasapiInfo, sizeof(*loopbackWasapiInfo));
+
+    // Append loopback device name identificator to the device name to provide possibility to find
+    // loopback device by its name for some external projects
+    loopbackDeviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN + 1);
+    if (loopbackDeviceInfo->name == NULL)
+        return FALSE;
+    _snprintf((char *)loopbackDeviceInfo->name, PA_WASAPI_DEVICE_NAME_LEN - 1,
+        "%s " PA_WASAPI_LOOPBACK_NAME_IDENTIFICATOR, deviceInfo->name);
+
+    // Acquire ref to the device as it is already referenced as render (output) device
+    // to avoid duplicate release in ReleaseWasapiDeviceInfoList()
+#ifndef PA_WINRT
+    SAFE_ADDREF(loopbackWasapiInfo->device);
+#endif
+
+    // Mark as loopback device
+    loopbackWasapiInfo->loopBack = TRUE;
+
+    // Input is the reverse of Output
+    loopbackDeviceInfo->maxInputChannels		 = deviceInfo->maxOutputChannels;
+    loopbackDeviceInfo->defaultHighInputLatency	 = deviceInfo->defaultHighOutputLatency;
+    loopbackDeviceInfo->defaultLowInputLatency	 = deviceInfo->defaultLowOutputLatency;
+    loopbackDeviceInfo->maxOutputChannels		 = 0;
+    loopbackDeviceInfo->defaultHighOutputLatency = 0;
+    loopbackDeviceInfo->defaultLowOutputLatency	 = 0;
+
+    return TRUE;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -2175,7 +2209,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaError result = paNoError;
     PaDeviceInfo *deviceInfoArray = NULL;
-    UINT32 i;
+    UINT32 i, j, loopbacks;
     WCHAR *defaultRenderId = NULL;
     WCHAR *defaultCaptureId = NULL;
 #ifndef PA_WINRT
@@ -2241,6 +2275,9 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     // Get device count
     hr = IMMDeviceCollection_GetCount(pEndPoints, &paWasapi->deviceCount);
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
+
+    // Get loopback device count (e.g. all renders)
+    loopbacks = GetDeviceListDeviceCount(pEndPoints, eRender);
 #else
     WinRT_GetDefaultDeviceId(defaultRender.id, STATIC_ARRAY_SIZE(defaultRender.id) - 1, eRender);
     defaultRenderId = defaultRender.id;
@@ -2289,19 +2326,24 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
             paWasapi->deviceCount++;
         }
     }
+
+    // Get loopback device count (e.g. all renders)
+    loopbacks = GetDeviceListDeviceCount(paWasapi, &deviceListContext, eRender);
 #endif
 
     // Allocate memory for the device list
-    if ((paWasapi->deviceCount != 0) && ((deviceInfoArray = AllocateDeviceListMemory(paWasapi)) == NULL))
+    if ((paWasapi->deviceCount != 0) &&
+        ((deviceInfoArray = AllocateDeviceListMemory(paWasapi, paWasapi->deviceCount + loopbacks)) == NULL))
     {
         result = paInsufficientMemory;
         goto error;
     }
 
     // Fill WASAPI device info
-    for (i = 0; i < paWasapi->deviceCount; ++i)
+    for (i = 0, j = 0; i < paWasapi->deviceCount; ++i)
     {
         PaDeviceInfo *deviceInfo = &deviceInfoArray[i];
+        PaWasapiDeviceInfo *wasapiInfo = &paWasapi->devInfo[i];
 
         PA_DEBUG(("WASAPI: device idx: %02d\n", i));
         PA_DEBUG(("WASAPI: ---------------\n"));
@@ -2309,7 +2351,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
         FillBaseDeviceInfo(deviceInfo, hostApiIndex);
 
         if ((result = FillDeviceInfo(paWasapi, pEndPoints, i, defaultRenderId, defaultCaptureId,
-            deviceInfo, &paWasapi->devInfo[i]
+            deviceInfo, wasapiInfo
         #ifdef PA_WINRT
             , &deviceListContext
         #endif
@@ -2322,35 +2364,28 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
 
         hostApi->deviceInfos[i] = deviceInfo;
         ++hostApi->info.deviceCount;
-    }
 
-    // check for loopbacks
-    UINT32 initialDevices = paWasapi->deviceCount;
-    for (i = 0; i < initialDevices; ++i) {
-        if (paWasapi->devInfo[i].flow == eRender) {
-            // need to add a loopback for this render device
-            if ((deviceInfoArray = AddLoopbacksToDeviceList(paWasapi, deviceInfoArray, i)) == NULL)
+        // Add loopback device for the render device
+        if (paWasapi->devInfo[i].flow == eRender)
+        {
+            // Add loopback device to the end of the device list
+            UINT32 loopbackIndex = paWasapi->deviceCount + j++;
+            PaDeviceInfo *loopbackDeviceInfo = &deviceInfoArray[loopbackIndex];
+            PaWasapiDeviceInfo *loopbackWasapiInfo = &paWasapi->devInfo[loopbackIndex];
+
+            if (!FillLooopbackDeviceInfo(paWasapi, loopbackDeviceInfo, loopbackWasapiInfo, deviceInfo, wasapiInfo))
             {
                 result = paInsufficientMemory;
                 goto error;
             }
-            paWasapi->devInfo[paWasapi->deviceCount].loopBack = TRUE;
+
+            hostApi->deviceInfos[loopbackIndex] = loopbackDeviceInfo;
             ++hostApi->info.deviceCount;
-            ++paWasapi->deviceCount;
         }
     }
 
-    // all loopbacks found, so write new devicelist to hostApi->deviceInfos
-    if ((hostApi->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateMemory(paWasapi->allocations,
-        sizeof(PaDeviceInfo *) * paWasapi->deviceCount)) == NULL)
-    {
-        result = paInsufficientMemory;
-        goto error;
-    }
-    for (i = 0; i < paWasapi->deviceCount; ++i)
-    {
-        hostApi->deviceInfos[i] = &deviceInfoArray[i];
-    }
+    // Resize device list to accomodate inserted loopback devices
+    paWasapi->deviceCount += loopbacks;
 
     // Fill the remaining slots with inactive device info
 #if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
@@ -2374,7 +2409,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     // Clear any non-fatal errors
     result = paNoError;
 
-    PRINT(("WASAPI: device list ok - found %d devices\n", paWasapi->deviceCount));
+    PRINT(("WASAPI: device list ok - found %d devices, %d loopbacks\n", paWasapi->deviceCount, loopbacks));
 
 done:
 
@@ -2725,7 +2760,8 @@ PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice )
 #endif
 }
 
-int PaWasapi_IsLoopback( PaDeviceIndex nDevice )
+// ------------------------------------------------------------------------------------------
+int PaWasapi_IsLoopback( PaDeviceIndex device )
 {
 	PaError ret;
 	PaDeviceIndex index;
@@ -2736,7 +2772,7 @@ int PaWasapi_IsLoopback( PaDeviceIndex nDevice )
 		return paNotInitialized;
 
 	// Get device index
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, nDevice, &paWasapi->inheritedHostApiRep);
+	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
 	if (ret != paNoError)
 		return ret;
 
@@ -3970,8 +4006,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             (stream->in.shareMode == AUDCLNT_SHAREMODE_SHARED) &&
             ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiAutoConvert)))
             stream->in.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
+
+        // Loopback device is a real output device, so we open stream with AUDCLNT_STREAMFLAGS_LOOPBACK
+        // flag to make it work as input device
         if (info->loopBack)
             stream->in.streamFlags |= AUDCLNT_STREAMFLAGS_LOOPBACK;
+
         // Fill parameters for Audio Client creation
         stream->in.params.device_info       = info;
         stream->in.params.stream_params     = (*inputParameters);
