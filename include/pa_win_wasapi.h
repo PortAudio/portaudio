@@ -437,7 +437,7 @@ int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDevic
 int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
 
 
-/** Get device IMMDevice pointer
+/** Get device IMMDevice pointer.
 
  @param device Device index.
  @param pAudioClient Pointer to pointer of IMMDevice.
@@ -445,6 +445,20 @@ int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
  @return Error code indicating success or failure.
 */
 PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice );
+
+
+/** Get device loopback state: 
+
+    0 - Not loopback, 
+    1 - Loopback, 
+    negative - PaErrorCode.
+
+ @param device Device index.
+
+ @return Non-negative value indicating loopback state or, a PaErrorCode (which is always negative)
+         if PortAudio is not initialized or an error is encountered.
+*/
+int PaWasapi_IsLoopback( PaDeviceIndex device );
 
 
 /** Boost thread priority of calling thread (MMCSS).
