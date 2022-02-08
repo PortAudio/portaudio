@@ -1979,9 +1979,9 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
 
     // Set default Output/Input devices
     if ((defaultRenderId != NULL) && (wcsncmp(wasapiDeviceInfo->deviceId, defaultRenderId, PA_WASAPI_DEVICE_NAME_LEN - 1) == 0))
-        hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
+        hostApi->info.defaultOutputDevice = index;
     if ((defaultCaptureId != NULL) && (wcsncmp(wasapiDeviceInfo->deviceId, defaultCaptureId, PA_WASAPI_DEVICE_NAME_LEN - 1) == 0))
-        hostApi->info.defaultInputDevice = hostApi->info.deviceCount;
+        hostApi->info.defaultInputDevice = index;
 
     // Get a temporary IAudioClient for more details
     {
@@ -2209,7 +2209,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaError result = paNoError;
     PaDeviceInfo *deviceInfoArray = NULL;
-    UINT32 i, j, loopbacks;
+    UINT32 i, j, loopbackDevices;
     WCHAR *defaultRenderId = NULL;
     WCHAR *defaultCaptureId = NULL;
 #ifndef PA_WINRT
@@ -2277,7 +2277,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
     // Get loopback device count (e.g. all renders)
-    loopbacks = GetDeviceListDeviceCount(pEndPoints, eRender);
+    loopbackDevices = GetDeviceListDeviceCount(pEndPoints, eRender);
 #else
     WinRT_GetDefaultDeviceId(defaultRender.id, STATIC_ARRAY_SIZE(defaultRender.id) - 1, eRender);
     defaultRenderId = defaultRender.id;
@@ -2328,12 +2328,12 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     }
 
     // Get loopback device count (e.g. all renders)
-    loopbacks = GetDeviceListDeviceCount(paWasapi, &deviceListContext, eRender);
+    loopbackDevices = GetDeviceListDeviceCount(paWasapi, &deviceListContext, eRender);
 #endif
 
     // Allocate memory for the device list
     if ((paWasapi->deviceCount != 0) &&
-        ((deviceInfoArray = AllocateDeviceListMemory(paWasapi, paWasapi->deviceCount + loopbacks)) == NULL))
+        ((deviceInfoArray = AllocateDeviceListMemory(paWasapi, paWasapi->deviceCount + loopbackDevices)) == NULL))
     {
         result = paInsufficientMemory;
         goto error;
@@ -2366,10 +2366,11 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
         ++hostApi->info.deviceCount;
 
         // Add loopback device for the render device
-        if (paWasapi->devInfo[i].flow == eRender)
+        if ((paWasapi->devInfo[i].flow == eRender) && (j < loopbackDevices))
         {
             // Add loopback device to the end of the device list
             UINT32 loopbackIndex = paWasapi->deviceCount + j++;
+			assert(loopbackIndex < (paWasapi->deviceCount + loopbackDevices));
             PaDeviceInfo *loopbackDeviceInfo = &deviceInfoArray[loopbackIndex];
             PaWasapiDeviceInfo *loopbackWasapiInfo = &paWasapi->devInfo[loopbackIndex];
 
@@ -2385,7 +2386,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     }
 
     // Resize device list to accomodate inserted loopback devices
-    paWasapi->deviceCount += loopbacks;
+    paWasapi->deviceCount += loopbackDevices;
 
     // Fill the remaining slots with inactive device info
 #if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
@@ -2409,7 +2410,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
     // Clear any non-fatal errors
     result = paNoError;
 
-    PRINT(("WASAPI: device list ok - found %d devices, %d loopbacks\n", paWasapi->deviceCount, loopbacks));
+    PRINT(("WASAPI: device list ok - found %d devices, %d loopback devices\n", paWasapi->deviceCount, loopbackDevices));
 
 done:
 
