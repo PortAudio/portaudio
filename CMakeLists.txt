@@ -35,6 +35,9 @@ add_library(PortAudio
   src/common/pa_types.h
   src/common/pa_util.h
 )
+
+include(GNUInstallDirs)
+
 target_include_directories(PortAudio PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/common>
@@ -95,8 +98,6 @@ endif()
 
 include(CMakeDependentOption)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
-
-include(GNUInstallDirs)
 
 # JACK is most commonly used on Linux, but it is cross platform, so allow building it on any OS
 # if the FindJACK.cmake module finds POSIX headers.
