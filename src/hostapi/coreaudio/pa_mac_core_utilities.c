@@ -222,7 +222,7 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
         break;
     case kAudioHardwareBadStreamError:
         errorText = "Audio Hardware: BadStream";
-        result = paBadStreamPtr;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareUnsupportedOperationError:
         errorText = "Audio Hardware: Unsupported Operation";
