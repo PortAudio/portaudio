@@ -1286,6 +1286,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 
             if (   strcmp (names[i],"ASIO DirectX Full Duplex Driver") == 0
                 || strcmp (names[i],"ASIO Multimedia Driver")          == 0
+                || strcmp (names[i],"ASIO Link Pro")                   == 0
                 || strncmp(names[i],"Premiere",8)                      == 0   //"Premiere Elements Windows Sound 1.0"
                 || strncmp(names[i],"Adobe",5)                         == 0   //"Adobe Default Windows Sound 1.5"
                )
