@@ -198,23 +198,23 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
         return paNoError;
     case kAudioHardwareNotRunningError:
         errorText = "Audio Hardware Not Running";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareUnspecifiedError:
         errorText = "Unspecified Audio Hardware Error";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareUnknownPropertyError:
         errorText = "Audio Hardware: Unknown Property";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareBadPropertySizeError:
         errorText = "Audio Hardware: Bad Property Size";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareIllegalOperationError:
         errorText = "Audio Hardware: Illegal Operation";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareBadDeviceError:
         errorText = "Audio Hardware: Bad Device";
@@ -222,11 +222,11 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
         break;
     case kAudioHardwareBadStreamError:
         errorText = "Audio Hardware: BadStream";
-        result = paBadStreamPtr;
+        result = paUnanticipatedHostError;
         break;
     case kAudioHardwareUnsupportedOperationError:
         errorText = "Audio Hardware: Unsupported Operation";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioDeviceUnsupportedFormatError:
         errorText = "Audio Device: Unsupported Format";
@@ -239,79 +239,79 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
     /* Audio Unit Errors: http://developer.apple.com/documentation/MusicAudio/Reference/CoreAudio/audio_units/chapter_5_section_3.html */
     case kAudioUnitErr_InvalidProperty:
         errorText = "Audio Unit: Invalid Property";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_InvalidParameter:
         errorText = "Audio Unit: Invalid Parameter";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_NoConnection:
         errorText = "Audio Unit: No Connection";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_FailedInitialization:
         errorText = "Audio Unit: Initialization Failed";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_TooManyFramesToProcess:
         errorText = "Audio Unit: Too Many Frames";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_InvalidFile:
         errorText = "Audio Unit: Invalid File";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_UnknownFileType:
         errorText = "Audio Unit: Unknown File Type";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_FileNotSpecified:
         errorText = "Audio Unit: File Not Specified";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_FormatNotSupported:
         errorText = "Audio Unit: Format Not Supported";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_Uninitialized:
         errorText = "Audio Unit: Uninitialized";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_InvalidScope:
         errorText = "Audio Unit: Invalid Scope";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_PropertyNotWritable:
         errorText = "Audio Unit: PropertyNotWritable";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_InvalidPropertyValue:
         errorText = "Audio Unit: Invalid Property Value";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_PropertyNotInUse:
         errorText = "Audio Unit: Property Not In Use";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_Initialized:
         errorText = "Audio Unit: Initialized";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_InvalidOfflineRender:
         errorText = "Audio Unit: Invalid Offline Render";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_Unauthorized:
         errorText = "Audio Unit: Unauthorized";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     case kAudioUnitErr_CannotDoInCurrentContext:
         errorText = "Audio Unit: cannot do in current context";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
         break;
     default:
         errorText = "Unknown Error";
-        result = paInternalError;
+        result = paUnanticipatedHostError;
     }
 
     if (isError)
@@ -333,7 +333,9 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
 
     DBUG(("%s on line %d: err='%s', msg=%s\n", errorType, line, str, errorText));
 
-    PaUtil_SetLastHostErrorInfo( paCoreAudio, error, errorText );
+    if (result == paUnanticipatedHostError) {
+        PaUtil_SetLastHostErrorInfo( paCoreAudio, error, errorText );
+    }
 
     return result;
 }
