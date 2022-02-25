@@ -33,7 +33,7 @@ jobs:
             os: windows-latest
             install_dir: C:\portaudio
             vcpkg_triplet: x64-windows
-            cmake_generator: "Visual Studio 16 2019"
+            cmake_generator: "Visual Studio 17 2022"
             # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
             # asiosdk instead of asiosdk.zip.
             asio_sdk_cache_path: "asiosdk.zip"
