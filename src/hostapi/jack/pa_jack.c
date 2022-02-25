@@ -551,7 +551,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         /* extract the client name from the port name, using a regex
          * that parses the clientname:portname syntax */
         UNLESS( !regexec( &port_regex, port, 1, &match_info, 0 ), paInternalError );
-        assert(match_info.rm_eo - match_info.rm_so < jack_client_name_size());
+        assert(match_info.rm_eo - match_info.rm_so <= jack_client_name_size());
         memcpy( tmp_client_name, port + match_info.rm_so,
                 match_info.rm_eo - match_info.rm_so );
         tmp_client_name[match_info.rm_eo - match_info.rm_so] = '\0';
