@@ -7,7 +7,7 @@
  *
  * Copyright (c) 1999-2018 Ross Bencina and Phil Burk
  * Copyright (c) 2006-2010 David Viens
- * Copyright (c) 2010-2018 Dmitry Kostjuchenko
+ * Copyright (c) 2010-2022 Dmitry Kostjuchenko
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -66,9 +66,7 @@ typedef enum PaWasapiFlags
     /* assign custom channel mask */
     paWinWasapiUseChannelMask           = (1 << 2),
 
-    /* select non-Event driven method of data read/write
-       Note: WASAPI Event driven core is capable of 2ms latency!!!, but Polling
-             method can only provide 15-20ms latency. */
+    /* use Polling method (Event method is the default, see details in the IMPORTANT notes) */
     paWinWasapiPolling                  = (1 << 3),
 
     /* force custom thread priority setting, must be used if PaWasapiStreamInfo::threadPriority
@@ -622,20 +620,25 @@ PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsi
         Provides best audio quality with low latency. Callback interface is implemented in
         two versions:
 
-        1) Event-Driven:
-        This is the most powerful WASAPI implementation which provides glitch-free
-        audio at around 3ms latency in Exclusive mode. Lowest possible latency for this mode is
+        1) Event-driven:
+        It is the most powerful data processing method which provides glitch-free audio with
+        around 3 ms latency in Exclusive mode. Lowest possible latency for this mode is
         3 ms for HD Audio class audio chips. For the Shared mode latency can not be
-        lower than 20 ms.
+        lower than 20 ms. This method consumes slightly less CPU in comparison to Polling.
+        It is the default processing method unless 'paWinWasapiPolling' is specified.
 
-        2) Poll-Driven:
-        Polling is another 2-nd method to operate with WASAPI. It is less efficient than Event-Driven
-        and provides latency at around 10-13ms. Polling must be used to overcome a system bug
-        under Windows Vista x64 when application is WOW64(32-bit) and Event-Driven method simply
-        times out (event handle is never signalled on buffer completion). Please note, such WOW64 bug
-        does not exist in Vista x86 or Windows 7.
-        Polling can be setup by specifying 'paWinWasapiPolling' flag. Our WASAPI implementation detects
-        WOW64 bug and sets 'paWinWasapiPolling' automatically.
+        2) Poll-driven:
+        Polling is an alternative to Event-driven processing. Due to its nature Polling consumes
+        slightly more CPU. This method is less efficient than Event-driven and its lowest possible
+        latency is around 10-13 ms.
+        Note: Newer Windows versions (for example 11) allow to achieve similar to Event-driven
+        low latency.
+        Note: Polling must be used to overcome system bug of Windows Vista (x64) when application
+        is WOW64 (32-bit process running on 64-bit OS) that results in WASAPI callback timeout if
+        Event-driven method is selected (event handle is never signalled on buffer completion).
+        This WOW64 bug does not exist in Windows Vista (x86) or Windows 7 or newer Windows versions.
+        Polling can be activated by specifying 'paWinWasapiPolling' flag. Our implementation
+        detects WOW64 bug and sets 'paWinWasapiPolling' automatically.
 
     Thread priority:
 
