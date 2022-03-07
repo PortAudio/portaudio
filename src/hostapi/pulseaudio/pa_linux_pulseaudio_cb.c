@@ -487,7 +487,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 {
     PaError result = paNoError;
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
-    int streamStarted = 0;      /* So we can know whether we need to take the stream down */
+    int l_iPlaybackStreamStarted = 0;
+    int l_iRecordStreamStarted = 0;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi = stream->hostapi;
     const char *l_strName = NULL;
     pa_operation *l_ptrOperation = NULL;
@@ -680,36 +681,41 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     if( stream->outStream != NULL
         || stream->inStream != NULL )
     {
-        while( 1)
+        stream->isActive = 0;
+        stream->isStopped = 1;
+
+        while( 1 )
         {
             pa_threaded_mainloop_lock( l_ptrPulseAudioHostApi->mainloop );
-            if( stream->outStream != NULL)
+            if( stream->outStream != NULL )
             {
-                if( PA_STREAM_READY == pa_stream_get_state( stream->outStream ))
+                if( PA_STREAM_READY == pa_stream_get_state( stream->outStream ) && !l_iPlaybackStreamStarted)
                 {
-                    stream->isActive = 1;
-                    stream->isStopped = 0;
+                    l_iPlaybackStreamStarted = 1;
                 }
             }
 
             else if( stream->inStream != NULL )
             {
-                if( PA_STREAM_READY == pa_stream_get_state( stream->inStream ))
+                if( PA_STREAM_READY == pa_stream_get_state( stream->inStream ) && !l_iRecordStreamStarted)
                 {
-                    stream->isActive = 1;
-                    stream->isStopped = 0;
+                    l_iRecordStreamStarted = 1;
                 }
             }
-
             else
             {
+                goto error;
+            }
+
+            if( (l_iPlaybackStreamStarted && stream->inStream == NULL) ||
+                ((l_iPlaybackStreamStarted && l_iRecordStreamStarted) &&
+                (stream->inStream != NULL && stream->outStream != NULL)) )
+            {
+                stream->isActive = 1;
+                stream->isStopped = 0;
                 break;
             }
 
-            if( stream->isActive == 1 )
-            {
-                break;
-            }
             pa_threaded_mainloop_unlock( l_ptrPulseAudioHostApi->mainloop );
 
             usleep(1000);
@@ -728,12 +734,13 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     return result;
   error:
 
-    if( streamStarted )
+    if( l_iPlaybackStreamStarted || l_iRecordStreamStarted )
     {
         PaPulseAudio_AbortStreamCb( stream );
     }
 
     stream->isActive = 0;
+    stream->isStopped = 1;
     result = paNotInitialized;
 
     goto end;
