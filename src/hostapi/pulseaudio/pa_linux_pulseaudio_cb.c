@@ -489,6 +489,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) s;
     int l_iPlaybackStreamStarted = 0;
     int l_iRecordStreamStarted = 0;
+    pa_stream_state_t l_SState = PA_STREAM_UNCONNECTED;
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi = stream->hostapi;
     const char *l_strName = NULL;
     pa_operation *l_ptrOperation = NULL;
@@ -689,17 +690,31 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             pa_threaded_mainloop_lock( l_ptrPulseAudioHostApi->mainloop );
             if( stream->outStream != NULL )
             {
-                if( PA_STREAM_READY == pa_stream_get_state( stream->outStream ) && !l_iPlaybackStreamStarted)
+                l_SState = pa_stream_get_state( stream->outStream );
+                if( PA_STREAM_READY == l_SState &&
+                    !l_iPlaybackStreamStarted)
                 {
                     l_iPlaybackStreamStarted = 1;
+                }
+                else if( PA_STREAM_FAILED == l_SState ||
+                         PA_STREAM_TERMINATED == l_SState )
+                {
+                    goto error;
                 }
             }
 
             else if( stream->inStream != NULL )
             {
-                if( PA_STREAM_READY == pa_stream_get_state( stream->inStream ) && !l_iRecordStreamStarted)
+                l_SState = pa_stream_get_state( stream->inStream );
+                if( PA_STREAM_READY == l_SState &&
+                    !l_iRecordStreamStarted)
                 {
                     l_iRecordStreamStarted = 1;
+                }
+                else if( PA_STREAM_FAILED == l_SState ||
+                         PA_STREAM_TERMINATED == l_SState )
+                {
+                    goto error;
                 }
             }
             else
@@ -727,6 +742,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     {
         goto error;
     }
+
+    /* Make sure we pass no error on intialize */
+    result = paNoError;
 
     /* Allways unlock.. so we don't get locked */
   end:
