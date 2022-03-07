@@ -3,7 +3,7 @@
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014-2020 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2022 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -74,7 +74,7 @@ PaError PaPulseAudio_ReadStreamBlock( PaStream * s,
     {
         PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
 
-        pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+        PaPulseAudio_Lock( l_ptrStream->mainloop );
         long l_read = PaUtil_ReadRingBuffer( &l_ptrStream->inputRing, l_ptrData,
                                              l_lLength );
         l_ptrData += l_read;
@@ -82,7 +82,7 @@ PaError PaPulseAudio_ReadStreamBlock( PaStream * s,
         if( l_lLength > 0 )
             pa_threaded_mainloop_wait( l_ptrStream->mainloop );
 
-        pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
+        PaPulseAudio_UnLock( l_ptrStream->mainloop );
 
         if( l_lLength > 0 )
         {
@@ -115,9 +115,9 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
     {
         PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
 
-        pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+        PaPulseAudio_Lock( l_ptrStream->mainloop );
         l_lWritable = pa_stream_writable_size( l_ptrStream->outStream );
-        pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
+        PaPulseAudio_UnLock( l_ptrStream->mainloop );
 
         if( l_lWritable > 0 )
         {
@@ -125,7 +125,7 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
            {
                 l_lWritable = l_lLength;
            }
-           pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+           PaPulseAudio_Lock( l_ptrStream->mainloop );
            l_iRet = pa_stream_write( l_ptrStream->outStream,
                                      l_ptrData,
                                      l_lWritable,
@@ -136,7 +136,7 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
             l_ptrOperation = pa_stream_update_timing_info( l_ptrStream->outStream,
                                                            NULL,
                                                            NULL );
-            pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
+            PaPulseAudio_UnLock( l_ptrStream->mainloop );
 
             l_iRet = 0;
 
@@ -148,7 +148,7 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
             while( pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING )
             {
                 l_iRet ++;
-                PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
+                PA_PULSEAUDIO_IS_ERROR( l_ptrStream, paStreamIsStopped )
 
                 /* As this shouldn never happen it's error if it does */
                 if( l_iRet >= 10000 )
@@ -159,12 +159,12 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
                 usleep(100);
             }
 
-            pa_threaded_mainloop_lock( l_ptrStream->mainloop );
+            PaPulseAudio_Lock( l_ptrStream->mainloop );
 
             pa_operation_unref( l_ptrOperation );
             l_ptrOperation = NULL;
 
-            pa_threaded_mainloop_unlock( l_ptrStream->mainloop );
+            PaPulseAudio_UnLock( l_ptrStream->mainloop );
 
             l_ptrData += l_lWritable;
             l_lLength -= l_lWritable;
@@ -197,20 +197,4 @@ signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * s )
 
     return (PaUtil_GetRingBufferReadAvailable(&l_ptrStream->inputRing) /
             l_ptrStream->inputFrameSize);
-}
-
-
-signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * s )
-{
-    PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
-    PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
-        l_ptrStream->hostapi;
-
-    if( l_ptrStream->outStream == NULL )
-    {
-        return 0;
-    }
-
-    return (PaUtil_GetRingBufferWriteAvailable(&l_ptrStream->outputRing) /
-            l_ptrStream->outputFrameSize);
 }

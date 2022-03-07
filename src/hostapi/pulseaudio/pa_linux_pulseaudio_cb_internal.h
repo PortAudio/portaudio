@@ -67,6 +67,11 @@ extern "C"
 {
 #endif                          /* __cplusplus */
 
+void PaPulseAudio_updateTimeInfo( pa_stream * s,
+                                  PaStreamCallbackTimeInfo *timeInfo,
+                                  int record );
+
+void *PaPulseAudio_processThread( void *userdata );
 
 PaError PaPulseAudio_CloseStreamCb( PaStream * stream );
 

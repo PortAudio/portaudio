@@ -3,7 +3,7 @@
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014-2020 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2022 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -115,7 +115,6 @@ typedef struct PaPulseAudio_Stream
     PaUtilBufferProcessor bufferProcessor;
     PaPulseAudio_HostApiRepresentation *hostapi;
 
-    PaUnixThread thread;
     unsigned long framesPerHostCallback;
     pa_threaded_mainloop *mainloop;
     pa_context *context;
@@ -123,15 +122,12 @@ typedef struct PaPulseAudio_Stream
     pa_sample_spec inSampleSpec;
     pa_stream *outStream;
     pa_stream *inStream;
-    size_t writableSize;
     pa_usec_t outStreamTime;
     pa_buffer_attr bufferAttr;
     int outputUnderflows;
     double latency;
     int outputChannelCount;
 
-    int callbackMode;       /* bool: are we running in callback mode? */
-    int rtSched;
     long maxFramesPerBuffer;
     long maxFramesHostPerBuffer;
     int outputFrameSize;
@@ -143,17 +139,11 @@ typedef struct PaPulseAudio_Stream
     char *sinkStreamName;
     char *sourceStreamName;
 
-    void *outBuffer;
-    void *inBuffer;
-
     PaUtilRingBuffer inputRing;
-    PaUtilRingBuffer outputRing;
 
     /* Used in communication between threads */
-    volatile sig_atomic_t callback_finished;        /* bool: are we in the "callback finished" state? */
-    volatile sig_atomic_t callbackAbort;    /* Drop frames? */
-    volatile sig_atomic_t isActive; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
-    volatile sig_atomic_t isStopped;        /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    volatile sig_atomic_t isActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    volatile sig_atomic_t isStopped; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
 
 }
 PaPulseAudio_Stream;
@@ -183,6 +173,11 @@ PaPulseAudio_Stream;
     { \
             return paStreamIsStopped; \
     }
+
+void PaPulseAudio_Lock( pa_threaded_mainloop *mainloop );
+
+void PaPulseAudio_UnLock( pa_threaded_mainloop *mainloop );
+
 PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                  PaHostApiIndex index );
 

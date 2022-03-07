@@ -83,8 +83,6 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * stream,
 
 signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * stream );
 
-signed long PaPulseAudio_GetStreamWriteAvailableBlock( PaStream * stream );
-
 #ifdef __cplusplus
 }
 #endif                          /* __cplusplus */
