@@ -64,6 +64,10 @@
 /* This is used to identify process name for PulseAudio. */
 extern char *__progname;
 
+/* Default latency values to expose. Chosen by trial and error to be reasonable. */
+#define PA_PULSEAUDIO_DEFAULT_MIN_LATENCY 0.015
+#define PA_PULSEAUDIO_DEFAULT_MAX_LATENCY 0.250
+
 /* PulseAudio specific functions */
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
@@ -347,8 +351,8 @@ void PaPulseAudio_SinkListCb( pa_context * c,
                                       l->sample_spec.channels,
                                       0,
                                       0,
-                                      l->latency / (double)PA_USEC_PER_SEC,
-                                      l->configured_latency / (double)PA_USEC_PER_SEC,
+                                      PA_PULSEAUDIO_DEFAULT_MIN_LATENCY,
+                                      PA_PULSEAUDIO_DEFAULT_MAX_LATENCY,
                                       l->sample_spec.rate ) != paNoError )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
@@ -397,8 +401,8 @@ void PaPulseAudio_SourceListCb( pa_context * c,
                                       l->name,
                                       l->sample_spec.channels,
                                       0,
-                                      l->latency / (double)PA_USEC_PER_SEC,
-                                      l->configured_latency / (double)PA_USEC_PER_SEC,
+                                      PA_PULSEAUDIO_DEFAULT_MIN_LATENCY,
+                                      PA_PULSEAUDIO_DEFAULT_MAX_LATENCY,
                                       0,
                                       0,
                                       l->sample_spec.rate ) != paNoError )
@@ -600,8 +604,8 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                       PA_CHANNELS_MAX,
                                       0,
                                       0,
-                                      0,
-                                      0,
+                                      PA_PULSEAUDIO_DEFAULT_MIN_LATENCY,
+                                      PA_PULSEAUDIO_DEFAULT_MAX_LATENCY,
                                       l_ptrPulseAudioHostApi->pulseaudioDefaultSampleSpec.rate ) != paNoError )
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
@@ -617,8 +621,8 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                       "The PulseAudio default source",
                                       PA_CHANNELS_MAX,
                                       0,
-                                      0,
-                                      0,
+                                      PA_PULSEAUDIO_DEFAULT_MIN_LATENCY,
+                                      PA_PULSEAUDIO_DEFAULT_MAX_LATENCY,
                                       0,
                                       0,
                                       l_ptrPulseAudioHostApi->pulseaudioDefaultSampleSpec.rate ) != paNoError )
