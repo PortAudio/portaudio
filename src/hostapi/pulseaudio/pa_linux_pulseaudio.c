@@ -594,7 +594,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
     // Add the "Default" sink at index 0
     if( _PaPulseAudio_AddAudioDevice( l_ptrPulseAudioHostApi,
-                                      "Default",
+                                      "Default Sink",
                                       "The PulseAudio default sink",
                                       0,
                                       PA_CHANNELS_MAX,
@@ -613,7 +613,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
     // Add the "Default" source at index 1
     if( _PaPulseAudio_AddAudioDevice( l_ptrPulseAudioHostApi,
-                                      "Default",
+                                      "Default Source",
                                       "The PulseAudio default source",
                                       PA_CHANNELS_MAX,
                                       0,
