@@ -300,7 +300,7 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
     hostapi->deviceInfoArray[hostapi->deviceCount].maxOutputChannels = outputChannels;
     hostapi->deviceInfoArray[hostapi->deviceCount].defaultLowInputLatency = defaultLowInputLatency;
     hostapi->deviceInfoArray[hostapi->deviceCount].defaultLowOutputLatency = defaultLowOutputLatency;
-    hostapi->deviceInfoArray[hostapi->deviceCount].defaultHighInputLatency = defaultHighOutputLatency;
+    hostapi->deviceInfoArray[hostapi->deviceCount].defaultHighInputLatency = defaultHighInputLatency;
     hostapi->deviceInfoArray[hostapi->deviceCount].defaultHighOutputLatency = defaultHighOutputLatency;
     hostapi->deviceInfoArray[hostapi->deviceCount].defaultSampleRate = defaultSampleRate;
     hostapi->deviceCount++;
