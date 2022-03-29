@@ -7,6 +7,7 @@
 a draft of new MinGW information on our
 Wiki: <a href="https://github.com/PortAudio/portaudio/wiki/Notes_about_building_PortAudio_with_MinGW">
 PortAudio Wiki: Notes about building PortAudio with MinGW</a></strong>
+If you are new to MinGW, this is the wrong page, and the correct page is almost certainly \ref compile_windows_mingw-w64. (MinGW is a largely defunct and unused project; MinGW-w64 is its current iteration.)
 
 = MinGW/MSYS =
 

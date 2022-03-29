@@ -13,6 +13,7 @@ Once you've downloaded PortAudio you'll need to compile it, which of course, dep
 
  - Windows
    - \ref compile_windows
+   - \ref compile_windows_mingw-w64
    - \ref compile_windows_mingw
    - \ref compile_windows_asio_msvc
  - Mac OS X
