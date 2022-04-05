@@ -8,13 +8,7 @@ Install MinGW-w64 from https://www.msys2.org/. Follow the instructions on this p
 
 Brief excursion: there are many toolchain variants in Msys2, and you must use the same toolchain to compile all projects together. In this tutorial, we will use the msvcrt-gcc toolchain, simply because it's already present on all Windows versions. Readers may eventually want to switch to the ucrt-gcc toolchain later, for their Windows 10+ builds, although there is hardly any benefit to doing so. A list of available toolchains is at https://www.msys2.org/docs/environments/.
 
-In addition, you have a choice of Windows audio APIs. Here's a summary:
-
-WASAPI: recommended by Microsoft. Supported since Windows Vista (includes 7/8/10+). This should be the default in most cases; it has the best performance of the APIs that work out of the box. If you want to support Windows XP or earlier, you will need to add in another API as a fallback. See the diagram at the top of \ref api_overview for a list of Windows APIs.
-
-ASIO: intended for pro audio users; this requires the user to install ASIO drivers, which can be finicky and annoying. Compared to WASAPI exclusive mode, ASIO may or may not have latency advantages (I have not tested).
-
-WMME, DirectSound, WDM/KS: these are worse than WASAPI, but can be used if WASAPI is not available (such as on Windows XP).
+In addition, you have a choice of Windows audio APIs; see the bottom of \ref compile_windows for a list.
 
 You can either use msys2's precompiled PortAudio or compile PortAudio yourself. To install msys2's precompiled PortAudio, see the next section. To compile PortAudio on your own, skip to the next next section.
 
