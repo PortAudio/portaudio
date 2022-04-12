@@ -96,6 +96,17 @@ Project Properties -> Configuration Properties -> C/C++ -> Preprocessor -> Prepr
 4) Remove PaAsio_* entry points from portaudio.def
 
 
+@section comp_win5 List of Windows audio APIs
+
+WASAPI: recommended by Microsoft. Supported since Windows Vista (includes 7/8/10+).
+
+ASIO: Low latency API intended for pro audio users; this requires the user to install ASIO drivers.
+
+WMME, DirectSound: Legacy APIs for greater backward compatibility
+
+WDM/KS: Low level direct-to-driver API.
+
+
 -----
 David Viens, davidv@plogue.com
 
