@@ -97,7 +97,7 @@ jobs:
         vcpkgTriplet: ${{ matrix.vcpkg_triplet }}
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: build/vcpkg_installed
-        vcpkgGitCommitId: 3ab8c7487451cc61c778258c92bd88dfe3c5f32e
+        vcpkgGitCommitId: f30786c9c4c901f21a13e2d524349e39cc359a90
         # Required when using vcpkg.json manifest in repository
         setupOnly: true
     - name: configure
