@@ -71,7 +71,6 @@ static int patest1Callback( const void *inputBuffer, void *outputBuffer,
     float *in = (float*)inputBuffer;
     float *out = (float*)outputBuffer;
     unsigned long i = 0;
-    int finished = paContinue;
 
     for( ; i<framesPerBuffer; i++ )
     {
@@ -83,7 +82,7 @@ static int patest1Callback( const void *inputBuffer, void *outputBuffer,
         *out++ = output;  /* right */
     }
 
-    return finished;
+    return paContinue;
 }
 
 int main(int argc, char* argv[]);
@@ -97,7 +96,7 @@ int main(int argc, char* argv[])
     const PaHostErrorInfo*  herr;
 
     printf("patest1.c\n"); fflush(stdout);
-    printf("Ring modulate input until key entered.\n"); fflush(stdout);
+    printf("Ring modulate input until ENTER key pressed.\n"); fflush(stdout);
 
     /* initialise sinusoidal wavetable */
     for( i=0; i<SINE_TABLE_SIZE; i++ )
