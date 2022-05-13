@@ -167,7 +167,7 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
 
     if( stream->outStream )
     {
-        if( !stream->inStream && l_lFramesPerHostBuffer == paFramesPerBufferUnspecified )
+        if( l_lFramesPerHostBuffer == paFramesPerBufferUnspecified )
         {
             l_lFramesPerHostBuffer = writableBytes / stream->outputFrameSize;
         }
