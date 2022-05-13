@@ -1074,7 +1074,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         result = PaPulseAudio_BlockingInitRingBuffer( stream,
                                                       &stream->inputRing,
-                                                      (4096 * 32) );
+                                                      stream->inputFrameSize * framesPerBuffer * inputChannelCount );
         if( result != paNoError )
         {
             goto openstream_error;
