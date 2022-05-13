@@ -811,10 +811,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                 goto startstreamcb_error;
             }
 
-            if( (l_iPlaybackStreamStarted && !stream->inStream) ||
-                (l_iRecordStreamStarted && !stream->outStream) ||
-                ((l_iPlaybackStreamStarted && l_iRecordStreamStarted) &&
-                (stream->inStream && stream->outStream)) )
+            if( (l_iPlaybackStreamStarted || stream->outStream == NULL) && 
+                (l_iRecordStreamStarted || stream->inStream == NULL) )
             {
                 stream->isActive = 1;
                 stream->isStopped = 0;
