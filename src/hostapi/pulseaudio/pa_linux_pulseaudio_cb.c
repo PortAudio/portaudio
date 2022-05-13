@@ -221,6 +221,20 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
             break;
         }
 
+        if(  stream->outStream )
+        {
+            PaPulseAudio_updateTimeInfo( stream->outStream,
+                                         &timeInfo,
+                                         0 );
+        }
+
+        if(  stream->inStream )
+        {
+            PaPulseAudio_updateTimeInfo( stream->inStream,
+                                         &timeInfo,
+                                         1 );
+        }
+
         PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 
         /* When doing Portaudio Duplex one has to write and read same amount of data
@@ -342,20 +356,6 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
         }
 
     } while ( l_lBytesLeft > 0 );
-
-    if(  stream->outStream )
-    {
-        PaPulseAudio_updateTimeInfo( stream->outStream,
-                                     &timeInfo,
-                                     0 );
-    }
-
-    if(  stream->inStream )
-    {
-        PaPulseAudio_updateTimeInfo( stream->inStream,
-                                     &timeInfo,
-                                     1 );
-    }
 
     l_vBuffer = NULL;
 
@@ -831,15 +831,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             }
 
             usleep(1000);
-        }
-
-        if( l_iRecordStreamStarted && stream->isActive )
-        {
-
-        }
-
-        if( l_iPlaybackStreamStarted && stream->isActive )
-        {
         }
     }
     else
