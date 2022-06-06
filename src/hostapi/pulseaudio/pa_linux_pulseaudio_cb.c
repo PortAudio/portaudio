@@ -66,6 +66,7 @@
 /* PulseAudio headers */
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 void PaPulseAudio_updateTimeInfo( pa_stream * s,
                                   PaStreamCallbackTimeInfo *timeInfo,
@@ -123,21 +124,22 @@ void PaPulseAudio_UnLock( pa_threaded_mainloop *mainloop )
     }
 }
 
-int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
-                                           size_t writableBytes,
-                                           size_t readableBytes )
+static int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
+                                                  size_t writableBytes,
+                                                  size_t readableBytes )
 {
     PaStreamCallbackTimeInfo timeInfo = { 0, 0, 0 };
-    size_t l_lOutFrameBytes = 0;
-    size_t l_lInFrameBytes = 0;
+    size_t l_lStreamBeginWrite = 0;
+    unsigned long l_lOutFrameBytes = 0;
+    unsigned long l_lInFrameBytes = 0;
     int l_iResult = paContinue;
     long numFrames = 0;
     int i = 0;
 
     uint32_t l_lFramesPerHostBuffer = stream->bufferProcessor.framesPerHostBuffer;
 
-    int32_t l_lBytesLeft = 0;
-    size_t l_lBytesToProcess = 0;
+    long l_lBytesLeft = 0;
+    long l_lBytesToProcess = 0;
 
     void *l_vBuffer = NULL;
     uint8_t l_cBUffer[PULSEAUDIO_BUFFER_SIZE];
@@ -152,7 +154,12 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
     {
         if( l_lFramesPerHostBuffer == paFramesPerBufferUnspecified )
         {
-            l_lFramesPerHostBuffer = readableBytes / stream->inputFrameSize;
+            l_lFramesPerHostBuffer = (readableBytes / (stream->inputFrameSize * 2));
+
+            if( (l_lFramesPerHostBuffer % 2) )
+            {
+                l_lFramesPerHostBuffer ++;
+            }
         }
 
         l_lInFrameBytes = (l_lFramesPerHostBuffer * stream->inputFrameSize);
@@ -169,16 +176,38 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
     {
         if( l_lFramesPerHostBuffer == paFramesPerBufferUnspecified )
         {
-            l_lFramesPerHostBuffer = writableBytes / stream->outputFrameSize;
+            if( !stream->framesPerHostCallback )
+            {
+                l_lFramesPerHostBuffer = (writableBytes / (stream->outputFrameSize * 2));
+
+                if( (l_lFramesPerHostBuffer % 2) )
+                {
+                    l_lFramesPerHostBuffer ++;
+                }
+
+                stream->framesPerHostCallback = l_lFramesPerHostBuffer;
+            }
+            else
+            {
+                l_lFramesPerHostBuffer = stream->framesPerHostCallback;
+            }
         }
 
         l_lInFrameBytes = l_lOutFrameBytes = (l_lFramesPerHostBuffer * stream->outputFrameSize);
 
         /* Get buffer to write straight to pulseaudio output stream
-           we need to calculate correct size with how manyt times
-           our l_lOutFrameBytes goes to needed output */
+         * we need to calculate correct size with how manyt times
+         * our l_lOutFrameBytes goes to needed output
+         */
+        double l_fHowManyTime = ((double)writableBytes / l_lOutFrameBytes);
 
-        l_lBytesToProcess = l_lBytesLeft = (1 + (writableBytes / l_lOutFrameBytes)) * l_lOutFrameBytes;
+        /* We need to write(/read) at least once */
+        if( l_fHowManyTime < 1 )
+        {
+            l_fHowManyTime = 1;
+        }
+
+        l_lBytesToProcess = l_lBytesLeft = (long)((l_fHowManyTime) * l_lOutFrameBytes);
 
         if( stream->bufferProcessor.streamCallback )
         {
@@ -271,64 +300,75 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
         if( l_bOutputCb )
         {
             PaPulseAudio_Lock( stream->mainloop );
-            if( ! pa_stream_begin_write( stream->outStream,
-                                       &l_vBuffer,
-                                       &l_lOutFrameBytes) )
+
+            /*
+             * If something is wanted
+             * tune in dark and
+             * distant future.
+             * This one  would be snappier to
+             * make with 'pa_stream_begin_write'
+             *
+             * But the problems starts to rise
+             * when it asks too less bytes than
+             * we get from
+             * PaUtil_SetInterleavedOutputChannels
+             *
+             * So just use pa_stream_write which
+             * is compromiss and seems to work
+             * as expected
+             */
+
+            PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
+                                                 0,
+                                                 l_cBUffer,
+                                                 stream->outputChannelCount );
+            PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
+                                        l_lFramesPerHostBuffer );
+
+            l_lBytesLeft -= l_lOutFrameBytes;
+
+            /* As patest_mono works as expected
+             * @TODO add it if needed
+             * If mono we assume to have stereo output
+             * So we just copy to other channel..
+             * Little bit hackish but works.. with float currently
+             * if( l_ptrStream->outputChannelCount == 1 )
+             * {
+             *     void *l_ptrStartOrig = l_cBUffer + l_lOutFrameBytes;
+             *     void *l_ptrStartStereo = l_cBUffer;
+             *     memcpy(l_ptrStartOrig, l_ptrStartStereo, l_lOutFrameBytes);
+             *
+             *     for(i = 0; i < l_lOutFrameBytes; i += stream->outputFrameSize)
+             *     {
+             *         memcpy( l_ptrStartStereo,
+             *                 l_ptrStartOrig,
+             *                 l_ptrStream->outputFrameSize );
+             *         l_ptrStartStereo += stream->outputFrameSize;
+             *         memcpy( l_ptrStartStereo,
+             *                 l_ptrStartOrig,
+             *                 l_ptrStream->outputFrameSize );
+             *         l_ptrStartStereo += stream->outputFrameSize;
+             *         l_ptrStartOrig += stream->outputFrameSize;
+             *     }
+             *
+             *     memcpy(l_ptrStartStereo, l_ptrStartOrig, l_lOutFrameBytes);
+             * }
+             */
+
+            /* In theory this one
+             * Can overflow if too much bytes are written
+             * Otherwise one can write as much as one
+             * desired it's just then adjusted to next
+             * Callback inside Pulseaudio
+             */
+            if( pa_stream_write( stream->outStream,
+                                 l_cBUffer,
+                                 l_lOutFrameBytes,
+                                 NULL,
+                                 0,
+                                 PA_SEEK_RELATIVE) )
             {
-
-                PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
-                                                     0,
-                                                     l_vBuffer,
-                                                     stream->outputChannelCount );
-                PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
-                                            l_lFramesPerHostBuffer );
-
-                l_lBytesLeft -= l_lOutFrameBytes;
-
-                /* As patest_mono works as expected
-                 * @TODO add it if needed
-                 * If mono we assume to have stereo output
-                 * So we just copy to other channel..
-                 * Little bit hackish but works.. with float currently
-                 * if( l_ptrStream->outputChannelCount == 1 )
-                 * {
-                 *     void *l_ptrStartOrig = l_cBUffer + l_lOutFrameBytes;
-                 *     void *l_ptrStartStereo = l_cBUffer;
-                 *     memcpy(l_ptrStartOrig, l_ptrStartStereo, l_lOutFrameBytes);
-                 *
-                 *     for(i = 0; i < l_lOutFrameBytes; i += stream->outputFrameSize)
-                 *     {
-                 *         memcpy( l_ptrStartStereo,
-                 *                 l_ptrStartOrig,
-                 *                 l_ptrStream->outputFrameSize );
-                 *         l_ptrStartStereo += stream->outputFrameSize;
-                 *         memcpy( l_ptrStartStereo,
-                 *                 l_ptrStartOrig,
-                 *                 l_ptrStream->outputFrameSize );
-                 *         l_ptrStartStereo += stream->outputFrameSize;
-                 *         l_ptrStartOrig += stream->outputFrameSize;
-                 *     }
-                 *
-                 *     memcpy(l_ptrStartStereo, l_ptrStartOrig, l_lOutFrameBytes);
-                 * }
-                 */
-
-                if( pa_stream_write( stream->outStream,
-                                     l_vBuffer,
-                                     l_lOutFrameBytes,
-                                     NULL,
-                                     0,
-                                     PA_SEEK_RELATIVE) )
-                {
-                    PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
-                              __FUNCTION__) );
-                }
-
-                l_vBuffer = NULL;
-            }
-            else
-            {
-                PA_DEBUG( ("Portaudio %s: Can't alloc writing buffer!\n",
+                PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
                           __FUNCTION__) );
             }
 
@@ -356,8 +396,6 @@ int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
         }
 
     } while ( l_lBytesLeft > 0 );
-
-    l_vBuffer = NULL;
 
     return paNoError;
 }
@@ -540,7 +578,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         }
 
         l_iError ++;
-        usleep(500);
+        usleep(10000);
     }
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
@@ -806,12 +844,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
             }
 
-            if( !stream->inStream && !stream->outStream)
-            {
-                goto startstreamcb_error;
-            }
-
-            if( (l_iPlaybackStreamStarted || stream->outStream == NULL) && 
+            if( (l_iPlaybackStreamStarted || stream->outStream == NULL) &&
                 (l_iRecordStreamStarted || stream->inStream == NULL) )
             {
                 stream->isActive = 1;
@@ -828,7 +861,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                 goto startstreamcb_error;
             }
 
-            usleep(1000);
+            usleep(10000);
         }
     }
     else
@@ -862,7 +895,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     goto startstreamcb_end;
 }
 
-PaError RequestStop( PaPulseAudio_Stream * stream,
+static PaError RequestStop( PaPulseAudio_Stream * stream,
                      int abort )
 {
     PaError result = paNoError;

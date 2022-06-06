@@ -83,7 +83,7 @@ extern "C"
    You should have pretty good size buffer with this. If output/intput doesn't happens in 2 second we
    have more trouble than this buffer.
    @todo change this to something more sophisticated */
-#define PULSEAUDIO_BUFFER_SIZE (88100 * 4 * 2)
+#define PULSEAUDIO_BUFFER_SIZE (96100 * 4 * 2)
 
 typedef struct
 {

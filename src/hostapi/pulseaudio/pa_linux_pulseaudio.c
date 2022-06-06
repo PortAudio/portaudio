@@ -65,8 +65,8 @@
 extern char *__progname;
 
 /* Default latency values to expose. Chosen by trial and error to be reasonable. */
-#define PA_PULSEAUDIO_DEFAULT_MIN_LATENCY 0.015
-#define PA_PULSEAUDIO_DEFAULT_MAX_LATENCY 0.250
+#define PA_PULSEAUDIO_DEFAULT_MIN_LATENCY 0.010
+#define PA_PULSEAUDIO_DEFAULT_MAX_LATENCY 0.080
 
 /* PulseAudio specific functions */
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
@@ -895,8 +895,7 @@ PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_( PaSampleFormat porta
 
 
 /* Allocate buffer. */
-PaError PaPulseAudio_BlockingInitRingBuffer( PaPulseAudio_Stream * stream,
-                                             PaUtilRingBuffer * rbuf,
+PaError PaPulseAudio_BlockingInitRingBuffer( PaUtilRingBuffer * rbuf,
                                              int size )
 {
     char *l_ptrBuffer = (char *) malloc(size);
@@ -970,6 +969,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     const char defaultSourceStreamName[] = "Portaudio source";
     const char defaultSinkStreamName[] = "Portaudio sink";
 
+    stream->framesPerHostCallback = framesPerBuffer;
     stream->sourceStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSourceStreamName));
     stream->sinkStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSinkStreamName));
     if ( !stream->sourceStreamName || !stream->sinkStreamName )
@@ -1072,8 +1072,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inDevice = inputParameters->device;
 
-        result = PaPulseAudio_BlockingInitRingBuffer( stream,
-                                                      &stream->inputRing,
+        result = PaPulseAudio_BlockingInitRingBuffer( &stream->inputRing,
                                                       stream->inputFrameSize * framesPerBuffer * inputChannelCount );
         if( result != paNoError )
         {
