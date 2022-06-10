@@ -66,7 +66,6 @@
 /* PulseAudio headers */
 #include <string.h>
 #include <unistd.h>
-#include <math.h>
 
 void PaPulseAudio_updateTimeInfo( pa_stream * s,
                                   PaStreamCallbackTimeInfo *timeInfo,
@@ -195,19 +194,7 @@ static int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
 
         l_lInFrameBytes = l_lOutFrameBytes = (l_lFramesPerHostBuffer * stream->outputFrameSize);
 
-        /* Get buffer to write straight to pulseaudio output stream
-         * we need to calculate correct size with how manyt times
-         * our l_lOutFrameBytes goes to needed output
-         */
-        double l_fHowManyTime = ((double)writableBytes / l_lOutFrameBytes);
-
-        /* We need to write(/read) at least once */
-        if( l_fHowManyTime < 1 )
-        {
-            l_fHowManyTime = 1;
-        }
-
-        l_lBytesToProcess = l_lBytesLeft = (long)((l_fHowManyTime) * l_lOutFrameBytes);
+        l_lBytesToProcess = l_lBytesLeft = ((1 + ((double)writableBytes / l_lOutFrameBytes)) * l_lOutFrameBytes);
 
         if( stream->bufferProcessor.streamCallback )
         {
