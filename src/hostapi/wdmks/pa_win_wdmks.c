@@ -3553,8 +3553,6 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
             for (i = 0; i < pFilter->pinCount; ++i)
             {
                 unsigned m;
-                ULONG nameIndex = 0;
-                ULONG nameIndexHash = 0;
                 PaWinWdmPin* pin = pFilter->pins[i];
 
                 if (pin == NULL)
@@ -3565,7 +3563,6 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
                     PaWinWdmDeviceInfo *wdmDeviceInfo = (PaWinWdmDeviceInfo *)outArgument->deviceInfos[idxDevice];
                     PaDeviceInfo *deviceInfo = &wdmDeviceInfo->inheritedDeviceInfo;
                     wchar_t localCompositeName[MAX_PATH];
-                    unsigned nameIndex = 0;
                     const BOOL isInput = (pin->dataFlow == KSPIN_DATAFLOW_OUT);
 
                     wdmDeviceInfo->filter = pFilter;
@@ -3598,7 +3595,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
 
                         /* Check if there are more entries with same name (which might very well be the case), if there
                         are, the name will be postfixed with an index. */
-                        nameIndex = GetNameIndex(&nameHash, localCompositeName, isInput);
+                        unsigned nameIndex = GetNameIndex(&nameHash, localCompositeName, isInput);
                         if (nameIndex > 0)
                         {
                             /* This name has multiple instances, so we post fix with a number */
