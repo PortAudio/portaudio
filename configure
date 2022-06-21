@@ -15900,7 +15900,42 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
            mac_version=""
         fi
         SHARED_FLAGS="$LIBS -dynamiclib $mac_arches $mac_sysroot $mac_version_min"
-        CFLAGS="-std=c99 $CFLAGS $mac_arches $mac_sysroot $mac_version_min"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=c11" >&5
+$as_echo_n "checking whether C compiler accepts -std=c11... " >&6; }
+if ${ax_cv_check_cflags___std_c11+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -std=c11"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___std_c11=yes
+else
+  ax_cv_check_cflags___std_c11=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_c11" >&5
+$as_echo "$ax_cv_check_cflags___std_c11" >&6; }
+if test "x$ax_cv_check_cflags___std_c11" = xyes; then :
+  CFLAGS="-std=c11 $CFLAGS"
+else
+  CFLAGS="-std=c99 $CFLAGS"
+fi
+
+        CFLAGS="$CFLAGS $mac_arches $mac_sysroot $mac_version_min"
         OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o"
         PADLL="libportaudio.dylib"
         ;;
