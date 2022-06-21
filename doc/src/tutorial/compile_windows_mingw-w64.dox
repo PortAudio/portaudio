@@ -16,7 +16,7 @@ You can either use msys2's precompiled PortAudio or compile PortAudio yourself. 
 
 Open your msys2 shell and run "pacman -S mingw-w64-x86_64-portaudio". This will get you a default build of PortAudio. I believe it comes with DirectSound, WASAPI, WD/MKS, WD/MKS_DEVICE_INFO, and WMME. Note the "-x86_64" in the middle of the package name. When you install msys2 packages, you specify the toolchain name in the middle, and "-x86_64" chooses the msvcrt-gcc toolchain.
 
-@section comp_mingw-w64_3 Compiling
+@section comp_mingw-w64_3 Compiling from scratch
 
 We will build with WASAPI only, with no fallback APIs, simply as an example. In the msys2 shell, navigate into your folder of PortAudio. Run:
 
@@ -26,6 +26,11 @@ mkdir build
 cd build
 cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DPA_USE_DS=0 -DPA_USE_WDMKS=0 -DPA_USE_WDMKS_DEVICE_INFO=0 -DPA_USE_WMME=0
 cmake --build .
+@endcode
+
+To test if it is working, you can run the sawtooth example (warning, it is very loud!):
+
+@code
 gcc ../examples/paex_saw.c -I../src/common -lportaudio
 ./a.exe
 @endcode
