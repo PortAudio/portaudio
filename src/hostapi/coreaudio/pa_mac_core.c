@@ -2807,6 +2807,7 @@ static PaError StopStream( PaStream *s )
         paErr = waitUntilBlioWriteBufferIsEmpty( &stream->blio, stream->sampleRate,
                 maxHostFrames );
         VDBUG( ( "waitUntilBlioWriteBufferIsEmpty returned %d\n", paErr ) );
+        (void) paErr; /* Prevent "unused variable" warnings. */
     }
     return FinishStoppingStream( stream );
 }
