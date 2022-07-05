@@ -50,3 +50,9 @@ out/
 
 # Visual Studio CMake settings file
 CMakeSettings.json
+
+# VSCode
+.vscode*
+
+# Common build directories of users and VSCode
+build*
