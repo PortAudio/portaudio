@@ -1055,16 +1055,16 @@ static void Int32_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    PaInt32 *src = (PaInt32*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer;
+    /* PaInt32 *src = (PaInt32*)sourceBuffer;
+    unsigned char *dest =  (unsigned char*)destinationBuffer; */
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* IMPLEMENT ME */
 
-        src += sourceStride;
-        dest += destinationStride;
+        /* src += sourceStride;
+        dest += destinationStride; */
     }
 }
 
@@ -1416,16 +1416,16 @@ static void Int16_To_Int8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    PaInt16 *src = (PaInt16*)sourceBuffer;
-    signed char *dest =  (signed char*)destinationBuffer;
+    /* PaInt16 *src = (PaInt16*)sourceBuffer;
+    signed char *dest =  (signed char*)destinationBuffer; */
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* IMPLEMENT ME */
 
-        src += sourceStride;
-        dest += destinationStride;
+        /* src += sourceStride;
+        dest += destinationStride; */
     }
 }
 
@@ -1456,16 +1456,16 @@ static void Int16_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    PaInt16 *src = (PaInt16*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer;
+    /* PaInt16 *src = (PaInt16*)sourceBuffer;
+    unsigned char *dest =  (unsigned char*)destinationBuffer; */
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* IMPLEMENT ME */
 
-        src += sourceStride;
-        dest += destinationStride;
+        /* src += sourceStride;
+        dest += destinationStride; */
     }
 }
 
