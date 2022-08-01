@@ -73,7 +73,11 @@ static int numAllocations_ = 0;
 
 void *PaUtil_AllocateMemory( long size )
 {
+    /* use { malloc(); memset() } instead of calloc() so that we get
+       the same alignment guarantee as malloc(). */
     void *result = malloc( size );
+    if ( result )
+        memset( result, 0, size );
 
 #if PA_TRACK_MEMORY
     if( result != NULL ) numAllocations_ += 1;

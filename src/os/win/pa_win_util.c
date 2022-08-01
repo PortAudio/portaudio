@@ -67,7 +67,7 @@ static int numAllocations_ = 0;
 
 void *PaUtil_AllocateMemory( long size )
 {
-    void *result = GlobalAlloc( GPTR, size );
+    void *result = GlobalAlloc( GMEM_FIXED | GMEM_ZEROINIT, size );
 
 #if PA_TRACK_MEMORY
     if( result != NULL ) numAllocations_ += 1;
