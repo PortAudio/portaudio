@@ -312,12 +312,12 @@ static char **GetAsioDriverNames( PaAsioHostApiRepresentation *asioHostApi, PaUt
     char **result = 0;
     int i;
 
-    result =(char**)PaUtil_GroupAllocateMemory(
+    result =(char**)PaUtil_GroupAllocateZeroInitializedMemory(
             group, sizeof(char*) * driverCount );
     if( !result )
         goto error;
 
-    result[0] = (char*)PaUtil_GroupAllocateMemory(
+    result[0] = (char*)PaUtil_GroupAllocateZeroInitializedMemory(
             group, 32 * driverCount );
     if( !result[0] )
         goto error;
@@ -1097,7 +1097,7 @@ static PaError InitPaDeviceInfoFromAsioDriver( PaAsioHostApiRepresentation *asio
         asioDeviceInfo->bufferGranularity = paAsioDriver.info.bufferGranularity;
 
 
-        asioDeviceInfo->asioChannelInfos = (ASIOChannelInfo*)PaUtil_GroupAllocateMemory(
+        asioDeviceInfo->asioChannelInfos = (ASIOChannelInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 asioHostApi->allocations,
                 sizeof(ASIOChannelInfo) * (deviceInfo->maxInputChannels
                         + deviceInfo->maxOutputChannels) );
@@ -1254,7 +1254,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 
         /* allocate enough space for all drivers, even if some aren't installed */
 
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
                 asioHostApi->allocations, sizeof(PaDeviceInfo*) * driverCount );
         if( !(*hostApi)->deviceInfos )
         {
@@ -1263,7 +1263,7 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
         }
 
         /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaAsioDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaAsioDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 asioHostApi->allocations, sizeof(PaAsioDeviceInfo) * driverCount );
         if( !deviceInfoArray )
         {

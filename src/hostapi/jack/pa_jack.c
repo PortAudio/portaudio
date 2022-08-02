@@ -524,8 +524,8 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
      * associated with the previous list */
     PaUtil_FreeAllAllocations( jackApi->deviceInfoMemory );
 
-    port_regex_string = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, port_regex_size );
-    tmp_client_name = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, jack_client_name_size() );
+    port_regex_string = PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory, port_regex_size );
+    tmp_client_name = PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory, jack_client_name_size() );
 
     /* We can only retrieve the list of clients indirectly, by first
      * asking for a list of all ports, then parsing the port names
@@ -537,7 +537,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     while( jack_ports[numPorts] )
         ++numPorts;
     /* At least there will be one port per client :) */
-    UNLESS( client_names = PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory, numPorts *
+    UNLESS( client_names = PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory, numPorts *
                 sizeof (char *) ), paInsufficientMemory );
 
     /* Build a list of clients from the list of ports */
@@ -566,7 +566,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         if (client_seen)
             continue;   /* A: Nothing to see here, move along */
 
-        UNLESS( client_names[numClients] = (char*)PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory,
+        UNLESS( client_names[numClients] = (char*)PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory,
                     strlen(tmp_client_name) + 1), paInsufficientMemory );
 
         /* The alsa_pcm client should go in spot 0.  If this
@@ -593,7 +593,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     /* there is one global sample rate all clients must conform to */
 
     globalSampleRate = jack_get_sample_rate( jackApi->jack_client );
-    UNLESS( commonApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory,
+    UNLESS( commonApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory,
                 sizeof(PaDeviceInfo*) * numClients ), paInsufficientMemory );
 
     assert( commonApi->info.deviceCount == 0 );
@@ -604,9 +604,9 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         PaDeviceInfo *curDevInfo;
         const char **clientPorts = NULL;
 
-        UNLESS( curDevInfo = (PaDeviceInfo*)PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory,
+        UNLESS( curDevInfo = (PaDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory,
                     sizeof(PaDeviceInfo) ), paInsufficientMemory );
-        UNLESS( curDevInfo->name = (char*)PaUtil_GroupAllocateMemory( jackApi->deviceInfoMemory,
+        UNLESS( curDevInfo->name = (char*)PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory,
                     strlen(client_names[client_index]) + 1 ), paInsufficientMemory );
         strcpy( (char *)curDevInfo->name, client_names[client_index] );
 
@@ -981,22 +981,22 @@ static PaError InitializeStream( PaJackStream *stream, PaJackHostApiRepresentati
     if( numInputChannels > 0 )
     {
         UNLESS( stream->local_input_ports =
-                (jack_port_t**) PaUtil_GroupAllocateMemory( stream->stream_memory, sizeof(jack_port_t*) * numInputChannels ),
+                (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numInputChannels ),
                 paInsufficientMemory );
         memset( stream->local_input_ports, 0, sizeof(jack_port_t*) * numInputChannels );
         UNLESS( stream->remote_output_ports =
-                (jack_port_t**) PaUtil_GroupAllocateMemory( stream->stream_memory, sizeof(jack_port_t*) * numInputChannels ),
+                (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numInputChannels ),
                 paInsufficientMemory );
         memset( stream->remote_output_ports, 0, sizeof(jack_port_t*) * numInputChannels );
     }
     if( numOutputChannels > 0 )
     {
         UNLESS( stream->local_output_ports =
-                (jack_port_t**) PaUtil_GroupAllocateMemory( stream->stream_memory, sizeof(jack_port_t*) * numOutputChannels ),
+                (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numOutputChannels ),
                 paInsufficientMemory );
         memset( stream->local_output_ports, 0, sizeof(jack_port_t*) * numOutputChannels );
         UNLESS( stream->remote_input_ports =
-                (jack_port_t**) PaUtil_GroupAllocateMemory( stream->stream_memory, sizeof(jack_port_t*) * numOutputChannels ),
+                (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numOutputChannels ),
                 paInsufficientMemory );
         memset( stream->remote_input_ports, 0, sizeof(jack_port_t*) * numOutputChannels );
     }
@@ -1121,12 +1121,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
     PaJackHostApiRepresentation *jackHostApi = (PaJackHostApiRepresentation*)hostApi;
     PaJackStream *stream = NULL;
-    char *port_string = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, jack_port_name_size() );
+    char *port_string = PaUtil_GroupAllocateZeroInitializedMemory( jackHostApi->deviceInfoMemory, jack_port_name_size() );
     // In the worst case every character would be escaped which would double the string length.
     // Add 1 for null terminator
     size_t regex_escaped_client_name_size = jack_client_name_size() * 2 + 1;
     unsigned long regex_size = regex_escaped_client_name_size + strlen(port_regex_suffix);
-    char *regex_pattern = PaUtil_GroupAllocateMemory( jackHostApi->deviceInfoMemory, regex_size );
+    char *regex_pattern = PaUtil_GroupAllocateZeroInitializedMemory( jackHostApi->deviceInfoMemory, regex_size );
     const char **jack_ports = NULL;
     /* int jack_max_buffer_size = jack_get_buffer_size( jackHostApi->jack_client ); */
     int i;

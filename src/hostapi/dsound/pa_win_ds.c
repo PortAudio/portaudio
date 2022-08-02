@@ -420,7 +420,7 @@ static char *DuplicateDeviceNameString( PaUtilAllocationGroup *allocations, cons
     {
         size_t len = WideCharToMultiByte(CP_UTF8, 0, src, -1, NULL, 0, NULL, NULL);
 
-        result = (char*)PaUtil_GroupAllocateMemory( allocations, (long)(len + 1) );
+        result = (char*)PaUtil_GroupAllocateZeroInitializedMemory( allocations, (long)(len + 1) );
         if( result ) {
             if (WideCharToMultiByte(CP_UTF8, 0, src, -1, result, (int)len, NULL, NULL) == 0) {
                 result = 0;
@@ -429,7 +429,7 @@ static char *DuplicateDeviceNameString( PaUtilAllocationGroup *allocations, cons
     }
     else
     {
-        result = (char*)PaUtil_GroupAllocateMemory( allocations, 1 );
+        result = (char*)PaUtil_GroupAllocateZeroInitializedMemory( allocations, 1 );
         if( result )
             result[0] = '\0';
     }
@@ -598,7 +598,7 @@ static void *DuplicateWCharString( PaUtilAllocationGroup *allocations, wchar_t *
     wchar_t *result;
 
     len = wcslen( source );
-    result = (wchar_t*)PaUtil_GroupAllocateMemory( allocations, (long) ((len+1) * sizeof(wchar_t)) );
+    result = (wchar_t*)PaUtil_GroupAllocateZeroInitializedMemory( allocations, (long) ((len+1) * sizeof(wchar_t)) );
     wcscpy( result, source );
     return result;
 }
@@ -1271,7 +1271,7 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     if( deviceCount > 0 )
     {
         /* allocate array for pointers to PaDeviceInfo structs */
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
                 winDsHostApi->allocations, sizeof(PaDeviceInfo*) * deviceCount );
         if( !(*hostApi)->deviceInfos )
         {
@@ -1280,7 +1280,7 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
         }
 
         /* allocate all PaDeviceInfo structs in a contiguous block */
-        deviceInfoArray = (PaWinDsDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaWinDsDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 winDsHostApi->allocations, sizeof(PaWinDsDeviceInfo) * deviceCount );
         if( !deviceInfoArray )
         {

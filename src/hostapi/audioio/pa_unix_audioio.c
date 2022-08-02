@@ -29,13 +29,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -168,7 +168,7 @@ PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
 
     PA_UNLESS( audioIOHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
 
-    if( (common->deviceInfos = PaUtil_GroupAllocateMemory(
+    if( (common->deviceInfos = PaUtil_GroupAllocateZeroInitializedMemory(
          audioIOHostApi->allocations, sizeof(PaDeviceInfo *) * AUDIOIO_MAX_DEVICES)) == NULL )
     {
         result = paInsufficientMemory;
@@ -193,12 +193,12 @@ PaError PaAudioIO_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
         if (fd < 0)
             continue;
 
-        PA_UNLESS(dev = PaUtil_GroupAllocateMemory(audioIOHostApi->allocations, sizeof(PaDeviceInfo)), paInsufficientMemory);
+        PA_UNLESS(dev = PaUtil_GroupAllocateZeroInitializedMemory(audioIOHostApi->allocations, sizeof(PaDeviceInfo)), paInsufficientMemory);
 
         dev->structVersion = 2;
         dev->hostApi = hostApiIndex;
 
-        PA_UNLESS(dev->name = PaUtil_GroupAllocateMemory(audioIOHostApi->allocations, sizeof(path)), paInsufficientMemory);
+        PA_UNLESS(dev->name = PaUtil_GroupAllocateZeroInitializedMemory(audioIOHostApi->allocations, sizeof(path)), paInsufficientMemory);
 
         memcpy((char *)dev->name, path, sizeof(path));
 

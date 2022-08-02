@@ -299,7 +299,7 @@ PaError PaUtil_InitializeDeviceInfo( PaDeviceInfo *deviceInfo, const char *name,
     if( allocations )
     {
         size_t len = strlen( name ) + 1;
-        PA_UNLESS( deviceInfo->name = PaUtil_GroupAllocateMemory( allocations, len ), paInsufficientMemory );
+        PA_UNLESS( deviceInfo->name = PaUtil_GroupAllocateZeroInitializedMemory( allocations, len ), paInsufficientMemory );
         strncpy( (char *)deviceInfo->name, name, len );
     }
     else
@@ -502,7 +502,7 @@ static PaError QueryDevice( char *deviceName, PaOSSHostApiRepresentation *ossApi
         goto error;
     }
 
-    PA_UNLESS( *deviceInfo = PaUtil_GroupAllocateMemory( ossApi->allocations, sizeof (PaDeviceInfo) ), paInsufficientMemory );
+    PA_UNLESS( *deviceInfo = PaUtil_GroupAllocateZeroInitializedMemory( ossApi->allocations, sizeof (PaDeviceInfo) ), paInsufficientMemory );
     PA_ENSURE( PaUtil_InitializeDeviceInfo( *deviceInfo, deviceName, ossApi->hostApiIndex, maxInputChannels, maxOutputChannels,
                 defaultLowInputLatency, defaultLowOutputLatency, defaultHighInputLatency, defaultHighOutputLatency, sampleRate,
                 ossApi->allocations ) );
@@ -577,7 +577,7 @@ static PaError BuildDeviceList( PaOSSHostApiRepresentation *ossApi )
 
     PA_DEBUG(("PaOSS %s: Total number of devices found: %d\n", __FUNCTION__, numDevices));
 
-    commonApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+    commonApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
         ossApi->allocations, sizeof(PaDeviceInfo*) * numDevices );
     memcpy( commonApi->deviceInfos, deviceInfos, numDevices * sizeof (PaDeviceInfo *) );
 

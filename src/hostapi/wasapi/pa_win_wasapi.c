@@ -1825,7 +1825,7 @@ static void FillBaseDeviceInfo(PaDeviceInfo *deviceInfo, PaHostApiIndex hostApiI
 static PaError FillInactiveDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, PaDeviceInfo *deviceInfo)
 {
     if (deviceInfo->name == NULL)
-        deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, 1);
+        deviceInfo->name = (char *)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations, 1);
 
     if (deviceInfo->name != NULL)
     {
@@ -1894,7 +1894,7 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
             hr = IPropertyStore_GetValue(pProperty, &PKEY_Device_FriendlyName, &value);
             IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
-            if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN)) == NULL)
+            if ((deviceInfo->name = (char *)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN)) == NULL)
             {
                 result = paInsufficientMemory;
                 PropVariantClear(&value);
@@ -1959,7 +1959,7 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
     wcsncpy(wasapiDeviceInfo->deviceId, listEntry->info->id, PA_WASAPI_DEVICE_ID_LEN - 1);
 
     // Set device name
-    if ((deviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN)) == NULL)
+    if ((deviceInfo->name = (char *)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN)) == NULL)
     {
         result = paInsufficientMemory;
         goto error;
@@ -2080,7 +2080,7 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
     PaUtilHostApiRepresentation *hostApi = (PaUtilHostApiRepresentation *)paWasapi;
     PaDeviceInfo *deviceInfoArray = NULL;
 
-    if ((paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+    if ((paWasapi->devInfo = (PaWasapiDeviceInfo *)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations,
         sizeof(PaWasapiDeviceInfo) * deviceCount)) == NULL)
     {
         return NULL;
@@ -2095,7 +2095,7 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
             deviceCount = PA_WASAPI_MAX_CONST_DEVICE_COUNT;
     #endif
 
-        if ((hostApi->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+        if ((hostApi->deviceInfos = (PaDeviceInfo **)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations,
             sizeof(PaDeviceInfo *) * deviceCount)) == NULL)
         {
             return NULL;
@@ -2104,7 +2104,7 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
             hostApi->deviceInfos[i] = NULL;
 
         // Allocate all device info structs in a contiguous block
-        if ((deviceInfoArray = (PaDeviceInfo *)PaUtil_GroupAllocateMemory(paWasapi->allocations,
+        if ((deviceInfoArray = (PaDeviceInfo *)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations,
             sizeof(PaDeviceInfo) * deviceCount)) == NULL)
         {
             return NULL;
@@ -2177,7 +2177,7 @@ static BOOL FillLooopbackDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, PaD
 
     // Append loopback device name identificator to the device name to provide possibility to find
     // loopback device by its name for some external projects
-    loopbackDeviceInfo->name = (char *)PaUtil_GroupAllocateMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN + 1);
+    loopbackDeviceInfo->name = (char *)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations, PA_WASAPI_DEVICE_NAME_LEN + 1);
     if (loopbackDeviceInfo->name == NULL)
         return FALSE;
     _snprintf((char *)loopbackDeviceInfo->name, PA_WASAPI_DEVICE_NAME_LEN - 1,
