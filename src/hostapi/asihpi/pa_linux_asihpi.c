@@ -1684,7 +1684,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     /* Create blank stream structure */
     PA_UNLESS_( stream = (PaAsiHpiStream *)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAsiHpiStream) ),
                 paInsufficientMemory );
-    memset( stream, 0, sizeof(PaAsiHpiStream) );
 
     /* If the number of frames per buffer is unspecified, we have to come up with one. */
     if( framesPerHostBuffer == paFramesPerBufferUnspecified )
@@ -1721,7 +1720,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         /* Create blank stream component structure */
         PA_UNLESS_( stream->input = (PaAsiHpiStreamComponent *)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAsiHpiStreamComponent) ),
                     paInsufficientMemory );
-        memset( stream->input, 0, sizeof(PaAsiHpiStreamComponent) );
         /* Create/validate format */
         PA_ENSURE_( PaAsiHpi_CreateFormat( hostApi, inputParameters, sampleRate,
                                            &stream->input->hpiDevice, &stream->input->hpiFormat ) );
@@ -1742,7 +1740,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         /* Create blank stream component structure */
         PA_UNLESS_( stream->output = (PaAsiHpiStreamComponent *)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAsiHpiStreamComponent) ),
                     paInsufficientMemory );
-        memset( stream->output, 0, sizeof(PaAsiHpiStreamComponent) );
         /* Create/validate format */
         PA_ENSURE_( PaAsiHpi_CreateFormat( hostApi, outputParameters, sampleRate,
                                            &stream->output->hpiDevice, &stream->output->hpiFormat ) );

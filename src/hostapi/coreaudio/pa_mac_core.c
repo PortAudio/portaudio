@@ -1777,13 +1777,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         goto error;
     }
 
-    /* If we fail after this point, we my be left in a bad state, with
-       some data structures setup and others not. So, first thing we
-       do is initialize everything so that if we fail, we know what hasn't
-       been touched.
+    /* NOTE: If we fail after this point, we my be left in a bad state, with
+       some data structures setup and others not. So, we critically depend on all
+       stream fields being zero-initialized so that if we fail, we know what
+       hasn't been touched. Zero-initialization is guaranteed by
+       PaUtil_AllocateZeroInitializedMemory().
      */
-    bzero( stream, sizeof( PaMacCoreStream ) );
-
     /*
     stream->blio.inputRingBuffer.buffer = NULL;
     stream->blio.outputRingBuffer.buffer = NULL;

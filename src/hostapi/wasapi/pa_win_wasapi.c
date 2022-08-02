@@ -2085,7 +2085,7 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
     {
         return NULL;
     }
-    memset(paWasapi->devInfo, 0, sizeof(PaWasapiDeviceInfo) * deviceCount);
+    /* NOTE: we depend on all paWasapi->devInfo elements being zero-initialized */
 
     if (deviceCount != 0)
     {
@@ -2109,7 +2109,7 @@ static PaDeviceInfo *AllocateDeviceListMemory(PaWasapiHostApiRepresentation *paW
         {
             return NULL;
         }
-        memset(deviceInfoArray, 0, sizeof(PaDeviceInfo) * deviceCount);
+        /* NOTE: we depend on all deviceInfoArray elements being zero-initialized */
     }
 
     return deviceInfoArray;
@@ -2461,7 +2461,9 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         result = paInsufficientMemory;
         goto error;
     }
-    memset(paWasapi, 0, sizeof(PaWasapiHostApiRepresentation)); /* ensure all fields are zeroed. especially paWasapi->allocations */
+
+    /* NOTE: we depend on PaUtil_AllocateZeroInitializedMemory() ensuring that all
+       fields are set to zero. especially paWasapi->allocations */
 
     // Initialize COM subsystem
     result = PaWinUtil_CoInitialize(paWASAPI, &paWasapi->comInitializationResult);
@@ -4061,7 +4063,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 LogPaError(result = paInsufficientMemory);
                 goto error;
             }
-            memset(stream->in.tailBuffer, 0, sizeof(PaUtilRingBuffer));
 
             // buffer memory region
             stream->in.tailBufferMemory = PaUtil_AllocateZeroInitializedMemory(frameSize * bufferFrames);

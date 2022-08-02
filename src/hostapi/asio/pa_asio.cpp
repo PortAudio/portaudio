@@ -1171,7 +1171,8 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
         goto error;
     }
 
-    memset( asioHostApi, 0, sizeof(PaAsioHostApiRepresentation) ); /* ensure all fields are zeroed. especially asioHostApi->allocations */
+    /* NOTE: we depend on PaUtil_AllocateZeroInitializedMemory() ensuring that all
+       fields are set to zero. especially asioHostApi->allocations */
 
     /*
         We initialize COM ourselves here and uninitialize it in Terminate().

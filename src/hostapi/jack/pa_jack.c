@@ -983,22 +983,22 @@ static PaError InitializeStream( PaJackStream *stream, PaJackHostApiRepresentati
         UNLESS( stream->local_input_ports =
                 (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numInputChannels ),
                 paInsufficientMemory );
-        memset( stream->local_input_ports, 0, sizeof(jack_port_t*) * numInputChannels );
+        /* NOTE: we depend on stream->local_input_ports being zero-initialized */
         UNLESS( stream->remote_output_ports =
                 (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numInputChannels ),
                 paInsufficientMemory );
-        memset( stream->remote_output_ports, 0, sizeof(jack_port_t*) * numInputChannels );
+        /* NOTE: we depend on stream->remote_output_ports being zero-initialized */
     }
     if( numOutputChannels > 0 )
     {
         UNLESS( stream->local_output_ports =
                 (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numOutputChannels ),
                 paInsufficientMemory );
-        memset( stream->local_output_ports, 0, sizeof(jack_port_t*) * numOutputChannels );
+        /* NOTE: we depend on stream->local_output_ports being zero-initialized */
         UNLESS( stream->remote_input_ports =
                 (jack_port_t**) PaUtil_GroupAllocateZeroInitializedMemory( stream->stream_memory, sizeof(jack_port_t*) * numOutputChannels ),
                 paInsufficientMemory );
-        memset( stream->remote_input_ports, 0, sizeof(jack_port_t*) * numOutputChannels );
+        /* NOTE: we depend on stream->remote_input_ports being zero-initialized */
     }
 
     stream->num_incoming_connections = numInputChannels;

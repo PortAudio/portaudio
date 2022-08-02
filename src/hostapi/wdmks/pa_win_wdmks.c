@@ -1344,9 +1344,6 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
         goto error;
     }
 
-    /* Zero the pin object */
-    /* memset( (void*)pin, 0, sizeof(PaWinWdmPin) ); */
-
     pin->parentFilter = parentFilter;
     pin->pinId = pinId;
 
@@ -2703,9 +2700,6 @@ static PaWinWdmFilter* FilterNew( PaWDMKSType type, DWORD devNode, const wchar_t
 
     /* Store device node */
     filter->deviceNode = devNode;
-
-    /* Zero the filter object - done by AllocateMemory */
-    /* memset( (void*)filter, 0, sizeof(PaWinWdmFilter) ); */
 
     /* Copy the filter name */
     wcsncpy(filter->devInfo.filterPath, filterName, MAX_PATH);
@@ -4437,9 +4431,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         goto error;
     }
 
-    /* Zero the stream object */
-    /* memset((void*)stream,0,sizeof(PaWinWdmStream)); */
-
     if( streamCallback )
     {
         PaUtil_InitializeStreamRepresentation( &stream->streamRepresentation,
@@ -5001,8 +4992,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     PA_DEBUG(("BytesPerInputFrame = %d\n",stream->capture.bytesPerFrame));
     PA_DEBUG(("BytesPerOutputFrame = %d\n",stream->render.bytesPerFrame));
-
-    /* memset(stream->hostBuffer,0,size); */
 
     /* Abort */
     stream->eventAbort          = CreateEvent(NULL, TRUE, FALSE, NULL);
