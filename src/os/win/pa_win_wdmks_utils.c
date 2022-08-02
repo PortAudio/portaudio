@@ -145,7 +145,7 @@ static PaError WdmGetPinPropertyMulti(
         return paUnanticipatedHostError;
     }
 
-    *ksMultipleItem = (KSMULTIPLE_ITEM*)PaUtil_AllocateMemory( multipleItemSize );
+    *ksMultipleItem = (KSMULTIPLE_ITEM*)PaUtil_AllocateZeroInitializedMemory( multipleItemSize );
     if( !*ksMultipleItem )
     {
         return paInsufficientMemory;

@@ -596,7 +596,7 @@ static PaError GetChannelInfo( PaMacAUHAL *auhalHostApi,
     if (err)
         return err;
 
-    buflist = PaUtil_AllocateMemory(propSize);
+    buflist = PaUtil_AllocateZeroInitializedMemory(propSize);
     if( !buflist )
         return paInsufficientMemory;
     err = ERR(PaMacCore_AudioDeviceGetProperty(macCoreDeviceId, 0, isInput, kAudioDevicePropertyStreamConfiguration, &propSize, buflist));
@@ -740,7 +740,7 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
         return UNIX_ERR(unixErr);
     }
 
-    auhalHostApi = (PaMacAUHAL*)PaUtil_AllocateMemory( sizeof(PaMacAUHAL) );
+    auhalHostApi = (PaMacAUHAL*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaMacAUHAL) );
     if( !auhalHostApi )
     {
         result = paInsufficientMemory;
@@ -1770,7 +1770,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( (streamFlags & paPlatformSpecificFlags) != 0 )
         return paInvalidFlag; /* unexpected platform specific flag */
 
-    stream = (PaMacCoreStream*)PaUtil_AllocateMemory( sizeof(PaMacCoreStream) );
+    stream = (PaMacCoreStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaMacCoreStream) );
     if( !stream )
     {
         result = paInsufficientMemory;

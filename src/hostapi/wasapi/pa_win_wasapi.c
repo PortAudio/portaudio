@@ -1242,7 +1242,7 @@ static EWindowsVersion GetWindowsVersion()
                 dwMinorVersion = ver.dwMinorVersion;
                 dwBuild        = ver.dwBuildNumber;
             }
-            
+
             PRINT(("WASAPI: getting Windows version with RtlGetVersion(): major=%d, minor=%d, build=%d\n", dwMajorVersion, dwMinorVersion, dwBuild));
         }
 
@@ -1263,7 +1263,7 @@ static EWindowsVersion GetWindowsVersion()
 
                 if (dwVersion < 0x80000000)
                     dwBuild = (DWORD)(HIWORD(dwVersion));
-                
+
                 PRINT(("WASAPI: getting Windows version with GetVersion(): major=%d, minor=%d, build=%d\n", dwMajorVersion, dwMinorVersion, dwBuild));
             }
         }
@@ -1662,11 +1662,11 @@ static HRESULT (STDMETHODCALLTYPE PaActivateAudioInterfaceCompletionHandler_Acti
 
 static IActivateAudioInterfaceCompletionHandler *CreateActivateAudioInterfaceCompletionHandler(const IID *iid, void **client)
 {
-    PaActivateAudioInterfaceCompletionHandler *handler = PaUtil_AllocateMemory(sizeof(PaActivateAudioInterfaceCompletionHandler));
+    PaActivateAudioInterfaceCompletionHandler *handler = PaUtil_AllocateZeroInitializedMemory(sizeof(PaActivateAudioInterfaceCompletionHandler));
 
     memset(handler, 0, sizeof(*handler));
 
-    handler->parent.lpVtbl = PaUtil_AllocateMemory(sizeof(*handler->parent.lpVtbl));
+    handler->parent.lpVtbl = PaUtil_AllocateZeroInitializedMemory(sizeof(*handler->parent.lpVtbl));
     handler->parent.lpVtbl->QueryInterface    = &PaActivateAudioInterfaceCompletionHandler_QueryInterface;
     handler->parent.lpVtbl->AddRef            = &PaActivateAudioInterfaceCompletionHandler_AddRef;
     handler->parent.lpVtbl->Release           = &PaActivateAudioInterfaceCompletionHandler_Release;
@@ -2152,7 +2152,7 @@ error:
     return 0;
 }
 #else
-static UINT32 GetDeviceListDeviceCount(const PaWasapiHostApiRepresentation *paWasapi, 
+static UINT32 GetDeviceListDeviceCount(const PaWasapiHostApiRepresentation *paWasapi,
     const PaWasapiWinrtDeviceListContext *deviceListContext, EDataFlow filterFlow)
 {
     UINT32 i, ret = 0;
@@ -2455,7 +2455,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     }
 #endif
 
-    paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateMemory(sizeof(PaWasapiHostApiRepresentation));
+    paWasapi = (PaWasapiHostApiRepresentation *)PaUtil_AllocateZeroInitializedMemory(sizeof(PaWasapiHostApiRepresentation));
     if (paWasapi == NULL)
     {
         result = paInsufficientMemory;
@@ -3913,7 +3913,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     // Allocate memory for PaWasapiStream
-    if ((stream = (PaWasapiStream *)PaUtil_AllocateMemory(sizeof(PaWasapiStream))) == NULL)
+    if ((stream = (PaWasapiStream *)PaUtil_AllocateZeroInitializedMemory(sizeof(PaWasapiStream))) == NULL)
     {
         LogPaError(result = paInsufficientMemory);
         goto error;
@@ -4056,7 +4056,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             UINT32 frameSize    = stream->in.wavex.Format.nBlockAlign;
 
             // buffer
-            if ((stream->in.tailBuffer = PaUtil_AllocateMemory(sizeof(PaUtilRingBuffer))) == NULL)
+            if ((stream->in.tailBuffer = PaUtil_AllocateZeroInitializedMemory(sizeof(PaUtilRingBuffer))) == NULL)
             {
                 LogPaError(result = paInsufficientMemory);
                 goto error;
@@ -4064,7 +4064,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             memset(stream->in.tailBuffer, 0, sizeof(PaUtilRingBuffer));
 
             // buffer memory region
-            stream->in.tailBufferMemory = PaUtil_AllocateMemory(frameSize * bufferFrames);
+            stream->in.tailBufferMemory = PaUtil_AllocateZeroInitializedMemory(frameSize * bufferFrames);
             if (stream->in.tailBufferMemory == NULL)
             {
                 LogPaError(result = paInsufficientMemory);

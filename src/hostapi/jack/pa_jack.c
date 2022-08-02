@@ -760,7 +760,7 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
     *hostApi = NULL;    /* Initialize to NULL */
 
     UNLESS( jackHostApi = (PaJackHostApiRepresentation*)
-        PaUtil_AllocateMemory( sizeof(PaJackHostApiRepresentation) ), paInsufficientMemory );
+        PaUtil_AllocateZeroInitializedMemory( sizeof(PaJackHostApiRepresentation) ), paInsufficientMemory );
     UNLESS( jackHostApi->deviceInfoMemory = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
 
     mainThread_ = pthread_self();
@@ -1209,7 +1209,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidSampleRate;
 #undef ABS
 
-    UNLESS( stream = (PaJackStream*)PaUtil_AllocateMemory( sizeof(PaJackStream) ), paInsufficientMemory );
+    UNLESS( stream = (PaJackStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaJackStream) ), paInsufficientMemory );
     ENSURE_PA( InitializeStream( stream, jackHostApi, inputChannelCount, outputChannelCount ) );
 
     /* the blocking emulation, if necessary */

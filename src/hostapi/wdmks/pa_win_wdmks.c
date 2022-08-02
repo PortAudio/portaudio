@@ -882,7 +882,7 @@ static PaError WdmGetPinPropertyMulti(
         return result;
     }
 
-    *ksMultipleItem = (KSMULTIPLE_ITEM*)PaUtil_AllocateMemory( multipleItemSize );
+    *ksMultipleItem = (KSMULTIPLE_ITEM*)PaUtil_AllocateZeroInitializedMemory( multipleItemSize );
     if( !*ksMultipleItem )
     {
         return paInsufficientMemory;
@@ -931,7 +931,7 @@ static PaError WdmGetPropertyMulti(HANDLE handle,
         return result;
     }
 
-    *ksMultipleItem = (KSMULTIPLE_ITEM*)PaUtil_AllocateMemory( multipleItemSize );
+    *ksMultipleItem = (KSMULTIPLE_ITEM*)PaUtil_AllocateZeroInitializedMemory( multipleItemSize );
     if( !*ksMultipleItem )
     {
         return paInsufficientMemory;
@@ -1337,7 +1337,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
     PA_DEBUG(("PinNew: Creating pin %d:\n",pinId));
 
     /* Allocate the new PIN object */
-    pin = (PaWinWdmPin*)PaUtil_AllocateMemory( sizeof(PaWinWdmPin) );
+    pin = (PaWinWdmPin*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinWdmPin) );
     if( !pin )
     {
         result = paInsufficientMemory;
@@ -1352,7 +1352,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
     /* Allocate a connect structure */
     pin->pinConnectSize = sizeof(KSPIN_CONNECT) + sizeof(KSDATAFORMAT_WAVEFORMATEX);
-    pin->pinConnect = (KSPIN_CONNECT*)PaUtil_AllocateMemory( pin->pinConnectSize );
+    pin->pinConnect = (KSPIN_CONNECT*)PaUtil_AllocateZeroInitializedMemory( pin->pinConnectSize );
     if( !pin->pinConnect )
     {
         result = paInsufficientMemory;
@@ -1671,7 +1671,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
             }
             else
             {
-                KSPIN_PHYSICALCONNECTION* pc = (KSPIN_PHYSICALCONNECTION*)PaUtil_AllocateMemory(cbBytes + 2);
+                KSPIN_PHYSICALCONNECTION* pc = (KSPIN_PHYSICALCONNECTION*)PaUtil_AllocateZeroInitializedMemory(cbBytes + 2);
                 ULONG pcPin;
                 wchar_t symbLinkName[MAX_PATH];
                 PA_DEBUG(("PinNew: Physical connection found!\n"));
@@ -1899,7 +1899,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                             PA_DEBUG(("PinNew: Setting up %u inputs\n", muxCount));
 
                             /* Now we redo the operation once known how many multiplexer positions there are */
-                            pin->inputs = (PaWinWdmMuxedInput**)PaUtil_AllocateMemory(muxCount * sizeof(PaWinWdmMuxedInput*));
+                            pin->inputs = (PaWinWdmMuxedInput**)PaUtil_AllocateZeroInitializedMemory(muxCount * sizeof(PaWinWdmMuxedInput*));
                             if (pin->inputs == NULL)
                             {
                                 FilterRelease(pin->parentFilter->topologyFilter);
@@ -1914,7 +1914,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 
                                 if (pin->inputs[i] == NULL)
                                 {
-                                    pin->inputs[i] = (PaWinWdmMuxedInput*)PaUtil_AllocateMemory(sizeof(PaWinWdmMuxedInput));
+                                    pin->inputs[i] = (PaWinWdmMuxedInput*)PaUtil_AllocateZeroInitializedMemory(sizeof(PaWinWdmMuxedInput));
                                     if (pin->inputs[i] == NULL)
                                     {
                                         FilterRelease(pin->parentFilter->topologyFilter);
@@ -2196,7 +2196,7 @@ static PaError PinSetFormat(PaWinWdmPin* pin, const WAVEFORMATEX* format)
 
     if( pin->pinConnectSize != size )
     {
-        newConnect = PaUtil_AllocateMemory( size );
+        newConnect = PaUtil_AllocateZeroInitializedMemory( size );
         if( newConnect == NULL )
             return paInsufficientMemory;
         memcpy( newConnect, (void*)pin->pinConnect, min(pin->pinConnectSize,size) );
@@ -2689,7 +2689,7 @@ static PaWinWdmFilter* FilterNew( PaWDMKSType type, DWORD devNode, const wchar_t
     PaError result;
 
     /* Allocate the new filter object */
-    filter = (PaWinWdmFilter*)PaUtil_AllocateMemory( sizeof(PaWinWdmFilter) );
+    filter = (PaWinWdmFilter*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinWdmFilter) );
     if( !filter )
     {
         result = paInsufficientMemory;
@@ -2831,7 +2831,7 @@ PaError FilterInitializePins( PaWinWdmFilter* filter )
         return paNoError;
 
     /* Allocate pointer array to hold the pins */
-    filter->pins = (PaWinWdmPin**)PaUtil_AllocateMemory( sizeof(PaWinWdmPin*) * filter->pinCount );
+    filter->pins = (PaWinWdmPin**)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinWdmPin*) * filter->pinCount );
     if( !filter->pins )
     {
         result = paInsufficientMemory;
@@ -3156,7 +3156,7 @@ PaWinWdmFilter** BuildFilterList( int* pFilterCount, int* pNoOfPaDevices, PaErro
     PA_DEBUG(("Interfaces found: %d\n",device-invalidDevices));
 
     /* Now allocate the list of pointers to devices */
-    ppFilters  = (PaWinWdmFilter**)PaUtil_AllocateMemory( sizeof(PaWinWdmFilter*) * filterCount);
+    ppFilters  = (PaWinWdmFilter**)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinWdmFilter*) * filterCount);
     if( ppFilters == 0 )
     {
         if(handle != NULL)
@@ -3478,12 +3478,12 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
     // Get hold of default device paths for capture & playback
     if( waveInMessage(0, DRV_QUERYDEVICEINTERFACESIZE, (DWORD_PTR)&defaultInDevPathSize, 0 ) == MMSYSERR_NOERROR )
     {
-        defaultInDevPath = (wchar_t *)PaUtil_AllocateMemory((defaultInDevPathSize + 1) * sizeof(wchar_t));
+        defaultInDevPath = (wchar_t *)PaUtil_AllocateZeroInitializedMemory((defaultInDevPathSize + 1) * sizeof(wchar_t));
         waveInMessage(0, DRV_QUERYDEVICEINTERFACE, (DWORD_PTR)defaultInDevPath, defaultInDevPathSize);
     }
     if( waveOutMessage(0, DRV_QUERYDEVICEINTERFACESIZE, (DWORD_PTR)&defaultOutDevPathSize, 0 ) == MMSYSERR_NOERROR )
     {
-        defaultOutDevPath = (wchar_t *)PaUtil_AllocateMemory((defaultOutDevPathSize + 1) * sizeof(wchar_t));
+        defaultOutDevPath = (wchar_t *)PaUtil_AllocateZeroInitializedMemory((defaultOutDevPathSize + 1) * sizeof(wchar_t));
         waveOutMessage(0, DRV_QUERYDEVICEINTERFACE, (DWORD_PTR)defaultOutDevPath, defaultOutDevPathSize);
     }
 
@@ -3827,7 +3827,7 @@ PaError PaWinWdm_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         }
     }
 
-    wdmHostApi = (PaWinWdmHostApiRepresentation*)PaUtil_AllocateMemory( sizeof(PaWinWdmHostApiRepresentation) );
+    wdmHostApi = (PaWinWdmHostApiRepresentation*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinWdmHostApiRepresentation) );
     if( !wdmHostApi )
     {
         result = paInsufficientMemory;
@@ -4422,7 +4422,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidFlag; /* unexpected platform specific flag */
     }
 
-    stream = (PaWinWdmStream*)PaUtil_AllocateMemory( sizeof(PaWinWdmStream) );
+    stream = (PaWinWdmStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinWdmStream) );
     if( !stream )
     {
         result = paInsufficientMemory;
@@ -5913,7 +5913,7 @@ PA_THREAD_FUNC ProcessingThread(void* pParam)
     PA_DEBUG(("Timeout = %ld ms\n",info.timeout));
 
     /* Allocate handle array */
-    handleArray = (HANDLE*)PaUtil_AllocateMemory((info.stream->capture.noOfPackets + info.stream->render.noOfPackets + 1) * sizeof(HANDLE));
+    handleArray = (HANDLE*)PaUtil_AllocateZeroInitializedMemory((info.stream->capture.noOfPackets + info.stream->render.noOfPackets + 1) * sizeof(HANDLE));
 
     /* Setup handle array for WFMO */
     if (info.stream->capture.pPin != 0)

@@ -130,7 +130,7 @@ PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
     PaSkeletonHostApiRepresentation *skeletonHostApi;
     PaDeviceInfo *deviceInfoArray;
 
-    skeletonHostApi = (PaSkeletonHostApiRepresentation*)PaUtil_AllocateMemory( sizeof(PaSkeletonHostApiRepresentation) );
+    skeletonHostApi = (PaSkeletonHostApiRepresentation*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaSkeletonHostApiRepresentation) );
     if( !skeletonHostApi )
     {
         result = paInsufficientMemory;
@@ -477,7 +477,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidFlag; /* unexpected platform specific flag */
 
 
-    stream = (PaSkeletonStream*)PaUtil_AllocateMemory( sizeof(PaSkeletonStream) );
+    stream = (PaSkeletonStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaSkeletonStream) );
     if( !stream )
     {
         result = paInsufficientMemory;
