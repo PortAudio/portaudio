@@ -3364,7 +3364,7 @@ static PaError CreateHashEntry(PaNameHashObject* obj, const wchar_t* name, const
     }
     if (p == NULL)
     {
-        p = (PaNameHashIndex*)PaUtil_GroupAllocateMemory(obj->allocGroup, sizeof(PaNameHashIndex));
+        p = (PaNameHashIndex*)PaUtil_GroupAllocateZeroInitializedMemory(obj->allocGroup, sizeof(PaNameHashIndex));
         if (p == NULL)
         {
             return paInsufficientMemory;
@@ -3495,7 +3495,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         unsigned devIsDefaultIn = 0, devIsDefaultOut = 0;
 
         /* Allocate the out param for all the info we need */
-        outArgument = (PaWinWDMScanDeviceInfosResults *) PaUtil_GroupAllocateMemory(
+        outArgument = (PaWinWDMScanDeviceInfosResults *) PaUtil_GroupAllocateZeroInitializedMemory(
             wdmHostApi->allocations, sizeof(PaWinWDMScanDeviceInfosResults) );
         if( !outArgument )
         {
@@ -3506,7 +3506,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         outArgument->defaultInputDevice  = paNoDevice;
         outArgument->defaultOutputDevice = paNoDevice;
 
-        outArgument->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+        outArgument->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
             wdmHostApi->allocations, sizeof(PaDeviceInfo*) * totalDeviceCount );
         if( !outArgument->deviceInfos )
         {
@@ -3515,7 +3515,7 @@ static PaError ScanDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, PaH
         }
 
         /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaWinWdmDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaWinWdmDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
             wdmHostApi->allocations, sizeof(PaWinWdmDeviceInfo) * totalDeviceCount );
         if( !deviceInfoArray )
         {
@@ -3723,7 +3723,7 @@ static PaError CommitDeviceInfos( struct PaUtilHostApiRepresentation *hostApi, P
     /* Free any old memory which might be in the device info */
     if( hostApi->deviceInfos )
     {
-        PaWinWDMScanDeviceInfosResults* localScanResults = (PaWinWDMScanDeviceInfosResults*)PaUtil_GroupAllocateMemory(
+        PaWinWDMScanDeviceInfosResults* localScanResults = (PaWinWDMScanDeviceInfosResults*)PaUtil_GroupAllocateZeroInitializedMemory(
             wdmHostApi->allocations, sizeof(PaWinWDMScanDeviceInfosResults));
         localScanResults->deviceInfos = hostApi->deviceInfos;
 
@@ -3910,7 +3910,7 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     if( wdmHostApi)
     {
-        PaWinWDMScanDeviceInfosResults* localScanResults = (PaWinWDMScanDeviceInfosResults*)PaUtil_GroupAllocateMemory(
+        PaWinWDMScanDeviceInfosResults* localScanResults = (PaWinWDMScanDeviceInfosResults*)PaUtil_GroupAllocateZeroInitializedMemory(
             wdmHostApi->allocations, sizeof(PaWinWDMScanDeviceInfosResults));
         localScanResults->deviceInfos = hostApi->deviceInfos;
         DisposeDeviceInfos(hostApi, localScanResults, hostApi->info.deviceCount);
@@ -4818,7 +4818,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             {
                 unsigned size = stream->capture.noOfPackets * stream->capture.framesPerBuffer * stream->capture.bytesPerFrame;
                 /* Allocate input host buffer */
-                stream->capture.hostBuffer = (char*)PaUtil_GroupAllocateMemory(stream->allocGroup, size);
+                stream->capture.hostBuffer = (char*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, size);
                 PA_DEBUG(("Input buffer allocated (size = %u)\n", size));
                 if( !stream->capture.hostBuffer )
                 {
@@ -4912,7 +4912,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             {
                 unsigned size = stream->render.noOfPackets * stream->render.framesPerBuffer * stream->render.bytesPerFrame;
                 /* Allocate output device buffer */
-                stream->render.hostBuffer = (char*)PaUtil_GroupAllocateMemory(stream->allocGroup, size);
+                stream->render.hostBuffer = (char*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, size);
                 PA_DEBUG(("Output buffer allocated (size = %u)\n", size));
                 if( !stream->render.hostBuffer )
                 {
@@ -5029,14 +5029,14 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         const unsigned bufferSizeInBytes = stream->capture.framesPerBuffer * stream->capture.bytesPerFrame;
         const unsigned ringBufferFrameSize = NextPowerOf2( 1024 + 2 * max(stream->capture.framesPerBuffer, stream->render.framesPerBuffer) );
 
-        stream->capture.events = (HANDLE*)PaUtil_GroupAllocateMemory(stream->allocGroup, stream->capture.noOfPackets * sizeof(HANDLE));
+        stream->capture.events = (HANDLE*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, stream->capture.noOfPackets * sizeof(HANDLE));
         if (stream->capture.events == NULL)
         {
             result = paInsufficientMemory;
             goto error;
         }
 
-        stream->capture.packets = (DATAPACKET*)PaUtil_GroupAllocateMemory(stream->allocGroup, stream->capture.noOfPackets * sizeof(DATAPACKET));
+        stream->capture.packets = (DATAPACKET*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, stream->capture.noOfPackets * sizeof(DATAPACKET));
         if (stream->capture.packets == NULL)
         {
             result = paInsufficientMemory;
@@ -5135,7 +5135,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         /* Setup the input ring buffer here */
-        stream->ringBufferData = (char*)PaUtil_GroupAllocateMemory(stream->allocGroup, ringBufferFrameSize * stream->capture.bytesPerFrame);
+        stream->ringBufferData = (char*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, ringBufferFrameSize * stream->capture.bytesPerFrame);
         if (stream->ringBufferData == NULL)
         {
             result = paInsufficientMemory;
@@ -5147,14 +5147,14 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         const unsigned bufferSizeInBytes = stream->render.framesPerBuffer * stream->render.bytesPerFrame;
 
-        stream->render.events = (HANDLE*)PaUtil_GroupAllocateMemory(stream->allocGroup, stream->render.noOfPackets * sizeof(HANDLE));
+        stream->render.events = (HANDLE*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, stream->render.noOfPackets * sizeof(HANDLE));
         if (stream->render.events == NULL)
         {
             result = paInsufficientMemory;
             goto error;
         }
 
-        stream->render.packets = (DATAPACKET*)PaUtil_GroupAllocateMemory(stream->allocGroup, stream->render.noOfPackets * sizeof(DATAPACKET));
+        stream->render.packets = (DATAPACKET*)PaUtil_GroupAllocateZeroInitializedMemory(stream->allocGroup, stream->render.noOfPackets * sizeof(DATAPACKET));
         if (stream->render.packets == NULL)
         {
             result = paInsufficientMemory;

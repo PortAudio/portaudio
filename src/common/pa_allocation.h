@@ -83,7 +83,7 @@ void PaUtil_DestroyAllocationGroup( PaUtilAllocationGroup* group );
 /** Allocate a block of memory through the specified allocation group.
 The allocated block is zero-initialized.
 */
-void* PaUtil_GroupAllocateMemory( PaUtilAllocationGroup* group, long size );
+void* PaUtil_GroupAllocateZeroInitializedMemory( PaUtilAllocationGroup* group, long size );
 
 /** Free a block of memory that was allocated through the specified allocation
  group. Calling this function is a relatively time consuming operation.

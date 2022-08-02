@@ -158,7 +158,7 @@ PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
 
     if( deviceCount > 0 )
     {
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
                 skeletonHostApi->allocations, sizeof(PaDeviceInfo*) * deviceCount );
         if( !(*hostApi)->deviceInfos )
         {
@@ -167,7 +167,7 @@ PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
         }
 
         /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 skeletonHostApi->allocations, sizeof(PaDeviceInfo) * deviceCount );
         if( !deviceInfoArray )
         {
@@ -181,7 +181,7 @@ PaError PaSkeleton_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
             deviceInfo->structVersion = 2;
             deviceInfo->hostApi = hostApiIndex;
             deviceInfo->name = 0; /* IMPLEMENT ME: allocate block and copy name eg:
-                deviceName = (char*)PaUtil_GroupAllocateMemory( skeletonHostApi->allocations, strlen(srcName) + 1 );
+                deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory( skeletonHostApi->allocations, strlen(srcName) + 1 );
                 if( !deviceName )
                 {
                     result = paInsufficientMemory;

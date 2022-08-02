@@ -357,7 +357,7 @@ static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
     VDBUG( ( "Found %ld device(s).\n", auhalHostApi->devCount ) );
 
     /* -- copy the device IDs -- */
-    auhalHostApi->devIds = (AudioDeviceID *)PaUtil_GroupAllocateMemory(
+    auhalHostApi->devIds = (AudioDeviceID *)PaUtil_GroupAllocateZeroInitializedMemory(
                                auhalHostApi->allocations,
                                propsize );
     if( !auhalHostApi->devIds )
@@ -675,7 +675,7 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
         if (err)
             return err;
 
-        name = PaUtil_GroupAllocateMemory(auhalHostApi->allocations,propSize+1);
+        name = PaUtil_GroupAllocateZeroInitializedMemory(auhalHostApi->allocations,propSize+1);
         if ( !name )
             return paInsufficientMemory;
         err = ERR(PaMacCore_AudioDeviceGetProperty(macCoreDeviceId, 0, 0, kAudioDevicePropertyDeviceName, &propSize, name));
@@ -686,7 +686,7 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
     {
         /* valid CFString so we just allocate a c string big enough to contain the data */
         propSize = CFStringGetMaximumSizeForEncoding(CFStringGetLength(nameRef), kCFStringEncodingUTF8);
-        name = PaUtil_GroupAllocateMemory(auhalHostApi->allocations, propSize+1);
+        name = PaUtil_GroupAllocateZeroInitializedMemory(auhalHostApi->allocations, propSize+1);
         if ( !name )
         {
             CFRelease(nameRef);
@@ -774,7 +774,7 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
 
     if( auhalHostApi->devCount > 0 )
     {
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
                 auhalHostApi->allocations, sizeof(PaDeviceInfo*) * auhalHostApi->devCount);
         if( !(*hostApi)->deviceInfos )
         {
@@ -783,7 +783,7 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
         }
 
         /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 auhalHostApi->allocations, sizeof(PaDeviceInfo) * auhalHostApi->devCount );
         if( !deviceInfoArray )
         {

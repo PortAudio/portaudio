@@ -144,7 +144,7 @@ void PaUtil_DestroyAllocationGroup( PaUtilAllocationGroup* group )
 }
 
 
-void* PaUtil_GroupAllocateMemory( PaUtilAllocationGroup* group, long size )
+void* PaUtil_GroupAllocateZeroInitializedMemory( PaUtilAllocationGroup* group, long size )
 {
     struct PaUtilAllocationGroupLink *links, *link;
     void *result = 0;

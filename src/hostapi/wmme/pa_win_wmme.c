@@ -699,7 +699,7 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     {
         len = WCharStringLen( wic.szPname ) + 1 + sizeof(constInputMapperSuffix_);
         /* Append I/O suffix to WAVE_MAPPER device. */
-        deviceName = (char*)PaUtil_GroupAllocateMemory(
+        deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory(
                     winMmeHostApi->allocations,
                     (long)len );
         if( !deviceName )
@@ -713,7 +713,7 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     else
     {
         len = WCharStringLen( wic.szPname ) + 1;
-        deviceName = (char*)PaUtil_GroupAllocateMemory(
+        deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory(
                     winMmeHostApi->allocations,
                     (long)len );
         if( !deviceName )
@@ -835,7 +835,7 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     {
         /* Append I/O suffix to WAVE_MAPPER device. */
         len = WCharStringLen( woc.szPname ) + 1 + sizeof(constOutputMapperSuffix_);
-        deviceName = (char*)PaUtil_GroupAllocateMemory(
+        deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory(
                     winMmeHostApi->allocations,
                     (long)len );
         if( !deviceName )
@@ -849,7 +849,7 @@ static PaError InitializeOutputDeviceInfo( PaWinMmeHostApiRepresentation *winMme
     else
     {
         len = WCharStringLen( woc.szPname ) + 1;
-        deviceName = (char*)PaUtil_GroupAllocateMemory(
+        deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory(
                     winMmeHostApi->allocations,
                     (long)len );
         if( !deviceName )
@@ -1004,7 +1004,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
     if( maximumPossibleDeviceCount > 0 ){
 
-        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+        (*hostApi)->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
                 winMmeHostApi->allocations, sizeof(PaDeviceInfo*) * maximumPossibleDeviceCount );
         if( !(*hostApi)->deviceInfos )
         {
@@ -1013,7 +1013,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
         }
 
         /* allocate all device info structs in a contiguous block */
-        deviceInfoArray = (PaWinMmeDeviceInfo*)PaUtil_GroupAllocateMemory(
+        deviceInfoArray = (PaWinMmeDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 winMmeHostApi->allocations, sizeof(PaWinMmeDeviceInfo) * maximumPossibleDeviceCount );
         if( !deviceInfoArray )
         {
@@ -1021,7 +1021,7 @@ PaError PaWinMme_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
             goto error;
         }
 
-        winMmeHostApi->winMmeDeviceIds = (UINT*)PaUtil_GroupAllocateMemory(
+        winMmeHostApi->winMmeDeviceIds = (UINT*)PaUtil_GroupAllocateZeroInitializedMemory(
                 winMmeHostApi->allocations, sizeof(int) * maximumPossibleDeviceCount );
         if( !winMmeHostApi->winMmeDeviceIds )
         {

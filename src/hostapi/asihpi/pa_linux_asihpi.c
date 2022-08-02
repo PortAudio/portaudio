@@ -579,11 +579,11 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
     if( deviceCount > 0 )
     {
         /* Memory allocation */
-        PA_UNLESS_( hostApi->deviceInfos = (PaDeviceInfo**) PaUtil_GroupAllocateMemory(
+        PA_UNLESS_( hostApi->deviceInfos = (PaDeviceInfo**) PaUtil_GroupAllocateZeroInitializedMemory(
                                                hpiHostApi->allocations, sizeof(PaDeviceInfo*) * deviceCount ),
                     paInsufficientMemory );
         /* Allocate all device info structs in a contiguous block */
-        PA_UNLESS_( hpiDeviceList = (PaAsiHpiDeviceInfo*) PaUtil_GroupAllocateMemory(
+        PA_UNLESS_( hpiDeviceList = (PaAsiHpiDeviceInfo*) PaUtil_GroupAllocateZeroInitializedMemory(
                                         hpiHostApi->allocations, sizeof(PaAsiHpiDeviceInfo) * deviceCount ),
                     paInsufficientMemory );
 
@@ -640,7 +640,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 /* Make sure name string is owned by API info structure */
                 sprintf( srcName,
                          "Adapter %d (%4X) - Input Stream %d", i+1, type, j+1 );
-                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateMemory(
+                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateZeroInitializedMemory(
                                              hpiHostApi->allocations, strlen(srcName) + 1 ), paInsufficientMemory );
                 strcpy( deviceName, srcName );
                 baseDeviceInfo->name = deviceName;
@@ -682,7 +682,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 /* Make sure name string is owned by API info structure */
                 sprintf( srcName,
                          "Adapter %d (%4X) - Output Stream %d", i+1, type, j+1 );
-                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateMemory(
+                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateZeroInitializedMemory(
                                              hpiHostApi->allocations, strlen(srcName) + 1 ), paInsufficientMemory );
                 strcpy( deviceName, srcName );
                 baseDeviceInfo->name = deviceName;
