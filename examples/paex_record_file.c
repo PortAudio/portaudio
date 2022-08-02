@@ -315,7 +315,7 @@ int main(void)
     /* We set the ring buffer size to about 500 ms */
     numSamples = NextPowerOf2((unsigned)(SAMPLE_RATE * 0.5 * NUM_CHANNELS));
     numBytes = numSamples * sizeof(SAMPLE);
-    data.ringBufferData = (SAMPLE *) PaUtil_AllocateMemory( numBytes );
+    data.ringBufferData = (SAMPLE *) PaUtil_AllocateZeroInitializedMemory( numBytes );
     if( data.ringBufferData == NULL )
     {
         printf("Could not allocate ring buffer data.\n");
