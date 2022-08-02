@@ -1199,7 +1199,8 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     deviceNamesAndGUIDs.inputNamesAndGUIDs.items = NULL;
     deviceNamesAndGUIDs.outputNamesAndGUIDs.items = NULL;
 
-    winDsHostApi = (PaWinDsHostApiRepresentation*)PaUtil_AllocateMemory( sizeof(PaWinDsHostApiRepresentation) );
+    winDsHostApi = (PaWinDsHostApiRepresentation*)
+            PaUtil_AllocateZeroInitializedMemory(sizeof(PaWinDsHostApiRepresentation) );
     if( !winDsHostApi )
     {
         result = paInsufficientMemory;
@@ -2016,7 +2017,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidFlag; /* unexpected platform specific flag */
 
 
-    stream = (PaWinDsStream*)PaUtil_AllocateMemory( sizeof(PaWinDsStream) );
+    stream = (PaWinDsStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaWinDsStream) );
     if( !stream )
     {
         result = paInsufficientMemory;

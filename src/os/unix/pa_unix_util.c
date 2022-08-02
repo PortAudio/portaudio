@@ -71,7 +71,7 @@ static int numAllocations_ = 0;
 #endif
 
 
-void *PaUtil_AllocateMemory( long size )
+void *PaUtil_AllocateZeroInitializedMemory( long size )
 {
     /* use { malloc(); memset() } instead of calloc() so that we get
        the same alignment guarantee as malloc(). */

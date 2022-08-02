@@ -249,7 +249,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         tempInputBufferSize =
             bp->framesPerTempBuffer * bp->bytesPerUserInputSample * inputChannelCount;
 
-        bp->tempInputBuffer = PaUtil_AllocateMemory( tempInputBufferSize );
+        bp->tempInputBuffer = PaUtil_AllocateZeroInitializedMemory( tempInputBufferSize );
         if( bp->tempInputBuffer == 0 )
         {
             result = paInsufficientMemory;
@@ -262,7 +262,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         if( userInputSampleFormat & paNonInterleaved )
         {
             bp->tempInputBufferPtrs =
-                (void **)PaUtil_AllocateMemory( sizeof(void*)*inputChannelCount );
+                (void **)PaUtil_AllocateZeroInitializedMemory( sizeof(void*)*inputChannelCount );
             if( bp->tempInputBufferPtrs == 0 )
             {
                 result = paInsufficientMemory;
@@ -271,7 +271,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         }
 
         bp->hostInputChannels[0] = (PaUtilChannelDescriptor*)
-                PaUtil_AllocateMemory( sizeof(PaUtilChannelDescriptor) * inputChannelCount * 2);
+                PaUtil_AllocateZeroInitializedMemory( sizeof(PaUtilChannelDescriptor) * inputChannelCount * 2);
         if( bp->hostInputChannels[0] == 0 )
         {
             result = paInsufficientMemory;
@@ -319,7 +319,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         tempOutputBufferSize =
                 bp->framesPerTempBuffer * bp->bytesPerUserOutputSample * outputChannelCount;
 
-        bp->tempOutputBuffer = PaUtil_AllocateMemory( tempOutputBufferSize );
+        bp->tempOutputBuffer = PaUtil_AllocateZeroInitializedMemory( tempOutputBufferSize );
         if( bp->tempOutputBuffer == 0 )
         {
             result = paInsufficientMemory;
@@ -332,7 +332,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         if( userOutputSampleFormat & paNonInterleaved )
         {
             bp->tempOutputBufferPtrs =
-                (void **)PaUtil_AllocateMemory( sizeof(void*)*outputChannelCount );
+                (void **)PaUtil_AllocateZeroInitializedMemory( sizeof(void*)*outputChannelCount );
             if( bp->tempOutputBufferPtrs == 0 )
             {
                 result = paInsufficientMemory;
@@ -341,7 +341,7 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         }
 
         bp->hostOutputChannels[0] = (PaUtilChannelDescriptor*)
-                PaUtil_AllocateMemory( sizeof(PaUtilChannelDescriptor)*outputChannelCount * 2 );
+                PaUtil_AllocateZeroInitializedMemory( sizeof(PaUtilChannelDescriptor)*outputChannelCount * 2 );
         if( bp->hostOutputChannels[0] == 0 )
         {
             result = paInsufficientMemory;

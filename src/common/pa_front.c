@@ -201,7 +201,7 @@ static PaError InitializeHostApis( void )
 
     initializerCount = CountHostApiInitializers();
 
-    hostApis_ = (PaUtilHostApiRepresentation**)PaUtil_AllocateMemory(
+    hostApis_ = (PaUtilHostApiRepresentation**)PaUtil_AllocateZeroInitializedMemory(
             sizeof(PaUtilHostApiRepresentation*) * initializerCount );
     if( !hostApis_ )
     {

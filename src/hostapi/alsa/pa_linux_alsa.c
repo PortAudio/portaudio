@@ -749,7 +749,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     if (!PaAlsa_LoadLibrary())
         return paHostApiNotFound;
 
-    PA_UNLESS( alsaHostApi = (PaAlsaHostApiRepresentation*) PaUtil_AllocateMemory(
+    PA_UNLESS( alsaHostApi = (PaAlsaHostApiRepresentation*) PaUtil_AllocateZeroInitializedMemory(
                 sizeof(PaAlsaHostApiRepresentation) ), paInsufficientMemory );
     PA_UNLESS( alsaHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
     alsaHostApi->hostApiIndex = hostApiIndex;
@@ -1927,7 +1927,7 @@ static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, Pa
     if( !callbackMode && !self->userInterleaved )
     {
         /* Pre-allocate non-interleaved user provided buffers */
-        PA_UNLESS( self->userBuffers = PaUtil_AllocateMemory( sizeof (void *) * self->numUserChannels ),
+        PA_UNLESS( self->userBuffers = PaUtil_AllocateZeroInitializedMemory( sizeof (void *) * self->numUserChannels ),
                 paInsufficientMemory );
     }
 
@@ -2183,7 +2183,7 @@ static PaError PaAlsaStream_Initialize( PaAlsaStream *self, PaAlsaHostApiReprese
 
     assert( self->capture.nfds || self->playback.nfds );
 
-    PA_UNLESS( self->pfds = (struct pollfd*)PaUtil_AllocateMemory( ( self->capture.nfds +
+    PA_UNLESS( self->pfds = (struct pollfd*)PaUtil_AllocateZeroInitializedMemory( ( self->capture.nfds +
                     self->playback.nfds ) * sizeof( struct pollfd ) ), paInsufficientMemory );
 
     PaUtil_InitializeCpuLoadMeasurer( &self->cpuLoadMeasurer, sampleRate );
@@ -2842,7 +2842,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         framesPerBuffer = atoi( getenv("PA_ALSA_PERIODSIZE") );
     }
 
-    PA_UNLESS( stream = (PaAlsaStream*)PaUtil_AllocateMemory( sizeof(PaAlsaStream) ), paInsufficientMemory );
+    PA_UNLESS( stream = (PaAlsaStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAlsaStream) ), paInsufficientMemory );
     PA_ENSURE( PaAlsaStream_Initialize( stream, alsaHostApi, inputParameters, outputParameters, sampleRate,
                 framesPerBuffer, callback, streamFlags, userData ) );
 

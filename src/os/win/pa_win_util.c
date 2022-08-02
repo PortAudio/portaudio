@@ -65,7 +65,7 @@ static int numAllocations_ = 0;
 #endif
 
 
-void *PaUtil_AllocateMemory( long size )
+void *PaUtil_AllocateZeroInitializedMemory( long size )
 {
     void *result = GlobalAlloc( GMEM_FIXED | GMEM_ZEROINIT, size );
 
