@@ -257,7 +257,10 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         }
 
         if( bp->framesInTempInputBuffer > 0 )
-            memset( bp->tempInputBuffer, 0, tempInputBufferSize );
+        {
+            /* NOTE: we depend on bp->tempInputBuffer being zero-initialized by the allocator. */
+            /* memset( bp->tempInputBuffer, 0, tempInputBufferSize ); */
+        }
 
         if( userInputSampleFormat & paNonInterleaved )
         {
@@ -327,7 +330,10 @@ PaError PaUtil_InitializeBufferProcessor( PaUtilBufferProcessor* bp,
         }
 
         if( bp->framesInTempOutputBuffer > 0 )
-            memset( bp->tempOutputBuffer, 0, tempOutputBufferSize );
+        {
+            /* NOTE: we depend on bp->tempOutputBuffer being zero-initialized by the allocator. */
+            /* memset( bp->tempOutputBuffer, 0, tempOutputBufferSize ); */
+        }
 
         if( userOutputSampleFormat & paNonInterleaved )
         {

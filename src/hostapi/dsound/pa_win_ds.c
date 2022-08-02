@@ -1207,7 +1207,8 @@ PaError PaWinDs_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
         goto error;
     }
 
-    memset( winDsHostApi, 0, sizeof(PaWinDsHostApiRepresentation) ); /* ensure all fields are zeroed. especially winDsHostApi->allocations */
+    /* NOTE: we depend on PaUtil_AllocateZeroInitializedMemory() ensuring that all
+       fields are set to zero. especially winDsHostApi->allocations */
 
     result = PaWinUtil_CoInitialize( paDirectSound, &winDsHostApi->comInitializationResult );
     if( result != paNoError )
@@ -2024,7 +2025,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         goto error;
     }
 
-    memset( stream, 0, sizeof(PaWinDsStream) ); /* initialize all stream variables to 0 */
+    /* NOTE: we depend on PaUtil_AllocateZeroInitializedMemory() ensuring that all
+       stream fields are set to zero. */
 
     if( streamCallback )
     {
