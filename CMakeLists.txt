@@ -298,7 +298,9 @@ elseif(UNIX)
   )
   target_include_directories(PortAudio PRIVATE src/os/unix)
   target_link_libraries(PortAudio PRIVATE m)
-  set(PKGCONFIG_LDFLAGS_PRIVATE "${PKGCONFIG_LDFLAGS_PUBLIC} -lm -lpthread")
+  if (NOT WASM)
+    set(PKGCONFIG_LDFLAGS_PRIVATE "${PKGCONFIG_LDFLAGS_PUBLIC} -lm -lpthread")
+  endif()
   set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -pthread")
 
   if(APPLE)
@@ -330,6 +332,17 @@ elseif(UNIX)
 
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
+  elseif(WASM)
+    option(PA_USE_WEBAUDIO "Enable support for WebAudio" ON)
+
+    if (PA_USE_WEBAUDIO)
+      target_compile_definitions(PortAudio PUBLIC PA_USE_WEBAUDIO=1)
+      set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_WEBAUDIO=1")
+
+      set(PORTAUDIO_PUBLIC_HEADERS ${PORTAUDIO_PUBLIC_HEADERS} include/pa_webaudio.h)
+      target_sources(PortAudio PRIVATE src/hostapi/webaudio/pa_webaudio.c)
+      set(PA_PRIVATE_COMPILE_DEFINITIONS ${PA_PRIVATE_COMPILE_DEFINITIOS} PA_USE_WEBAUDIO)
+    endif()
   else()
     # Some BSDs have a reimplementation of alsalib, so do not explicitly check for Linux.
     find_package(ALSA)

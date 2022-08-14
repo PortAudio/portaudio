@@ -111,6 +111,13 @@ are defaulted to 1.
 #error "Portaudio: PA_NO_<APINAME> is no longer supported, please remove definition and use PA_USE_<APINAME> instead"
 #endif
 
+#ifndef PA_USE_WEBAUDIO
+#define PA_USE_WEBAUDIO 0
+#elif (PA_USE_WEBAUDIO != 0) && (PA_USE_WEBAUDIO != 1)
+#undef PA_USE_WEBAUDIO
+#define PA_USE_WEBAUDIO 1
+#endif
+
 #ifndef PA_USE_OSS
 #define PA_USE_OSS 0
 #elif (PA_USE_OSS != 0) && (PA_USE_OSS != 1)
