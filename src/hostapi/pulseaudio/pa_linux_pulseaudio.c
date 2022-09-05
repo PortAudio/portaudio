@@ -124,7 +124,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     char l_strDeviceName[PAPULSEAUDIO_MAX_DEVICENAME];
 
     ptr = (PaPulseAudio_HostApiRepresentation *)
-          PaUtil_AllocateMemory(sizeof(PaPulseAudio_HostApiRepresentation));
+          PaUtil_AllocateZeroInitializedMemory(sizeof(PaPulseAudio_HostApiRepresentation));
 
     /* ptr is NULL if runs out of memory or pointer to allocated memory */
     if( !ptr )
@@ -271,10 +271,10 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
     hostapi->deviceInfoArray[hostapi->deviceCount].structVersion = 2;
     hostapi->deviceInfoArray[hostapi->deviceCount].hostApi = hostapi->hostApiIndex;
     hostapi->pulseaudioDeviceNames[hostapi->deviceCount] =
-        PaUtil_GroupAllocateMemory( hostapi->allocations,
-                                    l_iRealNameSize );
-    l_strLocalName = PaUtil_GroupAllocateMemory( hostapi->allocations,
-                                                 l_iDeviceNameSize );
+        PaUtil_GroupAllocateZeroInitializedMemory( hostapi->allocations,
+                                                   l_iRealNameSize );
+    l_strLocalName = PaUtil_GroupAllocateZeroInitializedMemory( hostapi->allocations,
+                                                                l_iDeviceNameSize );
     if( !hostapi->pulseaudioDeviceNames[hostapi->deviceCount] &&
         !l_strLocalName )
     {
@@ -668,9 +668,9 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
         (*hostApi)->deviceInfos =
             (PaDeviceInfo **)
-            PaUtil_GroupAllocateMemory( l_ptrPulseAudioHostApi->allocations,
-                                        sizeof(PaDeviceInfo *) *
-                                        l_ptrPulseAudioHostApi->deviceCount );
+            PaUtil_GroupAllocateZeroInitializedMemory( l_ptrPulseAudioHostApi->allocations,
+                                                       sizeof(PaDeviceInfo *) *
+                                                       l_ptrPulseAudioHostApi->deviceCount );
 
         if( !(*hostApi)->deviceInfos )
         {
@@ -957,7 +957,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     PaPulseAudio_Lock(l_ptrPulseAudioHostApi->mainloop);
     stream =
-        (PaPulseAudio_Stream *) PaUtil_AllocateMemory( sizeof( PaPulseAudio_Stream ) );
+        (PaPulseAudio_Stream *) PaUtil_AllocateZeroInitializedMemory( sizeof( PaPulseAudio_Stream ) );
 
     if( !stream )
     {
@@ -970,8 +970,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     const char defaultSinkStreamName[] = "Portaudio sink";
 
     stream->framesPerHostCallback = framesPerBuffer;
-    stream->sourceStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSourceStreamName));
-    stream->sinkStreamName = (char*)PaUtil_AllocateMemory(sizeof(defaultSinkStreamName));
+    stream->sourceStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSourceStreamName));
+    stream->sinkStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSinkStreamName));
     if ( !stream->sourceStreamName || !stream->sinkStreamName )
     {
         result = paInsufficientMemory;
@@ -1336,7 +1336,7 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
 
     /* Reallocate stream name in memory. */
     PaPulseAudio_Lock( stream->mainloop );
-    char *newStreamName = (char*)PaUtil_AllocateMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
+    char *newStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
     if ( !newStreamName )
     {
         PaPulseAudio_UnLock( stream->mainloop );
@@ -1372,7 +1372,7 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
 
     /* Reallocate stream name in memory. */
     PaPulseAudio_Lock( stream->mainloop );
-    char *newStreamName = (char*)PaUtil_AllocateMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
+    char *newStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
     if ( !newStreamName )
     {
         PaPulseAudio_UnLock( stream->mainloop );
