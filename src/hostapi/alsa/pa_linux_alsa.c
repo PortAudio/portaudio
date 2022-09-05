@@ -843,7 +843,8 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     PaError result = paNoError;
     snd_pcm_hw_params_t *hwParams;
     snd_pcm_uframes_t alsaBufferFrames, alsaPeriodFrames;
-    unsigned int minChans, maxChans;
+    unsigned int minChans = 0;
+    unsigned int maxChans = 0;
     int* minChannels, * maxChannels;
     double * defaultLowLatency, * defaultHighLatency, * defaultSampleRate =
         &devInfo->baseDeviceInfo.defaultSampleRate;
@@ -901,9 +902,22 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
 
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_min( hwParams, &minChans ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_max( hwParams, &maxChans ), paUnanticipatedHostError );
-    assert( maxChans <= INT_MAX );
-    assert( maxChans > 0 );    /* Weird linking issue could cause wrong version of ALSA symbols to be called,
+    const unsigned int kReasonableMaxChannels = 1024;
+    if( maxChans > kReasonableMaxChannels )
+    {
+        PA_DEBUG(( "%s: maxChans = %u, which is unreasonably high\n", __FUNCTION__, maxChans ));
+        result = paUnanticipatedHostError;
+        goto error;
+    }
+    if( maxChans == 0 || minChans == 0)
+    {
+        /* Weird linking issue could cause wrong version of ALSA symbols to be called,
                                    resulting in zeroed values */
+        PA_DEBUG(( "%s: minChans = %u, maxChans = %u, linking problem?\n",
+                __FUNCTION__, minChans, maxChans ));
+        result = paUnanticipatedHostError;
+        goto error;
+    }
 
     /* XXX: Limit to sensible number (ALSA plugins accept a crazy amount of channels)? */
     if( isPlug && maxChans > 128 )
