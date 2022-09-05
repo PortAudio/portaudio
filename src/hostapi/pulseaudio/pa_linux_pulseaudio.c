@@ -901,6 +901,8 @@ PaError PaPulseAudio_BlockingInitRingBuffer( PaUtilRingBuffer * rbuf,
 
     if( l_ptrBuffer == NULL )
     {
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
+                                          "PaPulseAudio_BlockingInitRingBuffer: Not enough memory to handle request");
         return paInsufficientMemory;
     }
 
@@ -916,6 +918,11 @@ PaError PaPulseAudio_BlockingInitRingBuffer( PaUtilRingBuffer * rbuf,
     if( l_SResult < paNoError )
     {
         free( l_ptrBuffer );
+        PA_DEBUG( ("Portaudio %s: Can't initialize input ringbuffer with size: %ld!\n",
+                   __FUNCTION__, size) );
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
+                                          "PaPulseAudio_BlockingInitRingBuffer: Can't initialize input ringbuffer");
+
         return paNotInitialized;
     }
 
@@ -945,6 +952,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
      outputSampleFormat;
     PaSampleFormat hostInputSampleFormat,
      hostOutputSampleFormat;
+    unsigned long ringbufferSize = 0;
+    unsigned long ringbufferSizeTmp = 1;
 
     /* validate platform specific flags */
     if( (streamFlags & paPlatformSpecificFlags) != 0 )
@@ -1070,8 +1079,20 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inDevice = inputParameters->device;
 
+        /* Make sure that ringbufferSize is power of two */
+        ringbufferSize = stream->inputFrameSize * framesPerBuffer * inputChannelCount;
+        ringbufferSizeTmp = 1;
+
+        /* Find next power of two */
+        while (ringbufferSizeTmp < ringbufferSize)
+        {
+             ringbufferSizeTmp *= 2;
+        }
+
+        ringbufferSize = ringbufferSizeTmp;
+
         result = PaPulseAudio_BlockingInitRingBuffer( &stream->inputRing,
-                                                      stream->inputFrameSize * framesPerBuffer * inputChannelCount );
+                                                      ringbufferSize );
         if( result != paNoError )
         {
             goto openstream_error;
