@@ -909,7 +909,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
         result = paUnanticipatedHostError;
         goto error;
     }
-    if( maxChans == 0 || minChans == 0)
+    else if( maxChans == 0 )
     {
         /* Weird linking issue could cause wrong version of ALSA symbols to be called,
                                    resulting in zeroed values */
