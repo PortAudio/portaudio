@@ -1820,4 +1820,3 @@ PaError PaJack_GetClientName(const char** clientName)
 error:
     return result;
 }
-
