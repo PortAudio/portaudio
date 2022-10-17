@@ -445,10 +445,10 @@ int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
 PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice );
 
 
-/** Get device loopback state: 
+/** Get device loopback state:
 
-    0 - Not loopback, 
-    1 - Loopback, 
+    0 - Not loopback,
+    1 - Loopback,
     negative - PaErrorCode.
 
  @param device Device index.
