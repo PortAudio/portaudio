@@ -480,8 +480,8 @@ typedef struct PaWasapiDeviceInfo
     // Form-factor
     EndpointFormFactor formFactor;
 
-	// Loopback state (TRUE if device acts as loopback)
-	BOOL loopBack;
+    // Loopback state (TRUE if device acts as loopback)
+    BOOL loopBack;
 }
 PaWasapiDeviceInfo;
 
@@ -2193,12 +2193,12 @@ static BOOL FillLooopbackDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, PaD
     loopbackWasapiInfo->loopBack = TRUE;
 
     // Input is the reverse of Output
-    loopbackDeviceInfo->maxInputChannels		 = deviceInfo->maxOutputChannels;
-    loopbackDeviceInfo->defaultHighInputLatency	 = deviceInfo->defaultHighOutputLatency;
-    loopbackDeviceInfo->defaultLowInputLatency	 = deviceInfo->defaultLowOutputLatency;
-    loopbackDeviceInfo->maxOutputChannels		 = 0;
+    loopbackDeviceInfo->maxInputChannels         = deviceInfo->maxOutputChannels;
+    loopbackDeviceInfo->defaultHighInputLatency     = deviceInfo->defaultHighOutputLatency;
+    loopbackDeviceInfo->defaultLowInputLatency     = deviceInfo->defaultLowOutputLatency;
+    loopbackDeviceInfo->maxOutputChannels         = 0;
     loopbackDeviceInfo->defaultHighOutputLatency = 0;
-    loopbackDeviceInfo->defaultLowOutputLatency	 = 0;
+    loopbackDeviceInfo->defaultLowOutputLatency     = 0;
 
     return TRUE;
 }
@@ -2370,7 +2370,7 @@ static PaError CreateDeviceList(PaWasapiHostApiRepresentation *paWasapi, PaHostA
         {
             // Add loopback device to the end of the device list
             UINT32 loopbackIndex = paWasapi->deviceCount + j++;
-			assert(loopbackIndex < (paWasapi->deviceCount + loopbackDevices));
+            assert(loopbackIndex < (paWasapi->deviceCount + loopbackDevices));
             PaDeviceInfo *loopbackDeviceInfo = &deviceInfoArray[loopbackIndex];
             PaWasapiDeviceInfo *loopbackWasapiInfo = &paWasapi->devInfo[loopbackIndex];
 
@@ -2766,24 +2766,24 @@ PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice )
 // ------------------------------------------------------------------------------------------
 int PaWasapi_IsLoopback( PaDeviceIndex device )
 {
-	PaError ret;
-	PaDeviceIndex index;
+    PaError ret;
+    PaDeviceIndex index;
 
-	// Get API
-	PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
-	if (paWasapi == NULL)
-		return paNotInitialized;
+    // Get API
+    PaWasapiHostApiRepresentation *paWasapi = _GetHostApi(&ret);
+    if (paWasapi == NULL)
+        return paNotInitialized;
 
-	// Get device index
-	ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
-	if (ret != paNoError)
-		return ret;
+    // Get device index
+    ret = PaUtil_DeviceIndexToHostApiDeviceIndex(&index, device, &paWasapi->inheritedHostApiRep);
+    if (ret != paNoError)
+        return ret;
 
-	// Validate index
-	if ((UINT32)index >= paWasapi->deviceCount)
-		return paInvalidDevice;
+    // Validate index
+    if ((UINT32)index >= paWasapi->deviceCount)
+        return paInvalidDevice;
 
-	return paWasapi->devInfo[ index ].loopBack;
+    return paWasapi->devInfo[ index ].loopBack;
 }
 
 // ------------------------------------------------------------------------------------------
