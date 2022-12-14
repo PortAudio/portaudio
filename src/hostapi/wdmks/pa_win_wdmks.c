@@ -6631,11 +6631,13 @@ static PaError PaPinCaptureEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo,
     unsigned long pos;
     unsigned bytesToRead;
     PaWinWdmIOInfo* pCapture = &pInfo->stream->capture;
-    const unsigned halfInputBuffer = pCapture->hostBufferSize>>1;
+    const unsigned halfInputBuffer = pCapture->hostBufferSize >> 1;
     PaWinWdmPin* pin = pInfo->stream->capture.pPin;
 
     /* Get hold of current ADC position */
     pin->fnAudioPosition(pin, &pos);
+    /* Wrap it (robi: why not use hw latency compensation here ?? because pos then gets _way_ off from
+    where it should be, i.e. at beginning or half buffer position. Why? No idea.)  */
     /* Compensate for HW FIFO to get to last read buffer position */
     pos += pin->hwLatency;
     pos %= pCapture->hostBufferSize;
@@ -6645,26 +6647,15 @@ static PaError PaPinCaptureEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo,
     /* Call barrier (or dummy) */
     pin->fnMemBarrier();
 
-    /* Read all the data available at ring host buffer and push to intermediate ring buffer "queue" */
+    /* Put it in "queue" */
     bytesToRead = (pCapture->hostBufferSize + pos - pCapture->lastPosition) % pCapture->hostBufferSize;
     if (bytesToRead > 0)
     {
-        unsigned frameCount = 0;
-        unsigned bytesToRead_Step1 = min(bytesToRead, pCapture->hostBufferSize - pCapture->lastPosition);
-        unsigned frameCount_Step1 = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
+        unsigned frameCount = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
             pCapture->hostBuffer + pCapture->lastPosition,
-            bytesToRead_Step1 / pCapture->bytesPerFrame);
-        frameCount += frameCount_Step1;
-        pCapture->lastPosition = (pCapture->lastPosition + frameCount_Step1 * pCapture->bytesPerFrame) % pCapture->hostBufferSize;
-        if (bytesToRead_Step1 < bytesToRead)
-        {
-            unsigned bytesToRead_Step2 = bytesToRead - bytesToRead_Step1;
-            unsigned frameCount_Step2 = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
-                pCapture->hostBuffer + pCapture->lastPosition,
-                bytesToRead_Step2 / pCapture->bytesPerFrame);
-            pCapture->lastPosition = (pCapture->lastPosition + frameCount_Step2 * pCapture->bytesPerFrame) % pCapture->hostBufferSize;
-            frameCount += frameCount_Step2;
-        }
+            bytesToRead / pCapture->bytesPerFrame);
+
+        pCapture->lastPosition = (pCapture->lastPosition + frameCount * pCapture->bytesPerFrame) % pCapture->hostBufferSize;
 
         PA_HP_TRACE((pInfo->stream->hLog, "Capture event (WaveRTPolled): pos = %4.1lf%%, framesRead=%u", (pos * 100.0 / pCapture->hostBufferSize), frameCount));
         ++pInfo->captureHead;
