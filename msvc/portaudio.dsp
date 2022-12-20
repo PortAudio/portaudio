@@ -69,8 +69,8 @@ LINK32=link.exe
 # PROP Intermediate_Dir "Debug_x86"
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\..\src\common" /I "..\..\include" /I ".\\" /I "..\..\src\os\win" /D "WIN32" /D "_DEBUG" /D "_USRDLL" /D "PA_ENABLE_DEBUG_OUTPUT" /D "_CRT_SECURE_NO_DEPRECATE" /D "PAWIN_USE_WDMKS_DEVICE_INFO" /FD /GZ /c
+# ADD BASE CPP /nologo /MTd /W3 /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /D "_USRDLL" /FD /GZ /c
+# ADD CPP /nologo /MDd /W3 /GX /ZI /Od /I "..\..\src\common" /I "..\..\include" /I ".\\" /I "..\..\src\os\win" /D "WIN32" /D "_DEBUG" /D "_USRDLL" /D "PA_ENABLE_DEBUG_OUTPUT" /D "_CRT_SECURE_NO_DEPRECATE" /D "PAWIN_USE_WDMKS_DEVICE_INFO" /FD /GZ /c
 # SUBTRACT CPP /YX /Yc /Yu
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
