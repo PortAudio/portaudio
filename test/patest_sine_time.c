@@ -144,6 +144,7 @@ int main(void)
     PaError err;
     paTestData data = {0};
     PaTime startTime;
+    int i;
     long maxFrameCount;
     double secondsPerLoop;
 
