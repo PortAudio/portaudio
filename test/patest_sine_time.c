@@ -174,7 +174,7 @@ int main(void)
               &data );
     if( err != paNoError ) goto error;
 
-    for (int i = 0; i < 2; i++) {
+    for (i = 0; i < 2; i++) {
         secondsPerLoop = NUM_SECONDS / NUM_LOOPS;
         /* Watch until sound loop is finished. */
         printf("Play for %3.1f seconds.\n",  secondsPerLoop); fflush(stdout);
