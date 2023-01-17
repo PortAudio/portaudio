@@ -47,6 +47,7 @@
 #include <math.h>
 
 #include "portaudio.h"
+#include "paqa_macros.h"
 
 /*--------- Definitions ---------*/
 #define MODE_INPUT        (0)
@@ -63,37 +64,6 @@ typedef struct PaQaData
 }
 PaQaData;
 
-static int gNumPassed = 0; /* Two globals */
-static int gNumFailed = 0;
-
-/*------------------- Macros ------------------------------*/
-/* Print ERROR if it fails. Tally success or failure. Odd  */
-/* do-while wrapper seems to be needed for some compilers. */
-
-#define EXPECT(_exp) \
-    do \
-    { \
-        if ((_exp)) {\
-            gNumPassed++; \
-        } \
-        else { \
-            printf("\nERROR - 0x%x - %s for %s\n", result, Pa_GetErrorText(result), #_exp ); \
-            gNumFailed++; \
-            goto error; \
-        } \
-    } while(0)
-
-#define HOPEFOR(_exp) \
-    do \
-    { \
-        if ((_exp)) {\
-            gNumPassed++; \
-        } \
-        else { \
-            printf("\nERROR - 0x%x - %s for %s\n", result, Pa_GetErrorText(result), #_exp ); \
-            gNumFailed++; \
-        } \
-    } while(0)
 
 /*-------------------------------------------------------------------------*/
 /* This routine will be called by the PortAudio engine when audio is needed.
@@ -393,11 +363,13 @@ int main(void)
 {
     PaError result;
 
+    printf("-----------------------------\n");
+    printf("paqa_errs - PortAudio QA test\n");
     EXPECT(((result = Pa_Initialize()) == paNoError));
     TestBadOpens();
     TestBadActions();
 error:
     Pa_Terminate();
-    printf("QA Report: %d passed, %d failed.\n", gNumPassed, gNumFailed);
-    return 0;
+    printf("paqa_errs: %d passed, %d failed.\n", gNumPassed, gNumFailed);
+    return (gNumFailed > 0) || (gNumPassed == 0);
 }
