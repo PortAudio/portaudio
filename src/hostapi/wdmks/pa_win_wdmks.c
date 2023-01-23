@@ -6617,7 +6617,7 @@ static PaError PaPinCaptureEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, 
             frameCount += frameCount_Step2;
         }
     }
-    
+
     PA_HP_TRACE((pInfo->stream->hLog, "Capture event (WaveRT): idx=%u head=%u (pos = %4.1lf%%, frames=%u)", realInBuf, pInfo->captureHead, (pos * 100.0 / pCapture->hostBufferSize), frameCount));
 
     ++pInfo->captureHead;
