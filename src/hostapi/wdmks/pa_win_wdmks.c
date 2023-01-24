@@ -6602,13 +6602,19 @@ static PaError PaPinCaptureEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, 
     if (bytesToRead > 0)
     {
         unsigned bytesToRead_Step1 = min(bytesToRead, pCapture->hostBufferSize - pCapture->lastPosition);
+        unsigned framesToRead_Step1 = bytesToRead_Step1 / pCapture->bytesPerFrame;
         unsigned frameCount_Step1 = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
             pCapture->hostBuffer + pCapture->lastPosition,
-            bytesToRead_Step1 / pCapture->bytesPerFrame);
+            framesToRead_Step1);
         frameCount += frameCount_Step1;
         pCapture->lastPosition = (pCapture->lastPosition + frameCount_Step1 * pCapture->bytesPerFrame) % pCapture->hostBufferSize;
-        if (bytesToRead_Step1 < bytesToRead)
+        if (bytesToRead_Step1 < bytesToRead && frameCount_Step1 == framesToRead_Step1)
         {
+            /* If the first step above does not move bytesToRead_Step1, do not run the code below.
+               The code below assumes the first write is complete. If it is not complete
+               bytesToRead_Step2 is not computed correctly, and the code does not account
+               for hostBuffer overrun since lastPosition may not be zero.
+             */
             unsigned bytesToRead_Step2 = bytesToRead - bytesToRead_Step1;
             unsigned frameCount_Step2 = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
                 pCapture->hostBuffer + pCapture->lastPosition,
