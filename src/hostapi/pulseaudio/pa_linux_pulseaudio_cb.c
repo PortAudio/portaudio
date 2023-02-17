@@ -194,7 +194,16 @@ static int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
 
         l_lInFrameBytes = l_lOutFrameBytes = (l_lFramesPerHostBuffer * stream->outputFrameSize);
 
-        l_lBytesToProcess = l_lBytesLeft = ((1 + ((double)writableBytes / l_lOutFrameBytes)) * l_lOutFrameBytes);
+        /**
+         * Reasoning behind this is:
+         * You need to read at at least outputFrameSize (which is given by Portaudio)
+         * and with duplex same amount of output and input
+         *
+         * If we don't write minimum writableBytes bytes then Pulseaudio/Pipewire
+         * won't ask us anymore audio..
+         */
+
+        l_lBytesToProcess = l_lBytesLeft = ((1 + (unsigned long)((double)writableBytes / l_lOutFrameBytes)) * l_lOutFrameBytes);
 
         if( stream->bufferProcessor.streamCallback )
         {
