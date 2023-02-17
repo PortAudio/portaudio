@@ -71,39 +71,39 @@ void PaPulseAudio_updateTimeInfo( pa_stream * s,
                                   PaStreamCallbackTimeInfo *timeInfo,
                                   int record )
 {
-  unsigned int l_iNegative = 0;
-  pa_usec_t l_lStreamTime = 0;
-  pa_usec_t l_lStreamLatency = 0;
+    unsigned int l_iNegative = 0;
+    pa_usec_t l_lStreamTime = 0;
+    pa_usec_t l_lStreamLatency = 0;
 
-  if( pa_stream_get_time( s,
+    if( pa_stream_get_time( s,
                           &l_lStreamTime ) == -PA_ERR_NODATA )
-  {
-      PA_DEBUG( ("Portaudio %s: No time available!\n",
+    {
+        PA_DEBUG( ("Portaudio %s: No time available!\n",
                 __FUNCTION__) );
-  }
-  else
-  {
+    }
+    else
+    {
     timeInfo->currentTime = ((PaTime) l_lStreamTime / (PaTime) 1000000);
-  }
+    }
 
-  if( pa_stream_get_latency( s,
+    if( pa_stream_get_latency( s,
                              &l_lStreamLatency,
                              &l_iNegative ) == -PA_ERR_NODATA )
-  {
-      PA_DEBUG( ("Portaudio %s: No latency available!\n",
+    {
+        PA_DEBUG( ("Portaudio %s: No latency available!\n",
                 __FUNCTION__) );
-  }
-  else
-  {
-      if( record == 0 )
-      {
-          timeInfo->outputBufferDacTime = timeInfo->currentTime + ((PaTime) l_lStreamLatency / (PaTime) 1000000);
-      }
-      else
-      {
-          timeInfo->inputBufferAdcTime = timeInfo->currentTime - ((PaTime) l_lStreamLatency / (PaTime) 1000000);
-      }
-  }
+    }
+    else
+    {
+        if( record == 0 )
+        {
+            timeInfo->outputBufferDacTime = timeInfo->currentTime + ((PaTime) l_lStreamLatency / (PaTime) 1000000);
+        }
+        else
+        {
+            timeInfo->inputBufferAdcTime = timeInfo->currentTime - ((PaTime) l_lStreamLatency / (PaTime) 1000000);
+        }
+    }
 }
 
 
@@ -561,7 +561,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
            && stream->inStream == NULL)
            || l_iError >= 5000 )
         {
-              l_iLoop = 1;
+            l_iLoop = 1;
         }
 
         l_iError ++;
@@ -901,10 +901,10 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
         && !pa_stream_is_corked( stream->outStream )
         && !abort )
     {
-       l_ptrOperation = pa_stream_cork( stream->outStream,
-                                        1,
-                                        PaPulseAudio_CorkSuccessCb,
-                                        stream );
+        l_ptrOperation = pa_stream_cork( stream->outStream,
+                                         1,
+                                         PaPulseAudio_CorkSuccessCb,
+                                         stream );
 
         while( pa_operation_get_state( l_ptrOperation ) == PA_OPERATION_RUNNING )
         {
@@ -916,7 +916,7 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
         l_ptrOperation = NULL;
     }
 
-  requeststop_error:
+    requeststop_error:
     PaPulseAudio_UnLock( l_ptrPulseAudioHostApi->mainloop );
     stream->isActive = 0;
     stream->isStopped = 1;

@@ -121,12 +121,12 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
 
         if( l_lWritable > 0 )
         {
-           if( l_lLength < l_lWritable )
-           {
+            if( l_lLength < l_lWritable )
+            {
                 l_lWritable = l_lLength;
-           }
-           PaPulseAudio_Lock( l_ptrStream->mainloop );
-           l_iRet = pa_stream_write( l_ptrStream->outStream,
+            }
+            PaPulseAudio_Lock( l_ptrStream->mainloop );
+            l_iRet = pa_stream_write( l_ptrStream->outStream,
                                      l_ptrData,
                                      l_lWritable,
                                      NULL,

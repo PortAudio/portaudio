@@ -137,7 +137,7 @@ are defaulted to 1.
 #elif (PA_USE_PULSEAUDIO != 0) && (PA_USE_PULSEAUDIO != 1)
 #undef PA_USE_PULSEAUDIO
 #define PA_USE_PULSEAUDIO 1
-#endif 
+#endif
 
 #ifndef PA_USE_SGI
 #define PA_USE_SGI 0

@@ -56,7 +56,7 @@ extern "C" {
  *
  * @param s The PortAudio stream to operate on.
  * @param streamName The new name/description of the source.
- * 
+ *
  * @return paNoError on success or the error encountered otherwise.
  */
 PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName );
@@ -67,7 +67,7 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName );
  *
  * @param s The PortAudio stream to operate on.
  * @param streamName The new name/description of the sink.
- * 
+ *
  * @return paNoError on success or the error encountered otherwise.
  */
 PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName );

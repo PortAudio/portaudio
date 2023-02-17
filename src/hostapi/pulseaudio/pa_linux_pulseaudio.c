@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2014-2020 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
- * Copyright (c) 2020 Daniel Schürmann
+ * Copyright (c) 2020 Daniel Schurmann
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
@@ -101,11 +101,11 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
              * https://freedesktop.org/software/pulseaudio/doxygen/def_8h.html
              */
 
-        	case PA_CONTEXT_UNCONNECTED:
+            case PA_CONTEXT_UNCONNECTED:
                PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The context hasn't been connected yet (PA_CONTEXT_UNCONNECTED)");
             break;
 
-        	case PA_CONTEXT_FAILED:
+            case PA_CONTEXT_FAILED:
                PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The connection failed or was disconnected. (PA_CONTEXT_FAILED)");
             break;
 
@@ -124,7 +124,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     char l_strDeviceName[PAPULSEAUDIO_MAX_DEVICENAME];
 
     ptr = (PaPulseAudio_HostApiRepresentation *)
-          PaUtil_AllocateZeroInitializedMemory(sizeof(PaPulseAudio_HostApiRepresentation));
+    PaUtil_AllocateZeroInitializedMemory(sizeof(PaPulseAudio_HostApiRepresentation));
 
     /* ptr is NULL if runs out of memory or pointer to allocated memory */
     if( !ptr )
@@ -174,7 +174,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     return ptr;
 
-  fail:
+    fail:
     PaPulseAudio_Free( ptr );
     return NULL;
 }
@@ -233,22 +233,22 @@ void PaPulseAudio_ServerInfoCb( pa_context *c,
                                 const pa_server_info *i,
                                 void *userdata )
 {
-  PaPulseAudio_HostApiRepresentation *l_ptrHostApi =
+    PaPulseAudio_HostApiRepresentation *l_ptrHostApi =
       (PaPulseAudio_HostApiRepresentation *) userdata;
-  PaError result = paNoError;
-  const char *l_strName = NULL;
+    PaError result = paNoError;
+    const char *l_strName = NULL;
 
-  if( !c  || !i )
-  {
-      PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+    if( !c  || !i )
+    {
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                          "PaPulseAudio_ServerInfoCb: Invalid context or can't get server info" );
-      pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
-      return;
-  }
+        pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
+        return;
+    }
 
-  l_ptrHostApi->pulseaudioDefaultSampleSpec = i->sample_spec;
+    l_ptrHostApi->pulseaudioDefaultSampleSpec = i->sample_spec;
 
-  pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
+    pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
 }
 
 
@@ -278,9 +278,9 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
     if( !hostapi->pulseaudioDeviceNames[hostapi->deviceCount] &&
         !l_strLocalName )
     {
-       PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                           "_PaPulseAudio_AddAudioDevice: Can't alloc memory" );
-       return paInsufficientMemory;
+        return paInsufficientMemory;
     }
 
     if( hostapi->deviceCount >= PAPULSEAUDIO_MAX_DEVICECOUNT )
@@ -359,7 +359,7 @@ void PaPulseAudio_SinkListCb( pa_context * c,
                                            "PaPulseAudio_SinkListCb: Can't add device. Maximum amount reached!" );
     }
 
-  error:
+    error:
     pa_threaded_mainloop_signal( l_ptrHostApi->mainloop,
                                  0 );
 }
@@ -411,7 +411,7 @@ void PaPulseAudio_SourceListCb( pa_context * c,
                                            "PaPulseAudio_SourceListCb: Can't add device. Maximum amount reached!" );
     }
 
-  error:
+    error:
     pa_threaded_mainloop_signal( l_ptrHostApi->mainloop,
                                  0 );
 }
@@ -718,7 +718,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     PaPulseAudio_UnLock( l_ptrPulseAudioHostApi->mainloop );
     return result;
 
-  error:
+    error:
 
     if( l_ptrPulseAudioHostApi )
     {
@@ -1086,7 +1086,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         /* Find next power of two */
         while (ringbufferSizeTmp < ringbufferSize)
         {
-             ringbufferSizeTmp *= 2;
+            ringbufferSizeTmp *= 2;
         }
 
         ringbufferSize = ringbufferSizeTmp;
@@ -1161,7 +1161,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         /* Really who has mono output anyway but whom I'm to judge? */
         if( stream->outSampleSpec.channels == 1 )
         {
-          stream->outSampleSpec.channels = 2;
+            stream->outSampleSpec.channels = 2;
         }
 
         if( !pa_sample_spec_valid( &stream->outSampleSpec ) )
@@ -1273,11 +1273,11 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     *s = (PaStream *) stream;
 
-  openstream_end:
+    openstream_end:
     PaPulseAudio_UnLock( l_ptrPulseAudioHostApi->mainloop );
     return result;
 
-  openstream_error:
+    openstream_error:
 
     if( stream )
     {
@@ -1286,7 +1286,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         PaUtil_FreeMemory(stream);
     }
 
-  goto openstream_end;
+    goto openstream_end;
 }
 
 PaError IsStreamStopped( PaStream * s )
