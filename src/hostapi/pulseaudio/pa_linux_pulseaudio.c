@@ -1089,7 +1089,17 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             ringbufferSizeTmp *= 2;
         }
 
-        ringbufferSize = ringbufferSizeTmp;
+        ringbufferSize = ringbufferSizeTmp * 64;
+
+        /* This can be low as 1024 and if there is coming 65536
+         * it does not fit in. Size of ringbuffer does not affect
+         * latency as it's played out as soon as there is room
+         * for playing
+         */
+        if (ringbufferSize < (65536 * 2))
+        {
+            ringbufferSize = (65536 * 2);
+        }
 
         result = PaPulseAudio_BlockingInitRingBuffer( &stream->inputRing,
                                                       ringbufferSize );
