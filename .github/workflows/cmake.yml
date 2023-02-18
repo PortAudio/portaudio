@@ -84,6 +84,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install libasound2-dev ${{ matrix.dependencies_extras }}
       if: matrix.os == 'ubuntu-latest'
+    - name: "[macOS] install dependencies"
+      # https://github.com/PortAudio/portaudio/issues/767
+      run: brew install pkg-config
+      if: matrix.os == 'macOS-latest'
     - name: "[Windows/MinGW] set up ASIO SDK cache"
       uses: actions/cache@v2
       if: matrix.asio_sdk_cache_path != null
