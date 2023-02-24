@@ -231,167 +231,136 @@ static int _PaPulseAudio_processAudioInputOutput( PaPulseAudio_Stream *stream,
                                 l_lBytesToProcess);
     }
 
-
-    /* We have to fullfill reading or writing callback or it does not ask
-     * anymore. So there can come many reads before it's fullfilled
-     */
-    do {
-        /* There is only Record stream so
-         * see if we have enough stuff to feed record stream
-         * If not then bail out.
+    if( (l_bOutputCb && PaUtil_GetRingBufferReadAvailable(&stream->outputRing) < writableBytes) ||
+        (l_bInputCb && !l_bOutputCb) )
+    {
+        /* We have to fullfill reading or writing callback or it does not ask
+         * anymore. So there can come many reads before it's fullfilled
          */
-        if( (l_bInputCb && !l_bOutputCb) &&
-            PaUtil_GetRingBufferReadAvailable(&stream->inputRing) < l_lInFrameBytes )
-        {
-            break;
-        }
-
-        if(  stream->outStream )
-        {
-            PaPulseAudio_updateTimeInfo( stream->outStream,
-                                         &timeInfo,
-                                         0 );
-        }
-
-        if(  stream->inStream )
-        {
-            PaPulseAudio_updateTimeInfo( stream->inStream,
-                                         &timeInfo,
-                                         1 );
-        }
-
-        PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
-
-        /* When doing Portaudio Duplex one has to write and read same amount of data
-         * if not done that way Portaudio will go boo boo and nothing works.
-         * This is why this is done as it's done
-         *
-         * Pulseaudio does not care and this is something that needs small adjusting
-         */
-        PaUtil_BeginBufferProcessing( &stream->bufferProcessor,
-                                      &timeInfo,
-                                      0 );
-
-        /* Read of ther is something to read */
-        if( l_bInputCb )
-        {
-            PaUtil_ReadRingBuffer(&stream->inputRing,
-                                  l_cBUffer,
-                                  l_lInFrameBytes);
-
-            PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
-                                                0,
-                                                l_cBUffer,
-                                                stream->inSampleSpec.channels );
-
-            PaUtil_SetInputFrameCount( &stream->bufferProcessor,
-                                       l_lFramesPerHostBuffer );
-
-            if(!l_bOutputCb && l_lBytesLeft)
+        do {
+            /* There is only Record stream so
+             * see if we have enough stuff to feed record stream
+             * If not then bail out.
+             */
+            if( (l_bInputCb && !l_bOutputCb) &&
+                PaUtil_GetRingBufferReadAvailable(&stream->inputRing) < l_lInFrameBytes )
             {
-                l_lBytesLeft -= l_lInFrameBytes;
-            }
-        }
-
-        if( l_bOutputCb )
-        {
-            PaPulseAudio_Lock( stream->mainloop );
-
-            /*
-             * If something is wanted
-             * tune in dark and
-             * distant future.
-             * This one  would be snappier to
-             * make with 'pa_stream_begin_write'
-             *
-             * But the problems starts to rise
-             * when it asks too less bytes than
-             * we get from
-             * PaUtil_SetInterleavedOutputChannels
-             *
-             * So just use pa_stream_write which
-             * is compromiss and seems to work
-             * as expected
-             */
-
-            PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
-                                                 0,
-                                                 l_cBUffer,
-                                                 stream->outputChannelCount );
-            PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
-                                        l_lFramesPerHostBuffer );
-
-            l_lBytesLeft -= l_lOutFrameBytes;
-
-            /* As patest_mono works as expected
-             * @TODO add it if needed
-             * If mono we assume to have stereo output
-             * So we just copy to other channel..
-             * Little bit hackish but works.. with float currently
-             * if( l_ptrStream->outputChannelCount == 1 )
-             * {
-             *     void *l_ptrStartOrig = l_cBUffer + l_lOutFrameBytes;
-             *     void *l_ptrStartStereo = l_cBUffer;
-             *     memcpy(l_ptrStartOrig, l_ptrStartStereo, l_lOutFrameBytes);
-             *
-             *     for(i = 0; i < l_lOutFrameBytes; i += stream->outputFrameSize)
-             *     {
-             *         memcpy( l_ptrStartStereo,
-             *                 l_ptrStartOrig,
-             *                 l_ptrStream->outputFrameSize );
-             *         l_ptrStartStereo += stream->outputFrameSize;
-             *         memcpy( l_ptrStartStereo,
-             *                 l_ptrStartOrig,
-             *                 l_ptrStream->outputFrameSize );
-             *         l_ptrStartStereo += stream->outputFrameSize;
-             *         l_ptrStartOrig += stream->outputFrameSize;
-             *     }
-             *
-             *     memcpy(l_ptrStartStereo, l_ptrStartOrig, l_lOutFrameBytes);
-             * }
-             */
-
-            /* In theory this one
-             * Can overflow if too much bytes are written
-             * Otherwise one can write as much as one
-             * desired it's just then adjusted to next
-             * Callback inside Pulseaudio
-             */
-            if( pa_stream_write( stream->outStream,
-                                 l_cBUffer,
-                                 l_lOutFrameBytes,
-                                 NULL,
-                                 0,
-                                 PA_SEEK_RELATIVE) )
-            {
-                PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
-                          __FUNCTION__) );
+                l_iResult = paContinue;
+                break;
             }
 
-            PaPulseAudio_UnLock( stream->mainloop );
-        }
-
-        numFrames =
-            PaUtil_EndBufferProcessing( &stream->bufferProcessor,
-                                        &l_iResult );
-
-        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
-                                      numFrames );
-
-        if( l_iResult != paContinue )
-        {
-            /* Eventually notify user all buffers have played */
-            if( stream->streamRepresentation.streamFinishedCallback
-                && stream->isActive )
+            if(  stream->outStream )
             {
-                stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
+                PaPulseAudio_updateTimeInfo( stream->outStream,
+                                             &timeInfo,
+                                             0 );
             }
 
-            stream->isActive = 0;
-            break;
-        }
+            if(  stream->inStream )
+            {
+                PaPulseAudio_updateTimeInfo( stream->inStream,
+                                             &timeInfo,
+                                             1 );
+            }
 
-    } while ( l_lBytesLeft > 0 );
+            PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
+
+            /* When doing Portaudio Duplex one has to write and read same amount of data
+             * if not done that way Portaudio will go boo boo and nothing works.
+             * This is why this is done as it's done
+             *
+             * Pulseaudio does not care and this is something that needs small adjusting
+             */
+            PaUtil_BeginBufferProcessing( &stream->bufferProcessor,
+                                          &timeInfo,
+                                          0 );
+
+            /* Read of ther is something to read */
+            if( l_bInputCb )
+            {
+                PaUtil_ReadRingBuffer(&stream->inputRing,
+                                      l_cBUffer,
+                                      l_lInFrameBytes);
+
+                PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
+                                                    0,
+                                                    l_cBUffer,
+                                                    stream->inSampleSpec.channels );
+
+                PaUtil_SetInputFrameCount( &stream->bufferProcessor,
+                                           l_lFramesPerHostBuffer );
+
+                if(!l_bOutputCb && l_lBytesLeft)
+                {
+                    l_lBytesLeft -= l_lInFrameBytes;
+                }
+            }
+
+            if( l_bOutputCb )
+            {
+
+                PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
+                                                     0,
+                                                     l_cBUffer,
+                                                     stream->outputChannelCount );
+                PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
+                                            l_lFramesPerHostBuffer );
+
+                l_lBytesLeft -= l_lOutFrameBytes;
+
+                /* Ringbuffer them for playing few moments after this */
+                PaUtil_WriteRingBuffer( &stream->outputRing,
+                        l_cBUffer,
+                        l_lOutFrameBytes );
+
+            }
+
+            numFrames =
+                PaUtil_EndBufferProcessing( &stream->bufferProcessor,
+                                            &l_iResult );
+
+            PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
+                                          numFrames );
+
+            if( l_iResult != paContinue )
+            {
+                /* Eventually notify user all buffers have played */
+                if( stream->streamRepresentation.streamFinishedCallback
+                    && stream->isActive )
+                {
+                    stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
+                }
+
+                stream->isActive = 0;
+                break;
+            }
+
+        } while ( l_lBytesLeft > 0 );
+    }
+
+    if( l_bOutputCb && l_iResult == paContinue)
+    {
+        void *l_ptrData = NULL;
+        size_t l_lBytes = writableBytes;
+
+        /* Allocate memory to make it faster to output stuff */
+        pa_stream_begin_write(stream->outStream, &l_ptrData, &l_lBytes);
+
+        PaUtil_ReadRingBuffer(&stream->outputRing,
+                      l_ptrData,
+                      l_lBytes);
+
+        if( pa_stream_write( stream->outStream,
+                             l_ptrData,
+                             l_lBytes,
+                             NULL,
+                             0,
+                             PA_SEEK_RELATIVE) )
+        {
+            PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
+                      __FUNCTION__) );
+        }
+    }
 
     return paNoError;
 }
@@ -423,15 +392,15 @@ void PaPulseAudio_StreamRecordCb( pa_stream * s,
          */
         if( PaUtil_GetRingBufferWriteAvailable(&l_ptrStream->inputRing) < length )
         {
-            uint8_t l_cBUffer[PULSEAUDIO_BUFFER_SIZE];
-            PaUtil_ReadRingBuffer(&l_ptrStream->inputRing,
-                                  l_cBUffer,
-                                  length);
+            uint8_t l_cBUffer[ PULSEAUDIO_BUFFER_SIZE ];
+            PaUtil_ReadRingBuffer( &l_ptrStream->inputRing,
+                                   l_cBUffer,
+                                   length );
         }
 
         PaUtil_WriteRingBuffer( &l_ptrStream->inputRing,
                                 l_ptrSampleData,
-                                length);
+                                length );
     }
 
     pa_stream_drop( l_ptrStream->inStream );
@@ -610,28 +579,28 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
      * tlength is for Playback
      * fragsize if for Record
      */
-    stream->bufferAttr.maxlength = (uint32_t)-1;
-    /* @TODO There is mixed documentation on this!
-     *
-     * API documentation tlength and fragsize
-     * should be '(uint32_t)-1' also but as '0' works
-     * but it breaks something this should be
-     * done as in documentation:
-     * https://freedesktop.org/software/pulseaudio/doxygen/structpa__buffer__attr.html
-     */
-    stream->bufferAttr.tlength = 0;
-    stream->bufferAttr.fragsize = 0;
-    stream->bufferAttr.prebuf = (uint32_t)-1;
-    stream->bufferAttr.minreq = (uint32_t)-1;
+    stream->outBufferAttr.maxlength = (uint32_t)-1;
+    stream->inBufferAttr.maxlength = (uint32_t)-1;
+    stream->outBufferAttr.tlength = (uint32_t)-1;
+    stream->inBufferAttr.tlength = (uint32_t)-1;
+    stream->outBufferAttr.fragsize = (uint32_t)-1;
+    stream->inBufferAttr.fragsize = (uint32_t)-1;
+    stream->outBufferAttr.prebuf = (uint32_t)-1;
+    stream->inBufferAttr.prebuf = (uint32_t)-1;
+    stream->outBufferAttr.minreq = (uint32_t)-1;
+    stream->inBufferAttr.minreq = (uint32_t)-1;
+
     stream->outputUnderflows = 0;
     PaPulseAudio_UnLock( l_ptrPulseAudioHostApi->mainloop );
 
     if( stream->outStream != NULL )
     {
+        stream->outBufferAttr.tlength = 0;
+
         /* Only change tlength if latency if more than Zero */
-        if( stream->latency > 0 )
+        if( stream->framesPerHostCallback )
         {
-            stream->bufferAttr.tlength = (stream->framesPerHostCallback * stream->outputFrameSize);
+            stream->outBufferAttr.tlength = (stream->framesPerHostCallback * stream->outputFrameSize);
         }
 
         pa_stream_set_write_callback( stream->outStream,
@@ -689,7 +658,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
                 if ( ! pa_stream_connect_playback( stream->outStream,
                                                    l_strName,
-                                                   &stream->bufferAttr,
+                                                   &stream->outBufferAttr,
                                                    PA_STREAM_INTERPOLATE_TIMING |
                                                    PA_STREAM_ADJUST_LATENCY |
                                                    PA_STREAM_AUTO_TIMING_UPDATE |
@@ -724,10 +693,12 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->inStream != NULL )
     {
+         stream->outBufferAttr.fragsize = 0;
+        
         /* Only change fragsize if latency if more than Zero */
-        if ( stream->latency > 0 )
+        if ( stream->framesPerHostCallback )
         {
-            stream->bufferAttr.fragsize = (stream->framesPerHostCallback * stream->inputFrameSize);
+            stream->inBufferAttr.fragsize = (stream->framesPerHostCallback * stream->inputFrameSize);
         }
 
         if( stream->inDevice != paNoDevice)
@@ -763,7 +734,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             /* Zero means success */
             if( ! pa_stream_connect_record( stream->inStream,
                                       l_strName,
-                                      &stream->bufferAttr,
+                                      &stream->inBufferAttr,
                                       PA_STREAM_INTERPOLATE_TIMING |
                                       PA_STREAM_ADJUST_LATENCY |
                                       PA_STREAM_AUTO_TIMING_UPDATE |

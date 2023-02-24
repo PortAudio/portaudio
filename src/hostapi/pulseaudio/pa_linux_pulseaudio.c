@@ -453,8 +453,8 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
             }
             else
             {
-                PA_DEBUG( ("%s: Buffer metrics: maxlength=%u, tlength=%u, prebuf=%u, minreq=%u, fragsize=%u\n",
-                           __FUNCTION__,
+                PA_DEBUG( ("%s: %s Buffer metrics: maxlength=%u, tlength=%u, prebuf=%u, minreq=%u, fragsize=%u\n",
+                           __FUNCTION__, pa_stream_get_device_name(s),
                            l_SBufferAttr->maxlength, l_SBufferAttr->tlength, l_SBufferAttr->prebuf,
                            l_SBufferAttr->minreq, l_SBufferAttr->maxlength, l_SBufferAttr->fragsize) );
             }
@@ -998,6 +998,9 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             0x00,
             sizeof(PaUtilRingBuffer) );
 
+    memset( &stream->outputRing,
+            0x00,
+            sizeof(PaUtilRingBuffer) );
 
     if( inputParameters )
     {
@@ -1047,6 +1050,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->inSampleSpec.rate = sampleRate;
         stream->inSampleSpec.channels = inputChannelCount;
         stream->latency = inputParameters->suggestedLatency;
+        stream->inputChannelCount = inputChannelCount;
 
         if( !pa_sample_spec_valid(&stream->inSampleSpec) )
         {
@@ -1204,6 +1208,20 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                       __FUNCTION__) );
         }
 
+        if( result != paNoError )
+        {
+            goto openstream_error;
+        }
+
+        /* There should be nice way to calc this but
+         * as this Ringbuffer is just used for few second converting
+         * sometimes little obscure Pulseaudio audio output to precise
+         * portaudio stuff.
+         *
+         * There should not be that much bytes of we are in big trouble
+         */
+        result = PaPulseAudio_BlockingInitRingBuffer( &stream->outputRing,
+                                                      (65536 * 4) );
         if( result != paNoError )
         {
             goto openstream_error;

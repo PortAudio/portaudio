@@ -123,10 +123,12 @@ typedef struct PaPulseAudio_Stream
     pa_stream *outStream;
     pa_stream *inStream;
     pa_usec_t outStreamTime;
-    pa_buffer_attr bufferAttr;
+    pa_buffer_attr outBufferAttr;
+    pa_buffer_attr inBufferAttr;
     int outputUnderflows;
     PaTime latency;
     int outputChannelCount;
+    int inputChannelCount;
 
     long maxFramesPerBuffer;
     long maxFramesHostPerBuffer;
@@ -140,6 +142,7 @@ typedef struct PaPulseAudio_Stream
     char *sourceStreamName;
 
     PaUtilRingBuffer inputRing;
+    PaUtilRingBuffer outputRing;
 
     /* Used in communication between threads */
     volatile sig_atomic_t isActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
