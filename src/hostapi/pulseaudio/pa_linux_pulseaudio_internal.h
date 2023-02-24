@@ -125,7 +125,7 @@ typedef struct PaPulseAudio_Stream
     pa_usec_t outStreamTime;
     pa_buffer_attr bufferAttr;
     int outputUnderflows;
-    double latency;
+    PaTime latency;
     int outputChannelCount;
 
     long maxFramesPerBuffer;

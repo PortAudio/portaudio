@@ -631,7 +631,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         /* Only change tlength if latency if more than Zero */
         if( stream->latency > 0 )
         {
-            stream->bufferAttr.tlength = pa_usec_to_bytes( (pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->outSampleSpec );
+            stream->bufferAttr.tlength = (stream->framesPerHostCallback * stream->outputFrameSize);
         }
 
         pa_stream_set_write_callback( stream->outStream,
@@ -727,7 +727,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         /* Only change fragsize if latency if more than Zero */
         if ( stream->latency > 0 )
         {
-            stream->bufferAttr.fragsize = pa_usec_to_bytes( (pa_usec_t)(stream->latency * PA_USEC_PER_SEC), &stream->inSampleSpec );
+            stream->bufferAttr.fragsize = (stream->framesPerHostCallback * stream->inputFrameSize);
         }
 
         if( stream->inDevice != paNoDevice)
