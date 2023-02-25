@@ -2052,20 +2052,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         hostOutputSampleFormat = 0;
     }
 
-    result =  PaUtil_InitializeBufferProcessor( &stream->bufferProcessor,
-                    inputChannelCount, inputSampleFormat, hostInputSampleFormat,
-                    outputChannelCount, outputSampleFormat, hostOutputSampleFormat,
-                    sampleRate, streamFlags, framesPerBuffer,
-                    0, /* ignored in paUtilVariableHostBufferSizePartialUsageAllowed mode. */
-                /* This next mode is required because DS can split the host buffer when it wraps around. */
-                    paUtilVariableHostBufferSizePartialUsageAllowed,
-                    streamCallback, userData );
-    if( result != paNoError )
-        goto error;
-
-    bufferProcessorIsInitialized = 1;
-
-
 /* DirectSound specific initialization */
     {
         HRESULT          hr;
@@ -2130,6 +2116,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         DBUG(("DirectSound host buffer size frames: %d, polling period seconds: %f, @ sr: %f\n",
                 stream->hostBufferSizeFrames, stream->pollingPeriodSeconds, sampleRate ));
+
+        result = PaUtil_InitializeBufferProcessor(&stream->bufferProcessor,
+            inputChannelCount, inputSampleFormat, hostInputSampleFormat,
+            outputChannelCount, outputSampleFormat, hostOutputSampleFormat,
+            sampleRate, streamFlags, framesPerBuffer,
+            stream->hostBufferSizeFrames, paUtilBoundedHostBufferSize,
+            streamCallback, userData);
+        if (result != paNoError)
+            goto error;
+
+        bufferProcessorIsInitialized = 1;
 
 
         /* ------------------ OUTPUT */
