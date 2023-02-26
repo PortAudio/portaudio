@@ -97,7 +97,7 @@ if(PA_USE_SKELETON)
 endif()
 
 include(CMakeDependentOption)
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/cmake/modules")
 
 # JACK is most commonly used on Linux, but it is cross platform, so allow building it on any OS
 # if the FindJACK.cmake module finds POSIX headers.
