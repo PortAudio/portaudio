@@ -74,6 +74,8 @@
 // using adjustments for MinGW build from @mgeier/MXE
 // https://github.com/mxe/mxe/commit/f4bbc45682f021948bdaefd9fd476e2a04c4740f
 #include <mmreg.h>  // must be before other Wasapi headers
+#include <ks.h>
+#include <ksmedia.h>
 #if defined(_MSC_VER) && (_MSC_VER >= 1400) || defined(__MINGW64_VERSION_MAJOR)
     #include <avrt.h>
     #define COBJMACROS
@@ -284,6 +286,8 @@ PA_DEFINE_IID(IKsJackDescription,   4509F757, 2D46, 4637, 8e, 62, ce, 7d, b9, 44
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_PCM,        0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_ADPCM,      0x00000002, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, 0x00000003, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
+__DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL,       0x00000092, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
+__DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS,  0x0000000a, 0x0cea, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 
 #ifdef __IAudioClient2_INTERFACE_DEFINED__
 typedef enum _pa_AUDCLNT_STREAMOPTIONS {
@@ -2879,6 +2883,16 @@ PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
             case  8: return paUInt8;
             }
         }
+        else
+        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL))
+        {
+            return paInt16;
+        }
+        else
+        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS))
+        {
+            return paInt16;
+        }
         break; }
 
     case WAVE_FORMAT_IEEE_FLOAT:
@@ -2907,6 +2921,8 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
     DWORD channelMask = 0;
     BOOL useExtensible = (params->channelCount > 2); // format is always forced for >2 channels format
     PaWasapiStreamInfo *streamInfo = (PaWasapiStreamInfo *)params->hostApiSpecificStreamInfo;
+    WAVEFORMATEXTENSIBLE_IEC61937* wavex_61937 = (WAVEFORMATEXTENSIBLE_IEC61937*)wavex;
+    BOOL matchEac3 = FALSE, matchAc3 = FALSE;
 
     // Convert PaSampleFormat to valid data bits
     if ((bitsPerSample = PaSampleFormatToBitsPerSample(params->sampleFormat)) == 0)
@@ -2919,11 +2935,21 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
         useExtensible = TRUE;
     }
 
+    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiMatchAc3))
+    {
+        matchAc3 = TRUE;
+    }
+
+    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiMatchEac3))
+    {
+        matchEac3 = TRUE;
+    }
+
     memset(wavex, 0, sizeof(*wavex));
 
     old                    = (WAVEFORMATEX *)wavex;
     old->nChannels      = (WORD)params->channelCount;
-    old->nSamplesPerSec = (DWORD)sampleRate;
+    old->nSamplesPerSec = matchEac3 ? 192000 : (DWORD)sampleRate;
     old->wBitsPerSample = bitsPerSample;
 
     // according to MSDN for WAVEFORMATEX structure for WAVE_FORMAT_PCM:
@@ -2945,12 +2971,23 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
     else
     {
         old->wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-        old->cbSize        = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+        old->cbSize = matchEac3 ? sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX)
+            : sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
 
         if ((params->sampleFormat & ~paNonInterleaved) == paFloat32)
             wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
         else
             wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_PCM;
+
+        if (matchEac3) {
+            wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS;
+            wavex_61937->dwEncodedSamplesPerSec = (DWORD)sampleRate;
+            wavex_61937->dwEncodedChannelCount = 0;
+            wavex_61937->dwAverageBytesPerSec = 0;
+        }
+        else if (matchAc3) {
+            wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL;
+        }
 
         wavex->Samples.wValidBitsPerSample = bitsPerSample;
 
@@ -3001,10 +3038,18 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
 {
     HRESULT hr = !S_OK;
     AUDCLNT_SHAREMODE shareMode = AUDCLNT_SHAREMODE_EXCLUSIVE;
+    WAVEFORMATEXTENSIBLE_IEC61937 testFormat_61937;
     WAVEFORMATEXTENSIBLE testFormat;
+    WAVEFORMATEXTENSIBLE* testFormatPtr;
     PaStreamParameters testParams;
     int i;
     static const PaSampleFormat bestToWorst[] = { paInt32, paInt24, paFloat32, paInt16 };
+
+    PaWasapiStreamInfo* streamInfo = (PaWasapiStreamInfo*)params->hostApiSpecificStreamInfo;
+    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiMatchEac3))
+        testFormatPtr = &testFormat_61937.FormatExt;
+    else
+        testFormatPtr = &testFormat;
 
     // Try combination Stereo (2 channels) and then we will use our custom mono-stereo mixer
     if (params->channelCount == 1)
@@ -3012,11 +3057,11 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
         testParams = (*params);
         testParams.channelCount = 2;
 
-        if (MakeWaveFormatFromParams(&testFormat, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
+        if (MakeWaveFormatFromParams(testFormatPtr, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
         {
-            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat.Format, NULL)) == S_OK)
+            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormatPtr->Format, NULL)) == S_OK)
             {
-                (*outWavex) = testFormat;
+                (*outWavex) = *testFormatPtr;
                 return hr;
             }
         }
@@ -3026,11 +3071,11 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
         {
             testParams.sampleFormat = bestToWorst[i];
 
-            if (MakeWaveFormatFromParams(&testFormat, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
+            if (MakeWaveFormatFromParams(testFormatPtr, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
             {
-                if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat.Format, NULL)) == S_OK)
+                if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormatPtr->Format, NULL)) == S_OK)
                 {
-                    (*outWavex) = testFormat;
+                    (*outWavex) = *testFormatPtr;
                     return hr;
                 }
             }
@@ -3043,11 +3088,11 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
     {
         testParams.sampleFormat = bestToWorst[i];
 
-        if (MakeWaveFormatFromParams(&testFormat, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
+        if (MakeWaveFormatFromParams(testFormatPtr, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
         {
-            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat.Format, NULL)) == S_OK)
+            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormatPtr->Format, NULL)) == S_OK)
             {
-                (*outWavex) = testFormat;
+                (*outWavex) = *testFormatPtr;
                 return hr;
             }
         }
@@ -3278,6 +3323,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     if (outputParameters != NULL)
     {
         HRESULT hr;
+        WAVEFORMATEXTENSIBLE_IEC61937 wavex_61937;
         WAVEFORMATEXTENSIBLE wavex;
         PaError answer;
         AUDCLNT_SHAREMODE shareMode = AUDCLNT_SHAREMODE_SHARED;
@@ -3292,8 +3338,10 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
             LogHostError(hr);
             return paInvalidDevice;
         }
-
-        answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex, TRUE);
+        if (outputStreamInfo && (outputStreamInfo->flags & paWinWasapiMatchEac3))
+            answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex_61937.FormatExt, TRUE);
+        else
+            answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex, TRUE);
         SAFE_RELEASE(tmpClient);
 
         if (answer != paFormatIsSupported)

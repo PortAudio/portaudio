@@ -82,7 +82,11 @@ typedef enum PaWasapiFlags
        playback formats that do not match the current configured system settings.
        this is in particular required for streams not matching the system mixer sample rate.
        only applies in Shared mode. */
-    paWinWasapiAutoConvert              = (1 << 6)
+    paWinWasapiAutoConvert              = (1 << 6),
+
+    paWinWasapiMatchAc3                = (1 << 7),
+
+    paWinWasapiMatchEac3                 = (1 << 8)
 }
 PaWasapiFlags;
 #define paWinWasapiExclusive             (paWinWasapiExclusive)
@@ -92,6 +96,8 @@ PaWasapiFlags;
 #define paWinWasapiThreadPriority        (paWinWasapiThreadPriority)
 #define paWinWasapiExplicitSampleFormat  (paWinWasapiExplicitSampleFormat)
 #define paWinWasapiAutoConvert           (paWinWasapiAutoConvert)
+#define paWinWasapiMatchAc3              (paWinWasapiMatchAc3)
+#define paWinWasapiMatchEac3             (paWinWasapiMatchEac3)
 
 
 /* Stream state.
