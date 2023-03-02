@@ -288,7 +288,7 @@ __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL,      0x00000092, 0
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS, 0x0000000a, 0x0cea, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 
 #ifndef _WAVEFORMATEXTENSIBLE_IEC61937_
-#define _WAVEFORMATEXTENSIBLE_IEC61937_
+    #define _WAVEFORMATEXTENSIBLE_IEC61937_
 typedef struct {
     WAVEFORMATEXTENSIBLE FormatExt;
     DWORD                dwEncodedSamplesPerSec;
@@ -296,6 +296,7 @@ typedef struct {
     DWORD                dwAverageBytesPerSec;
 } WAVEFORMATEXTENSIBLE_IEC61937, *PWAVEFORMATEXTENSIBLE_IEC61937;
 #endif // !_WAVEFORMATEXTENSIBLE_IEC61937_
+#define PA_WASAPI_EAC3_SAMPLES_PER_SEC_ (192000)
 
 #ifdef __IAudioClient2_INTERFACE_DEFINED__
 typedef enum _pa_AUDCLNT_STREAMOPTIONS {
@@ -2957,7 +2958,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE *wavex, const PaStr
 
     old                    = (WAVEFORMATEX *)wavex;
     old->nChannels      = (WORD)params->channelCount;
-    old->nSamplesPerSec = matchEac3 ? 192000 : (DWORD)sampleRate;
+    old->nSamplesPerSec = matchEac3 ? PA_WASAPI_EAC3_SAMPLES_PER_SEC_ : (DWORD)sampleRate;
     old->wBitsPerSample = bitsPerSample;
 
     // according to MSDN for WAVEFORMATEX structure for WAVE_FORMAT_PCM:
@@ -3043,7 +3044,7 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
 {
     HRESULT hr = !S_OK;
     AUDCLNT_SHAREMODE shareMode = AUDCLNT_SHAREMODE_EXCLUSIVE;
-    WAVEFORMATEXTENSIBLE_IEC61937 testFormat_61937;
+    WAVEFORMATEXTENSIBLE testFormat;
     PaStreamParameters testParams;
     int i;
     static const PaSampleFormat bestToWorst[] = { paInt32, paInt24, paFloat32, paInt16 };
@@ -3054,11 +3055,11 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
         testParams = (*params);
         testParams.channelCount = 2;
 
-        if (MakeWaveFormatFromParams(&testFormat_61937.FormatExt, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
+        if (MakeWaveFormatFromParams(&testFormat, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
         {
-            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat_61937.FormatExt.Format, NULL)) == S_OK)
+            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat.Format, NULL)) == S_OK)
             {
-                (*outWavex) = testFormat_61937.FormatExt;
+                (*outWavex) = testFormat;
                 return hr;
             }
         }
@@ -3068,11 +3069,11 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
         {
             testParams.sampleFormat = bestToWorst[i];
 
-            if (MakeWaveFormatFromParams(&testFormat_61937.FormatExt, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
+            if (MakeWaveFormatFromParams(&testFormat, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
             {
-                if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat_61937.FormatExt.Format, NULL)) == S_OK)
+                if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat.Format, NULL)) == S_OK)
                 {
-                    (*outWavex) = testFormat_61937.FormatExt;
+                    (*outWavex) = testFormat;
                     return hr;
                 }
             }
@@ -3085,11 +3086,11 @@ static HRESULT GetAlternativeSampleFormatExclusive(IAudioClient *client, double 
     {
         testParams.sampleFormat = bestToWorst[i];
 
-        if (MakeWaveFormatFromParams(&testFormat_61937.FormatExt, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
+        if (MakeWaveFormatFromParams(&testFormat, &testParams, sampleRate, packedSampleFormatOnly) == paNoError)
         {
-            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat_61937.FormatExt.Format, NULL)) == S_OK)
+            if ((hr = IAudioClient_IsFormatSupported(client, shareMode, &testFormat.Format, NULL)) == S_OK)
             {
-                (*outWavex) = testFormat_61937.FormatExt;
+                (*outWavex) = testFormat;
                 return hr;
             }
         }
@@ -3320,7 +3321,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     if (outputParameters != NULL)
     {
         HRESULT hr;
-        WAVEFORMATEXTENSIBLE_IEC61937 wavex_61937;
+        WAVEFORMATEXTENSIBLE wavex;
         PaError answer;
         AUDCLNT_SHAREMODE shareMode = AUDCLNT_SHAREMODE_SHARED;
         outputStreamInfo = (PaWasapiStreamInfo *)outputParameters->hostApiSpecificStreamInfo;
@@ -3334,7 +3335,8 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
             LogHostError(hr);
             return paInvalidDevice;
         }
-        answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex_61937.FormatExt, TRUE);
+
+        answer = GetClosestFormat(tmpClient, sampleRate, outputParameters, shareMode, &wavex, TRUE);
         SAFE_RELEASE(tmpClient);
 
         if (answer != paFormatIsSupported)
