@@ -74,8 +74,6 @@
 // using adjustments for MinGW build from @mgeier/MXE
 // https://github.com/mxe/mxe/commit/f4bbc45682f021948bdaefd9fd476e2a04c4740f
 #include <mmreg.h>  // must be before other Wasapi headers
-#include <ks.h>
-#include <ksmedia.h>
 #if defined(_MSC_VER) && (_MSC_VER >= 1400) || defined(__MINGW64_VERSION_MAJOR)
     #include <avrt.h>
     #define COBJMACROS
@@ -288,6 +286,16 @@ __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_ADPCM,                       0x00000002, 0
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,                  0x00000003, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL,      0x00000092, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS, 0x0000000a, 0x0cea, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
+
+#ifndef _WAVEFORMATEXTENSIBLE_IEC61937_
+#define _WAVEFORMATEXTENSIBLE_IEC61937_
+typedef struct {
+    WAVEFORMATEXTENSIBLE FormatExt;
+    DWORD                dwEncodedSamplesPerSec;
+    DWORD                dwEncodedChannelCount;
+    DWORD                dwAverageBytesPerSec;
+} WAVEFORMATEXTENSIBLE_IEC61937, *PWAVEFORMATEXTENSIBLE_IEC61937;
+#endif // !_WAVEFORMATEXTENSIBLE_IEC61937_
 
 #ifdef __IAudioClient2_INTERFACE_DEFINED__
 typedef enum _pa_AUDCLNT_STREAMOPTIONS {
