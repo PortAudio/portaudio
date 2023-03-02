@@ -84,9 +84,11 @@ typedef enum PaWasapiFlags
        only applies in Shared mode. */
     paWinWasapiAutoConvert              = (1 << 6),
 
-    paWinWasapiMatchAc3                = (1 << 7),
+    /* force data output to match AC3 passthrough mode */
+    paWinWasapiMatchAc3                 = (1 << 7),
 
-    paWinWasapiMatchEac3                 = (1 << 8)
+    /* force data output to match E-AC3 passthrough mode */
+    paWinWasapiMatchEac3                = (1 << 8)
 }
 PaWasapiFlags;
 #define paWinWasapiExclusive             (paWinWasapiExclusive)
