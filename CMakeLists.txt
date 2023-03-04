@@ -15,6 +15,43 @@ else()
   set(LIBRARY_BUILD_TYPE STATIC)
 endif()
 
+option(PA_WARNINGS_ARE_ERRORS "Turn compiler warnings into errors" OFF)
+if(PA_WARNINGS_ARE_ERRORS)
+    if(MSVC)
+        add_compile_options(/WX
+            # "Grandfathered" warnings that existed before we started enforcement.
+            # Do *NOT* add warnings to this list. Instead, fix your code so that it doesn't produce the warning.
+            # TODO: fix the offending code so that we don't have to exclude specific warnings anymore.
+            /wd4018 # W3 signed/unsigned mismatch
+            /wd4024 # W1 different types for formal and actual parameter
+            /wd4047 # W1 differs in levels of indirection
+            /wd4101 # W3 unreferenced local variable
+            /wd4133 # W3 incompatible types
+            /wd4146 # W2 unary minus operator applied to unsigned type, result still unsigned
+            /wd4244 # W2 conversion possible loss of data
+            /wd4267 # W3 conversion possible loss of data
+            /wd4305 # W1 truncation
+            /wd4477 # W1 format string requires an argument of type, but variadic argument number has type
+            /wd4996 # W3 unsafe/deprecated
+        )
+    else()
+        add_compile_options(-Werror
+            # "Grandfathered" warnings that existed before we started enforcement.
+            # Do *NOT* add warnings to this list. Instead, fix your code so that it doesn't produce the warning.
+            # TODO: fix the offending code so that we don't have to exclude specific warnings anymore.
+            -Wno-error=deprecated-declarations  # https://github.com/PortAudio/portaudio/issues/213 https://github.com/PortAudio/portaudio/issues/641
+            -Wno-error=incompatible-pointer-types
+            -Wno-error=int-conversion
+            -Wno-error=stringop-overflow
+        )
+        if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+             # Don't fail on older clang versions that don't recognize the latest warnings in the list above.
+             # Note that unrecognized warning options are not a fatal error on GCC, and in fact, GCC will choke on this option. Hence the conditional.
+            add_compile_options(-Wno-error=unknown-warning-option)
+        endif()
+    endif()
+endif()
+
 add_library(PortAudio
   ${LIBRARY_BUILD_TYPE}
   src/common/pa_allocation.c
