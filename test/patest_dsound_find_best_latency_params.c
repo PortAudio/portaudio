@@ -101,7 +101,7 @@ static void printWindowsVersionInfo( FILE *fp )
 
     memset( &osVersionInfoEx, 0, sizeof(OSVERSIONINFOEX) );
     osVersionInfoEx.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-    GetVersionEx( &osVersionInfoEx );
+    GetVersionEx( (LPOSVERSIONINFO) &osVersionInfoEx );
 
 
     if( osVersionInfoEx.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS ){
