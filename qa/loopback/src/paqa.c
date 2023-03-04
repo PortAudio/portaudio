@@ -968,7 +968,6 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
     int iRate;
     int iSize;
     int iFormat;
-    int savedValue;
     TestParameters testParams;
     const PaDeviceInfo *inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
     const PaDeviceInfo *outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
