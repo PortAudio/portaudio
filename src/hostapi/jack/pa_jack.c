@@ -1216,7 +1216,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->isBlockingStream = !streamCallback;
     if( stream->isBlockingStream )
     {
-        float latency = 0.001; /* 1ms is the absolute minimum we support */
+        float latency = 0.001f; /* 1ms is the absolute minimum we support */
         int   minimum_buffer_frames = 0;
 
         if( inputParameters && inputParameters->suggestedLatency > latency )
