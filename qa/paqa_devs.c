@@ -118,7 +118,7 @@ static int gNumFailed = 0;
 static float NextSineSample( PaQaData *data )
 {
     float phase = data->phase + PHASE_INCREMENT;
-    if( phase > M_PI ) phase -= 2.0 * M_PI;
+    if( phase > M_PI ) phase -= (float) (2.0 * M_PI);
     data->phase = phase;
     return sinf(phase) * SINE_AMPLITUDE;
 }
