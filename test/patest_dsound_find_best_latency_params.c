@@ -406,9 +406,9 @@ int main(int argc, char* argv[])
     if( argc >= 2 ){
         deviceIndex = -1;
         if( sscanf( argv[1], "%d", &deviceIndex ) != 1 )
-            usage(dsoundHostApiInfo);
+            usage(dsoundHostApiIndex);
         if( deviceIndex < 0 || deviceIndex >= Pa_GetDeviceCount() || Pa_GetDeviceInfo(deviceIndex)->hostApi != dsoundHostApiIndex ){
-            usage(dsoundHostApiInfo);
+            usage(dsoundHostApiIndex);
         }
     }
 
