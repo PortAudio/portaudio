@@ -36,11 +36,12 @@
  * license above.
  */
 
+#define  _WIN32_WINNT 0x0501 /* for GetNativeSystemInfo */
+
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
 
-#define  _WIN32_WINNT 0x0501 /* for GetNativeSystemInfo */
 #include <windows.h>
 //#include <mmsystem.h>   /* required when using pa_win_wmme.h */
 
