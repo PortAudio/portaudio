@@ -46,7 +46,7 @@
 //#include <mmsystem.h>   /* required when using pa_win_wmme.h */
 
 #include <conio.h>      /* for _getch */
-
+#include <tchar.h>
 
 #include "portaudio.h"
 #include "pa_win_ds.h"
@@ -202,7 +202,7 @@ static void printWindowsVersionInfo( FILE *fp )
 
 
     fprintf( fp, "OS name and edition: %s %s\n", osName, osProductType );
-    fprintf( fp, "OS version: %d.%d.%d %S\n",
+    _ftprintf( fp, TEXT("OS version: %d.%d.%d %s\n"),
                 osVersionInfoEx.dwMajorVersion, osVersionInfoEx.dwMinorVersion,
                 osVersionInfoEx.dwBuildNumber, osVersionInfoEx.szCSDVersion );
     fprintf( fp, "Processor architecture: %s\n", processorArchitecture );
