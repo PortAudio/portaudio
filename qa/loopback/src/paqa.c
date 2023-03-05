@@ -1017,7 +1017,7 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
                 // SAMPLE RATE
                 TestParameters srTestParams = flagTestParams;
                 srTestParams.sampleRate = sampleRates[iRate];
-                srTestParams.maxFrames = (int) (PAQA_TEST_DURATION * testParams.sampleRate);
+                srTestParams.maxFrames = (int) (PAQA_TEST_DURATION * srTestParams.sampleRate);
 
                 numBadChannels = PaQa_SingleLoopBackTest( userOptions, &srTestParams );
                 totalBadChannels += numBadChannels;
