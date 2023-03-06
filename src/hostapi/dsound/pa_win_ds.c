@@ -1734,63 +1734,29 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
     unsigned long maximumPollingPeriodFrames = (unsigned long)(sampleRate * PA_DS_MAXIMUM_POLLING_PERIOD_SECONDS);
     unsigned long pollingJitterFrames = (unsigned long)(sampleRate * PA_DS_POLLING_JITTER_SECONDS);
 
-    if( userFramesPerBuffer == paFramesPerBufferUnspecified )
+    unsigned long adjustedSuggestedOutputLatencyFrames = suggestedOutputLatencyFrames;
+    if( userFramesPerBuffer != paFramesPerBufferUnspecified && isFullDuplex )
     {
-        unsigned long targetBufferingLatencyFrames = max( suggestedInputLatencyFrames, suggestedOutputLatencyFrames );
-
-        *pollingPeriodFrames = targetBufferingLatencyFrames / 4;
-        if( *pollingPeriodFrames < minimumPollingPeriodFrames )
-        {
-            *pollingPeriodFrames = minimumPollingPeriodFrames;
-        }
-        else if( *pollingPeriodFrames > maximumPollingPeriodFrames )
-        {
-            *pollingPeriodFrames = maximumPollingPeriodFrames;
-        }
-
-        *hostBufferSizeFrames = *pollingPeriodFrames
-                + max( *pollingPeriodFrames + pollingJitterFrames, targetBufferingLatencyFrames);
+        /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
+           extra fixed latency. so we subtract it here as a fixed latency before computing
+           the buffer size. being careful not to produce an unrepresentable negative result.
+        */
+        adjustedSuggestedOutputLatencyFrames -= min( userFramesPerBuffer, adjustedSuggestedOutputLatencyFrames );
     }
-    else
-    {
-        unsigned long targetBufferingLatencyFrames = suggestedInputLatencyFrames;
-        if( isFullDuplex )
-        {
-            /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
-               extra fixed latency. so we subtract it here as a fixed latency before computing
-               the buffer size. being careful not to produce an unrepresentable negative result.
 
-               Note: this only works as expected if output latency is greater than input latency.
-               Otherwise we use input latency anyway since we do max(in,out).
-            */
+    const unsigned long targetBufferingLatencyFrames = max( suggestedInputLatencyFrames, adjustedSuggestedOutputLatencyFrames );
 
-            if( userFramesPerBuffer < suggestedOutputLatencyFrames )
-            {
-                unsigned long adjustedSuggestedOutputLatencyFrames =
-                        suggestedOutputLatencyFrames - userFramesPerBuffer;
+    *pollingPeriodFrames = (userFramesPerBuffer == paFramesPerBufferUnspecified) ?
+        targetBufferingLatencyFrames / 4 :
+        max( max( 1, userFramesPerBuffer / 4 ), targetBufferingLatencyFrames / 16 );
+    *pollingPeriodFrames = min( max( *pollingPeriodFrames, minimumPollingPeriodFrames ), maximumPollingPeriodFrames );
 
-                /* maximum of input and adjusted output suggested latency */
-                if( adjustedSuggestedOutputLatencyFrames > targetBufferingLatencyFrames )
-                    targetBufferingLatencyFrames = adjustedSuggestedOutputLatencyFrames;
-            }
-        }
-        else
-        {
-            /* maximum of input and output suggested latency */
-            if( suggestedOutputLatencyFrames > suggestedInputLatencyFrames )
-                targetBufferingLatencyFrames = suggestedOutputLatencyFrames;
-        }
-
-        *hostBufferSizeFrames = userFramesPerBuffer
-                + max( userFramesPerBuffer + pollingJitterFrames, targetBufferingLatencyFrames);
-
-        *pollingPeriodFrames = max( max(1, userFramesPerBuffer / 4), targetBufferingLatencyFrames / 16 );
-
-        if( *pollingPeriodFrames > maximumPollingPeriodFrames )
-        {
-            *pollingPeriodFrames = maximumPollingPeriodFrames;
-        }
-    }
+    const unsigned long intendedUserFramesPerBuffer =
+        (userFramesPerBuffer == paFramesPerBufferUnspecified) ?
+            *pollingPeriodFrames :
+            userFramesPerBuffer;
+    *hostBufferSizeFrames = intendedUserFramesPerBuffer
+        + max( intendedUserFramesPerBuffer + pollingJitterFrames, targetBufferingLatencyFrames );
 }
 
 
