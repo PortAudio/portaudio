@@ -1725,7 +1725,7 @@ error:
 
 static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
                                     unsigned long *pollingPeriodFrames,
-                                    int isFullDuplex,
+                                    int hasInput, int hasOutput,
                                     unsigned long suggestedInputLatencyFrames,
                                     unsigned long suggestedOutputLatencyFrames,
                                     double sampleRate, unsigned long userFramesPerBuffer )
@@ -1735,7 +1735,7 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
     unsigned long pollingJitterFrames = (unsigned long)(sampleRate * PA_DS_POLLING_JITTER_SECONDS);
 
     unsigned long adjustedSuggestedOutputLatencyFrames = suggestedOutputLatencyFrames;
-    if( userFramesPerBuffer != paFramesPerBufferUnspecified && isFullDuplex )
+    if( userFramesPerBuffer != paFramesPerBufferUnspecified && hasInput && hasOutput )
     {
         /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
            extra fixed latency. so we subtract it here as a fixed latency before computing
@@ -1757,6 +1757,21 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
             userFramesPerBuffer;
     *hostBufferSizeFrames = intendedUserFramesPerBuffer
         + max( intendedUserFramesPerBuffer + pollingJitterFrames, targetBufferingLatencyFrames );
+
+    /* In some (most?) systems, DirectSound has an odd limitation where it always uses
+       a fixed 31.25 ms granularity for the read cursor, regardless of parameters.
+       This in turn means that if we allocate an input buffer that is less than 31.25 ms,
+       the read cursor will stay stuck at zero. See https://github.com/PortAudio/portaudio/issues/775
+       To work around this problem, ensure that the input host buffer is large enough
+       for at least two 31.25 ms buffer "halves".
+
+       On pre-Vista Windows, we don't do this because DirectSound is implemented very
+       differently, and is therefore unlikely to suffer from the same issue.
+    */
+    if( hasInput && PaWinUtil_GetOsVersion() >= paOsVersionWindowsVistaServer2008 )
+    {
+        *hostBufferSizeFrames = max( *hostBufferSizeFrames, 2 * 0.03125 * sampleRate );
+    }
 }
 
 
@@ -2086,7 +2101,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         else
         {
             CalculateBufferSettings( (unsigned long*)&stream->hostBufferSizeFrames, &pollingPeriodFrames,
-                    /* isFullDuplex = */ (inputParameters && outputParameters),
+                    /* hasInput = */ !!inputParameters,
+                    /* hasOutput = */ !!outputParameters,
                     suggestedInputLatencyFrames,
                     suggestedOutputLatencyFrames,
                     sampleRate, framesPerBuffer );
