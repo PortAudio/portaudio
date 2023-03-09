@@ -6587,12 +6587,11 @@ static PaError PaPinCaptureEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, 
     PaWinWdmIOInfo* pCapture = &pInfo->stream->capture;
     const unsigned halfInputBuffer = pCapture->hostBufferSize >> 1;
     PaWinWdmPin* pin = pCapture->pPin;
-    DATAPACKET* packet = 0;
 
     /* Get hold of current ADC position */
     pin->fnAudioPosition(pin, &pos);
     pos %= pCapture->hostBufferSize;
-    pos &= ~(pCapture->bytesPerFrame - 1);
+    pos -= pos % pCapture->bytesPerFrame;
 
     /* Call barrier (or dummy) */
     pin->fnMemBarrier();
