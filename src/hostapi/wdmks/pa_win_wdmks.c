@@ -2336,6 +2336,8 @@ static PaError PinGetBufferWithNotification(PaWinWdmPin* pPin, void** pBuffer, D
 
     propIn.BaseAddress = 0;
     propIn.NotificationCount = 2;
+    /* Note RequestedBufferSize must be >0, otherwise the Ioctl will fail.
+     * See https://github.com/PortAudio/portaudio/issues/761 */
     propIn.RequestedBufferSize = *pRequestedBufSize;
     propIn.Property.Set = KSPROPSETID_RtAudio;
     propIn.Property.Id = KSPROPERTY_RTAUDIO_BUFFER_WITH_NOTIFICATION;
@@ -2372,6 +2374,8 @@ static PaError PinGetBufferWithoutNotification(PaWinWdmPin* pPin, void** pBuffer
     PA_LOGE_;
 
     propIn.BaseAddress = NULL;
+    /* Note RequestedBufferSize must be >0, otherwise the Ioctl will fail.
+     * See https://github.com/PortAudio/portaudio/issues/761 */
     propIn.RequestedBufferSize = *pRequestedBufSize;
     propIn.Property.Set = KSPROPSETID_RtAudio;
     propIn.Property.Id = KSPROPERTY_RTAUDIO_BUFFER;
@@ -4734,6 +4738,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         {
             stream->capture.framesPerBuffer = stream->capture.pPin->frameSize;
         }
+
+        if(stream->capture.framesPerBuffer == 0) {
+            /* WaveRT devices will reject a zero RequestedBufferSize.
+             * See https://github.com/PortAudio/portaudio/issues/761 */
+            stream->capture.framesPerBuffer = 1;
+        }
+
         PA_DEBUG(("Input frames chosen:%ld\n",stream->capture.framesPerBuffer));
 
         /* Setup number of packets to use */
@@ -4763,6 +4774,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         {
             stream->render.framesPerBuffer = stream->render.pPin->frameSize;
         }
+
+        if(stream->render.framesPerBuffer == 0) {
+            /* WaveRT devices will reject a zero RequestedBufferSize.
+             * See https://github.com/PortAudio/portaudio/issues/761 */
+            stream->render.framesPerBuffer = 1;
+        }
+
         PA_DEBUG(("Output frames chosen:%ld\n",stream->render.framesPerBuffer));
 
         /* Setup number of packets to use */
