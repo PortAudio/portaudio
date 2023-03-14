@@ -1,7 +1,7 @@
 /*
  * Portable Audio I/O Library WASAPI implementation
  * Copyright (c) 2006-2010 David Viens
- * Copyright (c) 2010-2022 Dmitry Kostjuchenko
+ * Copyright (c) 2010-2023 Dmitry Kostjuchenko
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2019 Ross Bencina, Phil Burk
@@ -597,7 +597,6 @@ typedef struct PaWasapiStream
     IStream                   *captureClientStream;
 #endif
     IAudioCaptureClient       *captureClient;
-    IAudioEndpointVolume      *inVol;
 
     // output
     PaWasapiSubStream          out;
@@ -606,7 +605,6 @@ typedef struct PaWasapiStream
     IStream                   *renderClientStream;
 #endif
     IAudioRenderClient        *renderClient;
-    IAudioEndpointVolume      *outVol;
 
     // Event handles for event-driven processing mode
     HANDLE event[S_COUNT];
@@ -3347,11 +3345,14 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
 }
 
 // ------------------------------------------------------------------------------------------
-static PaUint32 _GetFramesPerHostBuffer(PaUint32 userFramesPerBuffer, PaTime suggestedLatency, double sampleRate, PaUint32 TimerJitterMs)
+static UINT32 _CalculateFramesPerHostBuffer(UINT32 userFramesPerBuffer, PaTime suggestedLatency, double sampleRate)
 {
-    PaUint32 frames = userFramesPerBuffer + max( userFramesPerBuffer, (PaUint32)(suggestedLatency * sampleRate) );
-    frames += (PaUint32)((sampleRate * 0.001) * TimerJitterMs);
-    return frames;
+    // Note: WASAPI tends to enforce double buffering by itself therefore enforcing double buffering
+    // on PA side looks as an excessive measure.
+    const BOOL doubleBuffering = TRUE;
+
+    return userFramesPerBuffer + max((doubleBuffering ? userFramesPerBuffer : 0),
+        (UINT32)(suggestedLatency * sampleRate));
 }
 
 // ------------------------------------------------------------------------------------------
@@ -3366,7 +3367,7 @@ static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPe
     // Determine number of buffers used:
     // - Full-duplex mode will lead to period difference, thus only 1
     // - Input mode, only 1, as WASAPI allows extraction of only 1 packet
-    // - For Shared mode we use double buffering
+    // - For Shared mode we use double buffering (see _CalculateFramesPerHostBuffer)
     if ((sub->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE) || fullDuplex)
     {
         BOOL eventMode = ((sub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == AUDCLNT_STREAMFLAGS_EVENTCALLBACK);
@@ -3374,7 +3375,7 @@ static void _RecalculateBuffersCount(PaWasapiSubStream *sub, UINT32 userFramesPe
         // Exclusive mode does not allow >1 buffers be used for Event interface, e.g. GetBuffer
         // call must acquire max buffer size and it all must be processed.
         if (eventMode)
-            sub->userBufferAndHostMatch = 1;
+            sub->userBufferAndHostMatch = TRUE;
 
         // Full-duplex or Event mode: prefer paUtilBoundedHostBufferSize because exclusive mode will starve
         // and produce glitchy audio
@@ -3511,9 +3512,8 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
     if ((pSub->shareMode != AUDCLNT_SHAREMODE_EXCLUSIVE) &&
         (!pSub->streamFlags || ((pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK) == 0)))
     {
-        framesPerLatency = _GetFramesPerHostBuffer(userFramesPerBuffer,
-            params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
-            (pSub->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
+        framesPerLatency = _CalculateFramesPerHostBuffer(userFramesPerBuffer, params->suggestedLatency,
+            pSub->wavex.Format.nSamplesPerSec);
     }
     else
     {
@@ -3530,9 +3530,8 @@ static HRESULT CreateAudioClient(PaWasapiStream *pStream, PaWasapiSubStream *pSu
         overall = MakeHnsPeriod(framesPerLatency, pSub->wavex.Format.nSamplesPerSec);
         if (overall >= (106667 * 2)/*21.33ms*/)
         {
-            framesPerLatency = _GetFramesPerHostBuffer(userFramesPerBuffer,
-                params->suggestedLatency, pSub->wavex.Format.nSamplesPerSec, 0/*,
-                (streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? 0 : 1)*/);
+            framesPerLatency = _CalculateFramesPerHostBuffer(userFramesPerBuffer, params->suggestedLatency,
+                pSub->wavex.Format.nSamplesPerSec);
 
             // Use Polling interface
             pSub->streamFlags &= ~AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -3796,32 +3795,24 @@ done:
 }
 
 // ------------------------------------------------------------------------------------------
-static PaError ActivateAudioClientOutput(PaWasapiStream *stream)
+static PaError ActivateAudioClient(PaWasapiStream *stream, BOOL output)
 {
     HRESULT hr;
     PaError result;
     UINT32 maxBufferSize;
     PaTime bufferLatency;
-    const UINT32 framesPerBuffer = stream->out.params.frames_per_buffer;
+    PaWasapiSubStream *subStream = (output ? &stream->out : &stream->in);
 
     // Create Audio client
-    if (FAILED(hr = CreateAudioClient(stream, &stream->out, TRUE, &result)))
+    if (FAILED(hr = CreateAudioClient(stream, subStream, output, &result)))
     {
         LogPaError(result);
         goto error;
     }
-    LogWAVEFORMATEXTENSIBLE(&stream->out.wavex);
-
-    // Activate volume
-    stream->outVol = NULL;
-    /*hr = info->device->Activate(
-        __uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL,
-        (void**)&stream->outVol);
-    if (hr != S_OK)
-        return paInvalidDevice;*/
+    LogWAVEFORMATEXTENSIBLE(&subStream->wavex);
 
     // Get max possible buffer size to check if it is not less than that we request
-    if (FAILED(hr = IAudioClient_GetBufferSize(stream->out.clientParent, &maxBufferSize)))
+    if (FAILED(hr = IAudioClient_GetBufferSize(subStream->clientParent, &maxBufferSize)))
     {
         LogHostError(hr);
         LogPaError(result = paInvalidDevice);
@@ -3829,90 +3820,39 @@ static PaError ActivateAudioClientOutput(PaWasapiStream *stream)
     }
 
     // Correct buffer to max size if it maxed out result of GetBufferSize
-    stream->out.bufferSize = maxBufferSize;
+    subStream->bufferSize = maxBufferSize;
+
+    if (!output)
+    {
+        // Get interface latency (actually unneeded as we calculate latency from the size of maxBufferSize)
+        if (FAILED(hr = IAudioClient_GetStreamLatency(stream->in.clientParent, &stream->in.deviceLatency)))
+        {
+            LogHostError(hr);
+            LogPaError(result = paInvalidDevice);
+            goto error;
+        }
+        //stream->in.latencySeconds = nano100ToSeconds(stream->in.deviceLatency);
+    }
 
     // Number of frames that are required at each period
-    stream->out.framesPerHostCallback = maxBufferSize;
+    subStream->framesPerHostCallback = maxBufferSize;
 
     // Calculate frames per single buffer, if buffers > 1 then always framesPerBuffer
-    stream->out.framesPerBuffer =
-        (stream->out.userBufferAndHostMatch ? stream->out.framesPerHostCallback : framesPerBuffer);
+    subStream->framesPerBuffer = (subStream->userBufferAndHostMatch ?
+        subStream->framesPerHostCallback : subStream->params.frames_per_buffer);
 
     // Calculate buffer latency
-    bufferLatency = (PaTime)maxBufferSize / stream->out.wavex.Format.nSamplesPerSec;
+    bufferLatency = (PaTime)maxBufferSize / subStream->wavex.Format.nSamplesPerSec;
 
     // Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
-    stream->out.latencySeconds = bufferLatency;
+    subStream->latencySeconds = bufferLatency;
 
-    PRINT(("WASAPI::OpenStream(output): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ] mode[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->out.framesPerHostCallback, (float)(stream->out.latencySeconds*1000.0f), (stream->out.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (stream->out.params.wow64_workaround ? "YES" : "NO"), (stream->out.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? "EVENT" : "POLL")));
-
-    return paNoError;
-
-error:
-
-    return result;
-}
-
-// ------------------------------------------------------------------------------------------
-static PaError ActivateAudioClientInput(PaWasapiStream *stream)
-{
-    HRESULT hr;
-    PaError result;
-    UINT32 maxBufferSize;
-    PaTime bufferLatency;
-    const UINT32 framesPerBuffer = stream->in.params.frames_per_buffer;
-
-    // Create Audio client
-    if (FAILED(hr = CreateAudioClient(stream, &stream->in, FALSE, &result)))
-    {
-        LogPaError(result);
-        goto error;
-    }
-    LogWAVEFORMATEXTENSIBLE(&stream->in.wavex);
-
-    // Create volume mgr
-    stream->inVol = NULL;
-    /*hr = info->device->Activate(
-        __uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL,
-        (void**)&stream->inVol);
-    if (hr != S_OK)
-        return paInvalidDevice;*/
-
-    // Get max possible buffer size to check if it is not less than that we request
-    if (FAILED(hr = IAudioClient_GetBufferSize(stream->in.clientParent, &maxBufferSize)))
-    {
-        LogHostError(hr);
-        LogPaError(result = paInvalidDevice);
-        goto error;
-    }
-
-    // Correct buffer to max size if it maxed out result of GetBufferSize
-    stream->in.bufferSize = maxBufferSize;
-
-    // Get interface latency (actually unneeded as we calculate latency from the size
-    // of maxBufferSize).
-    if (FAILED(hr = IAudioClient_GetStreamLatency(stream->in.clientParent, &stream->in.deviceLatency)))
-    {
-        LogHostError(hr);
-        LogPaError(result = paInvalidDevice);
-        goto error;
-    }
-    //stream->in.latencySeconds = nano100ToSeconds(stream->in.deviceLatency);
-
-    // Number of frames that are required at each period
-    stream->in.framesPerHostCallback = maxBufferSize;
-
-    // Calculate frames per single buffer, if buffers > 1 then always framesPerBuffer
-    stream->in.framesPerBuffer =
-        (stream->in.userBufferAndHostMatch ? stream->in.framesPerHostCallback : framesPerBuffer);
-
-    // Calculate buffer latency
-    bufferLatency = (PaTime)maxBufferSize / stream->in.wavex.Format.nSamplesPerSec;
-
-    // Append buffer latency to interface latency in shared mode (see GetStreamLatency notes)
-    stream->in.latencySeconds = bufferLatency;
-
-    PRINT(("WASAPI::OpenStream(input): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ] mode[ %s ]\n", (UINT32)framesPerBuffer, (UINT32)stream->in.framesPerHostCallback, (float)(stream->in.latencySeconds*1000.0f), (stream->in.shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"), (stream->in.params.wow64_workaround ? "YES" : "NO"), (stream->in.streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? "EVENT" : "POLL")));
+    PRINT(("WASAPI::OpenStream(%s): framesPerUser[ %d ] framesPerHost[ %d ] latency[ %.02fms ] exclusive[ %s ] wow64_fix[ %s ] mode[ %s ]\n",
+        (output ? "output" : "input"),
+        subStream->params.frames_per_buffer, subStream->framesPerHostCallback, (subStream->latencySeconds * 1000),
+        (subStream->shareMode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "YES" : "NO"),
+        (subStream->params.wow64_workaround ? "YES" : "NO"),
+        (subStream->streamFlags & AUDCLNT_STREAMFLAGS_EVENTCALLBACK ? "EVENT" : "POLL")));
 
     return paNoError;
 
@@ -4068,7 +4008,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->in.params.wow64_workaround  = paWasapi->useWOW64Workaround;
 
         // Create and activate audio client
-        if ((result = ActivateAudioClientInput(stream)) != paNoError)
+        if ((result = ActivateAudioClient(stream, FALSE)) != paNoError)
         {
             LogPaError(result);
             goto error;
@@ -4201,7 +4141,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->out.params.wow64_workaround  = paWasapi->useWOW64Workaround;
 
         // Create and activate audio client
-        if ((result = ActivateAudioClientOutput(stream)) != paNoError)
+        if ((result = ActivateAudioClient(stream, TRUE)) != paNoError)
         {
             LogPaError(result);
             goto error;
@@ -4378,8 +4318,6 @@ static PaError CloseStream( PaStream* s )
     SAFE_RELEASE(stream->renderClientParent);
     SAFE_RELEASE(stream->out.clientParent);
     SAFE_RELEASE(stream->in.clientParent);
-    SAFE_RELEASE(stream->inVol);
-    SAFE_RELEASE(stream->outVol);
 
     CloseHandle(stream->event[S_INPUT]);
     CloseHandle(stream->event[S_OUTPUT]);
