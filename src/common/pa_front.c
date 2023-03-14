@@ -67,6 +67,7 @@
 #include <string.h>
 #include <stdlib.h> /* needed for strtol() */
 #include <assert.h> /* needed by PA_VALIDATE_ENDIANNESS */
+#include <stdbool.h>
 
 #include "portaudio.h"
 #include "pa_util.h"
@@ -154,6 +155,7 @@ static PaUtilHostApiRepresentation **hostApis_ = 0;
 static int hostApisCount_ = 0;
 static int defaultHostApiIndex_ = 0;
 static int initializationCount_ = 0;
+static bool initializing_ = false;
 static int deviceCount_ = 0;
 
 PaUtilStreamRepresentation *firstOpenStream_ = NULL;
@@ -360,8 +362,19 @@ PaError Pa_Initialize( void )
         ++initializationCount_;
         result = paNoError;
     }
+    else if( initializing_ )
+    {
+        // a concurrent initialization is already running
+        result = paInternalError;
+    }
     else
     {
+        // set initializing_ here to
+        // let recursive calls execute the if branch above.
+        // This can happen if a driver like FlexAsio itself uses portaudio
+        // and avoids a stack overflow in the user application.
+        initializing_ = true;
+
         PA_VALIDATE_TYPE_SIZES;
         PA_VALIDATE_ENDIANNESS;
 
@@ -371,6 +384,8 @@ PaError Pa_Initialize( void )
         result = InitializeHostApis();
         if( result == paNoError )
             ++initializationCount_;
+
+        initializing_ = false;
     }
 
     PA_LOGAPI_EXIT_PAERROR( "Pa_Initialize", result );
