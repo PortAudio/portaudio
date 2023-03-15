@@ -374,6 +374,7 @@ PaError Pa_Initialize( void )
         // let recursive calls execute the if branch above.
         // This can happen if a driver like FlexAsio itself uses portaudio
         // and avoids a stack overflow in the user application.
+        // https://github.com/PortAudio/portaudio/issues/766
         initializing_ = true;
 
         PA_VALIDATE_TYPE_SIZES;
