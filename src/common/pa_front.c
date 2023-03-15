@@ -365,6 +365,7 @@ PaError Pa_Initialize( void )
     else if( initializing_ )
     {
         // a concurrent initialization is already running
+        PA_DEBUG(("Attempting to re-enter Pa_Initialize(), aborting!\n"));
         result = paInternalError;
     }
     else
