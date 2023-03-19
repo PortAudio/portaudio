@@ -935,13 +935,20 @@ static void Int32_To_Int24_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    (void) destinationBuffer; /* unused parameters */
-    (void) destinationStride; /* unused parameters */
-    (void) sourceBuffer; /* unused parameters */
-    (void) sourceStride; /* unused parameters */
-    (void) count; /* unused parameters */
     (void) ditherGenerator; /* unused parameters */
-    /* IMPLEMENT ME */
+
+    PaInt32 *src = (PaInt32*)sourceBuffer;
+    signed char *dest = (signed char*)destinationBuffer;
+    PaInt32 dither;
+
+    while ( count-- )
+    {
+        dither = PaUtil_Generate16BitTriangularDither(ditherGenerator);
+        *dest = (signed char) ((((*src) >> 1) + dither) >> 7);
+        
+        src += sourceStride;
+        dest += destinationStride;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
