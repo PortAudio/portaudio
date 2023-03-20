@@ -943,6 +943,7 @@ static void Int32_To_Int24_Dither(
 
     while ( count-- )
     {
+        /* REVIEW */
         dither = PaUtil_Generate16BitTriangularDither(ditherGenerator);
         *dest = (signed char) ((((*src) >> 1) + dither) >> 7);
         
