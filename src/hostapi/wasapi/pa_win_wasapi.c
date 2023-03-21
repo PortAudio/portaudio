@@ -623,7 +623,7 @@ typedef struct PaWasapiStream
     volatile BOOL isActive;
 
     // Stream state: stopped (triggered by user only via external API)
-    volatile BOOL isStopped;
+    BOOL isStopped;
 
     PA_THREAD_ID dwThreadId;
     HANDLE hThread;
