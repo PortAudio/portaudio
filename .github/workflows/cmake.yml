@@ -116,7 +116,7 @@ jobs:
       run: cmake --build build --config ${{ env.cmake_build_type }} --parallel 2
     - name: install
       run: cmake --install build --config ${{ env.cmake_build_type }}
-    - name: "test configure"
+    - name: "configure build-test"
       run: cmake
           -S ./test/test_use_cmake -B build-test
           -G "${{ matrix.cmake_generator }}"
@@ -125,7 +125,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
           -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
           ${{ matrix.cmake_options }}
-    - name: "test build"
+    - name: "build build-test"
       run: cmake --build build-test --config ${{ env.cmake_build_type }}      
     - name: "Upload GitHub Actions artifacts"
       uses: actions/upload-artifact@v2
