@@ -84,11 +84,11 @@ typedef enum PaWasapiFlags
        only applies in Shared mode. */
     paWinWasapiAutoConvert              = (1 << 6),
 
-    /* force data output to match AC3 passthrough mode */
-    paWinWasapiMatchAc3                 = (1 << 7),
+    /* force data output to AC3 passthrough mode */
+    paWinWasapiAc3Passthrough           = (1 << 7),
 
-    /* force data output to match E-AC3 passthrough mode */
-    paWinWasapiMatchEac3                = (1 << 8)
+    /* force data output to E-AC3 passthrough mode */
+    paWinWasapiEac3Passthrough          = (1 << 8)
 }
 PaWasapiFlags;
 #define paWinWasapiExclusive             (paWinWasapiExclusive)
@@ -98,8 +98,8 @@ PaWasapiFlags;
 #define paWinWasapiThreadPriority        (paWinWasapiThreadPriority)
 #define paWinWasapiExplicitSampleFormat  (paWinWasapiExplicitSampleFormat)
 #define paWinWasapiAutoConvert           (paWinWasapiAutoConvert)
-#define paWinWasapiMatchAc3              (paWinWasapiMatchAc3)
-#define paWinWasapiMatchEac3             (paWinWasapiMatchEac3)
+#define paWinWasapiAc3Passthrough        (paWinWasapiAc3Passthrough)
+#define paWinWasapiEac3Passthrough       (paWinWasapiEac3Passthrough)
 
 
 /* Stream state.

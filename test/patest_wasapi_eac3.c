@@ -1,14 +1,14 @@
-/** @file paex_wmme_ac3.c
+/** @file patest_wasapi_eac3.c
     @ingroup examples_src
-    @brief Use WMME-specific interface to send raw AC3 data to a S/PDIF output.
-    @author Ross Bencina <rossb@audiomulch.com>
+    @brief Use WASAPI-specific interface to send raw EAC3 data to a S/PDIF output.
+    @author Ross Bencina <rossb@audiomulch.com>, Jie Ding <gabys999@gmail.com>
 */
 /*
  * $Id: $
  * Portable Audio I/O Library
- * Windows MME ac3 sound output test
+ * WASAPI eac3 sound output test
  *
- * Copyright (c) 2009 Ross Bencina
+ * Copyright (c) 2009-2023 Ross Bencina, Jie Ding
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -42,10 +42,8 @@
  */
 
 #include <stdio.h>
-#include <math.h>
 
-#include <windows.h>    /* required when using pa_win_wmme.h */
-#include <mmsystem.h>   /* required when using pa_win_wmme.h */
+#include <windows.h>    /* required when using pa_win_wasapi.h */
 
 #include "portaudio.h"
 #include "pa_win_wasapi.h"
@@ -53,16 +51,9 @@
 #define NUM_SECONDS         (200)
 #define SAMPLE_RATE         (48000)
 #define FRAMES_PER_BUFFER   (64)
-
-#ifndef M_PI
-#define M_PI  (3.14159265)
-#endif
-
-#define TABLE_SIZE          (100)
-
 #define CHANNEL_COUNT       (2)
 
-
+#define EAC3_FILEPATH        "./test_48k.eac3.spdif"
 
 typedef struct
 {
@@ -115,7 +106,7 @@ int main(int argc, char* argv[])
     paTestData data;
     int deviceIndex;
     FILE *fp;
-    const char *fileName = "d:\\test_48k.eac3.spdif";
+    const char *fileName = EAC3_FILEPATH;
     data.buffer = NULL;
 
     if( argc >= 2 )
@@ -165,7 +156,7 @@ int main(int argc, char* argv[])
     wasapiStreamInfo.size = sizeof(PaWasapiStreamInfo);
     wasapiStreamInfo.hostApiType = paWASAPI;
     wasapiStreamInfo.version = 1;
-    wasapiStreamInfo.flags = paWinWasapiExclusive | paWinWasapiUseChannelMask | paWinWasapiMatchEac3;
+    wasapiStreamInfo.flags = paWinWasapiExclusive | paWinWasapiUseChannelMask | paWinWasapiEac3Passthrough;
     wasapiStreamInfo.channelMask = PAWIN_SPEAKER_5POINT1;
     outputParameters.hostApiSpecificStreamInfo = &wasapiStreamInfo;
 

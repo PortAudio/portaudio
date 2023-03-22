@@ -2936,7 +2936,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
     PaWasapiStreamInfo *streamInfo = (PaWasapiStreamInfo *)params->hostApiSpecificStreamInfo;
     WAVEFORMATEXTENSIBLE *wavex = (WAVEFORMATEXTENSIBLE *)wavexu;
     WAVEFORMATEXTENSIBLE_IEC61937 *wavex_61937 = (WAVEFORMATEXTENSIBLE_IEC61937 *)wavexu;
-    BOOL matchEac3 = FALSE, matchAc3 = FALSE;
+    BOOL isEac3Passthrough = FALSE, isAc3Passthrough = FALSE;
 
     // Convert PaSampleFormat to valid data bits
     if ((bitsPerSample = PaSampleFormatToBitsPerSample(params->sampleFormat)) == 0)
@@ -2949,21 +2949,21 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
         useExtensible = TRUE;
     }
 
-    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiMatchAc3))
+    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiAc3Passthrough))
     {
-        matchAc3 = TRUE;
+        isAc3Passthrough = TRUE;
     }
 
-    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiMatchEac3))
+    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiEac3Passthrough))
     {
-        matchEac3 = TRUE;
+        isEac3Passthrough = TRUE;
     }
 
     memset(wavex, 0, sizeof(*wavex));
 
     old                    = (WAVEFORMATEX *)wavex;
     old->nChannels      = (WORD)params->channelCount;
-    old->nSamplesPerSec = matchEac3 ? PA_WASAPI_EAC3_SAMPLES_PER_SEC_ : (DWORD)sampleRate;
+    old->nSamplesPerSec = isEac3Passthrough ? PA_WASAPI_EAC3_SAMPLES_PER_SEC_ : (DWORD)sampleRate;
     old->wBitsPerSample = bitsPerSample;
 
     // according to MSDN for WAVEFORMATEX structure for WAVE_FORMAT_PCM:
@@ -2985,13 +2985,15 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
     else
     {
         old->wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-        old->cbSize     = matchEac3 ? sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX) : sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+        old->cbSize     = isEac3Passthrough 
+                          ? sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX) 
+                          : sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
 
-        if (matchAc3)
+        if (isAc3Passthrough)
         {
             wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL;
         }
-        else if (matchEac3)
+        else if (isEac3Passthrough)
         {
             wavex->SubFormat                    = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS;
             wavex_61937->dwEncodedSamplesPerSec = (DWORD)sampleRate;
