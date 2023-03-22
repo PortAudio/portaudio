@@ -1,5 +1,5 @@
 /** @file patest_wasapi_eac3.c
-    @ingroup examples_src
+    @ingroup test_src
     @brief Use WASAPI-specific interface to send raw EAC3 data to a S/PDIF output.
     @author Ross Bencina <rossb@audiomulch.com>, Jie Ding <gabys999@gmail.com>
 */
