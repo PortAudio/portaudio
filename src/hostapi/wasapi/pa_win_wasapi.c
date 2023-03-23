@@ -2985,8 +2985,8 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
     else
     {
         old->wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-        old->cbSize     = isEac3Passthrough 
-                          ? sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX) 
+        old->cbSize     = isEac3Passthrough
+                          ? sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX)
                           : sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
 
         if (isAc3Passthrough)
