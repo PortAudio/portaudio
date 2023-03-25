@@ -144,7 +144,7 @@ fi
 have_libossaudio=no
 have_oss=no
 if test "x$with_oss" != "xno"; then
-    AC_CHECK_HEADERS([sys/soundcard.h linux/soundcard.h machine/soundcard.h], [have_oss=yes])
+    AC_CHECK_HEADERS([sys/soundcard.h], [have_oss=yes])
     if test "x$have_oss" = "xyes"; then
         AC_CHECK_LIB(ossaudio, _oss_ioctl, have_libossaudio=yes, have_libossaudio=no)
     fi
