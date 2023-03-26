@@ -72,4 +72,3 @@ static int gNumFailed = 0;
     } while(0)
 
 #endif /* PORTAUDIO_QA_PAQA_TOOLS_H */
-
