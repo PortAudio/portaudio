@@ -365,7 +365,7 @@ int main(void)
 
     printf("-----------------------------\n");
     printf("paqa_errs - PortAudio QA test\n");
-    EXPECT(((result = Pa_Initialize()) == paNoError));
+    ASSERT_EQ(paNoError, (result = Pa_Initialize()));
     TestBadOpens();
     TestBadActions();
 error:
