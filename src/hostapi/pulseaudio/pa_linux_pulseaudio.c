@@ -113,7 +113,6 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 
         return -1;
     }
-
     return 0;
 }
 
@@ -145,6 +144,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
                                           "PaPulseAudio_HostApiRepresentation: Can't allocate PulseAudio mainloop");
         goto fail;
     }
+
+    ptr->mainloopApi = pa_threaded_mainloop_get_api(ptr->mainloop);
 
     /* Use program name as PulseAudio device name */
     snprintf( l_strDeviceName, PAPULSEAUDIO_MAX_DEVICENAME, "%s", __progname );
@@ -201,11 +202,21 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
     {
         pa_context_disconnect( ptr->context );
         pa_context_unref( ptr->context );
+        ptr->context = NULL;
     }
+
+    if( ptr->mainloopApi && ptr->timeEvent )
+    {
+        ptr->mainloopApi->time_free( ptr->timeEvent );
+        ptr->mainloopApi = NULL;
+        ptr->timeEvent = NULL;
+    }
+
 
     if( ptr->mainloop )
     {
         pa_threaded_mainloop_free( ptr->mainloop );
+        ptr->mainloop = NULL;
     }
 
     PaUtil_FreeMemory( ptr );
@@ -470,11 +481,11 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
     }
 }
 
-void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
+void PaPulseAudio_StreamUnderflowCb( pa_stream *s,
                                      void *userdata )
 {
     PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) userdata;
-
+    pa_buffer_attr *l_OutSampleSpec = NULL;
 
     /* If this is null we have big problems and we probably are out of memory */
     if( !s )
@@ -485,8 +496,8 @@ void PaPulseAudio_StreamUnderflowCb( pa_stream * s,
     }
 
     stream->outputUnderflows++;
-
-    PA_DEBUG( ("Portaudio %s: PulseAudio playback stream has underflowed\n", __FUNCTION__) );
+    l_OutSampleSpec = (pa_buffer_attr *)pa_stream_get_buffer_attr(s);
+    PA_DEBUG( ("Portaudio %s: PulseAudio '%s' with delay: %ld stream has underflowed\n", __FUNCTION__, pa_stream_get_device_name(s), l_OutSampleSpec->tlength) );
 
     PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                        "PaPulseAudio_StreamUnderflowCb: Pulseaudio stream underflow");
@@ -1337,20 +1348,32 @@ PaTime GetStreamTime( PaStream * s )
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi = stream->hostapi;
     pa_usec_t l_lUSec = 0;
     pa_operation *l_ptrOperation;
+    PaStreamCallbackTimeInfo timeInfo = { 0, 0, 0 };
 
     PaPulseAudio_Lock( l_ptrPulseAudioHostApi->mainloop );
 
-    if( pa_stream_get_time( stream->outStream, &stream->outStreamTime ) !=
-        -PA_ERR_NODATA )
+    if( stream->outStream )
     {
+        if( PaPulseAudio_updateTimeInfo( stream->outStream,
+                                     &timeInfo,
+                                     0 ) == -PA_ERR_NODATA )
+        {
+            return 0;
+        }
     }
-    else
+
+    if( stream->inStream )
     {
-        stream->outStreamTime = 0;
+        if( PaPulseAudio_updateTimeInfo( stream->inStream,
+                                     &timeInfo,
+                                     1 )  == -PA_ERR_NODATA )
+        {
+            return 0;
+        }
     }
 
     PaPulseAudio_UnLock( l_ptrPulseAudioHostApi->mainloop );
-    return ((float) stream->outStreamTime / (float) 1000000);
+    return timeInfo.currentTime;
 }
 
 

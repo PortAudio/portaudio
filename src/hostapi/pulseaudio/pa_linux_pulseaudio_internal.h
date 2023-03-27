@@ -74,7 +74,7 @@ extern "C"
 /* Just chosen by hand from mistake and success method. Nothing really groudbreaking
    If there is better number with better explantion then I'll be glad to change this
    @todo change this to something more sophisticated */
-#define PULSEAUDIO_TIME_EVENT_USEC 50000
+#define PULSEAUDIO_TIME_EVENT_USEC 750
 
 #define PAPULSEAUDIO_MAX_DEVICECOUNT 1024
 #define PAPULSEAUDIO_MAX_DEVICENAME 1024
@@ -100,6 +100,7 @@ typedef struct
 
     /* PulseAudio stuff goes here */
     pa_threaded_mainloop *mainloop;
+    pa_mainloop_api *mainloopApi;
     pa_context *context;
     int deviceCount;
     pa_time_event *timeEvent;
@@ -117,12 +118,12 @@ typedef struct PaPulseAudio_Stream
 
     unsigned long framesPerHostCallback;
     pa_threaded_mainloop *mainloop;
+    pa_time_event *timeEvent;
     pa_context *context;
     pa_sample_spec outSampleSpec;
     pa_sample_spec inSampleSpec;
     pa_stream *outStream;
     pa_stream *inStream;
-    pa_usec_t outStreamTime;
     pa_buffer_attr outBufferAttr;
     pa_buffer_attr inBufferAttr;
     int outputUnderflows;
@@ -130,8 +131,8 @@ typedef struct PaPulseAudio_Stream
     int outputChannelCount;
     int inputChannelCount;
 
-    long maxFramesPerBuffer;
-    long maxFramesHostPerBuffer;
+    size_t maxFramesPerBuffer;
+    size_t maxFramesHostPerBuffer;
     int outputFrameSize;
     int inputFrameSize;
 
@@ -143,6 +144,8 @@ typedef struct PaPulseAudio_Stream
 
     PaUtilRingBuffer inputRing;
     PaUtilRingBuffer outputRing;
+
+    size_t missedBytes;
 
     /* Used in communication between threads */
     volatile sig_atomic_t isActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
