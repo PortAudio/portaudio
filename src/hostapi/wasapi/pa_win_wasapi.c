@@ -1007,6 +1007,18 @@ static PaSampleFormat GetSampleFormatForIO(PaSampleFormat format_id)
 }
 
 // ------------------------------------------------------------------------------------------
+// Get number of bits set
+static UINT32 PopCount(UINT32 value)
+{
+    UINT32 count = 0, i;
+
+    for (i = 0; i < (sizeof(UINT32) * 8); ++i)
+        count += (value & (1 << i));
+
+    return count;
+}
+
+// ------------------------------------------------------------------------------------------
 // Converts Hns period into number of frames
 static UINT32 MakeFramesFromHns(REFERENCE_TIME hnsPeriod, UINT32 nSamplesPerSec)
 {
@@ -2961,7 +2973,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
 
     memset(wavex, 0, sizeof(*wavex));
 
-    old                    = (WAVEFORMATEX *)wavex;
+    old                 = (WAVEFORMATEX *)wavex;
     old->nChannels      = (WORD)params->channelCount;
     old->nSamplesPerSec = isEac3Passthrough ? PA_WASAPI_EAC3_SAMPLES_PER_SEC_ : (DWORD)sampleRate;
     old->wBitsPerSample = bitsPerSample;
@@ -2979,7 +2991,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
     // WAVEFORMATEX
     if (!useExtensible)
     {
-        old->wFormatTag    = WAVE_FORMAT_PCM;
+        old->wFormatTag = WAVE_FORMAT_PCM;
     }
     // WAVEFORMATEXTENSIBLE
     else
@@ -2997,7 +3009,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
         {
             wavex->SubFormat                    = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS;
             wavex_61937->dwEncodedSamplesPerSec = (DWORD)sampleRate;
-            wavex_61937->dwEncodedChannelCount  = 0;
+            wavex_61937->dwEncodedChannelCount  = PopCount(channelMask);
             wavex_61937->dwAverageBytesPerSec   = 0;
         }
         else if ((params->sampleFormat & ~paNonInterleaved) == paFloat32)
