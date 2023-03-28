@@ -15,6 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: configure
-      run: ./configure
+      run: ./configure CFLAGS=-Werror
     - name: make
-      run: make
+      run: make CFLAGS=-Werror
