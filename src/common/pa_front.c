@@ -365,7 +365,7 @@ PaError Pa_Initialize( void )
     {
         // a concurrent initialization is already running
         PA_DEBUG(("Attempting to re-enter Pa_Initialize(), aborting!\n"));
-        result = paInternalError;
+        result = paCanNotInitializeRecursively;
     }
     else
     {
@@ -469,6 +469,7 @@ const char *Pa_GetErrorText( PaError errorCode )
     case paCanNotWriteToAnInputOnlyStream:      result = "Can't write to an input only stream"; break;
     case paIncompatibleStreamHostApi: result = "Incompatible stream host API"; break;
     case paBadBufferPtr:             result = "Bad buffer pointer"; break;
+    case paCanNotInitializeRecursively: result = "PortAudio can not initialized recursively"; break;
     default:
         if( errorCode > 0 )
             result = "Invalid error code (value greater than zero)";
