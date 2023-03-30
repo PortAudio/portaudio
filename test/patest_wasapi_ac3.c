@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
     wasapiStreamInfo.hostApiType = paWASAPI;
     wasapiStreamInfo.version = 1;
     wasapiStreamInfo.flags = paWinWasapiExclusive | paWinWasapiUseChannelMask | paWinWasapiAc3Passthrough;
-    wasapiStreamInfo.channelMask = PAWIN_SPEAKER_STEREO;
+    wasapiStreamInfo.channelMask = PAWIN_SPEAKER_STEREO; /* Set channel mask for consistency with the SPDIFF data format, but it seems to work either way. */
     outputParameters.hostApiSpecificStreamInfo = &wasapiStreamInfo;
 
 
