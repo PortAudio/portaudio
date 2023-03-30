@@ -17,4 +17,4 @@ jobs:
     - name: configure
       run: ./configure CFLAGS=-Werror
     - name: make
-      run: make CFLAGS=-Werror
+      run: make
