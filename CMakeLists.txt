@@ -5,11 +5,18 @@ project(PortAudio VERSION 19.8)
 # General PortAudio stuff
 #
 
-option(BUILD_SHARED_LIBS "Build dynamic library" ON)
+option(PA_BUILD_SHARED_LIBS "Build dynamic library" ${BUILD_SHARED_LIBS})
 option(PA_BUILD_TESTS "Include test projects" OFF)
 option(PA_BUILD_EXAMPLES "Include example projects" OFF)
 
+if(PA_BUILD_SHARED_LIBS)
+  set(LIBRARY_BUILD_TYPE SHARED)
+else()
+  set(LIBRARY_BUILD_TYPE STATIC)
+endif()
+
 add_library(PortAudio
+  ${LIBRARY_BUILD_TYPE}
   src/common/pa_allocation.c
   src/common/pa_allocation.h
   src/common/pa_converters.c
@@ -65,7 +72,7 @@ else()
   target_compile_definitions(PortAudio PRIVATE PA_LITTLE_ENDIAN)
 endif()
 
-if(WIN32 AND MSVC AND BUILD_SHARED_LIBS
+if(WIN32 AND MSVC AND PA_BUILD_SHARED_LIBS
   # Check if the user is building PortAudio stand-alone or as part of a larger
   # project. If this is part of a larger project (i.e. the CMakeLists.txt has
   # been imported by some other CMakeLists.txt), we don't want to override
@@ -243,7 +250,7 @@ if(WIN32)
     target_compile_definitions(PortAudio PRIVATE PAWIN_USE_WDMKS_DEVICE_INFO)
   endif()
 
-  if(BUILD_SHARED_LIBS)
+  if(PA_BUILD_SHARED_LIBS)
     configure_file(cmake/portaudio.def.in "${CMAKE_CURRENT_BINARY_DIR}/portaudio.def" @ONLY)
     target_sources(PortAudio PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/portaudio.def")
   endif()
@@ -406,7 +413,7 @@ install(TARGETS PortAudio
 
 # Some of the tests and examples use private symbols which are not
 # exposed by the .def file on Windows.
-if(WIN32 AND BUILD_SHARED_LIBS)
+if(WIN32 AND PA_BUILD_SHARED_LIBS)
   set(LINK_PRIVATE_SYMBOLS OFF)
 else()
   set(LINK_PRIVATE_SYMBOLS ON)
