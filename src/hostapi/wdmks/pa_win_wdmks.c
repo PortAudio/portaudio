@@ -6600,31 +6600,46 @@ static PaError PaPinRenderSubmitHandler_WaveCyclic(PaProcessThreadInfo* pInfo, u
 static PaError PaPinCaptureEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, unsigned eventIndex)
 {
     unsigned long pos;
-    unsigned realInBuf;
-    unsigned frameCount;
+    unsigned frameCount = 0;
+    unsigned bytesToRead;
     PaWinWdmIOInfo* pCapture = &pInfo->stream->capture;
     const unsigned halfInputBuffer = pCapture->hostBufferSize >> 1;
     PaWinWdmPin* pin = pCapture->pPin;
-    DATAPACKET* packet = 0;
 
     /* Get hold of current ADC position */
     pin->fnAudioPosition(pin, &pos);
-    /* Wrap it (robi: why not use hw latency compensation here ?? because pos then gets _way_ off from
-    where it should be, i.e. at beginning or half buffer position. Why? No idea.)  */
-
     pos %= pCapture->hostBufferSize;
-    /* Then realInBuf will point to "other" half of double buffer */
-    realInBuf = pos < halfInputBuffer ? 1U : 0U;
-
-    packet = pInfo->stream->capture.packets + realInBuf;
+    pos -= pos % pCapture->bytesPerFrame;
 
     /* Call barrier (or dummy) */
     pin->fnMemBarrier();
 
-    /* Put it in queue */
-    frameCount = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer, packet->Header.Data, pCapture->framesPerBuffer);
-
-    pInfo->capturePackets[pInfo->captureHead & cPacketsArrayMask].packet = packet;
+    /* Read all the data available at ring host buffer and push to intermediate ring buffer "queue" */
+    bytesToRead = (pCapture->hostBufferSize + pos - pCapture->lastPosition) % pCapture->hostBufferSize;
+    if (bytesToRead > 0)
+    {
+        unsigned bytesToRead_Step1 = min(bytesToRead, pCapture->hostBufferSize - pCapture->lastPosition);
+        unsigned framesToRead_Step1 = bytesToRead_Step1 / pCapture->bytesPerFrame;
+        unsigned frameCount_Step1 = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
+            pCapture->hostBuffer + pCapture->lastPosition,
+            framesToRead_Step1);
+        frameCount += frameCount_Step1;
+        pCapture->lastPosition = (pCapture->lastPosition + frameCount_Step1 * pCapture->bytesPerFrame) % pCapture->hostBufferSize;
+        if (bytesToRead_Step1 < bytesToRead && frameCount_Step1 == framesToRead_Step1)
+        {
+            /* If the first step above does not move bytesToRead_Step1, do not run the code below.
+               The code below assumes the first write is complete. If it is not complete
+               bytesToRead_Step2 is not computed correctly, and the code does not account
+               for hostBuffer overrun since lastPosition may not be zero.
+             */
+            unsigned bytesToRead_Step2 = bytesToRead - bytesToRead_Step1;
+            unsigned frameCount_Step2 = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer,
+                pCapture->hostBuffer + pCapture->lastPosition,
+                bytesToRead_Step2 / pCapture->bytesPerFrame);
+            pCapture->lastPosition = (pCapture->lastPosition + frameCount_Step2 * pCapture->bytesPerFrame) % pCapture->hostBufferSize;
+            frameCount += frameCount_Step2;
+        }
+    }
 
     PA_HP_TRACE((pInfo->stream->hLog, "Capture event (WaveRT): idx=%u head=%u (pos = %4.1lf%%, frames=%u)", realInBuf, pInfo->captureHead, (pos * 100.0 / pCapture->hostBufferSize), frameCount));
 
@@ -6639,7 +6654,7 @@ static PaError PaPinCaptureEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo,
     unsigned long pos;
     unsigned bytesToRead;
     PaWinWdmIOInfo* pCapture = &pInfo->stream->capture;
-    const unsigned halfInputBuffer = pCapture->hostBufferSize>>1;
+    const unsigned halfInputBuffer = pCapture->hostBufferSize >> 1;
     PaWinWdmPin* pin = pInfo->stream->capture.pPin;
 
     /* Get hold of current ADC position */
