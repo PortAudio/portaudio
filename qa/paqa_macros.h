@@ -1,37 +1,28 @@
 
-#ifndef PORTAUDIO_QA_PAQA_TOOLS_H
-#define PORTAUDIO_QA_PAQA_TOOLS_H
+#ifndef PORTAUDIO_QA_PAQA_MACROS_H
+#define PORTAUDIO_QA_PAQA_MACROS_H
 
-static int gNumPassed = 0; /* Two globals */
-static int gNumFailed = 0;
+extern int paQaNumPassed;
+extern int paQaNumFailed;
+
+/* You must use this macro exactly once in each test program. */
+#define PAQA_INSTANTIATE_GLOBALS\
+    int paQaNumPassed = 0;\
+    int paQaNumFailed = 0;
 
 /*------------------- Macros ------------------------------*/
 /* Print ERROR if it fails. Tally success or failure. Odd  */
 /* do-while wrapper seems to be needed for some compilers. */
-
-//#define EXPECT(_exp) \
-//    do \
-//    { \
-//        if ((_exp)) {\
-//            gNumPassed++; \
-//        } \
-//        else { \
-//            printf("\nERROR - 0x%x - %s for %s\n", result, Pa_GetErrorText(result), #_exp ); \
-//            gNumFailed++; \
-//            goto error; \
-//        } \
-//    } while(0)
-
 #define ASSERT_TRUE(_exp) \
     do \
     { \
         if (_exp) {\
-            gNumPassed++; \
+            paQaNumPassed++; \
         } \
         else { \
             printf("ERROR at %s:%d, (%s) not true\n", \
                 __FILE__, __LINE__, #_exp ); \
-            gNumFailed++; \
+            paQaNumFailed++; \
             goto error; \
         } \
     } while(0)
@@ -42,12 +33,12 @@ static int gNumFailed = 0;
         int mA = (int)(_a); \
         int mB = (int)(_b); \
         if (mA _op mB) {\
-            gNumPassed++; \
+            paQaNumPassed++; \
         } \
         else { \
             printf("ERROR at %s:%d, (%s) %s (%s), %d %s %d\n", \
                 __FILE__, __LINE__, #_a, #_opn, #_b, mA, #_opn, mB ); \
-            gNumFailed++; \
+            paQaNumFailed++; \
             goto error; \
         } \
     } while(0)
@@ -63,12 +54,18 @@ static int gNumFailed = 0;
     do \
     { \
         if ((_exp)) {\
-            gNumPassed++; \
+            paQaNumPassed++; \
         } \
         else { \
             printf("\nERROR - 0x%x - %s for %s\n", result, Pa_GetErrorText(result), #_exp ); \
-            gNumFailed++; \
+            paQaNumFailed++; \
         } \
     } while(0)
 
-#endif /* PORTAUDIO_QA_PAQA_TOOLS_H */
+#define PAQA_PRINT_RESULT \
+        printf("QA Report: %d passed, %d failed.\n", paQaNumPassed, paQaNumFailed )
+
+#define PAQA_EXIT_RESULT \
+        (((paQaNumFailed > 0) || (paQaNumPassed == 0)) ? EXIT_FAILURE : EXIT_SUCCESS)
+
+#endif /* PORTAUDIO_QA_PAQA_MACROS_H */

@@ -78,6 +78,8 @@
 #define TEST_LEVEL_NORMAL  (1)
 #define TEST_LEVEL_EXHAUSTIVE  (2)
 
+PAQA_INSTANTIATE_GLOBALS
+
 typedef struct PaSineOscillator
 {
     float          phase;
@@ -139,27 +141,11 @@ static int QaCallback( const void *inputBuffer, void *outputBuffer,
                        PaStreamCallbackFlags statusFlags,
                        void *userData );
 
-static void PaQaSetupParameters(PaQaTestParameters *parameters,
-                                int framesDuration,
-                                int framesPerBuffer,
-                   int sampleRate,
-                   int mode,
-                   int numInputChannels,
-                   int numOutputChannels,
-                   PaSampleFormat format)
-{
-    parameters->framesDuration = framesDuration;
-    parameters->framesPerBuffer = framesPerBuffer;
-    parameters->numInputChannels = numInputChannels;
-    parameters->numOutputChannels = numOutputChannels;
-    parameters->mode = mode;
-    parameters->sampleRate = sampleRate;
-    parameters->format = format;
-}
-
 static void PaQaSetupData(PaQaData *myData,
                           const PaQaTestParameters *parameters)
 {
+    memset(myData, 0, sizeof(PaQaData));
+
     myData->parameters = parameters;
     myData->frameCounter = 0;
     myData->framesLeft = (unsigned long) (parameters->sampleRate * parameters->durationSeconds);
@@ -171,7 +157,7 @@ static void PaQaSetupData(PaQaData *myData,
     {
         myData->sineOscillators[channelIndex].phase = 0.0f;
         myData->sineOscillators[channelIndex].phaseIncrement =
-        (2.0 * M_PI * LOWEST_FREQUENCY / parameters->sampleRate);
+                (2.0 * M_PI * LOWEST_FREQUENCY / parameters->sampleRate);
     }
 
     switch( parameters->format )
@@ -197,16 +183,19 @@ static void PaQaSetupData(PaQaData *myData,
         myData->audioBuffer = malloc(myData->bytesPerSample * numChannels * myData->framesPerBurst);
     }
 }
-// TODO teardown delete audioBuffer
 
-/****************************************** Globals ***********/
+static void PaQaTeardownData(PaQaData *myData,
+                          const PaQaTestParameters *parameters)
+{
+    (void) parameters;
+    free(myData->audioBuffer);
+}
 
 static float NextSineSample( PaSineOscillator *sineOscillator )
 {
     float phase = sineOscillator->phase + sineOscillator->phaseIncrement;
-    if( phase > M_PI ) phase -= 2.0 * M_PI;
+    if( phase > (float)M_PI ) phase -= (float)(2.0 * M_PI);
     sineOscillator->phase = phase;
->>>>>>> 68a7c88 (Improve paqa_devs)
     return sinf(phase) * SINE_AMPLITUDE;
 }
 
@@ -228,7 +217,7 @@ static float NextSineSample( PaSineOscillator *sineOscillator )
 ** It may be called at interrupt level on some machines so don't do anything
 ** that could mess up the system like calling malloc() or free().
 */
-static int QaCallback( const void * inputData,
+static int QaCallback( const void *inputData,
                        void *outputData,
                        unsigned long framesPerBuffer,
                        const PaStreamCallbackTimeInfo* timeInfo,
@@ -314,13 +303,13 @@ static int QaCallback( const void * inputData,
     {
         PaUtil_AddTraceMessage("QaCallback: running. framesLeft", data->framesLeft );
         data->framesLeft -= framesPerBuffer;
-        return 0;
+        return paContinue;
     }
     else
     {
         PaUtil_AddTraceMessage("QaCallback: DONE! framesLeft", data->framesLeft );
         data->framesLeft = 0;
-        return 1; /* STOP */
+        return paComplete;
     }
 }
 
@@ -343,6 +332,15 @@ static PaError CheckBlockingIO(PaStream *stream,
                 result = Pa_WriteStream(stream, data->audioBuffer, data->framesPerBurst);
                 ASSERT_EQ(paNoError, result);
             }
+        } else if (data->parameters->mode == MODE_INPUT) {
+            result = Pa_ReadStream(stream, data->audioBuffer, data->framesPerBurst);
+            ASSERT_EQ(paNoError, result);
+            callbackResult = QaCallback(data->audioBuffer,
+                                        NULL /*outputBuffer */,
+                                        data->framesPerBurst,
+                                        NULL, // TODO
+                                        0, // stream flags
+                                        data);
         }
         elapsedTime += millisPerBurst;
     }
@@ -457,7 +455,7 @@ static int TestSingleStreamParameters(PaQaTestParameters testParameters)
 
     printf("------ Test: %s, device = %d"
            ", #ch = %d"
-           ", rate = %g"
+           ", rate = %5g"
            ", format = %lu"
            ", %s, %s\n",
             ( testParameters.mode == MODE_INPUT ) ? "INPUT" : "OUTPUT",
@@ -507,10 +505,12 @@ static int TestSingleStreamParameters(PaQaTestParameters testParameters)
     } else {
         printf("    Parameters NOT supported.\n");
     }
+    PaQaTeardownData(&myData, &testParameters);
     return 0;
 
 error:
     if( stream != NULL ) Pa_CloseStream( stream );
+    PaQaTeardownData(&myData, &testParameters);
     return -1;
 }
 
@@ -520,6 +520,7 @@ static void RunQuickTest()
     PaQaTestParameters parameters = kDefaultTestParameters;
 
 #if 1
+    printf("\n=========== INPUT ==============\n");
     parameters.mode = MODE_INPUT;
     parameters.deviceID = Pa_GetDefaultInputDevice();
     parameters.format = paFloat32;
@@ -533,8 +534,18 @@ static void RunQuickTest()
     parameters.sampleRate = 44100;
     parameters.numInputChannels = 2;
     TestSingleStreamParameters(parameters);
+
+    parameters.useCallback = 0;
+    TestSingleStreamParameters(parameters); /* Blocking */
+    parameters.useNonInterleaved = 1;
+    TestSingleStreamParameters(parameters); /* Blocking, NonInterleaved */
+    parameters.useCallback = 1;
+    TestSingleStreamParameters(parameters); /* NonInterleaved */
+    parameters.useCallback = 1;
 #endif
 
+    printf("\n=========== OUTPUT =============\n");
+    parameters = kDefaultTestParameters;
     parameters.mode = MODE_OUTPUT;
     parameters.deviceID = Pa_GetDefaultOutputDevice();
     parameters.sampleRate = 48000;
@@ -543,26 +554,18 @@ static void RunQuickTest()
     parameters.useCallback = 0;
     TestSingleStreamParameters(parameters);
 
-    /* Non-Interleaved */
-    parameters.useNonInterleaved = 1;
-    parameters.numOutputChannels = 2;
-    parameters.useCallback = 1;
-    parameters.format = paFloat32;
-    parameters.useCallback = 0;
-    TestSingleStreamParameters(parameters); /* Blocking */
-    parameters.useCallback = 1;
-    TestSingleStreamParameters(parameters);
-    parameters.format = paInt16;
-    TestSingleStreamParameters(parameters);
-    parameters.format = paInt32;
-    TestSingleStreamParameters(parameters);
-
     /* Interleaved */
+    parameters = kDefaultTestParameters;
+    parameters.deviceID = Pa_GetDefaultOutputDevice();
     parameters.useNonInterleaved = 0;
     parameters.numOutputChannels = 1;
     parameters.useCallback = 1;
     parameters.format = paFloat32;
     TestSingleStreamParameters(parameters);
+    parameters.useCallback = 0;
+    parameters.format = paFloat32;
+    TestSingleStreamParameters(parameters); /* Blocking */
+    parameters.useCallback = 1;
 
     parameters.sampleRate = 44100;
     parameters.numOutputChannels = 2;
@@ -573,16 +576,31 @@ static void RunQuickTest()
     parameters.numOutputChannels = 2;
     parameters.format = paInt16;
     TestSingleStreamParameters(parameters);
+
+    /* Non-Interleaved */
+    parameters = kDefaultTestParameters;
+    parameters.deviceID = Pa_GetDefaultOutputDevice();
+    parameters.useNonInterleaved = 1;
+    parameters.numOutputChannels = 2;
+    parameters.format = paFloat32;
+    parameters.useCallback = 0;
+    TestSingleStreamParameters(parameters); /* Blocking */
+    parameters.useCallback = 1;
+    TestSingleStreamParameters(parameters);  /* Blocking */
+    parameters.format = paInt16;
+    TestSingleStreamParameters(parameters);
+    parameters.format = paInt32;
+    TestSingleStreamParameters(parameters);
 }
 
-static const double kStandardSampleRates[] = {
+static const double constStandardSampleRates_[] = {
         8000.0,  9600.0, 11025.0, 12000.0, 16000.0, 22050.0,
         24000.0, 32000.0, 44100.0, 48000.0, 88200.0, 96000.0,
         -1.0 }; /* Negative terminated list. */
-static const PaSampleFormat kFormatsToTest[] = {
+
+static const PaSampleFormat constFormatsToTest_[] = {
     paFloat32, paInt32, paInt16, 0
 }; /* Zero terminated list. */
-
 
 /**
  * Iterate through each option with other options set to default.
@@ -630,9 +648,9 @@ static void TestNormal( int mode, int allDevices )
         }
 
         /* Try each standard sample rate. */
-        for( i=0; kStandardSampleRates[i] > 0; i++ )
+        for( i=0; constStandardSampleRates_[i] > 0; i++ )
         {
-            parameters.sampleRate = kStandardSampleRates[i];
+            parameters.sampleRate = constStandardSampleRates_[i];
             TestSingleStreamParameters(parameters);
         }
         parameters.sampleRate = pdi->defaultSampleRate;
@@ -659,8 +677,8 @@ static void TestNormal( int mode, int allDevices )
         parameters.useCallback = 1;
         parameters.useNonInterleaved = 0;
 
-        for (int jf = 0; kFormatsToTest[jf] > 0; jf++) {
-            parameters.format = kFormatsToTest[jf];
+        for (int jf = 0; constFormatsToTest_[jf] > 0; jf++) {
+            parameters.format = constFormatsToTest_[jf];
             TestSingleStreamParameters(parameters);
         }
     }
@@ -709,15 +727,15 @@ static void TestExhaustive( int mode, int allDevices )
                 parameters.numOutputChannels = jc;
             }
             /* Try each standard sample rate. */
-            for( i=0; kStandardSampleRates[i] > 0; i++ )
+            for( i=0; constStandardSampleRates_[i] > 0; i++ )
             {
-                parameters.sampleRate = kStandardSampleRates[i];
+                parameters.sampleRate = constStandardSampleRates_[i];
                 for (int callback = 0; callback < 2; callback++) {
                     parameters.useCallback = callback;
                     for (int nonInterleaved = 0; nonInterleaved < 2; nonInterleaved++) {
                         parameters.useNonInterleaved = nonInterleaved;
-                        for (int jf = 0; kFormatsToTest[jf] > 0; jf++) {
-                            parameters.format = kFormatsToTest[jf];
+                        for (int jf = 0; constFormatsToTest_[jf] > 0; jf++) {
+                            parameters.format = constFormatsToTest_[jf];
                             TestSingleStreamParameters(parameters);
                         }
                     }
@@ -819,6 +837,7 @@ int main( int argc, char **argv )
 
 error:
     ASSERT_EQ(paNoError, Pa_Terminate());
-    printf("QA Report: %d passed, %d failed.\n", gNumPassed, gNumFailed );
-    return ((gNumFailed > 0) || (gNumPassed == 0)) ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    PAQA_PRINT_RESULT;
+    return PAQA_EXIT_RESULT;
 }

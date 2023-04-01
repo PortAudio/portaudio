@@ -43,7 +43,9 @@
  * license above.
  */
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 #include "portaudio.h"
@@ -55,6 +57,8 @@
 #define FRAMES_PER_BUFFER (64)
 #define SAMPLE_RATE       (44100.0)
 
+PAQA_INSTANTIATE_GLOBALS
+
 typedef struct PaQaData
 {
     unsigned long  framesLeft;
@@ -63,7 +67,6 @@ typedef struct PaQaData
     int            mode;
 }
 PaQaData;
-
 
 /*-------------------------------------------------------------------------*/
 /* This routine will be called by the PortAudio engine when audio is needed.
@@ -370,6 +373,7 @@ int main(void)
     TestBadActions();
 error:
     Pa_Terminate();
-    printf("paqa_errs: %d passed, %d failed.\n", gNumPassed, gNumFailed);
-    return (gNumFailed > 0) || (gNumPassed == 0);
+
+    PAQA_PRINT_RESULT;
+    return PAQA_EXIT_RESULT;
 }
