@@ -45,7 +45,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdlib.h> /* for EXIT_SUCCESS and EXIT_FAILURE */
 #include <math.h>
 
 #include "portaudio.h"

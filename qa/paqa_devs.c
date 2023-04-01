@@ -54,7 +54,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdlib.h> /* for EXIT_SUCCESS and EXIT_FAILURE */
 #include <string.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -325,7 +325,7 @@ static PaError CheckBlockingIO(PaStream *stream,
             callbackResult = QaCallback(NULL /*inputBuffer */,
                                         data->audioBuffer,
                                         data->framesPerBurst,
-                                        NULL, // TODO
+                                        NULL /* timeInfo */, // TODO
                                         0, // stream flags
                                         data);
             if (callbackResult == 0) {
@@ -338,7 +338,7 @@ static PaError CheckBlockingIO(PaStream *stream,
             callbackResult = QaCallback(data->audioBuffer,
                                         NULL /*outputBuffer */,
                                         data->framesPerBurst,
-                                        NULL, // TODO
+                                        NULL /* timeInfo */, // TODO
                                         0, // stream flags
                                         data);
         }
