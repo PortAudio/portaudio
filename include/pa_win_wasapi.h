@@ -84,11 +84,8 @@ typedef enum PaWasapiFlags
        only applies in Shared mode. */
     paWinWasapiAutoConvert              = (1 << 6),
 
-    /* force data output to AC3 passthrough mode */
-    paWinWasapiAc3Passthrough           = (1 << 7),
-
-    /* force data output to E-AC3 passthrough mode */
-    paWinWasapiEac3Passthrough          = (1 << 8)
+    /* use Passthrough mode for sending encoded audio data in PCM containers to the audio device */
+    paWinWasapiPassthrough              = (1 << 7),
 }
 PaWasapiFlags;
 #define paWinWasapiExclusive             (paWinWasapiExclusive)
@@ -98,8 +95,7 @@ PaWasapiFlags;
 #define paWinWasapiThreadPriority        (paWinWasapiThreadPriority)
 #define paWinWasapiExplicitSampleFormat  (paWinWasapiExplicitSampleFormat)
 #define paWinWasapiAutoConvert           (paWinWasapiAutoConvert)
-#define paWinWasapiAc3Passthrough        (paWinWasapiAc3Passthrough)
-#define paWinWasapiEac3Passthrough       (paWinWasapiEac3Passthrough)
+#define paWinWasapiPassthrough           (paWinWasapiPassthrough)
 
 
 /* Stream state.
@@ -310,6 +306,59 @@ typedef enum PaWasapiStreamOption
 PaWasapiStreamOption;
 
 
+/** Passthrough format.
+
+    Format ids are taken from the Microsoft documentation "Representing Formats for IEC 61937 Transmissions"
+    and are composed by such formula where GUID is the guid of passthrough format:
+    GUID.Data1 << 16 | GUID.Data2.
+
+ @version Available as of 19.7.0
+*/
+typedef enum PaWasapiPassthroughFormat
+{
+    ePassthroughFormatPcmIec60958           = 0x00000000,
+    ePassthroughFormatDolbyDigital          = 0x00920000,
+    ePassthroughFormatMpeg1                 = 0x00030cea,
+    ePassthroughFormatMpeg3                 = 0x00040cea,
+    ePassthroughFormatMpeg2                 = 0x00050cea,
+    ePassthroughFormatAac                   = 0x00060cea,
+    ePassthroughFormatDts                   = 0x00080cea,
+    ePassthroughFormatDolbyDigitalPlus      = 0x000a0cea,
+    ePassthroughFormatDolbyDigitalPlusAtmos = 0x010a0cea,
+    ePassthroughFormatDtsHd                 = 0x000b0cea,
+    ePassthroughFormatDtsXE1                = 0x010b0cea,
+    ePassthroughFormatDtsXE2                = 0x030b0cea,
+    ePassthroughFormatDolbyMlp              = 0x000c0cea,
+    ePassthroughFormatDolbyMat20            = 0x010c0cea,
+    ePassthroughFormatDolbyMat21            = 0x030c0cea,
+    ePassthroughFormatWmaPro                = 0x01640000,
+    ePassthroughFormatAtrac                 = 0x00080cea,
+    ePassthroughFormatOneBitAudio           = 0x00090cea,
+    ePassthroughFormatDst                   = 0x000d0cea,
+}
+PaWasapiPassthroughFormat;
+
+
+/** Passthrough details.
+
+    Passthrough details provide direct link to the additional members in WAVEFORMATEXTENSIBLE_IEC61937.
+    Passthrough mode allows to pass encoded data inside the PCM containers to the audio device.
+
+    Detailed description about supported formats and examples are provided in Microsoft documentation:
+    "Representing Formats for IEC 61937 Transmissions".
+
+ @version Available as of 19.7.0
+*/
+typedef struct PaWasapiStreamPassthrough
+{
+    PaWasapiPassthroughFormat formatId;
+    unsigned int encodedSamplesPerSec;
+    unsigned int encodedChannelCount;
+    unsigned int averageBytesPerSec;
+}
+PaWasapiStreamPassthrough;
+
+
 /* Stream descriptor. */
 typedef struct PaWasapiStreamInfo
 {
@@ -355,6 +404,13 @@ typedef struct PaWasapiStreamInfo
      @version Available as of 19.6.0
     */
     PaWasapiStreamOption streamOption;
+
+    /** Passthrough details.
+     @note paWinWasapiPassthrough flag must be specified in PaWasapiStreamInfo::flags to enable Passthrough mode.
+     @see paWinWasapiPassthrough
+     @version Available as of 19.7.0
+    */
+    PaWasapiStreamPassthrough passthrough;
 }
 PaWasapiStreamInfo;
 

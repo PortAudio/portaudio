@@ -284,8 +284,7 @@ PA_DEFINE_IID(IKsJackDescription,   4509F757, 2D46, 4637, 8e, 62, ce, 7d, b9, 44
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_PCM,                         0x00000001, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_ADPCM,                       0x00000002, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 __DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT,                  0x00000003, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
-__DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL,      0x00000092, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
-__DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS, 0x0000000a, 0x0cea, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
+__DEFINE_GUID(pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM,                0x00000000, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 );
 
 #ifndef _WAVEFORMATEXTENSIBLE_IEC61937_
     #define _WAVEFORMATEXTENSIBLE_IEC61937_
@@ -1004,18 +1003,6 @@ static PaSampleFormat GetSampleFormatForIO(PaSampleFormat format_id)
 {
     return ((format_id & ~paNonInterleaved) == paCustomFormat ?
         (paInt32 | (format_id & paNonInterleaved ? paNonInterleaved : 0)) : format_id);
-}
-
-// ------------------------------------------------------------------------------------------
-// Get number of bits set
-static UINT32 PopCount(UINT32 value)
-{
-    UINT32 count = 0, i;
-
-    for (i = 0; i < (sizeof(UINT32) * 8); ++i)
-        count += (value & (1 << i));
-
-    return count;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -2909,12 +2896,7 @@ PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
             }
         }
         else
-        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL))
-        {
-            return paInt16;
-        }
-        else
-        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS))
+        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM))
         {
             return paInt16;
         }
@@ -2947,8 +2929,7 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
     BOOL useExtensible = (params->channelCount > 2); // format is always forced for >2 channels format
     PaWasapiStreamInfo *streamInfo = (PaWasapiStreamInfo *)params->hostApiSpecificStreamInfo;
     WAVEFORMATEXTENSIBLE *wavex = (WAVEFORMATEXTENSIBLE *)wavexu;
-    WAVEFORMATEXTENSIBLE_IEC61937 *wavex_61937 = (WAVEFORMATEXTENSIBLE_IEC61937 *)wavexu;
-    BOOL isEac3Passthrough = FALSE, isAc3Passthrough = FALSE;
+    BOOL passthroughMode = ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiPassthrough));
 
     // Convert PaSampleFormat to valid data bits
     if ((bitsPerSample = PaSampleFormatToBitsPerSample(params->sampleFormat)) == 0)
@@ -2961,21 +2942,11 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
         useExtensible = TRUE;
     }
 
-    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiAc3Passthrough))
-    {
-        isAc3Passthrough = TRUE;
-    }
-
-    if ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiEac3Passthrough))
-    {
-        isEac3Passthrough = TRUE;
-    }
-
-    memset(wavex, 0, sizeof(*wavex));
+    memset(wavexu, 0, sizeof(*wavexu));
 
     old                 = (WAVEFORMATEX *)wavex;
     old->nChannels      = (WORD)params->channelCount;
-    old->nSamplesPerSec = isEac3Passthrough ? PA_WASAPI_EAC3_SAMPLES_PER_SEC_ : (DWORD)sampleRate;
+    old->nSamplesPerSec = (DWORD)sampleRate;
     old->wBitsPerSample = bitsPerSample;
 
     // according to MSDN for WAVEFORMATEX structure for WAVE_FORMAT_PCM:
@@ -2997,20 +2968,20 @@ static PaError MakeWaveFormatFromParams(WAVEFORMATEXTENSIBLE_UNION *wavexu, cons
     else
     {
         old->wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-        old->cbSize     = isEac3Passthrough
-                          ? sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX)
-                          : sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX);
+        old->cbSize = (passthroughMode ? (sizeof(WAVEFORMATEXTENSIBLE_IEC61937) - sizeof(WAVEFORMATEX))
+            : (sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)));
 
-        if (isAc3Passthrough)
+        if (passthroughMode)
         {
-            wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL;
-        }
-        else if (isEac3Passthrough)
-        {
-            wavex->SubFormat                    = pa_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL_PLUS;
-            wavex_61937->dwEncodedSamplesPerSec = (DWORD)sampleRate;
-            wavex_61937->dwEncodedChannelCount  = PopCount(channelMask);
-            wavex_61937->dwAverageBytesPerSec   = 0;
+            WAVEFORMATEXTENSIBLE_IEC61937 *wavex_61937 = (WAVEFORMATEXTENSIBLE_IEC61937 *)wavexu;
+
+            wavex->SubFormat = pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM;
+            wavex->SubFormat.Data1 = (streamInfo->passthrough.formatId >> 16);
+            wavex->SubFormat.Data2 = (USHORT)(streamInfo->passthrough.formatId & 0x0000FFFF);
+
+            wavex_61937->dwEncodedSamplesPerSec = streamInfo->passthrough.encodedSamplesPerSec;
+            wavex_61937->dwEncodedChannelCount = streamInfo->passthrough.encodedChannelCount;
+            wavex_61937->dwAverageBytesPerSec = streamInfo->passthrough.averageBytesPerSec;
         }
         else if ((params->sampleFormat & ~paNonInterleaved) == paFloat32)
         {

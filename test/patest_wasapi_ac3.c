@@ -99,8 +99,8 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 /*******************************************************************/
 int main(int argc, char* argv[])
 {
-    PaStreamParameters outputParameters;
-    PaWasapiStreamInfo wasapiStreamInfo;
+    PaStreamParameters outputParameters = { 0 };
+    PaWasapiStreamInfo wasapiStreamInfo = { 0 };
     PaStream *stream;
     PaError err;
     paTestData data;
@@ -151,15 +151,15 @@ int main(int argc, char* argv[])
     outputParameters.channelCount = CHANNEL_COUNT;
     outputParameters.sampleFormat = paInt16;
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
-    outputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.hostApiSpecificStreamInfo = &wasapiStreamInfo;
 
     wasapiStreamInfo.size = sizeof(PaWasapiStreamInfo);
     wasapiStreamInfo.hostApiType = paWASAPI;
     wasapiStreamInfo.version = 1;
-    wasapiStreamInfo.flags = paWinWasapiExclusive | paWinWasapiUseChannelMask | paWinWasapiAc3Passthrough;
-    wasapiStreamInfo.channelMask = PAWIN_SPEAKER_STEREO; /* Set channel mask for consistency with the SPDIFF data format, but it seems to work either way. */
-    outputParameters.hostApiSpecificStreamInfo = &wasapiStreamInfo;
+    wasapiStreamInfo.flags = paWinWasapiExclusive | paWinWasapiUseChannelMask | paWinWasapiPassthrough;
+    wasapiStreamInfo.channelMask = PAWIN_SPEAKER_STEREO;
 
+    wasapiStreamInfo.passthrough.formatId = ePassthroughFormatDolbyDigital;
 
     if( Pa_IsFormatSupported( 0, &outputParameters, SAMPLE_RATE ) == paFormatIsSupported  ){
         printf( "Pa_IsFormatSupported reports device will support %d channels.\n", CHANNEL_COUNT );
