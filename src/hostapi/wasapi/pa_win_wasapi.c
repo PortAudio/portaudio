@@ -295,7 +295,6 @@ typedef struct {
     DWORD                dwAverageBytesPerSec;
 } WAVEFORMATEXTENSIBLE_IEC61937, *PWAVEFORMATEXTENSIBLE_IEC61937;
 #endif // !_WAVEFORMATEXTENSIBLE_IEC61937_
-#define PA_WASAPI_EAC3_SAMPLES_PER_SEC_ (192000)
 
 typedef union _WAVEFORMATEXTENSIBLE_UNION
 {
@@ -2874,9 +2873,7 @@ static void LogWAVEFORMATEXTENSIBLE(const WAVEFORMATEXTENSIBLE *in)
 // ------------------------------------------------------------------------------------------
 PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
 {
-    const WAVEFORMATEX *fmt = (WAVEFORMATEX *)fmtext;
-
-    switch (fmt->wFormatTag)
+    switch (fmtext->Format.wFormatTag)
     {
     case WAVE_FORMAT_EXTENSIBLE: {
         if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
@@ -2887,7 +2884,7 @@ PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
         else
         if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_PCM))
         {
-            switch (fmt->wBitsPerSample)
+            switch (fmtext->Format.wBitsPerSample)
             {
             case 32: return paInt32;
             case 24: return paInt24;
@@ -2896,7 +2893,14 @@ PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
             }
         }
         else
-        if (IsEqualGUID(&fmtext->SubFormat, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM))
+        // KSDATAFORMAT_SUBTYPE_IEC61937_PCM is a naked format GUID which has different Data1 and Data2
+        // depending on the passthrough format, for the possible values refer Microsoft documentation
+        // "Representing Formats for IEC 61937 Transmissions". Here we check if Data3 and Data4 match
+        // assuming that if they do match then we have KSDATAFORMAT_SUBTYPE_IEC61937_XXX format.
+        // Currently PA WASAPI is using KSDATAFORMAT_SUBTYPE_IEEE_FLOAT and KSDATAFORMAT_SUBTYPE_PCM
+        // therefore this check is reliable in this way.
+        if (!memcmp(&fmtext->SubFormat.Data3, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM.Data3,
+            (sizeof(GUID) - sizeof(pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM.Data1) - sizeof(pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM.Data2))))
         {
             return paInt16;
         }
@@ -2906,7 +2910,7 @@ PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
         return paFloat32;
 
     case WAVE_FORMAT_PCM: {
-        switch (fmt->wBitsPerSample)
+        switch (fmtext->Format.wBitsPerSample)
         {
         case 32: return paInt32;
         case 24: return paInt24;
