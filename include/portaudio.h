@@ -151,7 +151,8 @@ typedef enum PaErrorCode
     paCanNotReadFromAnOutputOnlyStream,
     paCanNotWriteToAnInputOnlyStream,
     paIncompatibleStreamHostApi,
-    paBadBufferPtr
+    paBadBufferPtr,
+    paCanNotInitializeRecursively
 } PaErrorCode;
 
 
