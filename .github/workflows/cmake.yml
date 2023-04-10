@@ -114,6 +114,7 @@ jobs:
            -DPA_USE_SKELETON=ON
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
+           -DPA_WARNINGS_ARE_ERRORS=ON
            -S .
            -B build
     - name: build
