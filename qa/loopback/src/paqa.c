@@ -1351,7 +1351,7 @@ int TestSampleFormatConversion( void )
     const char charInput[] = { 127, 64, -64, -128 };
     const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
     const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
-    const int intInput[] = { 2147483647, 2147483647/2, -1073741824 /*-2147483648/2 doesn't work in msvc*/, -2147483648 };
+    const int intInput[] = { 2147483647, 2147483647/2, /*-2147483648/2:*/(-2147483647 - 1)/2, /*"-2147483648":*/(-2147483647 - 1) }; /*see PR #814*/
 
     float floatOutput[4];
     short shortOutput[4];
