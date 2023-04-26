@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
     wasapiStreamInfo.hostApiType = paWASAPI;
     wasapiStreamInfo.version = 1;
     wasapiStreamInfo.flags = paWinWasapiExclusive | paWinWasapiUseChannelMask | paWinWasapiPassthrough;
-    wasapiStreamInfo.channelMask = PAWIN_SPEAKER_5POINT1;
+    wasapiStreamInfo.channelMask = PAWIN_SPEAKER_5POINT1; /* set channel mask according to the encoded Dolby stream */
 
     wasapiStreamInfo.passthrough.formatId = ePassthroughFormatDolbyDigitalPlus;
     wasapiStreamInfo.passthrough.encodedSamplesPerSec = SAMPLE_RATE / 4;
