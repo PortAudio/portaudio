@@ -312,7 +312,7 @@ PaWasapiStreamOption;
     and are composed by such formula where GUID is the guid of passthrough format:
     GUID.Data1 << 16 | GUID.Data2.
 
- @version Available as of 19.7.0
+ @version Available as of 19.8.0
 */
 typedef enum PaWasapiPassthroughFormat
 {
@@ -347,7 +347,7 @@ PaWasapiPassthroughFormat;
     Detailed description about supported formats and examples are provided in Microsoft documentation:
     "Representing Formats for IEC 61937 Transmissions".
 
- @version Available as of 19.7.0
+ @version Available as of 19.8.0
 */
 typedef struct PaWasapiStreamPassthrough
 {
