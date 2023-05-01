@@ -2900,7 +2900,7 @@ PaSampleFormat WaveToPaFormat(const WAVEFORMATEXTENSIBLE *fmtext)
         // Currently PA WASAPI is using KSDATAFORMAT_SUBTYPE_IEEE_FLOAT and KSDATAFORMAT_SUBTYPE_PCM
         // therefore this check is reliable in this way.
         if (!memcmp(&fmtext->SubFormat.Data3, &pa_KSDATAFORMAT_SUBTYPE_IEC61937_PCM.Data3,
-            (sizeof(GUID) - offsetof(GUID, Data3))
+            (sizeof(GUID) - offsetof(GUID, Data3))))
         {
             return paInt16;
         }
