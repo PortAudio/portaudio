@@ -1351,7 +1351,8 @@ int TestSampleFormatConversion( void )
     const char charInput[] = { 127, 64, -64, -128 };
     const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
     const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
-    const int intInput[] = { 2147483647, 2147483647/2, /*-2147483648/2:*/(-2147483647 - 1)/2, /*"-2147483648":*/(-2147483647 - 1) }; /*see PR #814*/
+    const int int_minus_2147483648 = (-2147483647 - 1); /*"-2147483648" as a signed integer. See PR #814*/
+    const int intInput[] = { 2147483647, 2147483647/2, int_minus_2147483648/2, int_minus_2147483648 }; /*see PR #814*/
 
     float floatOutput[4];
     short shortOutput[4];
