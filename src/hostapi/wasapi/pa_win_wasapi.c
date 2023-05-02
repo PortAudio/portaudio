@@ -44,6 +44,7 @@
 */
 
 #include <windows.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <process.h>
 #include <assert.h>
