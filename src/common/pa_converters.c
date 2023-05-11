@@ -939,16 +939,26 @@ static void Int32_To_Int24_Dither(
 
     PaInt32 *src = (PaInt32*)sourceBuffer;
     signed char *dest = (signed char*)destinationBuffer;
+    signed char *scaledDitherResult = (signed char*)destinationBuffer;
     PaInt32 dither;
 
     while ( count-- )
     {
         /* REVIEW */
         dither = PaUtil_Generate16BitTriangularDither(ditherGenerator);
-        *dest = (signed char) ((((*src) >> 1) + dither) >> 7);
-        
+        *scaledDitherResult = (signed char) ((((*src) >> 1) + (dither >> 8)) >> 7);
+
+#if defined(PA_LITTLE_ENDIAN)
+        dest[0] = (unsigned char)(*scaledDitherResult >> 8);
+        dest[1] = (unsigned char)(*scaledDitherResult >> 16);
+        dest[2] = (unsigned char)(*scaledDitherResult >> 24);
+#elif defined(PA_BIG_ENDIAN)
+        dest[0] = (unsigned char)(*scaledDitherResult >> 24);
+        dest[1] = (unsigned char)(*scaledDitherResult >> 16);
+        dest[2] = (unsigned char)(*scaledDitherResult >> 8);
+#endif
         src += sourceStride;
-        dest += destinationStride;
+        dest += destinationStride * 3;
     }
 }
 
