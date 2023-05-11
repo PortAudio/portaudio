@@ -946,7 +946,7 @@ static void Int32_To_Int24_Dither(
     {
         /* REVIEW */
         dither = PaUtil_Generate16BitTriangularDither(ditherGenerator);
-        *scaledDitherResult = (signed char) ((((*src) >> 1) + (dither >> 8)) >> 7);
+        *scaledDitherResult = (signed char) ((((*src) >> 1) + dither) >> 7);
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(*scaledDitherResult >> 8);
