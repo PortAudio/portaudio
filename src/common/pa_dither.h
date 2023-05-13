@@ -84,17 +84,6 @@ void PaUtil_InitializeTriangularDitherState( PaUtilTriangularDitherGenerator *di
 PaInt32 PaUtil_Generate16BitTriangularDither( PaUtilTriangularDitherGenerator *ditherState );
 
 
-/* REVEIW */
-/**
- @brief Calculate 3 LSB dither signal with a triangular distribution.
- Ranged for adding to a 1 bit right-shifted 32 bit integer
- prior to >>7.
- @return
- A signed 32-bit integer with a range of +32767 to -32768
-*/
-PaInt32 PaUtil_Generate24BitTriangularDither(PaUtilTriangularDitherGenerator* ditherState);
-
-
 /**
  @brief Calculate 2 LSB dither signal with a triangular distribution.
  Ranged for adding to a pre-scaled float.

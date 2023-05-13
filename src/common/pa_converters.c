@@ -938,24 +938,24 @@ static void Int32_To_Int24_Dither(
     (void) ditherGenerator; /* unused parameters */
 
     PaInt32 *src = (PaInt32*)sourceBuffer;
-    signed char *dest = (signed char*)destinationBuffer;
-    signed char *scaledDitherResult = (signed char*)destinationBuffer;
+    unsigned char *dest = (unsigned char*)destinationBuffer;
+    PaInt32 *scaledDitherResult = (PaInt32*)destinationBuffer;
     PaInt32 dither;
 
     while ( count-- )
     {
         /* REVIEW */
         dither = PaUtil_Generate16BitTriangularDither(ditherGenerator);
-        *scaledDitherResult = (signed char) ((((*src) >> 1) + dither) >> 7);
+        *scaledDitherResult = (PaInt32) ((((*src) >> 1) + dither) >> 7);
 
 #if defined(PA_LITTLE_ENDIAN)
-        dest[0] = (unsigned char)(*scaledDitherResult >> 8);
-        dest[1] = (unsigned char)(*scaledDitherResult >> 16);
-        dest[2] = (unsigned char)(*scaledDitherResult >> 24);
+        dest[0] = (unsigned char)(*scaledDitherResult);
+        dest[1] = (unsigned char)(*scaledDitherResult >> 8);
+        dest[2] = (unsigned char)(*scaledDitherResult >> 16);
 #elif defined(PA_BIG_ENDIAN)
-        dest[0] = (unsigned char)(*scaledDitherResult >> 24);
-        dest[1] = (unsigned char)(*scaledDitherResult >> 16);
-        dest[2] = (unsigned char)(*scaledDitherResult >> 8);
+        dest[0] = (unsigned char)(*scaledDitherResult >> 16);
+        dest[1] = (unsigned char)(*scaledDitherResult >> 8);
+        dest[2] = (unsigned char)(*scaledDitherResult);
 #endif
         src += sourceStride;
         dest += destinationStride * 3;
