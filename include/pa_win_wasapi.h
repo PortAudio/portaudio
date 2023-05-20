@@ -84,7 +84,9 @@ typedef enum PaWasapiFlags
        only applies in Shared mode. */
     paWinWasapiAutoConvert              = (1 << 6),
 
-    /* use Passthrough mode for sending encoded audio data in PCM containers to the audio device */
+    /* use Passthrough mode for sending encoded audio data in PCM containers to the audio device,
+       refer to Microsoft documentation "Representing Formats for IEC 61937 Transmissions" for more
+       details about data representation and stream configuration */
     paWinWasapiPassthrough              = (1 << 7),
 }
 PaWasapiFlags;
@@ -308,10 +310,11 @@ PaWasapiStreamOption;
 
 /** Passthrough format.
 
-    Format ids are taken from the Microsoft documentation "Representing Formats for IEC 61937 Transmissions"
+    Format ids are obtained from the Microsoft documentation "Representing Formats for IEC 61937 Transmissions"
     and are composed by such formula where GUID is the guid of passthrough format:
     GUID.Data1 << 16 | GUID.Data2.
 
+ @see PaWasapiStreamPassthrough
  @version Available as of 19.8.0
 */
 typedef enum PaWasapiPassthroughFormat
@@ -344,9 +347,10 @@ PaWasapiPassthroughFormat;
     Passthrough details provide direct link to the additional members in WAVEFORMATEXTENSIBLE_IEC61937.
     Passthrough mode allows to pass encoded data inside the PCM containers to the audio device.
 
-    Detailed description about supported formats and examples are provided in Microsoft documentation:
+    Detailed description about supported formats and examples are provided in Microsoft documentation
     "Representing Formats for IEC 61937 Transmissions".
 
+ @see paWinWasapiPassthrough
  @version Available as of 19.8.0
 */
 typedef struct PaWasapiStreamPassthrough
