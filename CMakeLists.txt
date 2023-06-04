@@ -22,7 +22,6 @@ if(PA_WARNINGS_ARE_ERRORS)
             # "Grandfathered" warnings that existed before we started enforcement.
             # Do *NOT* add warnings to this list. Instead, fix your code so that it doesn't produce the warning.
             # TODO: fix the offending code so that we don't have to exclude specific warnings anymore.
-            /wd4018 # W3 signed/unsigned mismatch
             /wd4244 # W2 conversion possible loss of data
             /wd4267 # W3 conversion possible loss of data
             /wd4996 # W3 unsafe/deprecated

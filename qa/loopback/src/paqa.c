@@ -120,8 +120,8 @@ typedef struct LoopbackContext_s
     volatile int       minInputOutputDelta;
     volatile int       maxInputOutputDelta;
 
-    int                minFramesPerBuffer;
-    int                maxFramesPerBuffer;
+    unsigned long      minFramesPerBuffer;
+    unsigned long      maxFramesPerBuffer;
     int                primingCount;
     TestParameters    *test;
     volatile int       done;
@@ -849,7 +849,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
         {
             double latencyMSec;
 
-            printf( "%4d-%4d | ",
+            printf( "%4lu-%4lu | ",
                    loopbackContext.minFramesPerBuffer,
                    loopbackContext.maxFramesPerBuffer
                    );
