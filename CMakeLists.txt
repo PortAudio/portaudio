@@ -240,6 +240,16 @@ if(WIN32)
     endif()
   endif()
 
+  option(PA_USE_OBOE "Enable support for Oboe" ON)
+  if(PA_USE_OBOE)
+    target_sources(PortAudio PRIVATE src/hostapi/oboe/pa_oboe.cpp)
+    set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_oboe.h)
+    target_compile_definitions(PortAudio PUBLIC PA_USE_OBOE=1)
+    set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_OBOE=1")
+    target_link_libraries(PortAudio PRIVATE oboe)
+  endif()
+
+
   option(PA_USE_WMME "Enable support for WMME" ON)
   if(PA_USE_WMME)
     target_sources(PortAudio PRIVATE src/hostapi/wmme/pa_win_wmme.c)
