@@ -273,6 +273,8 @@ PaHostApiIndex Pa_GetDefaultHostApi( void );
 
  @see PaHostApiInfo
 */
+
+//TODO: PaOboe - add paOboe = something
 typedef enum PaHostApiTypeId
 {
     paInDevelopment=0, /* use while developing support for a new host API */

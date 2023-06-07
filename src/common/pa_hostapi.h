@@ -153,6 +153,8 @@ are defaulted to 1.
 #define PA_USE_ASIHPI 1
 #endif
 
+//TODO: add PA_USE_OBOE
+
 #ifdef __cplusplus
 extern "C"
 {
