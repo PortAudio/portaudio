@@ -118,5 +118,5 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/PortAudioCppConfig.cmake"
 set(PC_PREFIX "\${pcfiledir}/../..")  
 configure_file(cmake/portaudiocpp.pc.in "${CMAKE_CURRENT_BINARY_DIR}/portaudiocpp.pc" @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/portaudiocpp.pc"
-        CONFIGURATIONS Release
+        CONFIGURATIONS Release RelWithDebInfo
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
