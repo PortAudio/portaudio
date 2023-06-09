@@ -150,6 +150,17 @@ if(PA_USE_JACK)
   install(FILES cmake/modules/FindJACK.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
 endif()
 
+# Oboe only works on Android, which has a Linux kernel.
+find_package(Oboe)
+option(PA_USE_OBOE "Enable support for Oboe" ON)
+if(PA_USE_OBOE)
+  target_sources(PortAudio PRIVATE src/hostapi/oboe/pa_oboe.cpp)
+  set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_oboe.h)
+  target_compile_definitions(PortAudio PUBLIC PA_USE_OBOE=1)
+  set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_OBOE=1")
+  target_link_libraries(PortAudio PRIVATE Oboe)
+endif()
+
 if(WIN32)
   target_sources(PortAudio PRIVATE
     src/os/win/pa_win_coinitialize.c
@@ -342,15 +353,6 @@ elseif(UNIX)
       else()
         set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} alsa")
       endif()
-    endif()
-
-    option(PA_USE_OBOE "Enable support for Oboe" ON)
-    if(PA_USE_OBOE)
-      target_sources(PortAudio PRIVATE src/hostapi/oboe/pa_oboe.cpp)
-      set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_oboe.h)
-      target_compile_definitions(PortAudio PUBLIC PA_USE_OBOE=1)
-      set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_OBOE=1")
-      target_link_libraries(PortAudio PRIVATE oboe)
     endif()
 
     # OSS is intentionally off by default to avoid confusing users of PortAudio
