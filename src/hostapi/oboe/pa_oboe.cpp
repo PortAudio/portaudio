@@ -91,7 +91,7 @@
         PaError m_err;                                                      \
         if (UNLIKELY((m_err = (expr)) < paNoError))                         \
         {                                                                   \
-            PaUtil_DebugPrint(("Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( \
+            PaUtil_DebugPrint(("Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( \
                                                                 __LINE__ ) "\n")); \
             PaUtil_SetLastHostErrorInfo(paInDevelopment, m_err, errorText); \
             m_error = m_err;                                               \
@@ -386,10 +386,10 @@ PaError OboeEngine::openStream(Direction direction, int32_t sampleRate,
 
         inputStream->setBufferSizeInFrames(inputStream->getFramesPerBurst() * numberOfBuffers);
         oboeStream->inputBuffers =
-                (void **) PaUtil_AllocateMemory(numberOfBuffers * sizeof(int32_t *));
+                (void **) PaUtil_AllocateZeroInitializedMemory(numberOfBuffers * sizeof(int32_t *));
 
         for (int i = 0; i < numberOfBuffers; ++i) {
-            oboeStream->inputBuffers[i] = (void *) PaUtil_AllocateMemory(
+            oboeStream->inputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
                     oboeStream->framesPerHostCallback *
                     oboeStream->bytesPerFrame *
                     oboeStream->bufferProcessor.inputChannelCount);
@@ -429,10 +429,10 @@ PaError OboeEngine::openStream(Direction direction, int32_t sampleRate,
 
         outputStream->setBufferSizeInFrames(outputStream->getFramesPerBurst() * numberOfBuffers);
         oboeStream->outputBuffers =
-                (void **) PaUtil_AllocateMemory(numberOfBuffers * sizeof(int32_t *));
+                (void **) PaUtil_AllocateZeroInitializedMemory(numberOfBuffers * sizeof(int32_t *));
 
         for (int i = 0; i < numberOfBuffers; ++i) {
-            oboeStream->outputBuffers[i] = (void *) PaUtil_AllocateMemory(
+            oboeStream->outputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
                     oboeStream->framesPerHostCallback *
                     oboeStream->bytesPerFrame *
                     oboeStream->bufferProcessor.outputChannelCount);
@@ -810,7 +810,7 @@ bool OboeEngine::readStream(void *buffer, int32_t framesToRead) {
  * @return  the address of the oboeStream.
  */
 OboeStream* OboeEngine::initializeOboeStream() {
-    oboeStream = (OboeStream *) PaUtil_AllocateMemory(sizeof(OboeStream));
+    oboeStream = (OboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(OboeStream));
     return oboeStream;
 }
 
@@ -989,7 +989,7 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
     PaDeviceInfo *m_deviceInfoArray;
     char *m_deviceName;
 
-    m_oboeHostApi = (PaOboeHostApiRepresentation *) PaUtil_AllocateMemory(
+    m_oboeHostApi = (PaOboeHostApiRepresentation *) PaUtil_AllocateZeroInitializedMemory(
             sizeof(PaOboeHostApiRepresentation));
     if (!m_oboeHostApi) {
         m_result = paInsufficientMemory;
@@ -1015,7 +1015,7 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
 
 
     m_deviceCount = 1;
-    (*hostApi)->deviceInfos = (PaDeviceInfo **) PaUtil_GroupAllocateMemory(
+    (*hostApi)->deviceInfos = (PaDeviceInfo **) PaUtil_GroupAllocateZeroInitializedMemory(
             m_oboeHostApi->allocations, sizeof(PaDeviceInfo *) * m_deviceCount);
 
     if (!(*hostApi)->deviceInfos) {
@@ -1024,7 +1024,7 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
     }
 
     /* allocate all device info structs in a contiguous block */
-    m_deviceInfoArray = (PaDeviceInfo *) PaUtil_GroupAllocateMemory(
+    m_deviceInfoArray = (PaDeviceInfo *) PaUtil_GroupAllocateZeroInitializedMemory(
             m_oboeHostApi->allocations, sizeof(PaDeviceInfo) * m_deviceCount);
     if (!m_deviceInfoArray) {
         m_result = paInsufficientMemory;
@@ -1519,7 +1519,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     m_oboeStream->isActive = false;
 
     if (!(m_oboeStream->isBlocking)) {}
-//        PaUnixThreading_Initialize();
+//        PaUnixThreading_Initialize(); TODO: see if threading works with this version of PortAudio
 
     if (m_inputChannelCount > 0) {
         m_oboeStream->hasInput = true;

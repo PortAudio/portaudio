@@ -19,6 +19,9 @@ libtool
 portaudio-2.0.pc
 autom4te.cache/*
 
+# build_all_PaOboe.sh CMake output folder
+build
+
 # Precompiled Headers
 *.gch
 *.pch
