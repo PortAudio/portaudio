@@ -58,4 +58,3 @@ CMakeSettings.json
 .vscode*
 
 # Common build directories of users and VSCode
-build*
