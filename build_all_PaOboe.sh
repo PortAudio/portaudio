@@ -5,8 +5,6 @@
 
 #!/bin/bash
 
-ANDROID_NDK=/home/netresults.wintranet/benfatti/Android/Sdk/ndk/23.1.7779620
-
 if [ -z "$ANDROID_NDK" ]; then
   echo "Please set ANDROID_NDK to the Android NDK folder"
   exit 1
