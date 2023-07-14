@@ -225,7 +225,7 @@ static int QaCallback( const void *inputData,
                        void *userData )
 {
     unsigned long frameIndex;
-    unsigned long channelIndex;
+    int channelIndex;
     float sample;
     PaQaData *data = (PaQaData *) userData;
     const PaQaTestParameters *parameters = data->parameters;
