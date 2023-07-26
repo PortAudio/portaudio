@@ -11,55 +11,55 @@ This module provides the following imported target, if found:
 #]=======================================================================]
 
 if (NOT DEFINED PA_DIRECTORY)
-    set(PA_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set(PA_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif ()
 
-set(OBOE_DIRECTORY ${PA_DIRECTORY}/../../oboe-main)
+MESSAGE("Searching for Oboe...")
+
+set(OBOE_DIRECTORY ${PA_DIRECTORY}/../../oboe)
 
 set(OBOE_INCLUDE_DIR ${OBOE_DIRECTORY}/include)
 set(OBOE_BUILD_DIR ${OBOE_DIRECTORY}/build)
 
 set(OBOE_LIBRARY_DIRS ${OBOE_BUILD_DIR}/${ANDROID_ABI})
-set(OBOE_LIBRARY ${OBOE_BUILD_DIR}/${ANDROID_ABI}/liboboe.so)
+set(OBOE_LINK_LIBRARIES ${OBOE_BUILD_DIR}/${ANDROID_ABI}/liboboe.so)
 
-if(OBOE_INCLUDE_DIR)
-    # Already in cache, be silent
-    set(OBOE_FIND_QUIETLY TRUE)
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(OBOE Oboe)
 else()
-    find_package(PkgConfig)
-    pkg_check_modules(PC_OBOE QUIET Oboe)
-endif(OBOE_INCLUDE_DIR)
-
-find_path(OBOE_INCLUDE_DIR
-        NAMES oboe/Oboe.h
-        DOC "Oboe include directory")
-
-find_library(OBOE_LIBRARY
+    find_library(OBOE_LINK_LIBRARIES
         NAMES liboboe.so
         HINTS ${OBOE_LIBRARY_DIRS}
-        DOC "Oboe Shared Library")
+        DOC "Oboe Library"
+    )
+    find_path(OBOE_INCLUDE_DIR
+        NAMES oboe/Oboe.h
+        DOC "Oboe header"
+    )
+endif()
 
 find_library(LOG_LIBRARY log) #used by pa_oboe.cpp and pa_oboe.h as a logging tool
+list(APPEND OBOE_LINK_LIBRARIES ${LOG_LIBRARY})
 
-# Handle the QUIETLY and REQUIRED arguments and set OPENSL_FOUND to TRUE if
-# all listed variables are TRUE.
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(
     Oboe
     DEFAULT_MSG
+    OBOE_LINK_LIBRARIES
     OBOE_INCLUDE_DIR
-    OBOE_LIBRARY
 )
 
-if(OBOE_INCLUDE_DIR AND OBOE_LIBRARY)
+if(OBOE_INCLUDE_DIR AND OBOE_LINK_LIBRARIES)
     set(OBOE_FOUND TRUE)
     if(NOT TARGET Oboe)
         add_library(Oboe INTERFACE IMPORTED)
+        target_link_libraries(Oboe INTERFACE "${OBOE_LINK_LIBRARIES}")
         target_include_directories(Oboe INTERFACE "${OBOE_INCLUDE_DIR}")
-        target_link_libraries(Oboe INTERFACE ${LOG_LIBRARY})
     endif()
-else()
-    if (Oboe_FIND_REQUIRED)
-        message(FATAL_ERROR "Could NOT find OBOE")
-    endif()
+#else()
+#    if (Oboe_FIND_REQUIRED)
+#        message(FATAL_ERROR "Could NOT find OBOE")
+#    endif()
 endif()

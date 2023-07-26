@@ -73,6 +73,9 @@ add_library(PortAudio
 
 include(GNUInstallDirs)
 
+MESSAGE("CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+MESSAGE("CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
+
 target_include_directories(PortAudio PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/common>
@@ -160,6 +163,8 @@ if(PA_USE_OBOE)
   target_compile_definitions(PortAudio PUBLIC PA_USE_OBOE=1)
   set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_OBOE=1")
   target_link_libraries(PortAudio PRIVATE Oboe)
+
+  install(FILES cmake/modules/FindOboe.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
 endif()
 
 if(WIN32)
