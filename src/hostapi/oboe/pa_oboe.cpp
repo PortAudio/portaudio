@@ -3,7 +3,7 @@
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
  *
- * Android Oboe implementation of PortAudio based on Sanne Raymaekers' work with OpenSLES.
+ * Android Oboe implementation of PortAudio.
  *
  ****************************************************************************************
  *      Author:                                                                         *
@@ -1454,7 +1454,8 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
     /* FIXME: Replace "paInt16" with whatever format you prefer -
-     *  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options */
+              PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options
+     */
         m_hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paInt16, m_outputSampleFormat);
         m_oboeStream->outputFormat = m_hostOutputSampleFormat;
