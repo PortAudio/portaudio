@@ -3,7 +3,7 @@
  * PortAudio Portable Real-Time Audio Library
  * Latest Version at: http://www.portaudio.com
  *
- * Android Oboe implementation of PortAudio based on Sanne Raymaekers' work with OpenSLES.
+ * Android Oboe implementation of PortAudio.
  *
  ****************************************************************************************
  *      Author:                                                                         *
