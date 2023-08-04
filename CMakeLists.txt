@@ -305,17 +305,13 @@ elseif(UNIX)
     target_include_directories(PortAudio PRIVATE src/hostapi/coreaudio)
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_mac_core.h)
 
-    find_library(COREAUDIO_LIBRARY CoreAudio REQUIRED)
-    find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox REQUIRED)
-    find_library(AUDIOUNIT_LIBRARY AudioUnit REQUIRED)
-    find_library(COREFOUNDATION_LIBRARY CoreFoundation REQUIRED)
-    find_library(CORESERVICES_LIBRARY CoreServices REQUIRED)
-    target_link_libraries(PortAudio PRIVATE
-      "${COREAUDIO_LIBRARY}"
-      "${AUDIOTOOLBOX_LIBRARY}"
-      "${AUDIOUNIT_LIBRARY}"
-      "${COREFOUNDATION_LIBRARY}"
-      "${CORESERVICES_LIBRARY}"
+    target_link_libraries(PortAudio 
+      PRIVATE
+        -Wl,-framework,CoreAudio
+        -Wl,-framework,AudioToolbox
+        -Wl,-framework,AudioUnit
+        -Wl,-framework,CoreFoundation
+        -Wl,-framework,CoreServices
     )
     target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
     set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
