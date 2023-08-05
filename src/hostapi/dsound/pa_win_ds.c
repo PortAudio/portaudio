@@ -326,7 +326,7 @@ typedef struct PaWinDsStream
 /* Set minimal latency based on the current OS version.
  * NT has higher latency.
  */
-static double PaWinDS_GetMinSystemLatencySeconds( void )
+static DWORD PaWinDS_GetWindowsMajorVersion( void )
 {
 /*
 NOTE: GetVersionEx() is deprecated as of Windows 8.1 and can not be used to reliably detect
@@ -338,23 +338,33 @@ See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprec
 */
 #pragma warning (disable : 4996) /* use of GetVersionEx */
 
+    OSVERSIONINFO osvi;
+    osvi.dwOSVersionInfoSize = sizeof(osvi);
+    GetVersionEx(&osvi);
+    return osvi.dwMajorVersion;
+
+#pragma warning (default : 4996)
+}
+
+
+/* Set minimal latency based on the current OS version.
+ * NT has higher latency.
+ */
+static double PaWinDS_GetMinSystemLatencySeconds( void )
+{
     double minLatencySeconds;
     /* Set minimal latency based on whether NT or other OS.
      * NT has higher latency.
      */
 
-    OSVERSIONINFO osvi;
-    osvi.dwOSVersionInfoSize = sizeof( osvi );
-    GetVersionEx( &osvi );
-    DBUG(("PA - PlatformId = 0x%x\n", osvi.dwPlatformId ));
-    DBUG(("PA - MajorVersion = 0x%x\n", osvi.dwMajorVersion ));
-    DBUG(("PA - MinorVersion = 0x%x\n", osvi.dwMinorVersion ));
+    const DWORD windowsMajorVersion = PaWinDS_GetWindowsMajorVersion();
+    DBUG(("PA - windowsMajorVersion = 0x%x\n", windowsMajorVersion));
     /* Check for NT */
-    if( (osvi.dwMajorVersion == 4) && (osvi.dwPlatformId == 2) )
+    if( (windowsMajorVersion == 4) && (windowsMajorVersion == 2) )
     {
         minLatencySeconds = PA_DS_WIN_NT_DEFAULT_LATENCY_;
     }
-    else if(osvi.dwMajorVersion >= 5)
+    else if(windowsMajorVersion >= 5)
     {
         minLatencySeconds = PA_DS_WIN_WDM_DEFAULT_LATENCY_;
     }
@@ -363,8 +373,6 @@ See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprec
         minLatencySeconds = PA_DS_WIN_9X_DEFAULT_LATENCY_;
     }
     return minLatencySeconds;
-
-#pragma warning (default : 4996)
 }
 
 
@@ -1741,7 +1749,7 @@ error:
 
 static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
                                     unsigned long *pollingPeriodFrames,
-                                    int isFullDuplex,
+                                    int hasInput, int hasOutput,
                                     unsigned long suggestedInputLatencyFrames,
                                     unsigned long suggestedOutputLatencyFrames,
                                     double sampleRate, unsigned long userFramesPerBuffer )
@@ -1750,62 +1758,43 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
     unsigned long maximumPollingPeriodFrames = (unsigned long)(sampleRate * PA_DS_MAXIMUM_POLLING_PERIOD_SECONDS);
     unsigned long pollingJitterFrames = (unsigned long)(sampleRate * PA_DS_POLLING_JITTER_SECONDS);
 
-    if( userFramesPerBuffer == paFramesPerBufferUnspecified )
+    unsigned long adjustedSuggestedOutputLatencyFrames = suggestedOutputLatencyFrames;
+    if( userFramesPerBuffer != paFramesPerBufferUnspecified && hasInput && hasOutput )
     {
-        unsigned long targetBufferingLatencyFrames = max( suggestedInputLatencyFrames, suggestedOutputLatencyFrames );
-
-        *pollingPeriodFrames = targetBufferingLatencyFrames / 4;
-        if( *pollingPeriodFrames < minimumPollingPeriodFrames )
-        {
-            *pollingPeriodFrames = minimumPollingPeriodFrames;
-        }
-        else if( *pollingPeriodFrames > maximumPollingPeriodFrames )
-        {
-            *pollingPeriodFrames = maximumPollingPeriodFrames;
-        }
-
-        *hostBufferSizeFrames = *pollingPeriodFrames
-                + max( *pollingPeriodFrames + pollingJitterFrames, targetBufferingLatencyFrames);
+        /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
+           extra fixed latency. so we subtract it here as a fixed latency before computing
+           the buffer size. being careful not to produce an unrepresentable negative result.
+        */
+        adjustedSuggestedOutputLatencyFrames -= min( userFramesPerBuffer, adjustedSuggestedOutputLatencyFrames );
     }
-    else
+
+    const unsigned long targetBufferingLatencyFrames = max( suggestedInputLatencyFrames, adjustedSuggestedOutputLatencyFrames );
+
+    *pollingPeriodFrames = (userFramesPerBuffer == paFramesPerBufferUnspecified) ?
+        targetBufferingLatencyFrames / 4 :
+        max( max( 1, userFramesPerBuffer / 4 ), targetBufferingLatencyFrames / 16 );
+    *pollingPeriodFrames = min( max( *pollingPeriodFrames, minimumPollingPeriodFrames ), maximumPollingPeriodFrames );
+
+    const unsigned long intendedUserFramesPerBuffer =
+        (userFramesPerBuffer == paFramesPerBufferUnspecified) ?
+            *pollingPeriodFrames :
+            userFramesPerBuffer;
+    *hostBufferSizeFrames = intendedUserFramesPerBuffer
+        + max( intendedUserFramesPerBuffer + pollingJitterFrames, targetBufferingLatencyFrames );
+
+    /* In some (most?) systems, DirectSound has an odd limitation where it always uses
+       a fixed 31.25 ms granularity for the read cursor, regardless of parameters.
+       This in turn means that if we allocate an input buffer that is less than 31.25 ms,
+       the read cursor will stay stuck at zero. See https://github.com/PortAudio/portaudio/issues/775
+       To work around this problem, ensure that the input host buffer is large enough
+       for at least two 31.25 ms buffer "halves".
+
+       On pre-Vista Windows, we don't do this because DirectSound is implemented very
+       differently, and is therefore unlikely to suffer from the same issue.
+    */
+    if( hasInput && PaWinDS_GetWindowsMajorVersion() >= 6 )
     {
-        unsigned long targetBufferingLatencyFrames = suggestedInputLatencyFrames;
-        if( isFullDuplex )
-        {
-            /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
-               extra fixed latency. so we subtract it here as a fixed latency before computing
-               the buffer size. being careful not to produce an unrepresentable negative result.
-
-               Note: this only works as expected if output latency is greater than input latency.
-               Otherwise we use input latency anyway since we do max(in,out).
-            */
-
-            if( userFramesPerBuffer < suggestedOutputLatencyFrames )
-            {
-                unsigned long adjustedSuggestedOutputLatencyFrames =
-                        suggestedOutputLatencyFrames - userFramesPerBuffer;
-
-                /* maximum of input and adjusted output suggested latency */
-                if( adjustedSuggestedOutputLatencyFrames > targetBufferingLatencyFrames )
-                    targetBufferingLatencyFrames = adjustedSuggestedOutputLatencyFrames;
-            }
-        }
-        else
-        {
-            /* maximum of input and output suggested latency */
-            if( suggestedOutputLatencyFrames > suggestedInputLatencyFrames )
-                targetBufferingLatencyFrames = suggestedOutputLatencyFrames;
-        }
-
-        *hostBufferSizeFrames = userFramesPerBuffer
-                + max( userFramesPerBuffer + pollingJitterFrames, targetBufferingLatencyFrames);
-
-        *pollingPeriodFrames = max( max(1, userFramesPerBuffer / 4), targetBufferingLatencyFrames / 16 );
-
-        if( *pollingPeriodFrames > maximumPollingPeriodFrames )
-        {
-            *pollingPeriodFrames = maximumPollingPeriodFrames;
-        }
+        *hostBufferSizeFrames = max( *hostBufferSizeFrames, 2 * 0.03125 * sampleRate );
     }
 }
 
@@ -2142,7 +2131,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         else
         {
             CalculateBufferSettings( (unsigned long*)&stream->hostBufferSizeFrames, &pollingPeriodFrames,
-                    /* isFullDuplex = */ (inputParameters && outputParameters),
+                    /* hasInput = */ !!inputParameters,
+                    /* hasOutput = */ !!outputParameters,
                     suggestedInputLatencyFrames,
                     suggestedOutputLatencyFrames,
                     sampleRate, framesPerBuffer );
