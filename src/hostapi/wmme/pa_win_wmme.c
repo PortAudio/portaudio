@@ -113,6 +113,7 @@
 #include "pa_win_wmme.h"
 #include "pa_win_waveformat.h"
 #include "pa_win_util.h"
+#include "pa_win_version.h"
 
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
 #include "pa_win_wdmks_utils.h"
@@ -322,7 +323,7 @@ static void PaMme_SetLastSystemError( DWORD errorCode )
 
 
 static int PaMme_IsWindowsVistaOrGreater() {
-    return LOBYTE(LOWORD(GetVersion())) >= 6;
+    return (PaWinUtil_GetOsVersion() >= paOsVersionWindowsVistaServer2008);
 }
 
 
@@ -906,37 +907,22 @@ error:
 
 static void GetDefaultLatencies( PaTime *defaultLowLatency, PaTime *defaultHighLatency )
 {
-/*
-NOTE: GetVersionEx() is deprecated as of Windows 8.1 and can not be used to reliably detect
-versions of Windows higher than Windows 8 (due to manifest requirements for reporting higher versions).
-Microsoft recommends switching to VerifyVersionInfo (available on Win 2k and later), however GetVersionEx
-is faster, for now we just disable the deprecation warning.
-See: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724451(v=vs.85).aspx
-See: http://www.codeproject.com/Articles/678606/Part-Overcoming-Windows-s-deprecation-of-GetVe
-*/
-#pragma warning (disable : 4996) /* use of GetVersionEx */
+    PaOsVersion version = PaWinUtil_GetOsVersion();
 
-    OSVERSIONINFO osvi;
-    osvi.dwOSVersionInfoSize = sizeof( osvi );
-    GetVersionEx( &osvi );
-
-    /* Check for NT */
-    if( (osvi.dwMajorVersion == 4) && (osvi.dwPlatformId == 2) )
-    {
-        *defaultLowLatency = PA_MME_WIN_NT_DEFAULT_LATENCY_;
-    }
-    else if(osvi.dwMajorVersion >= 5)
-    {
-        *defaultLowLatency = PA_MME_WIN_WDM_DEFAULT_LATENCY_;
-    }
-    else
+    if(version <= paOsVersionWindows9x)
     {
         *defaultLowLatency = PA_MME_WIN_9X_DEFAULT_LATENCY_;
     }
+    else if(version == paOsVersionWindowsNT4)
+    {
+        *defaultLowLatency = PA_MME_WIN_NT_DEFAULT_LATENCY_;
+    }
+    else if(version >= paOsVersionWindows2000)
+    {
+        *defaultLowLatency = PA_MME_WIN_WDM_DEFAULT_LATENCY_;
+    }
 
     *defaultHighLatency = *defaultLowLatency * 2;
-
-#pragma warning (default : 4996)
 }
 
 
