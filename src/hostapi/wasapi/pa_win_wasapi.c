@@ -107,10 +107,11 @@
 #include "pa_stream.h"
 #include "pa_cpuload.h"
 #include "pa_process.h"
-#include "pa_win_wasapi.h"
 #include "pa_debugprint.h"
 #include "pa_ringbuffer.h"
+#include "pa_win_version.h"
 #include "pa_win_coinitialize.h"
+#include "pa_win_wasapi.h"
 
 #if !defined(NTDDI_VERSION) || (defined(__GNUC__) && (__GNUC__ <= 6) && !defined(__MINGW64__))
 
@@ -1182,193 +1183,24 @@ static BOOL IsWow64()
 
 #endif
 }
-
-// ------------------------------------------------------------------------------------------
-typedef enum EWindowsVersion
-{
-    WINDOWS_UNKNOWN = 0,
-    WINDOWS_VISTA_SERVER2008,
-    WINDOWS_7_SERVER2008R2,
-    WINDOWS_8_SERVER2012,
-    WINDOWS_8_1_SERVER2012R2,
-    WINDOWS_10_SERVER2016,
-    WINDOWS_FUTURE
-}
-EWindowsVersion;
-// Alternative way for checking Windows version (allows to check version on Windows 8.1 and up)
-#ifndef PA_WINRT
-static BOOL IsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor)
-{
-    typedef ULONGLONG (NTAPI *LPFN_VERSETCONDITIONMASK)(ULONGLONG ConditionMask, DWORD TypeMask, BYTE Condition);
-    typedef BOOL (WINAPI *LPFN_VERIFYVERSIONINFO)(LPOSVERSIONINFOEXA lpVersionInformation, DWORD dwTypeMask, DWORDLONG dwlConditionMask);
-
-    LPFN_VERSETCONDITIONMASK fnVerSetConditionMask;
-    LPFN_VERIFYVERSIONINFO fnVerifyVersionInfo;
-    OSVERSIONINFOEXA osvi = { sizeof(osvi), 0, 0, 0, 0, {0}, 0, 0 };
-    DWORDLONG dwlConditionMask;
-
-    fnVerSetConditionMask = (LPFN_VERSETCONDITIONMASK)GetProcAddress(GetModuleHandleA("kernel32"), "VerSetConditionMask");
-    fnVerifyVersionInfo = (LPFN_VERIFYVERSIONINFO)GetProcAddress(GetModuleHandleA("kernel32"), "VerifyVersionInfoA");
-
-    if ((fnVerSetConditionMask == NULL) || (fnVerifyVersionInfo == NULL))
-        return FALSE;
-
-    dwlConditionMask = fnVerSetConditionMask(
-        fnVerSetConditionMask(
-            fnVerSetConditionMask(
-                0, VER_MAJORVERSION,     VER_GREATER_EQUAL),
-                   VER_MINORVERSION,     VER_GREATER_EQUAL),
-                   VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL);
-
-    osvi.dwMajorVersion    = wMajorVersion;
-    osvi.dwMinorVersion    = wMinorVersion;
-    osvi.wServicePackMajor = wServicePackMajor;
-
-    return (fnVerifyVersionInfo(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR, dwlConditionMask) != FALSE);
-}
-#endif
-// Get Windows version
-// note: We are trying to get Windows version starting from Windows Vista. Earlier OS versions
-//       will fall into WINDOWS_UNKNOWN case.
-static EWindowsVersion GetWindowsVersion()
-{
-#ifndef PA_WINRT
-    static EWindowsVersion version = WINDOWS_UNKNOWN;
-
-    if (version == WINDOWS_UNKNOWN)
-    {
-        DWORD dwMajorVersion = 0xFFFFFFFFU, dwMinorVersion = 0, dwBuild = 0;
-
-        // RTL_OSVERSIONINFOW equals OSVERSIONINFOW but it is missing inb MinGW winnt.h header,
-        // thus use OSVERSIONINFOW for greater portability
-        typedef NTSTATUS (WINAPI *LPFN_RTLGETVERSION)(POSVERSIONINFOW lpVersionInformation);
-        LPFN_RTLGETVERSION fnRtlGetVersion;
-
-        #define NTSTATUS_SUCCESS ((NTSTATUS)0x00000000L)
-
-        // RtlGetVersion must be able to provide true Windows version (Windows 10 may be reported as Windows 8
-        // by GetVersion API)
-        if ((fnRtlGetVersion = (LPFN_RTLGETVERSION)GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion")) != NULL)
-        {
-            OSVERSIONINFOW ver = { sizeof(OSVERSIONINFOW), 0, 0, 0, 0, {0} };
-
-            if (fnRtlGetVersion(&ver) == NTSTATUS_SUCCESS)
-            {
-                dwMajorVersion = ver.dwMajorVersion;
-                dwMinorVersion = ver.dwMinorVersion;
-                dwBuild        = ver.dwBuildNumber;
-            }
-
-            PRINT(("WASAPI: getting Windows version with RtlGetVersion(): major=%d, minor=%d, build=%d\n", dwMajorVersion, dwMinorVersion, dwBuild));
-        }
-
-        #undef NTSTATUS_SUCCESS
-
-        // fallback to GetVersion if RtlGetVersion is missing
-        if (dwMajorVersion == 0xFFFFFFFFU)
-        {
-            typedef DWORD (WINAPI *LPFN_GETVERSION)(VOID);
-            LPFN_GETVERSION fnGetVersion;
-
-            if ((fnGetVersion = (LPFN_GETVERSION)GetProcAddress(GetModuleHandleA("kernel32"), "GetVersion")) != NULL)
-            {
-                DWORD dwVersion = fnGetVersion();
-
-                dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
-                dwMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
-
-                if (dwVersion < 0x80000000)
-                    dwBuild = (DWORD)(HIWORD(dwVersion));
-
-                PRINT(("WASAPI: getting Windows version with GetVersion(): major=%d, minor=%d, build=%d\n", dwMajorVersion, dwMinorVersion, dwBuild));
-            }
-        }
-
-        if (dwMajorVersion != 0xFFFFFFFFU)
-        {
-            switch (dwMajorVersion)
-            {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-                break; // skip lower
-            case 6:
-                switch (dwMinorVersion)
-                {
-                case 0:  version = WINDOWS_VISTA_SERVER2008; break;
-                case 1:  version = WINDOWS_7_SERVER2008R2;   break;
-                case 2:  version = WINDOWS_8_SERVER2012;     break;
-                case 3:  version = WINDOWS_8_1_SERVER2012R2; break;
-                default: version = WINDOWS_FUTURE;           break;
-                }
-                break;
-            case 10:
-                switch (dwMinorVersion)
-                {
-                case 0:  version = WINDOWS_10_SERVER2016;    break;
-                default: version = WINDOWS_FUTURE;           break;
-                }
-                break;
-            default:
-                version = WINDOWS_FUTURE;
-                break;
-            }
-        }
-        // fallback to VerifyVersionInfo if RtlGetVersion and GetVersion are missing
-        else
-        {
-            PRINT(("WASAPI: getting Windows version with VerifyVersionInfo()\n"));
-
-            if (IsWindowsVersionOrGreater(10, 0, 0))
-                version = WINDOWS_10_SERVER2016;
-            else
-            if (IsWindowsVersionOrGreater(6, 3, 0))
-                version = WINDOWS_8_1_SERVER2012R2;
-            else
-            if (IsWindowsVersionOrGreater(6, 2, 0))
-                version = WINDOWS_8_SERVER2012;
-            else
-            if (IsWindowsVersionOrGreater(6, 1, 0))
-                version = WINDOWS_7_SERVER2008R2;
-            else
-            if (IsWindowsVersionOrGreater(6, 0, 0))
-                version = WINDOWS_VISTA_SERVER2008;
-            else
-                version = WINDOWS_FUTURE;
-        }
-
-        PRINT(("WASAPI: Windows version = %d\n", version));
-    }
-
-    return version;
-#else
-    #if (_WIN32_WINNT >= _WIN32_WINNT_WIN10)
-        return WINDOWS_10_SERVER2016;
-    #else
-        return WINDOWS_8_SERVER2012;
-    #endif
-#endif
-}
-
 // ------------------------------------------------------------------------------------------
 static BOOL UseWOW64Workaround()
 {
     // note: WOW64 bug is common to Windows Vista x64, thus we fall back to safe Poll-driven
     //       method. Windows 7 x64 seems has WOW64 bug fixed.
 
-    return (IsWow64() && (GetWindowsVersion() == WINDOWS_VISTA_SERVER2008));
+    return (IsWow64() && (PaWinUtil_GetOsVersion() == paOsVersionWindowsVistaServer2008));
 }
 
 // ------------------------------------------------------------------------------------------
 static UINT32 GetAudioClientVersion()
 {
-    if (GetWindowsVersion() >= WINDOWS_10_SERVER2016)
+    PaOsVersion version = PaWinUtil_GetOsVersion();
+
+    if (version >= paOsVersionWindows10Server2016)
         return 3;
     else
-    if (GetWindowsVersion() >= WINDOWS_8_SERVER2012)
+    if (version >= paOsVersionWindows8Server2012)
         return 2;
 
     return 1;
@@ -1782,11 +1614,11 @@ static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, cons
         switch (streamInfo->streamOption)
         {
         case eStreamOptionRaw:
-            if (GetWindowsVersion() >= WINDOWS_8_1_SERVER2012R2)
+            if (PaWinUtil_GetOsVersion() >= paOsVersionWindows8_1Server2012R2)
                 audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_RAW;
             break;
         case eStreamOptionMatchFormat:
-            if (GetWindowsVersion() >= WINDOWS_10_SERVER2016)
+            if (PaWinUtil_GetOsVersion() >= paOsVersionWindows10Server2016)
                 audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_MATCH_FORMAT;
             break;
         }
@@ -2458,7 +2290,7 @@ PaError PaWasapi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 
 #ifndef PA_WINRT
     // Fail safely for any Windows version below Windows Vista
-    if (GetWindowsVersion() == WINDOWS_UNKNOWN)
+    if (PaWinUtil_GetOsVersion() < paOsVersionWindowsVistaServer2008)
     {
         PRINT(("WASAPI: Unsupported Windows version!\n"));
         return paNoError;
@@ -3125,7 +2957,7 @@ static PaError GetClosestFormat(IAudioClient *client, double sampleRate, const P
     MakeWaveFormatFromParams(outWavexU, &params, sampleRate, FALSE);
 
     // If built-in PCM converter requested then shared mode format will always succeed
-    if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) &&
+    if ((PaWinUtil_GetOsVersion() >= paOsVersionWindows7Server2008R2) &&
         (shareMode == AUDCLNT_SHAREMODE_SHARED) &&
         ((streamInfo != NULL) && (streamInfo->flags & paWinWasapiAutoConvert)))
         return paFormatIsSupported;
@@ -3993,7 +3825,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             stream->in.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
         // Use built-in PCM converter (channel count and sample rate) if requested
-        if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) &&
+        if ((PaWinUtil_GetOsVersion() >= paOsVersionWindows7Server2008R2) &&
             (stream->in.shareMode == AUDCLNT_SHAREMODE_SHARED) &&
             ((inputStreamInfo != NULL) && (inputStreamInfo->flags & paWinWasapiAutoConvert)))
             stream->in.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
@@ -4131,7 +3963,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             stream->out.streamFlags = 0; // polling interface is implemented for full-duplex mode also
 
         // Use built-in PCM converter (channel count and sample rate) if requested
-        if ((GetWindowsVersion() >= WINDOWS_7_SERVER2008R2) &&
+        if ((PaWinUtil_GetOsVersion() >= paOsVersionWindows7Server2008R2) &&
             (stream->out.shareMode == AUDCLNT_SHAREMODE_SHARED) &&
             ((outputStreamInfo != NULL) && (outputStreamInfo->flags & paWinWasapiAutoConvert)))
             stream->out.streamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);

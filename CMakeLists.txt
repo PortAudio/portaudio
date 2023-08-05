@@ -157,6 +157,8 @@ if(WIN32)
     src/os/win/pa_win_hostapis.c
     src/os/win/pa_win_util.c
     src/os/win/pa_win_util.h
+    src/os/win/pa_win_version.c
+    src/os/win/pa_win_version.h
     src/os/win/pa_win_waveformat.c
     src/os/win/pa_win_wdmks_utils.h
     src/os/win/pa_x86_plain_converters.h
