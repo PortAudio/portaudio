@@ -248,7 +248,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
      */
     if( !stream->isActive )
     {
-        printf("GUUPPI\n");
         if(stream->outputStream)
         {
             l_ptrData = l_cBUffer;
@@ -426,7 +425,7 @@ void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
 
     if( l_ptrStream->bufferProcessor.streamCallback )
     {
-       _PaPulseAudio_ProcessAudio( l_ptrStream, length );
+        _PaPulseAudio_ProcessAudio( l_ptrStream, length );
     }
 
     pa_threaded_mainloop_signal( l_ptrStream->mainloop,
@@ -611,12 +610,10 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     {
         stream->outputBufferAttr.fragsize = 0;
 
-        /* Only change fragsize if latency if more than Zero
-         * Default input reads
-         *
-         * which is not very convinientä Request smaller chunks
-         * of data so it's easier to hame nice looking timestamps
-         * with current callback system
+        /* Default input reads 65,535 bytes setting fragsize
+         * fragments request to smaller chunks of data so it's
+         * easier to get nicer looking timestamps with current
+         * callback system
          */
         stream->inputBufferAttr.fragsize = pa_usec_to_bytes( l_lRequestFrameSize,
                                                              &stream->inputSampleSpec );
@@ -700,9 +697,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->outputStream )
     {
-        /* Only change tlength if latency if more than Zero and we 
-         * are not doing duplex as then input change the game
-         * Request small latency for easier output and timestamps
+        /* tlength does almost the same as fragsize in record.
+         * See reasoning up there in comments.
          *
          * In future this should we tuned when things changed
          * this just 'good' default

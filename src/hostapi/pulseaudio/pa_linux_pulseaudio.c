@@ -1008,7 +1008,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     memset( &stream->inputRing,
             0x00,
             sizeof(PaUtilRingBuffer) );
-         
+
     /* This is something that Pulseaudio can handle
      * and it's also bearable small
      */
