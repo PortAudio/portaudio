@@ -3,7 +3,7 @@
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014-2022 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2023 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -79,6 +79,8 @@ extern "C"
 #define PAPULSEAUDIO_MAX_DEVICECOUNT 1024
 #define PAPULSEAUDIO_MAX_DEVICENAME 1024
 
+#define PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC 32
+
 /* Assuming of 2 seconds of 44100 Hz sample rate with FLOAT (4 bytes) and stereo channels (2 channels).
    You should have pretty good size buffer with this. If output/intput doesn't happens in 2 second we
    have more trouble than this buffer.
@@ -118,14 +120,13 @@ typedef struct PaPulseAudio_Stream
 
     unsigned long framesPerHostCallback;
     pa_threaded_mainloop *mainloop;
-    pa_time_event *timeEvent;
     pa_context *context;
-    pa_sample_spec outSampleSpec;
-    pa_sample_spec inSampleSpec;
-    pa_stream *outStream;
-    pa_stream *inStream;
-    pa_buffer_attr outBufferAttr;
-    pa_buffer_attr inBufferAttr;
+    pa_sample_spec outputSampleSpec;
+    pa_sample_spec inputSampleSpec;
+    pa_stream *outputStream;
+    pa_stream *inputStream;
+    pa_buffer_attr outputBufferAttr;
+    pa_buffer_attr inputBufferAttr;
     int outputUnderflows;
     PaTime latency;
     int outputChannelCount;
@@ -136,14 +137,13 @@ typedef struct PaPulseAudio_Stream
     int outputFrameSize;
     int inputFrameSize;
 
-    PaDeviceIndex inDevice;
-    PaDeviceIndex outDevice;
+    PaDeviceIndex inputDevice;
+    PaDeviceIndex outputDevice;
 
-    char *sinkStreamName;
-    char *sourceStreamName;
+    char *outputStreamName;
+    char *inputStreamName;
 
     PaUtilRingBuffer inputRing;
-    PaUtilRingBuffer outputRing;
 
     size_t missedBytes;
 
@@ -159,18 +159,18 @@ PaPulseAudio_Stream;
     if( !(pastream) || \
         !(pastream)->context || \
         !PA_CONTEXT_IS_GOOD( pa_context_get_state( (pastream)->context ) ) || \
-        ( (pastream)->outStream && \
-        !PA_STREAM_IS_GOOD( pa_stream_get_state( (pastream)->outStream ) ) ) || \
-        ( (pastream)->inStream && \
-        !PA_STREAM_IS_GOOD( pa_stream_get_state( (pastream)->inStream ) ) ) ) \
+        ( (pastream)->outputStream && \
+        !PA_STREAM_IS_GOOD( pa_stream_get_state( (pastream)->outputStream ) ) ) || \
+        ( (pastream)->inputStream && \
+        !PA_STREAM_IS_GOOD( pa_stream_get_state( (pastream)->inputStream ) ) ) ) \
     { \
         if( !(pastream) || \
             ( (pastream)->context && \
               pa_context_get_state( (pastream)->context ) == PA_CONTEXT_FAILED ) || \
-            ( (pastream)->outStream && \
-              pa_stream_get_state( (pastream)->outStream ) == PA_STREAM_FAILED ) || \
-            ( (pastream)->inStream && \
-               pa_stream_get_state( (pastream)->inStream ) == PA_STREAM_FAILED ) ) \
+            ( (pastream)->outputStream && \
+              pa_stream_get_state( (pastream)->outputStream ) == PA_STREAM_FAILED ) || \
+            ( (pastream)->inputStream && \
+               pa_stream_get_state( (pastream)->inputStream ) == PA_STREAM_FAILED ) ) \
             { \
                 return errorCode; \
             } \

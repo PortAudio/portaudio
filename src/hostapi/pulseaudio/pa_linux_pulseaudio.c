@@ -3,7 +3,7 @@
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014-2020 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2023 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
  * Copyright (c) 2020 Daniel Schurmann
  *
@@ -605,7 +605,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
     pa_operation_unref( l_ptrOperation );
 
-    // Add the "Default" sink at index 0
+    /* Add the "Default" sink at index 0 */
     if( _PaPulseAudio_AddAudioDevice( l_ptrPulseAudioHostApi,
                                       "Default Sink",
                                       "The PulseAudio default sink",
@@ -624,7 +624,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                 l_ptrPulseAudioHostApi->deviceCount - 1;
     }
 
-    // Add the "Default" source at index 1
+    /* Add the "Default" source at index 1 */
     if( _PaPulseAudio_AddAudioDevice( l_ptrPulseAudioHostApi,
                                       "Default Source",
                                       "The PulseAudio default source",
@@ -988,30 +988,34 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     const char defaultSinkStreamName[] = "Portaudio sink";
 
     stream->framesPerHostCallback = framesPerBuffer;
-    stream->sourceStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSourceStreamName));
-    stream->sinkStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSinkStreamName));
-    if ( !stream->sourceStreamName || !stream->sinkStreamName )
+    stream->inputStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSourceStreamName));
+    stream->outputStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSinkStreamName));
+    if ( !stream->inputStreamName || !stream->outputStreamName )
     {
         result = paInsufficientMemory;
         goto openstream_error;
     }
 
     /* Copy initial stream names to memory. */
-    memcpy( stream->sourceStreamName, defaultSourceStreamName, sizeof(defaultSourceStreamName) );
-    memcpy( stream->sinkStreamName, defaultSinkStreamName, sizeof(defaultSinkStreamName) );
+    memcpy( stream->inputStreamName, defaultSourceStreamName, sizeof(defaultSourceStreamName) );
+    memcpy( stream->outputStreamName, defaultSinkStreamName, sizeof(defaultSinkStreamName) );
 
     stream->isActive = 0;
     stream->isStopped = 1;
 
-    stream->inStream = NULL;
-    stream->outStream = NULL;
+    stream->inputStream = NULL;
+    stream->outputStream = NULL;
     memset( &stream->inputRing,
             0x00,
             sizeof(PaUtilRingBuffer) );
-
-    memset( &stream->outputRing,
-            0x00,
-            sizeof(PaUtilRingBuffer) );
+         
+    /* This is something that Pulseaudio can handle
+     * and it's also bearable small
+     */
+    if( framesPerBuffer == paFramesPerBufferUnspecified )
+    {
+        framesPerBuffer = PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC;
+    }
 
     if( inputParameters )
     {
@@ -1051,19 +1055,19 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         result = PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_(
             hostInputSampleFormat,
-            &stream->inSampleSpec );
+            &stream->inputSampleSpec );
 
         if( result != paNoError )
         {
             goto openstream_error;
         }
 
-        stream->inSampleSpec.rate = sampleRate;
-        stream->inSampleSpec.channels = inputChannelCount;
+        stream->inputSampleSpec.rate = sampleRate;
+        stream->inputSampleSpec.channels = inputChannelCount;
         stream->latency = inputParameters->suggestedLatency;
         stream->inputChannelCount = inputChannelCount;
 
-        if( !pa_sample_spec_valid(&stream->inSampleSpec) )
+        if( !pa_sample_spec_valid(&stream->inputSampleSpec) )
         {
             PA_DEBUG( ("Portaudio %s: Invalid input audio spec!\n",
                       __FUNCTION__) );
@@ -1071,18 +1075,18 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             goto openstream_error;
         }
 
-        stream->inStream =
+        stream->inputStream =
             pa_stream_new( l_ptrPulseAudioHostApi->context,
-                           stream->sourceStreamName,
-                           &stream->inSampleSpec,
+                           stream->inputStreamName,
+                           &stream->inputSampleSpec,
                            NULL );
 
-        if( stream->inStream != NULL )
+        if( stream->inputStream != NULL )
         {
-            pa_stream_set_state_callback( stream->inStream,
+            pa_stream_set_state_callback( stream->inputStream,
                                           PaPulseAudio_StreamStateCb,
                                           stream);
-            pa_stream_set_started_callback( stream->inStream,
+            pa_stream_set_started_callback( stream->inputStream,
                                             PaPulseAudio_StreamStartedCb,
                                             stream );
         }
@@ -1092,7 +1096,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                        __FUNCTION__) );
         }
 
-        stream->inDevice = inputParameters->device;
+        stream->inputDevice = inputParameters->device;
 
         /* Make sure that ringbufferSize is power of two */
         ringbufferSize = stream->inputFrameSize * framesPerBuffer * inputChannelCount;
@@ -1117,7 +1121,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         result = PaPulseAudio_BlockingInitRingBuffer( &stream->inputRing,
-                                                      ringbufferSize );
+                                                      (65536 * 4) );
         if( result != paNoError )
         {
             goto openstream_error;
@@ -1171,25 +1175,25 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         result = PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_(
             hostOutputSampleFormat,
-            &stream->outSampleSpec );
+            &stream->outputSampleSpec );
 
         if( result != paNoError )
         {
             goto openstream_error;
         }
 
-        stream->outSampleSpec.rate = sampleRate;
-        stream->outSampleSpec.channels = outputChannelCount;
+        stream->outputSampleSpec.rate = sampleRate;
+        stream->outputSampleSpec.channels = outputChannelCount;
         stream->outputChannelCount = outputChannelCount;
         stream->latency = outputParameters->suggestedLatency;
 
         /* Really who has mono output anyway but whom I'm to judge? */
-        if( stream->outSampleSpec.channels == 1 )
+        if( stream->outputSampleSpec.channels == 1 )
         {
-            stream->outSampleSpec.channels = 2;
+            stream->outputSampleSpec.channels = 2;
         }
 
-        if( !pa_sample_spec_valid( &stream->outSampleSpec ) )
+        if( !pa_sample_spec_valid( &stream->outputSampleSpec ) )
         {
             PA_DEBUG( ("Portaudio %s: Invalid audio spec for output!\n",
                       __FUNCTION__) );
@@ -1197,18 +1201,18 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             goto openstream_error;
         }
 
-        stream->outStream =
+        stream->outputStream =
             pa_stream_new( l_ptrPulseAudioHostApi->context,
-                           stream->sinkStreamName,
-                           &stream->outSampleSpec,
+                           stream->outputStreamName,
+                           &stream->outputSampleSpec,
                            NULL );
 
-        if( stream->outStream != NULL )
+        if( stream->outputStream != NULL )
         {
-            pa_stream_set_state_callback( stream->outStream,
+            pa_stream_set_state_callback( stream->outputStream,
                                           PaPulseAudio_StreamStateCb,
                                           stream );
-            pa_stream_set_started_callback( stream->outStream,
+            pa_stream_set_started_callback( stream->outputStream,
                                             PaPulseAudio_StreamStartedCb,
                                             stream );
         }
@@ -1224,21 +1228,12 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             goto openstream_error;
         }
 
-        /* There should be nice way to calc this but
-         * as this Ringbuffer is just used for few second converting
-         * sometimes little obscure Pulseaudio audio output to precise
-         * portaudio stuff.
-         *
-         * There should not be that much bytes of we are in big trouble
-         */
-        result = PaPulseAudio_BlockingInitRingBuffer( &stream->outputRing,
-                                                      (65536 * 4) );
         if( result != paNoError )
         {
             goto openstream_error;
         }
 
-        stream->outDevice = outputParameters->device;
+        stream->outputDevice = outputParameters->device;
     }
 
     else
@@ -1320,8 +1315,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( stream )
     {
-        PaUtil_FreeMemory( stream->sourceStreamName );
-        PaUtil_FreeMemory( stream->sinkStreamName );
+        PaUtil_FreeMemory( stream->inputStreamName );
+        PaUtil_FreeMemory( stream->outputStreamName );
         PaUtil_FreeMemory(stream);
     }
 
@@ -1352,9 +1347,9 @@ PaTime GetStreamTime( PaStream * s )
 
     PaPulseAudio_Lock( l_ptrPulseAudioHostApi->mainloop );
 
-    if( stream->outStream )
+    if( stream->outputStream )
     {
-        if( PaPulseAudio_updateTimeInfo( stream->outStream,
+        if( PaPulseAudio_updateTimeInfo( stream->outputStream,
                                      &timeInfo,
                                      0 ) == -PA_ERR_NODATA )
         {
@@ -1362,9 +1357,9 @@ PaTime GetStreamTime( PaStream * s )
         }
     }
 
-    if( stream->inStream )
+    if( stream->inputStream )
     {
-        if( PaPulseAudio_updateTimeInfo( stream->inStream,
+        if( PaPulseAudio_updateTimeInfo( stream->inputStream,
                                      &timeInfo,
                                      1 )  == -PA_ERR_NODATA )
         {
@@ -1399,7 +1394,7 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     PaError result = paNoError;
     pa_operation *op = NULL;
 
-    if ( stream->inStream == NULL )
+    if ( stream->inputStream == NULL )
     {
         return paInvalidDevice;
     }
@@ -1414,10 +1409,10 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     }
     snprintf(newStreamName, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1, "%s", streamName);
 
-    PaUtil_FreeMemory( stream->sourceStreamName );
-    stream->sourceStreamName = newStreamName;
+    PaUtil_FreeMemory( stream->inputStreamName );
+    stream->inputStreamName = newStreamName;
 
-    op = pa_stream_set_name( stream->inStream, streamName, RenameStreamCb, stream );
+    op = pa_stream_set_name( stream->inputStream, streamName, RenameStreamCb, stream );
     PaPulseAudio_UnLock( stream->mainloop );
 
     /* Wait for completion. */
@@ -1435,7 +1430,7 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     PaError result = paNoError;
     pa_operation *op = NULL;
 
-    if ( stream->outStream == NULL )
+    if ( stream->outputStream == NULL )
     {
         return paInvalidDevice;
     }
@@ -1450,10 +1445,10 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     }
     snprintf(newStreamName, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1, "%s", streamName);
 
-    PaUtil_FreeMemory( stream->sinkStreamName );
-    stream->sinkStreamName = newStreamName;
+    PaUtil_FreeMemory( stream->outputStreamName );
+    stream->outputStreamName = newStreamName;
 
-    op = pa_stream_set_name( stream->outStream, streamName, RenameStreamCb, stream );
+    op = pa_stream_set_name( stream->outputStream, streamName, RenameStreamCb, stream );
     PaPulseAudio_UnLock( stream->mainloop );
 
     /* Wait for completion. */

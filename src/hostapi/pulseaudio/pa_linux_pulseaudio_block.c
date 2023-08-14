@@ -3,7 +3,7 @@
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014-2022 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2023 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
  *
  * Based on the Open Source API proposed by Ross Bencina
@@ -116,7 +116,7 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
         PA_PULSEAUDIO_IS_ERROR(l_ptrStream, paStreamIsStopped)
 
         PaPulseAudio_Lock( l_ptrStream->mainloop );
-        l_lWritable = pa_stream_writable_size( l_ptrStream->outStream );
+        l_lWritable = pa_stream_writable_size( l_ptrStream->outputStream );
         PaPulseAudio_UnLock( l_ptrStream->mainloop );
 
         if( l_lWritable > 0 )
@@ -126,14 +126,14 @@ PaError PaPulseAudio_WriteStreamBlock( PaStream * s,
                 l_lWritable = l_lLength;
             }
             PaPulseAudio_Lock( l_ptrStream->mainloop );
-            l_iRet = pa_stream_write( l_ptrStream->outStream,
+            l_iRet = pa_stream_write( l_ptrStream->outputStream,
                                      l_ptrData,
                                      l_lWritable,
                                      NULL,
                                      0,
                                      PA_SEEK_RELATIVE );
 
-            l_ptrOperation = pa_stream_update_timing_info( l_ptrStream->outStream,
+            l_ptrOperation = pa_stream_update_timing_info( l_ptrStream->outputStream,
                                                            NULL,
                                                            NULL );
             PaPulseAudio_UnLock( l_ptrStream->mainloop );
@@ -190,7 +190,7 @@ signed long PaPulseAudio_GetStreamReadAvailableBlock( PaStream * s )
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) s;
 
-    if( l_ptrStream->inStream == NULL )
+    if( l_ptrStream->inputStream == NULL )
     {
         return 0;
     }

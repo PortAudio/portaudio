@@ -3,7 +3,7 @@
  * PulseAudio host to play natively in Linux based systems without
  * ALSA emulation
  *
- * Copyright (c) 2014-2020 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
+ * Copyright (c) 2014-2023 Tuukka Pasanen <tuukka.pasanen@ilmi.fi>
  * Copyright (c) 2016 Sqweek
  *
  * Based on the Open Source API proposed by Ross Bencina
