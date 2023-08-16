@@ -1002,6 +1002,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     stream->isActive = 0;
     stream->isStopped = 1;
+    stream->pulseaudioIsActive = 0;
+    stream->pulseaudioIsStopped = 1;
 
     stream->inputStream = NULL;
     stream->outputStream = NULL;

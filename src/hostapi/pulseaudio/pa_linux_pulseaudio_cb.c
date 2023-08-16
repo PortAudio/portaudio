@@ -242,11 +242,19 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     }
 
     /*
+     * When stopped we should stop feeding or recording right away
+     */
+    if( stream->isStopped )
+    {
+        return paNotInitialized;
+    }
+
+    /*
      * This can be called before we have reached out
      * starting Portaudio stream or Portaudio stream
      * is stopped
      */
-    if( !stream->isActive )
+    if( !stream->pulseaudioIsActive )
     {
         if(stream->outputStream)
         {
@@ -388,10 +396,10 @@ void PaPulseAudio_StreamRecordCb( pa_stream * s,
 {
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) userdata;
 
-    if( !l_ptrStream->isActive )
+    if( !l_ptrStream->pulseaudioIsActive )
     {
-        l_ptrStream->isActive = 1;
-        l_ptrStream->isStopped = 0;
+        l_ptrStream->pulseaudioIsActive = 1;
+        l_ptrStream->pulseaudioIsStopped= 0;
     }
 
     _PaPulseAudio_Read( l_ptrStream, length );
@@ -417,10 +425,10 @@ void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
     PaPulseAudio_Stream *l_ptrStream = (PaPulseAudio_Stream *) userdata;
     uint8_t l_cBUffer[PULSEAUDIO_BUFFER_SIZE];
 
-    if( !l_ptrStream->inputStream && !l_ptrStream->isActive )
+    if( !l_ptrStream->inputStream && !l_ptrStream->pulseaudioIsActive )
     {
-        l_ptrStream->isActive = 1;
-        l_ptrStream->isStopped = 0;
+        l_ptrStream->pulseaudioIsActive = 1;
+        l_ptrStream->pulseaudioIsStopped = 0;
     }
 
     if( l_ptrStream->bufferProcessor.streamCallback )
@@ -482,6 +490,8 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     /* Wait for stream to be stopped */
     stream->isActive = 0;
     stream->isStopped = 1;
+    stream->pulseaudioIsActive = 0;
+    stream->pulseaudioIsStopped = 1;
 
     if( stream->outputStream != NULL
         && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY )
@@ -570,6 +580,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     stream->isActive = 0;
     stream->isStopped = 1;
+    stream->pulseaudioIsActive = 0;
+    stream->pulseaudioIsStopped = 1;
     stream->missedBytes = 0;
 
     /* Ready the processor */
@@ -824,6 +836,10 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     /* Make sure we pass no error on intialize */
     result = paNoError;
 
+    /* Stream is now active */
+    stream->isActive = 1;
+    stream->isStopped = 0;
+
     /* Allways unlock.. so we don't get locked */
     startstreamcb_end:
     return result;
@@ -857,6 +873,9 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
     /* Wait for stream to be stopped */
     stream->isActive = 0;
     stream->isStopped = 1;
+    stream->pulseaudioIsActive = 0;
+    stream->pulseaudioIsStopped = 1;
+
     stream->missedBytes = 0;
 
     /* Test if there is something that we can play */
@@ -884,6 +903,8 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
     PaPulseAudio_UnLock( l_ptrPulseAudioHostApi->mainloop );
     stream->isActive = 0;
     stream->isStopped = 1;
+    stream->pulseaudioIsActive = 0;
+    stream->pulseaudioIsStopped = 1;
 
     return result;
 }

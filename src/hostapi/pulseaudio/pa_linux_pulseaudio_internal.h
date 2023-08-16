@@ -150,6 +150,8 @@ typedef struct PaPulseAudio_Stream
     /* Used in communication between threads */
     volatile sig_atomic_t isActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
     volatile sig_atomic_t isStopped; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    volatile sig_atomic_t pulseaudioIsActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    volatile sig_atomic_t pulseaudioIsStopped; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
 
 }
 PaPulseAudio_Stream;
