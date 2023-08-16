@@ -198,10 +198,30 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     {
         if( !stream->framesPerHostCallback )
         {
+            int l_iCurrentFrameSize = stream->outputFrameSize;
+
+            /* If we have output device then outputFrameSize > 0
+             * Otherwise we should use inputFrameSize as we only
+             * have input device
+             */
+            if( l_iCurrentFrameSize <= 0 )
+            {
+                l_iCurrentFrameSize = stream->inputFrameSize;
+            }
+
+            /* If everything else fails just have some sane default
+             * This should not ever happen and probably it will fail in
+             * somewhere else
+             */
+            if( l_iCurrentFrameSize  <= 0 )
+            {
+                return paNotInitialized;
+            }
+
             /* This just good enough and most
              * Pulseaudio server and ALSA can handle it
              */
-            l_lFramesPerHostBuffer = (256 / (stream->outputFrameSize * 2));
+            l_lFramesPerHostBuffer = (128 / (l_iCurrentFrameSize * 2));
 
             if( (l_lFramesPerHostBuffer % 2) )
             {
@@ -233,7 +253,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
      */
     if( stream->inputStream )
     {
-        l_lInFrameBytes = l_lInFrameBytes = (l_lFramesPerHostBuffer * stream->inputFrameSize);
+        l_lInFrameBytes = l_lOutFrameBytes = (l_lFramesPerHostBuffer * stream->inputFrameSize);
 
         if( stream->bufferProcessor.streamCallback )
         {
@@ -246,7 +266,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
      */
     if( stream->isStopped )
     {
-        return paNotInitialized;
+        return paStreamIsStopped;
     }
 
     /*
@@ -271,7 +291,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
         return paContinue;
     }
-
 
     while(1)
     {
