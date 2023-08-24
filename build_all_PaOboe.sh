@@ -42,7 +42,7 @@ function build_PaOboe {
   popd
 }
 
-build_PaOboe armeabi-v7a 16
+#build_PaOboe armeabi-v7a 16
 build_PaOboe arm64-v8a 21
-build_PaOboe x86 16
-build_PaOboe x86_64 21
+#build_PaOboe x86 16
+#build_PaOboe x86_64 21
