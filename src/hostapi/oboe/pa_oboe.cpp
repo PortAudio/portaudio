@@ -82,8 +82,6 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,MODULE_NAME, __VA_ARGS__)
 #define LOGF(...) __android_log_print(ANDROID_LOG_FATAL,MODULE_NAME, __VA_ARGS__)
 
-//TODO: PaOboe_Patch: PaUtil_AllocateZeroInitializedMemory replaces PaUtil_AllocateMemory (same with GoupAllocations)
-
 // Copied from @{pa_opensles.c}.
 #define ENSURE(expr, errorText)                                             \
     do                                                                      \
