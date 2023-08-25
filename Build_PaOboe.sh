@@ -34,7 +34,6 @@ function build_PaOboe {
 
   pushd ${BUILD_DIR}
   make -j5
-  make install
   popd
 }
 
