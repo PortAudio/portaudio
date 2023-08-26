@@ -1118,7 +1118,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
          * This is too much as most of the time there is not much
          * stuff in buffer but it's enough if we are doing blocked
          * and reading is somewhat slower than callback
-         */ 
+         */
         result = PaPulseAudio_BlockingInitRingBuffer( &stream->inputRing,
                                                       (65536 * 4) );
         if( result != paNoError )

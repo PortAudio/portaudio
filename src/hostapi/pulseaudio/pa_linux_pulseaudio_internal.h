@@ -142,20 +142,20 @@ typedef struct PaPulseAudio_Stream
     size_t missedBytes;
 
     /* Used in communication between threads
-     * 
+     *
      * State machine works like this:
      * When stream is wanted to start with Pa_StartStream
      * then isActive is 1 if opening of devices goes well
      * and isStopped is then 0.
-     * 
+     *
      * When requested to stop isStopped is 1 on isActive is 0
      * and nothing should be written to ouput or read from input
      * anymore
-     * 
+     *
      * Pulseaudio does not like this as it creates streams and they
      * start when they are ready and it can be after we have
      * exited Pa_StartStream or before if get's kicked up very fast
-     * 
+     *
      * pulseaudioIsActive and pulseaudioIsStopped are used to find if
      * there is stream active or stopped in pulseaudio side. They
      * live their own life besides isActive and isStopped to make sure
