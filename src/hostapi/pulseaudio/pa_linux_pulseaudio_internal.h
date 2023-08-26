@@ -147,11 +147,31 @@ typedef struct PaPulseAudio_Stream
 
     size_t missedBytes;
 
-    /* Used in communication between threads */
-    volatile sig_atomic_t isActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
-    volatile sig_atomic_t isStopped; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
-    volatile sig_atomic_t pulseaudioIsActive;  /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
-    volatile sig_atomic_t pulseaudioIsStopped; /* Is stream in active state? (Between StartStream and StopStream || !paContinue) */
+    /* Used in communication between threads
+     * 
+     * State machine works like this:
+     * When stream is wanted to start with Pa_StartStream
+     * then isActive is 1 if opening of devices goes well
+     * and isStopped is then 0.
+     * 
+     * When requested to stop isStopped is 1 on isActive is 0
+     * and nothing should be written to ouput or read from input
+     * anymore
+     * 
+     * Pulseaudio does not like this as it creates streams and they
+     * start when they are ready and it can be after we have
+     * exited Pa_StartStream or before if get's kicked up very fast
+     * 
+     * pulseaudioIsActive and pulseaudioIsStopped are used to find if
+     * there is stream active or stopped in pulseaudio side. They
+     * live their own life besides isActive and isStopped to make sure
+     * that portaudio will have input and output available before
+     * reading or writing to stream.
+     */
+    volatile sig_atomic_t isActive;
+    volatile sig_atomic_t isStopped;
+    volatile sig_atomic_t pulseaudioIsActive;
+    volatile sig_atomic_t pulseaudioIsStopped;
 
 }
 PaPulseAudio_Stream;
