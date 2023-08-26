@@ -1100,28 +1100,11 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inputDevice = inputParameters->device;
 
-        /* Make sure that ringbufferSize is power of two */
-        ringbufferSize = stream->inputFrameSize * framesPerBuffer * inputChannelCount;
-        ringbufferSizeTmp = 1;
-
-        /* Find next power of two */
-        while (ringbufferSizeTmp < ringbufferSize)
-        {
-            ringbufferSizeTmp *= 2;
-        }
-
-        ringbufferSize = ringbufferSizeTmp * 64;
-
-        /* This can be low as 1024 and if there is coming 65536
-         * it does not fit in. Size of ringbuffer does not affect
-         * latency as it's played out as soon as there is room
-         * for playing
-         */
-        if (ringbufferSize < (65536 * 2))
-        {
-            ringbufferSize = (65536 * 2);
-        }
-
+        /*
+         * This is too much as most of the time there is not much
+         * stuff in buffer but it's enough if we are doing blocked
+         * and reading is somewhat slower than callback
+         */ 
         result = PaPulseAudio_BlockingInitRingBuffer( &stream->inputRing,
                                                       (65536 * 4) );
         if( result != paNoError )
