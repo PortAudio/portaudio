@@ -116,6 +116,7 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
     return 0;
 }
 
+/* Create HostAPI presensentation */
 PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 {
     PaPulseAudio_HostApiRepresentation *ptr;
@@ -180,6 +181,7 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     return NULL;
 }
 
+/* Free HostAPI */
 void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
 {
 
@@ -222,7 +224,9 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
     PaUtil_FreeMemory( ptr );
 }
 
-
+/* If there is drop connection to server this one is called
+ * in future it should stop the stream also
+ */
 void PaPulseAudio_CheckContextStateCb( pa_context * c,
                                       void *userdata )
 {
@@ -240,6 +244,7 @@ void PaPulseAudio_CheckContextStateCb( pa_context * c,
     pa_threaded_mainloop_signal( ptr->mainloop, 0 );
 }
 
+/* Server info callback */
 void PaPulseAudio_ServerInfoCb( pa_context *c,
                                 const pa_server_info *i,
                                 void *userdata )
@@ -262,7 +267,9 @@ void PaPulseAudio_ServerInfoCb( pa_context *c,
     pa_threaded_mainloop_signal( l_ptrHostApi->mainloop, 0 );
 }
 
-
+/* Function adds device to list. It can be input or output stream
+ *  or in pulseaudio source or sink.
+ */
 int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
                                   const char *PaPulseAudio_SinkSourceName,
                                   const char *PaPulseAudio_SinkSourceNameDesc,
@@ -274,7 +281,12 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
                                   double defaultHighOutputLatency,
                                   const long defaultSampleRate )
 {
-    /* These should be at least 1 */
+    /* These should be at least 1
+     *
+     * Maximun size of string is 1024 (PAPULSEAUDIO_MAX_DEVICENAME)
+     * which should be mostly suffient even pulseaudio device
+     * names can be very long
+     */
     int l_iRealNameSize = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME - 1) + 1;
     int l_iDeviceNameSize = strnlen(PaPulseAudio_SinkSourceName, PAPULSEAUDIO_MAX_DEVICENAME - 1) + 1;
     char *l_strLocalName = NULL;
@@ -294,6 +306,9 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
         return paInsufficientMemory;
     }
 
+    /* We can maximum have 1024 (PAPULSEAUDIO_MAX_DEVICECOUNT)
+     * devices where to choose which should be mostly enough
+     */
     if( hostapi->deviceCount >= PAPULSEAUDIO_MAX_DEVICECOUNT )
     {
         return paDeviceUnavailable;
@@ -323,6 +338,7 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
     return paNoError;
 }
 
+/* Called when iterating through sinks */
 void PaPulseAudio_SinkListCb( pa_context * c,
                               const pa_sink_info * l,
                               int eol,
@@ -375,6 +391,7 @@ void PaPulseAudio_SinkListCb( pa_context * c,
                                  0 );
 }
 
+/* Called when iterating through sources */
 void PaPulseAudio_SourceListCb( pa_context * c,
                                 const pa_source_info * l,
                                 int eol,
@@ -481,6 +498,11 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
     }
 }
 
+/* If stream is underflowed then this callback is called
+ * one needs to enable debug to make use os this
+ *
+ * Otherwise it's used to update error message
+ */
 void PaPulseAudio_StreamUnderflowCb( pa_stream *s,
                                      void *userdata )
 {
@@ -506,7 +528,7 @@ void PaPulseAudio_StreamUnderflowCb( pa_stream *s,
                                  0 );
 }
 
-
+/* Initialize HostAPI */
 PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                  PaHostApiIndex hostApiIndex )
 {
@@ -747,7 +769,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     return result;
 }
 
-
+/* Drop stream now */
 void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 {
     PaPulseAudio_HostApiRepresentation *l_ptrPulseAudioHostApi =
@@ -766,7 +788,7 @@ void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     PaPulseAudio_Free( l_ptrPulseAudioHostApi );
 }
 
-
+/* Checks from pulseaudio that is format supported */
 PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
                            const PaStreamParameters * inputParameters,
                            const PaStreamParameters * outputParameters,
@@ -862,6 +884,11 @@ PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     return paFormatIsSupported;
 }
 
+/* Makes conversion from portaudio to pulseaudio sample defines
+ * Little endian formats are used (if there is some mystical big endian
+ * sound device this should be fixed but until then it's safe to believe
+ * this works
+ */
 PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_( PaSampleFormat portaudiosf,
                                                             pa_sample_spec * pulseaudiosf )
 {
