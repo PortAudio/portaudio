@@ -64,10 +64,6 @@
 /* This is used to identify process name for PulseAudio. */
 extern char *__progname;
 
-/* Default latency values to expose. Chosen by trial and error to be reasonable. */
-#define PA_PULSEAUDIO_DEFAULT_MIN_LATENCY 0.010
-#define PA_PULSEAUDIO_DEFAULT_MAX_LATENCY 0.080
-
 /* PulseAudio specific functions */
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
@@ -1038,14 +1034,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             0x00,
             sizeof(PaUtilRingBuffer) );
 
-    /* This is something that Pulseaudio can handle
-     * and it's also bearable small
-     */
-    if( framesPerBuffer == paFramesPerBufferUnspecified )
-    {
-        framesPerBuffer = PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC;
-    }
-
     if( inputParameters )
     {
         inputChannelCount = inputParameters->channelCount;
@@ -1093,7 +1081,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inputSampleSpec.rate = sampleRate;
         stream->inputSampleSpec.channels = inputChannelCount;
-        stream->latency = inputParameters->suggestedLatency;
         stream->inputChannelCount = inputChannelCount;
 
         if( !pa_sample_spec_valid(&stream->inputSampleSpec) )
@@ -1197,7 +1184,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->outputSampleSpec.rate = sampleRate;
         stream->outputSampleSpec.channels = outputChannelCount;
         stream->outputChannelCount = outputChannelCount;
-        stream->latency = outputParameters->suggestedLatency;
 
         /* Really who has mono output anyway but whom I'm to judge? */
         if( stream->outputSampleSpec.channels == 1 )

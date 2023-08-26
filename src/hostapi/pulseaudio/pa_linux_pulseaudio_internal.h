@@ -59,8 +59,6 @@
 #include <string.h>
 #include <pulse/pulseaudio.h>
 
-
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -71,15 +69,12 @@ extern "C"
 #define PA_PULSEAUDIO_SET_LAST_HOST_ERROR(errorCode, errorText) \
     PaUtil_SetLastHostErrorInfo(paInDevelopment, errorCode, errorText)
 
-/* Just chosen by hand from mistake and success method. Nothing really groudbreaking
-   If there is better number with better explantion then I'll be glad to change this
-   @todo change this to something more sophisticated */
-#define PULSEAUDIO_TIME_EVENT_USEC 750
-
 #define PAPULSEAUDIO_MAX_DEVICECOUNT 1024
 #define PAPULSEAUDIO_MAX_DEVICENAME 1024
 
-#define PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC 32
+/* Default latency values to expose. Chosen by trial and error to be reasonable. */
+#define PA_PULSEAUDIO_DEFAULT_MIN_LATENCY 0.010
+#define PA_PULSEAUDIO_DEFAULT_MAX_LATENCY 0.080
 
 /* Assuming of 2 seconds of 44100 Hz sample rate with FLOAT (4 bytes) and stereo channels (2 channels).
    You should have pretty good size buffer with this. If output/intput doesn't happens in 2 second we
@@ -128,7 +123,6 @@ typedef struct PaPulseAudio_Stream
     pa_buffer_attr outputBufferAttr;
     pa_buffer_attr inputBufferAttr;
     int outputUnderflows;
-    PaTime latency;
     int outputChannelCount;
     int inputChannelCount;
 
