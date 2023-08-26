@@ -633,6 +633,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     pa_stream_flags_t l_iFlags = PA_STREAM_INTERPOLATE_TIMING |
                                  PA_STREAM_AUTO_TIMING_UPDATE |
+                                 PA_STREAM_ADJUST_LATENCY |
                                  PA_STREAM_NO_REMIX_CHANNELS |
                                  PA_STREAM_NO_REMAP_CHANNELS |
                                  PA_STREAM_DONT_MOVE;
@@ -648,8 +649,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
          */
         stream->inputBufferAttr.fragsize = pa_usec_to_bytes( l_lRequestFrameSize,
                                                              &stream->inputSampleSpec );
-        stream->inputBufferAttr.prebuf = pa_usec_to_bytes( l_lRequestFrameSize,
-                                                           &stream->inputSampleSpec );
 
         if( stream->inputDevice != paNoDevice)
         {
@@ -734,13 +733,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
          * In future this should we tuned when things changed
          * this just 'good' default
          */
-        if( !stream->inputStream )
-        {
-            stream->outputBufferAttr.tlength = pa_usec_to_bytes( l_lRequestFrameSize,
-                                                                 &stream->outputSampleSpec );
-            stream->outputBufferAttr.prebuf = pa_usec_to_bytes( l_lRequestFrameSize,
-                                                                &stream->outputSampleSpec );
-        }
+        stream->outputBufferAttr.tlength = pa_usec_to_bytes( l_lRequestFrameSize,
+                                                             &stream->outputSampleSpec );
 
         pa_stream_set_write_callback( stream->outputStream,
                                       PaPulseAudio_StreamPlaybackCb,
