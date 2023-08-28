@@ -78,8 +78,7 @@ void PaOboe_SetSelectedDevice(oboe::Direction direction, int32_t deviceID);
 
 /**
  * Provide PA Oboe with the performance mode chosen by the user.
- * @param  direction - the direction of the stream for which we want to set the performance mode. If set to kUnspecified,
- *         both input and output performance modes will be set to performanceMode.
+ * @param  direction - the direction of the stream for which we want to set the performance mode.
  * @param  performanceMode - the performance mode chosen by the user.
  */
  void PaOboe_SetPerformanceMode(oboe::Direction direction, oboe::PerformanceMode performanceMode);
