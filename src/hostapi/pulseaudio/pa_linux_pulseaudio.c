@@ -986,8 +986,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
      outputSampleFormat;
     PaSampleFormat hostInputSampleFormat,
      hostOutputSampleFormat;
-    unsigned long ringbufferSize = 0;
-    unsigned long ringbufferSizeTmp = 1;
 
     /* validate platform specific flags */
     if( (streamFlags & paPlatformSpecificFlags) != 0 )

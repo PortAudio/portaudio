@@ -640,8 +640,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->inputStream )
     {
-        stream->outputBufferAttr.fragsize = 0;
-
         /* Default input reads 65,535 bytes setting fragsize
          * fragments request to smaller chunks of data so it's
          * easier to get nicer looking timestamps with current
