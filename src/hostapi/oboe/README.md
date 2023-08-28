@@ -23,13 +23,13 @@ To build portaudio with Oboe, there are some necessary steps:
 TODOs:
 ----  
 - Tests. This implementation was non-extensively tested for VoIP calls and blocking streams - for  
-  everything else, it should have a decent structure.
+  everything else, it should have a decent structure, but needs to be tested.
 
 - Add support for armeabi-v7a and x86 architectures.
 
 - Implement onErrorAfterClose in a way that works, and checking the callback methods.
 
-Misc
+Miscellaneous
 ----  
 ### Latency and Sharing Mode:
 Using LowLatency and SharingMode Exclusive is possible, but a function in  pa_oboe.h that sets said flags *is yet to be implemented*, so you'll have to manually set those properties in the  OboeEngine::OpenStream function.

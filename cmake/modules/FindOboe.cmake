@@ -11,7 +11,7 @@ This module provides the following imported target, if found:
 #]=======================================================================]
 
 if(NOT DEFINED OBOE_DIRECTORY)
-    #Insert the path of the directory where you cloned Oboe
+    #Insert the path of the directory where you cloned Oboe, i.e. ${CMAKE_CURRENT_SOURCE_DIR}/../oboe
     set(OBOE_DIRECTORY FALSE)
 endif()
 
