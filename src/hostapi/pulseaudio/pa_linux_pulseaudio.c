@@ -993,6 +993,13 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidFlag;   /* unexpected platform specific flag */
     }
 
+    /* This is something that Pulseaudio can handle
+     * and it's also bearable small
+     */
+    if( framesPerBuffer == paFramesPerBufferUnspecified )
+    {
+        framesPerBuffer = PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC;
+    }
 
     PaPulseAudio_Lock(l_ptrPulseAudioHostApi->mainloop);
     stream =

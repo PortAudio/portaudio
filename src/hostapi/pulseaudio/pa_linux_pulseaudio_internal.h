@@ -76,6 +76,9 @@ extern "C"
 #define PA_PULSEAUDIO_DEFAULT_MIN_LATENCY 0.010
 #define PA_PULSEAUDIO_DEFAULT_MAX_LATENCY 0.080
 
+/* Just some value that Pulseaudio can handle */
+#define PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC 32
+
 /* Assuming of 2 seconds of 44100 Hz sample rate with FLOAT (4 bytes) and stereo channels (2 channels).
    You should have pretty good size buffer with this. If output/intput doesn't happens in 2 second we
    have more trouble than this buffer.
