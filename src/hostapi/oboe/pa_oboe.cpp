@@ -297,7 +297,7 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
     bool m_outcome = false;
 
     m_builder.setDeviceId(getSelectedDevice(direction))
-            // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
+                    // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
             ->setFormat(AudioFormat::I16)
             ->setDirection(direction)
             ->setSampleRate(sampleRate)
@@ -1412,8 +1412,8 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                     )
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
-    /* FIXME: Replace "paInt16" with whatever format you prefer -
-     *  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options */
+        /* FIXME: Replace "paInt16" with whatever format you prefer -
+         *  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options */
         m_hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paInt16, m_inputSampleFormat);
         m_oboeStream->inputFormat = m_hostInputSampleFormat;
@@ -1452,9 +1452,9 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                     )
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
-    /* FIXME: Replace "paInt16" with whatever format you prefer -
-              PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options
-     */
+        /* FIXME: Replace "paInt16" with whatever format you prefer -
+                  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options
+         */
         m_hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paInt16, m_outputSampleFormat);
         m_oboeStream->outputFormat = m_hostOutputSampleFormat;
@@ -1866,15 +1866,10 @@ static double GetStreamCpuLoad(PaStream *s) {
  * @return  256 for Android API Level <= 23, 192 otherwise.
  */
 static unsigned long GetApproximateLowBufferSize() {
-/* FIXME: This function should return the following commented values, but was changed in order to improve
-         compatibility with KCTI for android. Please use the commented values in normal conditions. */
-
-//    if (__ANDROID_API__ <= 23)
-//        return 256;
-//    else
-//        return 192;
-
-    return 1024;
+    if (__ANDROID_API__ <= 23)
+        return 256;
+    else
+        return 192;
 }
 
 
