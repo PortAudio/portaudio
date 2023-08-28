@@ -73,9 +73,6 @@ add_library(PortAudio
 
 include(GNUInstallDirs)
 
-MESSAGE("CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-MESSAGE("CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
-
 target_include_directories(PortAudio PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/common>
@@ -156,7 +153,7 @@ endif()
 
 # Oboe only works on Android, which has a Linux kernel.
 find_package(Oboe)
-option(PA_USE_OBOE "Enable support for Oboe" ON)
+cmake_dependent_option(PA_USE_OBOE "Enable support for Oboe" ON OBOE_FOUND OFF)
 if(PA_USE_OBOE)
   message("Oboe found!")
   target_sources(PortAudio PRIVATE src/hostapi/oboe/pa_oboe.cpp)

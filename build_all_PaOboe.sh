@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to build Portaudio_Oboe for multiple Android ABIs
+# Script used to build Portaudio for multiple Android ABIs, useful for its Oboe host API.
 #
 # Ensure that ANDROID_NDK environment variable is set to your Android NDK location
 # e.g. /Library/Android/sdk/ndk-bundle
