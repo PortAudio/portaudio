@@ -4,8 +4,6 @@
 # Ensure that ANDROID_NDK environment variable is set to your Android NDK location
 # e.g. /Library/Android/sdk/ndk-bundle
 
-ANDROID_NDK=/home/netresults.wintranet/benfatti/Android/Sdk/ndk/23.1.7779620
-
 if [ -z "$ANDROID_NDK" ]; then
   echo "Please set ANDROID_NDK to the Android NDK folder"
   exit 1
