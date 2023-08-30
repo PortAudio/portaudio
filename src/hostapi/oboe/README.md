@@ -19,7 +19,6 @@ To build portaudio with Oboe, there are some necessary steps:
    - OBOE_INCLUDE_DIR set to the path of the Oboe include directory;
    - OBOE_LINK_LIBRARIES set to the path of the prebuilt libraries.
 4) Build Portaudio (you can use "build_all_PaOboe.sh" to build it for all supported Android ABIs).
-5) Don't forget to add liboboe.so and libportaudio.so in your jniLibs folder.
 
 TODOs:
 ----  
