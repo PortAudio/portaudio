@@ -2,17 +2,22 @@
 FindOboe
 --------
 
-Finds the Oboe Directory by searching for it in the PA_DIRECTORY, which is the CMAKE_SOURCE_DIR if
-not set.
+Finds the Oboe library. OBOE_DIRECTORY has to be set to the path of the directory where
+the Oboe repository was cloned (see src/hostapi/oboe/README.md for more information).
+
+Imported Targets
+^^^^^^^^^^^^^^^^
 
 This module provides the following imported target, if found:
-    ``Oboe``
+
+``Oboe``
+  The OBOE library
 
 #]=======================================================================]
 
 if(NOT DEFINED OBOE_DIRECTORY)
     #Insert the path of the directory where you cloned Oboe, i.e. ${CMAKE_CURRENT_SOURCE_DIR}/../oboe
-    set(OBOE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../oboe)
+    set(OBOE_DIRECTORY FALSE)
 endif()
 
 if(NOT OBOE_DIRECTORY)
