@@ -1190,12 +1190,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->outputSampleSpec.channels = outputChannelCount;
         stream->outputChannelCount = outputChannelCount;
 
-        /* Really who has mono output anyway but whom I'm to judge? */
-        if( stream->outputSampleSpec.channels == 1 )
-        {
-            stream->outputSampleSpec.channels = 2;
-        }
-
         if( !pa_sample_spec_valid( &stream->outputSampleSpec ) )
         {
             PA_DEBUG( ("Portaudio %s: Invalid audio spec for output!\n",

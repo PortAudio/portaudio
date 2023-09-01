@@ -190,6 +190,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     int l_iResult = paContinue;
     void *l_ptrData = NULL;
     size_t l_lWrittenBytes = 0;
+    uint8_t l_cInputMonoToStereoCopy = 0;
 
     /* If there is no specified per host buffer then
      * just generate one or but correct one in place
@@ -269,6 +270,19 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         return paContinue;
     }
 
+    /* If we have input which is mono and
+     * output which is stereo. We have to copy
+     * mono to monomono which is stereo.
+     * Then just read half and copy
+     */
+    if( l_bOutputCb &&
+        stream->outputSampleSpec.channels == 2 &&
+        stream->inputSampleSpec.channels == 1)
+    {
+        l_lInFrameBytes /= 2;
+        l_cInputMonoToStereoCopy = 1;
+    }
+
     while(1)
     {
     /* There is only Record stream so
@@ -323,9 +337,9 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     /* Read of ther is something to read */
     if( l_bInputCb )
     {
-        PaUtil_ReadRingBuffer(&stream->inputRing,
-                              l_cBUffer,
-                              l_lInFrameBytes);
+        PaUtil_ReadRingBuffer( &stream->inputRing,
+                               l_cBUffer,
+                               l_lInFrameBytes);
 
         PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
                                             0,
@@ -334,7 +348,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
         PaUtil_SetInputFrameCount( &stream->bufferProcessor,
                                    l_lFramesPerHostBuffer );
-
     }
 
     if( l_bOutputCb )
