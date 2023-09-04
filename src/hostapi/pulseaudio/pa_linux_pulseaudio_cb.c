@@ -282,115 +282,121 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     while(1)
     {
-    /* There is only Record stream so
-     * see if we have enough stuff to feed record stream
-     * If not then bail out.
-     */
-    if( isInputCb &&
-        PaUtil_GetRingBufferReadAvailable(&stream->inputRing) < pulseaudioInputBytes )
-    {
-        if(isOutputCb && (pulseaudioOutputWritten < length) && !stream->missedBytes)
+        /*
+         * If everything fail like stream vanish or mainloop
+         * is in error state try to handle error
+         */
+        PA_PULSEAUDIO_IS_ERROR( stream, paStreamIsStopped )
+
+        /* There is only Record stream so
+         * see if we have enough stuff to feed record stream
+         * If not then bail out.
+         */
+        if( isInputCb &&
+            PaUtil_GetRingBufferReadAvailable(&stream->inputRing) < pulseaudioInputBytes )
         {
-            stream->missedBytes = length - pulseaudioOutputWritten;
+            if(isOutputCb && (pulseaudioOutputWritten < length) && !stream->missedBytes)
+            {
+                stream->missedBytes = length - pulseaudioOutputWritten;
+            }
+            else
+            {
+                stream->missedBytes = 0;
+            }
+            break;
         }
-        else
+        else if( pulseaudioOutputWritten >= length)
         {
             stream->missedBytes = 0;
+            break;
         }
-        break;
-    }
-    else if( pulseaudioOutputWritten >= length)
-    {
-        stream->missedBytes = 0;
-        break;
-    }
 
-    if(  stream->outputStream )
-    {
-        PaPulseAudio_updateTimeInfo( stream->outputStream,
-                                     &timeInfo,
-                                     0 );
-    }
+        if(  stream->outputStream )
+        {
+            PaPulseAudio_updateTimeInfo( stream->outputStream,
+                                         &timeInfo,
+                                         0 );
+        }
 
-    if(  stream->inputStream )
-    {
-        PaPulseAudio_updateTimeInfo( stream->inputStream,
-                                     &timeInfo,
-                                     1 );
-    }
+        if(  stream->inputStream )
+        {
+            PaPulseAudio_updateTimeInfo( stream->inputStream,
+                                         &timeInfo,
+                                         1 );
+        }
 
-    PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
+        PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 
-    /* When doing Portaudio Duplex one has to write and read same amount of data
-     * if not done that way Portaudio will go boo boo and nothing works.
-     * This is why this is done as it's done
-     *
-     * Pulseaudio does not care and this is something that needs small adjusting
-     */
-    PaUtil_BeginBufferProcessing( &stream->bufferProcessor,
-                                  &timeInfo,
-                                  0 );
-
-    /* Read of ther is something to read */
-    if( isInputCb )
-    {
-        PaUtil_ReadRingBuffer( &stream->inputRing,
-                               pulseaudioSampleBuffer,
-                               pulseaudioInputBytes);
-
-        PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
-                                            0,
-                                            pulseaudioSampleBuffer,
-                                            stream->inputSampleSpec.channels );
-
-        PaUtil_SetInputFrameCount( &stream->bufferProcessor,
-                                   hostFramesPerBuffer );
-    }
-
-    if( isOutputCb )
-    {
-
-        size_t tmpSize = pulseaudioOutputBytes;
-
-        /* Allocate memory to make it faster to output stuff */
-        pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
-
-        /* If bufferData is NULL then output is not ready
-         * and we have to wait for it
+        /* When doing Portaudio Duplex one has to write and read same amount of data
+         * if not done that way Portaudio will go boo boo and nothing works.
+         * This is why this is done as it's done
+         *
+         * Pulseaudio does not care and this is something that needs small adjusting
          */
-        if(!bufferData)
+        PaUtil_BeginBufferProcessing( &stream->bufferProcessor,
+                                      &timeInfo,
+                                      0 );
+
+        /* Read of ther is something to read */
+        if( isInputCb )
         {
-            return paNotInitialized;
+            PaUtil_ReadRingBuffer( &stream->inputRing,
+                                   pulseaudioSampleBuffer,
+                                   pulseaudioInputBytes);
+
+            PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
+                                                0,
+                                                pulseaudioSampleBuffer,
+                                                stream->inputSampleSpec.channels );
+
+            PaUtil_SetInputFrameCount( &stream->bufferProcessor,
+                                       hostFramesPerBuffer );
         }
 
-        PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
-                                             0,
-                                             bufferData,
-                                             stream->outputChannelCount );
-
-        PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
-                                    hostFramesPerBuffer );
-
-        if( pa_stream_write( stream->outputStream,
-                             bufferData,
-                             pulseaudioOutputBytes,
-                             NULL,
-                             0,
-                             PA_SEEK_RELATIVE ) )
+        if( isOutputCb )
         {
-            PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
-                      __FUNCTION__) );
+
+            size_t tmpSize = pulseaudioOutputBytes;
+
+            /* Allocate memory to make it faster to output stuff */
+            pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
+
+            /* If bufferData is NULL then output is not ready
+             * and we have to wait for it
+             */
+            if(!bufferData)
+            {
+                return paNotInitialized;
+            }
+
+            PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
+                                                 0,
+                                                 bufferData,
+                                                 stream->outputChannelCount );
+
+            PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
+                                        hostFramesPerBuffer );
+
+            if( pa_stream_write( stream->outputStream,
+                                 bufferData,
+                                 pulseaudioOutputBytes,
+                                 NULL,
+                                 0,
+                                 PA_SEEK_RELATIVE ) )
+            {
+                PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
+                          __FUNCTION__) );
+            }
+
+            pulseaudioOutputWritten += pulseaudioOutputBytes;
         }
 
-        pulseaudioOutputWritten += pulseaudioOutputBytes;
-    }
+        hostFrameCount =
+            PaUtil_EndBufferProcessing( &stream->bufferProcessor,
+                                        &ret );
 
-    hostFrameCount =
-        PaUtil_EndBufferProcessing( &stream->bufferProcessor,
-                                    &ret );
-
-    PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
-                                  hostFrameCount );
+        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
+                                      hostFrameCount );
     }
 
     return ret;
@@ -502,12 +508,33 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY )
     {
         PaPulseAudio_Lock(stream->mainloop);
-
-        /* Then we cancel all writing (if there is any)
-         *  and wait for disconnetion (TERMINATION) which
-         * can take a while for ethernet connections
+        /**
+         * Pause stream so it stops faster
          */
-        pa_stream_cancel_write( stream->outputStream );
+        pulseaudioOperation = pa_stream_cork( stream->outputStream,
+                                              1,
+                                              PaPulseAudio_CorkSuccessCb,
+                                              stream );
+
+        PaPulseAudio_UnLock( stream->mainloop );
+
+        while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
+        {
+            pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
+            waitLoop ++;
+
+            if(waitLoop > 250)
+            {
+                break;
+            }
+        }
+
+        waitLoop = 0;
+
+        PaPulseAudio_Lock(stream->mainloop);
+        pa_operation_unref( pulseaudioOperation );
+        pulseaudioOperation = NULL;
+
         pa_stream_disconnect( stream->outputStream );
         PaPulseAudio_UnLock( stream->mainloop );
     }
@@ -516,6 +543,33 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && pa_stream_get_state( stream->inputStream ) == PA_STREAM_READY )
     {
         PaPulseAudio_Lock( stream->mainloop );
+
+        /**
+         * Pause stream so it stops so it stops faster
+         */
+        pulseaudioOperation = pa_stream_cork( stream->inputStream,
+                                              1,
+                                              PaPulseAudio_CorkSuccessCb,
+                                              stream );
+
+        PaPulseAudio_UnLock( stream->mainloop );
+
+        while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
+        {
+            pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
+            waitLoop ++;
+
+            if(waitLoop > 250)
+            {
+                break;
+            }
+        }
+
+        waitLoop = 0;
+
+        PaPulseAudio_Lock( stream->mainloop );
+        pa_operation_unref( pulseaudioOperation );
+        pulseaudioOperation = NULL;
 
         /* Then we disconnect stream and wait for
          * Termination
