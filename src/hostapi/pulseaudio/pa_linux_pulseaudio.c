@@ -75,15 +75,15 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
      */
     if( !ptr )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_CheckConnection: Host API is NULL! Can't do anything about it");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_CheckConnection: Host API is NULL! Can't do anything about it" );
         return -1;
     }
 
     if( !ptr->context || !ptr->mainloop )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_CheckConnection: PulseAudio context or mainloop are NULL");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_CheckConnection: PulseAudio context or mainloop are NULL" );
         return -1;
     }
 
@@ -98,13 +98,14 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
              */
 
             case PA_CONTEXT_UNCONNECTED:
-               PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The context hasn't been connected yet (PA_CONTEXT_UNCONNECTED)");
+               PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                                  "PaPulseAudio_CheckConnection: The context hasn't been connected yet (PA_CONTEXT_UNCONNECTED)" );
             break;
 
             case PA_CONTEXT_FAILED:
-               PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0, "PaPulseAudio_CheckConnection: The connection failed or was disconnected. (PA_CONTEXT_FAILED)");
+               PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                                  "PaPulseAudio_CheckConnection: The connection failed or was disconnected. (PA_CONTEXT_FAILED)" );
             break;
-
         }
 
         return -1;
@@ -125,8 +126,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
     /* ptr is NULL if runs out of memory or pointer to allocated memory */
     if( !ptr )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_HostApiRepresentation: Can't allocate memory required for using PulseAudio");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_HostApiRepresentation: Can't allocate memory required for using PulseAudio" );
         return NULL;
     }
 
@@ -137,8 +138,8 @@ PaPulseAudio_HostApiRepresentation *PaPulseAudio_New( void )
 
     if( !ptr->mainloop )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_HostApiRepresentation: Can't allocate PulseAudio mainloop");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_HostApiRepresentation: Can't allocate PulseAudio mainloop" );
         goto fail;
     }
 
@@ -186,8 +187,8 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
      */
     if( !ptr )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_Free: Host API is NULL! Can't do anything about it");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_Free: Host API is NULL! Can't do anything about it" );
         return;
     }
 
@@ -233,7 +234,7 @@ void PaPulseAudio_CheckContextStateCb( pa_context * c,
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                            "PaPulseAudio_CheckContextStateCb: Invalid context " );
-        pa_threaded_mainloop_signal(ptr->mainloop, 0);
+        pa_threaded_mainloop_signal( ptr->mainloop, 0 );
         return;
     }
 
@@ -281,8 +282,8 @@ int _PaPulseAudio_AddAudioDevice( PaPulseAudio_HostApiRepresentation *hostapi,
      * which should be mostly suffient even pulseaudio device
      * names can be very long
      */
-    int pulseaudioRealNameSize = strnlen(PaPulseAudio_SinkSourceNameDesc, PAPULSEAUDIO_MAX_DEVICENAME - 1) + 1;
-    int pulseaudioDeviceNameSize = strnlen(PaPulseAudio_SinkSourceName, PAPULSEAUDIO_MAX_DEVICENAME - 1) + 1;
+    int pulseaudioRealNameSize = strnlen( PaPulseAudio_SinkSourceNameDesc, (PAPULSEAUDIO_MAX_DEVICENAME - 1) ) + 1;
+    int pulseaudioDeviceNameSize = strnlen( PaPulseAudio_SinkSourceName, (PAPULSEAUDIO_MAX_DEVICENAME - 1) ) + 1;
     char *pulseaudioLocalDeviceName = NULL;
 
     hostapi->deviceInfoArray[hostapi->deviceCount].structVersion = 2;
@@ -467,7 +468,7 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
             {
                 PA_DEBUG( ("Portaudio %s: Can get buffer attr: '%s'\n",
                            __FUNCTION__,
-                           pa_strerror(pa_context_errno(pa_stream_get_context(s) ) ) ) );
+                           pa_strerror(pa_context_errno(pa_stream_get_context(s) ) )) );
                 PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                            "PaPulseAudio_StreamStateCb: Can't get Stream pa_buffer_attr" );
             }
@@ -484,7 +485,7 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
         default:
             PA_DEBUG( ("Portaudio %s: FAILED '%s'\n",
                       __FUNCTION__,
-                      pa_strerror( pa_context_errno( pa_stream_get_context( s ) ) ) ) );
+                      pa_strerror( pa_context_errno( pa_stream_get_context( s ) ) )) );
 
             break;
     }
@@ -831,7 +832,7 @@ PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         inputChannelCount = 0;
     }
 
-    if( outputParameters)
+    if( outputParameters )
     {
         outputChannelCount = outputParameters->channelCount;
         outputSampleFormat = outputParameters->sampleFormat;
@@ -926,13 +927,13 @@ PaError PaPulseAudio_ConvertPortaudioFormatToPaPulseAudio_( PaSampleFormat porta
 PaError PaPulseAudio_BlockingInitRingBuffer( PaUtilRingBuffer * rbuf,
                                              int size )
 {
-    char *ringbufferBuffer = (char *) malloc(size);
+    char *ringbufferBuffer = (char *) malloc( size );
     PaError ret = paNoError;
 
     if( ringbufferBuffer == NULL )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_BlockingInitRingBuffer: Not enough memory to handle request");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_BlockingInitRingBuffer: Not enough memory to handle request" );
         return paInsufficientMemory;
     }
 
@@ -950,8 +951,8 @@ PaError PaPulseAudio_BlockingInitRingBuffer( PaUtilRingBuffer * rbuf,
         free( ringbufferBuffer );
         PA_DEBUG( ("Portaudio %s: Can't initialize input ringbuffer with size: %ld!\n",
                    __FUNCTION__, size) );
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR(0,
-                                          "PaPulseAudio_BlockingInitRingBuffer: Can't initialize input ringbuffer");
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+                                           "PaPulseAudio_BlockingInitRingBuffer: Can't initialize input ringbuffer" );
 
         return paNotInitialized;
     }
@@ -986,7 +987,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     /* validate platform specific flags */
     if( (streamFlags & paPlatformSpecificFlags) != 0 )
     {
-        return paInvalidFlag;   /* unexpected platform specific flag */
+        return paInvalidFlag;
     }
 
     /* This is something that Pulseaudio can handle
@@ -1012,8 +1013,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     const char defaultSinkStreamName[] = "Portaudio sink";
 
     stream->framesPerHostCallback = framesPerBuffer;
-    stream->inputStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSourceStreamName));
-    stream->outputStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(sizeof(defaultSinkStreamName));
+    stream->inputStreamName = (char*)PaUtil_AllocateZeroInitializedMemory( sizeof( defaultSourceStreamName ) );
+    stream->outputStreamName = (char*)PaUtil_AllocateZeroInitializedMemory( sizeof( defaultSinkStreamName ) );
     if ( !stream->inputStreamName || !stream->outputStreamName )
     {
         result = paInsufficientMemory;
@@ -1021,8 +1022,8 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     }
 
     /* Copy initial stream names to memory. */
-    memcpy( stream->inputStreamName, defaultSourceStreamName, sizeof(defaultSourceStreamName) );
-    memcpy( stream->outputStreamName, defaultSinkStreamName, sizeof(defaultSinkStreamName) );
+    memcpy( stream->inputStreamName, defaultSourceStreamName, sizeof( defaultSourceStreamName ) );
+    memcpy( stream->outputStreamName, defaultSinkStreamName, sizeof( defaultSinkStreamName ) );
 
     stream->isActive = 0;
     stream->isStopped = 1;
@@ -1033,7 +1034,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->outputStream = NULL;
     memset( &stream->inputRing,
             0x00,
-            sizeof(PaUtilRingBuffer) );
+            sizeof( PaUtilRingBuffer ) );
 
     if( inputParameters )
     {
@@ -1084,7 +1085,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         stream->inputSampleSpec.channels = inputChannelCount;
         stream->inputChannelCount = inputChannelCount;
 
-        if( !pa_sample_spec_valid(&stream->inputSampleSpec) )
+        if( !pa_sample_spec_valid( &stream->inputSampleSpec ) )
         {
             PA_DEBUG( ("Portaudio %s: Invalid input audio spec!\n",
                       __FUNCTION__) );
@@ -1310,7 +1311,7 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         PaUtil_FreeMemory( stream->inputStreamName );
         PaUtil_FreeMemory( stream->outputStreamName );
-        PaUtil_FreeMemory(stream);
+        PaUtil_FreeMemory( stream );
     }
 
     goto openstream_end;
@@ -1341,8 +1342,8 @@ PaTime GetStreamTime( PaStream * s )
     if( stream->outputStream )
     {
         if( PaPulseAudio_updateTimeInfo( stream->outputStream,
-                                     &timeInfo,
-                                     0 ) == -PA_ERR_NODATA )
+                                         &timeInfo,
+                                         0 ) == -PA_ERR_NODATA )
         {
             return 0;
         }
@@ -1351,8 +1352,8 @@ PaTime GetStreamTime( PaStream * s )
     if( stream->inputStream )
     {
         if( PaPulseAudio_updateTimeInfo( stream->inputStream,
-                                     &timeInfo,
-                                     1 )  == -PA_ERR_NODATA )
+                                         &timeInfo,
+                                         1 )  == -PA_ERR_NODATA )
         {
             return 0;
         }
@@ -1392,13 +1393,13 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
 
     /* Reallocate stream name in memory. */
     PaPulseAudio_Lock( stream->mainloop );
-    char *newStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
+    char *newStreamName = (char*)PaUtil_AllocateZeroInitializedMemory( strnlen( streamName, PAPULSEAUDIO_MAX_DEVICENAME ) + 1 );
     if ( !newStreamName )
     {
         PaPulseAudio_UnLock( stream->mainloop );
         return paInsufficientMemory;
     }
-    snprintf(newStreamName, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1, "%s", streamName);
+    snprintf( newStreamName, strnlen( streamName, PAPULSEAUDIO_MAX_DEVICENAME ) + 1, "%s", streamName );
 
     PaUtil_FreeMemory( stream->inputStreamName );
     stream->inputStreamName = newStreamName;
@@ -1428,13 +1429,13 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
 
     /* Reallocate stream name in memory. */
     PaPulseAudio_Lock( stream->mainloop );
-    char *newStreamName = (char*)PaUtil_AllocateZeroInitializedMemory(strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1);
+    char *newStreamName = (char*)PaUtil_AllocateZeroInitializedMemory( strnlen( streamName, PAPULSEAUDIO_MAX_DEVICENAME ) + 1 );
     if ( !newStreamName )
     {
         PaPulseAudio_UnLock( stream->mainloop );
         return paInsufficientMemory;
     }
-    snprintf(newStreamName, strnlen(streamName, PAPULSEAUDIO_MAX_DEVICENAME) + 1, "%s", streamName);
+    snprintf( newStreamName, strnlen( streamName, PAPULSEAUDIO_MAX_DEVICENAME ) + 1, "%s", streamName );
 
     PaUtil_FreeMemory( stream->outputStreamName );
     stream->outputStreamName = newStreamName;

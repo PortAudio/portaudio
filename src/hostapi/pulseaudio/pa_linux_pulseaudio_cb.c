@@ -76,7 +76,7 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
     pa_usec_t pulseaudioStreamLatency = 0;
 
     if( pa_stream_get_time( s,
-                          &pulseaudioStreamTime ) == -PA_ERR_NODATA )
+                            &pulseaudioStreamTime ) == -PA_ERR_NODATA )
     {
         return -PA_ERR_NODATA;
     }
@@ -133,7 +133,7 @@ void _PaPulseAudio_WriteRingBuffer( PaUtilRingBuffer *ringbuffer,
      * If you try to read too much and there is no room then this
      * will fail. But I don't know how to get into that?
      */
-    if( PaUtil_GetRingBufferWriteAvailable(ringbuffer) < length )
+    if( PaUtil_GetRingBufferWriteAvailable( ringbuffer ) < length )
     {
         uint8_t tmpBuffer[ PULSEAUDIO_BUFFER_SIZE ];
         PaUtil_ReadRingBuffer( ringbuffer,
@@ -666,7 +666,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             if( ! pa_stream_connect_record( stream->inputStream,
                                             pulseaudioName,
                                             &stream->inputBufferAttr,
-                                            pulseaudioStreamFlags) )
+                                            pulseaudioStreamFlags ) )
             {
                 pa_stream_set_started_callback( stream->inputStream,
                                                 PaPulseAudio_StreamStartedCb,
@@ -749,11 +749,11 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                           __FUNCTION__,
                           stream->outputDevice,
                           pulseaudioHostApi->pulseaudioDeviceNames[stream->
-                                                                        outputDevice]) );
+                                                            outputDevice]) );
             }
 
             PaDeviceIndex defaultOutputDevice;
-            PaError result = PaUtil_DeviceIndexToHostApiDeviceIndex(&defaultOutputDevice,
+            PaError result = PaUtil_DeviceIndexToHostApiDeviceIndex( &defaultOutputDevice,
                              pulseaudioHostApi->inheritedHostApiRep.info.defaultOutputDevice,
                              &(pulseaudioHostApi->inheritedHostApiRep) );
 
@@ -764,7 +764,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             if( result == paNoError && stream->outputDevice != defaultOutputDevice )
             {
                 pulseaudioName = pulseaudioHostApi->
-                            pulseaudioDeviceNames[stream->outputDevice];
+                                    pulseaudioDeviceNames[stream->outputDevice];
             }
 
             if(result == paNoError)
@@ -880,9 +880,9 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
         && !abort )
     {
         pulseaudioOperation = pa_stream_cork( stream->outputStream,
-                                         1,
-                                         PaPulseAudio_CorkSuccessCb,
-                                         stream );
+                                              1,
+                                              PaPulseAudio_CorkSuccessCb,
+                                              stream );
 
         while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
         {
@@ -909,7 +909,6 @@ PaError PaPulseAudio_StopStreamCb( PaStream * s )
     return RequestStop( (PaPulseAudio_Stream *) s,
                         0 );
 }
-
 
 PaError PaPulseAudio_AbortStreamCb( PaStream * s )
 {
