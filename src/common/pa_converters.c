@@ -1012,16 +1012,18 @@ static void Int32_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt32 *src = (PaInt32*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt32 *src = (PaInt32*)sourceBuffer;
+    unsigned char *dest = (unsigned char*)destinationBuffer;
+
+    PaInt32 dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (unsigned char) ((((src[0] >> 1) + dither) >> 23) + 128);
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
@@ -1260,13 +1262,30 @@ static void Int24_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    (void) destinationBuffer; /* unused parameters */
-    (void) destinationStride; /* unused parameters */
-    (void) sourceBuffer; /* unused parameters */
-    (void) sourceStride; /* unused parameters */
-    (void) count; /* unused parameters */
-    (void) ditherGenerator; /* unused parameters */
-    /* IMPLEMENT ME */
+    unsigned char *src = (unsigned char*)sourceBuffer;
+    unsigned char  *dest = (unsigned char*)destinationBuffer;
+
+    PaInt32 temp, dither;
+
+    while( count-- )
+    {
+
+#if defined(PA_LITTLE_ENDIAN)
+        temp = (((PaInt32)src[0]) << 8);
+        temp = temp | (((PaInt32)src[1]) << 16);
+        temp = temp | (((PaInt32)src[2]) << 24);
+#elif defined(PA_BIG_ENDIAN)
+        temp = (((PaInt32)src[0]) << 24);
+        temp = temp | (((PaInt32)src[1]) << 16);
+        temp = temp | (((PaInt32)src[2]) << 8);
+#endif
+
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
+
+        src += sourceStride * 3;
+        dest += destinationStride;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1373,16 +1392,20 @@ static void Int16_To_Int8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt16 *src = (PaInt16*)sourceBuffer;
-    signed char *dest =  (signed char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt16 *src = (PaInt16*)sourceBuffer;
+    signed char *dest = (signed char*)destinationBuffer;
+
+    PaInt32 temp, dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        temp = ((PaInt32)src[0]) << 16;
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (signed char) (((temp >> 1) + dither) >> 23);
+
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
@@ -1413,16 +1436,20 @@ static void Int16_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt16 *src = (PaInt16*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt16 *src = (PaInt16*)sourceBuffer;
+    unsigned char *dest = (unsigned char*)destinationBuffer;
+
+    PaInt32 temp, dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        temp = ((PaInt32)src[0]) << 16;
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
+
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
