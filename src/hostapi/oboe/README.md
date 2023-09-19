@@ -21,7 +21,7 @@ To build portaudio with Oboe, there are some necessary steps:
 
 TODOs:
 ----  
-- Testing. This implementation was tested for VoIP calls that use blocking streams - for everything else, lots of tests are needed.
+- Testing. This implementation is being tested for VoIP calls that use blocking streams - for everything else, lots of tests are needed.
 
 Misc
 ----  
