@@ -8,11 +8,16 @@ Building:
 To build portaudio with Oboe, there are some necessary steps:
 1) An android NDK is needed to crosscompile it. I used the version 25.1.8937393, which I found at https://developer.android.com/ndk/downloads.
 2) Clone the Oboe repository - just follow the steps detailed here: https://github.com/google/oboe/blob/main/docs/GettingStarted.md.
-   Make sure to correctly link the NDK path in the Oboe build.
-3) Set the CMake variable OBOE_DIR (used in cmake/modules/FindOboe.cmake) to the path of the cloned Oboe repository.
-4) Build the Oboe Library (you can use "build_all_android.sh").
-5) Build PaOboe (you can use "build_all_PaOboe.sh").
-6) Don't forget to add liboboe.so and libportaudio.so in your jniLibs folder.
+   Make sure to correctly link the NDK path in the Oboe build. If you instead prefer to use the prebuilt libraries, you can just clone the include directory.
+3) Set the CMake variable OBOE_DIRECTORY (used in cmake/modules/FindOboe.cmake) to the path of the cloned Oboe repository, and build the Oboe libraries (you can use "build_all_android.sh").
+
+   If you instead used the prebuilt libraries, do the following:
+   - set OBOE_DIRECTORY to TRUE;
+   - set OBOE_INCLUDE_DIR to the include directory you cloned in step 2;
+   - set OBOE_LIBRARIES to path_to_Oboe_libraries_folder/${ANDROID_ABI}/your_path_to_prebuilt_libraries_of_the_chosen_ABI;
+
+4) Build PaOboe (you can use "build_all_PaOboe.sh").
+5) Don't forget to add liboboe.so and libportaudio.so in your jniLibs folder.
 
 TODOs:
 ----  
