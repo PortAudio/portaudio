@@ -1020,8 +1020,8 @@ static void Int32_To_UInt8_Dither(
     {
        
         PaInt32 dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
-        PaInt32 result = (*src + dither);
-        result = (result >> 24) + 128;
+        PaInt32 result = ((*src >> 1)  + (dither << 8));
+        result = (result >> 23) + 128;
         *dest = (unsigned char)result;
 
         src += sourceStride;
