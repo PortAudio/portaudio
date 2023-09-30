@@ -404,10 +404,10 @@ case "${host_os}" in
 
         if [[ "$have_pulse" = "yes" ] || [ "$have_jack" = "yes" ]] ; then
            OTHER_OBJS="$OTHER_OBJS src/common/pa_ringbuffer.o"
-           INCLUDES="$INCLUDES pa_linux_pulseaudio.h"
         fi
 
         if [[ "$have_pulse" = "yes" ] && [ "$with_pulse" != "no" ]] ; then
+           INCLUDES="$INCLUDES pa_linux_pulseaudio.h"
            DLL_LIBS="$DLL_LIBS $PULSE_LIBS"
            CFLAGS="$CFLAGS $PULSE_CFLAGS"
            OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.o"
