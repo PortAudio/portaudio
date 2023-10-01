@@ -16,6 +16,7 @@ jobs:
             cmake_options:
               -DPA_USE_OSS=ON
               -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+            werror_flags: "-Werror"
           - name: Ubuntu MinGW
             os: ubuntu-latest
             install_dir: ~/portaudio
@@ -29,6 +30,7 @@ jobs:
               -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
               -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-w64-mingw32.cmake
+            werror_flags: "-Werror"
           - name: Windows MSVC
             os: windows-latest
             install_dir: C:\portaudio
@@ -42,6 +44,7 @@ jobs:
               -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
               -DCMAKE_TOOLCHAIN_FILE=D:\a\portaudio\portaudio\vcpkg\scripts\buildsystems\vcpkg.cmake
+            werror_flags: "" # TODO: use "/WX"
           - name: Windows MinGW
             os: windows-latest
             install_dir: C:\portaudio
@@ -55,6 +58,7 @@ jobs:
               -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
               -DCMAKE_TOOLCHAIN_FILE=D:\a\portaudio\portaudio\vcpkg\scripts\buildsystems\vcpkg.cmake
+            werror_flags: "-Werror"
           - name: macOS Clang
             os: macOS-latest
             install_dir: ~/portaudio
@@ -63,6 +67,7 @@ jobs:
             cmake_options:
               -DCMAKE_FRAMEWORK=OFF
               -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+            werror_flags: "-Werror"
           - name: macOS Clang framework
             os: macOS-latest
             install_dir: ~/portaudio
@@ -71,11 +76,14 @@ jobs:
             cmake_options:
               -DCMAKE_FRAMEWORK=ON
               -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+            werror_flags: "-Werror"
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
     env:
       cmake_build_type: RelWithDebInfo
+      CFLAGS: ${{ matrix.werror_flags }}
+      CXXFLAGS: ${{ matrix.werror_flags }}
     steps:
     - name: checkout Git repository
       uses: actions/checkout@v2
