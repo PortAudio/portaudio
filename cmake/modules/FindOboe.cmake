@@ -22,7 +22,8 @@ endif()
 
 if(NOT OBOE_DIRECTORY)
     message(AUTHOR_WARNING
-            "If you're trying to use Oboe as a Host API, please specify the directory where you cloned its repository. For further information, please read src/hostapi/oboe/README.md"
+            "If you're trying to use Oboe as a Host API, please specify the directory where you
+            cloned its repository. For further information, please read src/hostapi/oboe/README.md"
             )
     set(OBOE_FOUND FALSE)
 else()
@@ -53,8 +54,7 @@ else()
     find_library(LOG_LIBRARY log) #used by pa_oboe.cpp and pa_oboe.h as a logging tool
 
     set(OBOE_LINK_LIBRARIES ${OBOE_LIBRARIES} ${LOG_LIBRARY})
-
-
+    
     include(FindPackageHandleStandardArgs)
     find_package_handle_standard_args(
             Oboe
