@@ -31,10 +31,10 @@ else()
         set(OBOE_INCLUDE_DIR ${OBOE_DIRECTORY}/include)
     endif()
 
-    if(NOT DEFINED OBOE_LIBRARIES)
+    if(NOT DEFINED OBOE_LIBRARY_DIRS)
         set(OBOE_LIBRARY_DIRS ${OBOE_DIRECTORY}/build/${ANDROID_ABI})
-        set(OBOE_LIBRARIES ${OBOE_LIBRARY_DIRS}/liboboe.so)
     endif()
+    set(OBOE_LIBRARIES ${OBOE_LIBRARY_DIRS}/liboboe.so)
 
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
@@ -54,7 +54,7 @@ else()
     find_library(LOG_LIBRARY log) #used by pa_oboe.cpp and pa_oboe.h as a logging tool
 
     set(OBOE_LINK_LIBRARIES ${OBOE_LIBRARIES} ${LOG_LIBRARY})
-    
+
     include(FindPackageHandleStandardArgs)
     find_package_handle_standard_args(
             Oboe
