@@ -299,14 +299,14 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
 
     m_builder.setDeviceId(getSelectedDevice(direction))
             // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
-            ->setFormat(AudioFormat::I16)
+            ->setFormat(AudioFormat::Float)
             ->setDirection(direction)
             ->setSampleRate(sampleRate)
             ->setChannelCount(channelCount);
     if (direction == Direction::Input) {
-        m_result = m_builder.openStream(inputStream);
+        m_result = m_builder->openStream(inputStream);
     } else {
-        m_result = m_builder.openStream(outputStream);
+        m_result = m_builder->openStream(outputStream);
     }
 
     if (m_result != Result::OK) {
@@ -1225,8 +1225,8 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
                 m_androidRecordingPreset != InputPreset::Camcorder &&
                 m_androidRecordingPreset != InputPreset::VoiceRecognition &&
                 m_androidRecordingPreset != InputPreset::VoiceCommunication
-                // Should I add compatibility with VoicePerformance?
-                    ) {
+                m_androidRecordingPreset != InputPreset::VoicePerformance
+                ) {
                 m_outcome = paIncompatibleHostApiSpecificStreamInfo;
                 return m_outcome;
             }
@@ -1416,14 +1416,14 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                 )
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
-        /* FIXME: Replace "paInt16" with whatever format you prefer -
+        /* FIXME: Replace "paFloat32" with whatever format you prefer -
          *  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options */
         m_hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(
-                paInt16, m_inputSampleFormat);
+                paFloat32, m_inputSampleFormat);
         m_oboeStream->inputFormat = m_hostInputSampleFormat;
     } else {
         m_inputChannelCount = 0;
-        m_inputSampleFormat = m_hostInputSampleFormat = paInt16; /* Surpress 'uninitialised var' warnings. */
+        m_inputSampleFormat = m_hostInputSampleFormat = paFloat32; /* Surpress 'uninitialised var' warnings. */
         m_oboeStream->inputFormat = m_hostInputSampleFormat;
     }
 
@@ -1456,15 +1456,15 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                     )
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
-        /* FIXME: Replace "paInt16" with whatever format you prefer -
+        /* FIXME: Replace "paFloat32" with whatever format you prefer -
                   PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options
          */
         m_hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
-                paInt16, m_outputSampleFormat);
+                paFloat32, m_outputSampleFormat);
         m_oboeStream->outputFormat = m_hostOutputSampleFormat;
     } else {
         m_outputChannelCount = 0;
-        m_outputSampleFormat = m_hostOutputSampleFormat = paInt16;
+        m_outputSampleFormat = m_hostOutputSampleFormat = paFloat32;
         m_oboeStream->outputFormat = m_hostOutputSampleFormat;
     }
 
