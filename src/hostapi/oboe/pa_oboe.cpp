@@ -1337,9 +1337,9 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
                 m_androidOutputUsage != Usage::NotificationRingtone &&
                 m_androidOutputUsage != Usage::VoiceCommunication &&
                 m_androidOutputUsage != Usage::VoiceCommunicationSignalling &&
-                m_androidOutputUsage != Usage::Alarm
-                // See if more are needed.
-                    ) {
+                m_androidOutputUsage != Usage::Alarm &&
+                m_androidOutputUsage != Usage::Game
+                ) {
                 m_outcome = paIncompatibleHostApiSpecificStreamInfo;
                 return m_outcome;
             }
@@ -1442,6 +1442,8 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     PaSampleFormat m_inputSampleFormat, m_outputSampleFormat;
     PaSampleFormat m_hostInputSampleFormat, m_hostOutputSampleFormat;
 
+
+    //FIXME: add a function that lets the user choose usage and preset
     Usage m_androidOutputUsage = Usage::VoiceCommunication;
     InputPreset m_androidInputPreset = InputPreset::Generic;
 
@@ -1476,8 +1478,8 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                 m_androidInputPreset != InputPreset::Camcorder &&
                 m_androidInputPreset != InputPreset::VoiceRecognition &&
                 m_androidInputPreset != InputPreset::VoiceCommunication
-                // Should I add compatibility with VoicePerformance?
-                    )
+                m_androidInputPreset != InputPreset::VoicePerformance
+                )
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
         /* FIXME: Replace "paInt16" with whatever format you prefer -
