@@ -424,6 +424,24 @@ elseif(UNIX)
       target_compile_definitions(PortAudio PUBLIC PA_USE_AUDIOIO=1)
       set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_AUDIOIO=1")
     endif()
+
+    find_package(PulseAudio)
+    cmake_dependent_option(PA_USE_PULSEAUDIO "Enable support for PulseAudio general purpose sound server" ON PulseAudio_FOUND OFF)
+    if(PA_USE_PULSEAUDIO)
+      target_link_libraries(PortAudio PRIVATE PulseAudio::PulseAudio)
+      target_sources(PortAudio PRIVATE
+        src/hostapi/pulseaudio/pa_linux_pulseaudio_block.c
+        src/hostapi/pulseaudio/pa_linux_pulseaudio.c
+        src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.c)
+
+      target_compile_definitions(PortAudio PUBLIC PA_USE_PULSEAUDIO=1)
+      set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_PULSEAUDIO=1")
+      set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} libpulse")
+
+      # needed for PortAudioConfig.cmake so `find_package(PortAudio)` works in downstream projects
+      install(FILES cmake/modules/FindPulseAudio.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
+    endif()
+
   endif()
 endif()
 
