@@ -161,10 +161,9 @@ using namespace oboe;
 //Useful global variables
 int32_t g_inputDeviceId = kUnspecified;
 int32_t g_outputDeviceId = kUnspecified;
-PerformanceMode g_inputPerfMode = PerformanceMode::None;
-bool g_inputPerfModeUser = false;
-PerformanceMode g_outputPerfMode = PerformanceMode::None;
-bool g_outputPerfModeUser = false;
+
+PerformanceMode g_inputPerfMode = PerformanceMode::LowLatency;
+PerformanceMode g_outputPerfMode = PerformanceMode::LowLatency;
 
 /**
  * Stream structure, useful to store relevant information. It's needed by Portaudio.
@@ -254,10 +253,6 @@ private:
 
     //device selection implementation
     int32_t getSelectedDevice(oboe::Direction direction);
-
-    //auto performance mode selection
-    void performanceModeAutoSelection(Direction direction);
-    double assertLatency(Direction direction);
 };
 
 
@@ -319,8 +314,6 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
              convertToText(m_result));
         return m_outcome;
     }
-
-    performanceModeAutoSelection(direction);
 
     if (sampleRate != kUnspecified) {
         m_outcome = (sampleRate == m_builder.getSampleRate());
@@ -877,65 +870,6 @@ int32_t OboeEngine::getSelectedDevice(Direction direction) {
         return g_inputDeviceId;
     else
         return g_outputDeviceId;
-}
-
-
-/**
- * \brief   Function used to automatically select the performance mode, based on the latency value LOW_LATENCY_MS, if no
- *          choice was made via PaOboe_SetPerformanceMode. It uses OboeEngine::assertLatency to make this decision.
- * @param   direction the Oboe::Direction of the stream we want to select the mode of.
- */
-void OboeEngine::performanceModeAutoSelection(Direction direction){
-    double m_result = assertLatency(direction);
-
-    if(direction == Direction::Input) {
-        if (m_result >= 0 && !g_inputPerfModeUser) {
-            if (m_result <= LOW_LATENCY_MS)
-                g_inputPerfMode = PerformanceMode::LowLatency;
-            else
-                g_inputPerfMode = PerformanceMode::PowerSaving;
-        }
-    } else {
-        if (m_result >= 0 && !g_outputPerfModeUser) {
-            if (m_result <= LOW_LATENCY_MS)
-                g_outputPerfMode = PerformanceMode::LowLatency;
-            else
-                g_outputPerfMode = PerformanceMode::PowerSaving;
-        }
-    }
-}
-
-
-/**
- * \brief   Asserts if the device supports latency tutning, then calculates the latency of an AudioStream.
- * @param   direction the direction of the AudioStream we want to check.
- * @return  the measured latency, or -1.0 if any error occurs.
- */
-double OboeEngine::assertLatency(Direction direction){
-    if(__ANDROID_API__<31) {
-        LOGI("[OboeEngine::assertLatency]\t Latency Tuning is not supported for Android API level < 31");
-        return -1.0;
-    }
-    if(direction == Direction::Input){
-        ResultWithValue<double> m_result = inputStream->calculateLatencyMillis();
-        if (m_result) {
-            return m_result.value();
-        } else {
-            LOGE("[OboeEngine::assertLatency]\t Error calculating input latency: %s",
-                 oboe::convertToText(m_result.error()));
-            return -1.0;
-        }
-    } else {
-        ResultWithValue<double> m_result = outputStream->calculateLatencyMillis();
-        if (m_result) {
-            return m_result.value();
-        } else {
-            LOGE("[OboeEngine::assertLatency]\t Error calculating output latency: %s",
-                 oboe::convertToText(m_result.error()));
-            return -1.0;
-        }
-    }
-
 }
 
 
@@ -1957,10 +1891,8 @@ void PaOboe_SetSelectedDevice(Direction direction, int32_t deviceID) {
 void PaOboe_SetPerformanceMode(oboe::Direction direction, oboe::PerformanceMode performanceMode){
     if(direction == Direction::Input) {
         g_inputPerfMode = performanceMode;
-        g_inputPerfModeUser = true;
     } else {
         g_outputPerfMode = performanceMode;
-        g_outputPerfModeUser = true;
     }
 }
 
