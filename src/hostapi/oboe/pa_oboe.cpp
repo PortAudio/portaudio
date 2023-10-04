@@ -880,11 +880,11 @@ OboeCallback::onAudioReady(AudioStream *i_audioStream, void *i_audioData, int32_
 void OboeCallback::onErrorAfterClose(AudioStream *i_audioStream, Result i_error) {
     if (i_error == oboe::Result::ErrorDisconnected) {
         OboeEngine* oboeEngine = m_oboeStreamHolder->getEngineAddress();
-        LOGW("[OboeEngine::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
+        LOGW("[OboeCallback::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
         if (!oboeEngine->restartStream(m_oboeStreamHolder, 0))
-            LOGE("[OboeEngine::onErrorAfterClose]\t Couldn't restart stream(s)");
+            LOGE("[OboeCallback::onErrorAfterClose]\t Couldn't restart stream(s)");
     } else
-        LOGE("[OboeEngine::onErrorAfterClose]\t Error was %s", oboe::convertToText(i_error));
+        LOGE("[OboeCallback::onErrorAfterClose]\t Error was %s", oboe::convertToText(i_error));
 }
 
 
@@ -1086,10 +1086,8 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **i_hostApi, PaHostApiInde
         deviceInfo->defaultSampleRate = sampleRates[0];
 
         for (i = 0; i < numberOfSampleRates; ++i) {
-            if (IsOutputSampleRateSupported(
-                    oboeHostApi, sampleRates[i]) == paNoError &&
-                IsInputSampleRateSupported(
-                        oboeHostApi, sampleRates[i]) == paNoError) {
+            if (IsOutputSampleRateSupported(oboeHostApi, sampleRates[i]) == paNoError &&
+                    IsInputSampleRateSupported(oboeHostApi, sampleRates[i]) == paNoError) {
                 deviceInfo->defaultSampleRate = sampleRates[i];
                 break;
             }
@@ -1224,7 +1222,7 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *i_hostApi,
 
         /* check that input device can support inputChannelCount */
         if (inputChannelCount >
-            i_hostApi->deviceInfos[i_inputParameters->device]->maxInputChannels) {
+                i_hostApi->deviceInfos[i_inputParameters->device]->maxInputChannels) {
             return paInvalidChannelCount;
         }
 
@@ -1262,8 +1260,7 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *i_hostApi,
         }
 
         /* check that output device can support outputChannelCount */
-        if (outputChannelCount >
-            i_hostApi->deviceInfos[i_outputParameters->device]->maxOutputChannels) {
+        if (outputChannelCount > i_hostApi->deviceInfos[i_outputParameters->device]->maxOutputChannels) {
             return paInvalidChannelCount;
         }
 
@@ -1304,6 +1301,7 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *i_hostApi,
 
 /**
  * \brief   Calls OboeEngine::openStream to open the outputStream and a Generic input preset.
+ * @param   oboeStream is the OboeStream we want to initialize in the output direction.
  * @param   oboeHostApi points towards a OboeHostApiRepresentation (see struct defined at the top of
  *              this file);
  * @param   androidOutputUsage is an attribute that expresses why we are opening the output stream.
@@ -1313,7 +1311,7 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *i_hostApi,
  *              the correct amount of memory.
  * @return  the value returned by OboeEngine::openStream.
  */
-static PaError InitializeOutputStream(PaOboeHostApiRepresentation *i_oboeHostApi,
+static PaError InitializeOutputStream(OboeStream i_oboeStream, PaOboeHostApiRepresentation *i_oboeHostApi,
                                       Usage i_androidOutputUsage, double i_sampleRate) {
 
     return i_oboeHostApi->oboeEngine->openStream(i_oboeStream,
@@ -1326,6 +1324,7 @@ static PaError InitializeOutputStream(PaOboeHostApiRepresentation *i_oboeHostApi
 
 /**
  * \brief   Calls OboeEngine::openStream to open the outputStream and a Generic input preset.
+ * @param   oboeStream is the OboeStream we want to initialize in the input direction.
  * @param   oboeHostApi points towards a OboeHostApiRepresentation (see struct defined at the top of
  *              this file);
  * @param   androidInputPreset is an attribute that defines the audio source. This information
@@ -1350,7 +1349,7 @@ static PaError InitializeInputStream(OboeStream i_oboeStream, PaOboeHostApiRepre
  * \brief   Opens the portaudio audio stream - while initializing our OboeStream.
  * @param   hostApi points towards a *HostApiRepresentation, which is a structure representing the
  *              interface to a host API (see struct in "pa_hostapi.h");
- * @param   s points to a pointer to a PaStream, which is an audio stream structure used and built
+ * @param   paStream points to a pointer to a PaStream, which is an audio stream structure used and built
  *              by portaudio, which will hold the information of our OboeStream;
  * @param   inputParameters points towards the parameters given to the input stream;
  * @param   outputParameters points towards the parameters given to the output stream;
@@ -1540,7 +1539,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
                 ((PaTime) PaUtil_GetBufferProcessorOutputLatencyFrames(
                         &oboeStream->bufferProcessor)
                  + oboeStream->framesPerHostCallback) / i_sampleRate;
-        ENSURE(InitializeOutputStream(oboeHostApi,
+        ENSURE(InitializeOutputStream(oboeStream, oboeHostApi,
                                       androidOutputUsage, i_sampleRate),
                "Initializing outputstream failed");
     } else { oboeStream->hasOutput = false; }
@@ -1562,7 +1561,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
  * \brief   Calls OboeEngine::closeStream, and then frees the memory that was allocated to sustain
  *          the stream(s). When CloseStream() is called, the multi-api layer ensures that the stream
  *          has already been stopped or aborted.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
  *              portaudio, which holds the information of our OboeStream.
  * @return  paNoError, but warns in the logs if OboeEngine::closeStream failed.
  */
@@ -1736,7 +1735,7 @@ static PaError ReadStream(PaStream *i_paStream, void *i_buffer, unsigned long i_
     while (i_frames > 0) {
         framesToRead = PA_MIN(oboeStream->framesPerHostCallback, i_frames);
 
-        if (!(oboeEngine->readStream(userBuffer, framesToRead *
+        if (!(oboeEngine->readStream(oboeStream, userBuffer, framesToRead *
                                                  oboeStream->bufferProcessor.inputChannelCount)))
             error = paInternalError;
 
@@ -1766,7 +1765,7 @@ static PaError WriteStream(PaStream *i_paStream, const void *i_buffer, unsigned 
     while (i_frames > 0) {
         framesToWrite = PA_MIN(stream->framesPerHostCallback, i_frames);
 
-        if (!(oboeEngine->writeStream(userBuffer, framesToWrite *
+        if (!(oboeEngine->writeStream(oboeStream, userBuffer, framesToWrite *
                                                   oboeStream->bufferProcessor.outputChannelCount)))
             error = paInternalError;
 
