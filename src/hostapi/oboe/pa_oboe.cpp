@@ -205,6 +205,12 @@ typedef struct OboeStream {
 
     void setEngineAddress(OboeEngine *i_oboeEngine) { oboeEngineAddress = i_oboeEngine; }
 
+    //The only instances of output and input streams that will be used, and their builders
+    std::shared_ptr <AudioStream> outputStream;
+    AudioStreamBuilder outputBuilder;
+    std::shared_ptr <AudioStream> inputStream;
+    AudioStreamBuilder inputBuilder;
+
 private:
     OboeEngine *oboeEngineAddress;
 } OboeStream;
@@ -235,11 +241,11 @@ private:
 
 
 /**
- * Stream engine of the host API - Oboe. We allocate only one instance of the engine per PaOboe_Initialize call, and
- * we call its functions when we want to operate directly on Oboe. More infos on each functions are
- * provided right before their implementations.
+ * Stream engine of the host API - Oboe. We allocate only one instance of the engine per OboeStream, and
+ * we call its functions when we want to operate directly on Oboe. More infos on each function are
+ * provided right before its implementation.
  */
-class OboeEngine : public AudioStreamCallback {
+class OboeEngine {
 public:
     OboeEngine();
 
@@ -253,26 +259,23 @@ public:
 
     bool stopStream(OboeStream *oboeStream);
 
-    bool restartStream(int direction);
+    bool restartStream(OboeStream *oboeStream, int direction);
 
     bool closeStream(OboeStream *oboeStream);
 
     bool abortStream(OboeStream *oboeStream);
 
     //Blocking read/write functions
-    bool writeStream(const void *buffer, int32_t framesToWrite);
+    bool writeStream(OboeStream *oboeStream, const void *buffer, int32_t framesToWrite);
 
-    bool readStream(void *buffer, int32_t framesToRead);
+    bool readStream(OboeStream *oboeStream, void *buffer, int32_t framesToRead);
 
     //Engine utils
     OboeStream *allocateOboeStream();
 
 private:
-    //The only instances of output and input streams that will be used, and their builders
-    std::shared_ptr <AudioStream> m_outputStream;
-    AudioStreamBuilder m_outputBuilder;
-    std::shared_ptr <AudioStream> m_inputStream;
-    AudioStreamBuilder m_inputBuilder;
+    std::shared_ptr <AudioStream> m_testStream;
+    AudioStreamBuilder m_testBuilder;
 
     //Conversion utils
     static AudioFormat PaToOboeFormat(PaSampleFormat paFormat);
@@ -300,7 +303,7 @@ typedef struct PaOboeHostApiRepresentation {
 
 
 /**
- * \brief   Initializes an instance of the engine.
+ * \brief   Constructor.
  */
 OboeEngine::OboeEngine() {}
 
@@ -317,21 +320,16 @@ OboeEngine::OboeEngine() {}
  *          they aren't, or if tryStream couldn't open a stream.
  */
 bool OboeEngine::tryStream(Direction i_direction, int32_t i_sampleRate, int32_t i_channelCount) {
-    AudioStreamBuilder builder;
     Result result;
     bool outcome = false;
 
-    builder.setDeviceId(getSelectedDevice(i_direction))
-                    // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
+    m_testBuilder.setDeviceId(getSelectedDevice(i_direction))
+            // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
             ->setFormat(AudioFormat::Float)
             ->setDirection(i_direction)
             ->setSampleRate(i_sampleRate)
-            ->setChannelCount(i_channelCount);
-    if (i_direction == Direction::Input) {
-        result = builder->openStream(m_inputStream);
-    } else {
-        result = builder->openStream(m_outputStream);
-    }
+            ->setChannelCount(i_channelCount)
+            ->openStream(m_testStream);
 
     if (result != Result::OK) {
         LOGE("[OboeEngine::TryStream]\t Couldn't open the stream in TryStream. Error: %s",
@@ -340,26 +338,23 @@ bool OboeEngine::tryStream(Direction i_direction, int32_t i_sampleRate, int32_t 
     }
 
     if (i_sampleRate != kUnspecified) {
-        outcome = (i_sampleRate == builder.getSampleRate());
+        outcome = (i_sampleRate == m_testBuilder.getSampleRate());
         if (!outcome) {
             LOGW("[OboeEngine::TryStream]\t Tried sampleRate = %d, built sampleRate = %d",
-                 i_sampleRate, builder.getSampleRate());
+                 i_sampleRate, m_testBuilder.getSampleRate());
         }
     } else if (i_channelCount != kUnspecified) {
-        outcome = (i_channelCount == builder.getChannelCount());
+        outcome = (i_channelCount == m_testBuilder.getChannelCount());
         if (!outcome) {
             LOGW("[OboeEngine::TryStream]\t Tried channelCount = %d, built channelCount = %d",
-                 channelCount, builder.getChannelCount());
+                 i_channelCount, m_testBuilder.getChannelCount());
         }
     } else {
         LOGE("[OboeEngine::TryStream]\t Logical failure. This message should NEVER occur.");
         outcome = false;
     }
 
-    if (i_direction == Direction::Input)
-        m_inputStream->close();
-    else
-        m_outputStream->close();
+    m_testStream->close();
 
     return outcome;
 }
@@ -371,6 +366,7 @@ bool OboeEngine::tryStream(Direction i_direction, int32_t i_sampleRate, int32_t 
  *          direction == Ditrction::Output) or its preset (if direction == Direction::Input).
  *          Moreover, this function checks if the stream is blocking, and sets its callback
  *          function if not.
+ * @param   oboeStream The stream we want to open
  * @param   direction The Oboe::Direction of the stream we want to open;
  * @param   sampleRate The sample rate of the stream we want to open;
  * @param   androidOutputUsage The Oboe::Usage of the output stream we want to open
@@ -392,7 +388,7 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
     }
 
     if (i_direction == Direction::Input) {
-        m_inputBuilder.setChannelCount(i_oboeStream->bufferProcessor.inputChannelCount)
+        i_oboeStream->inputBuilder.setChannelCount(i_oboeStream->bufferProcessor.inputChannelCount)
                 ->setFormat(PaToOboeFormat(i_oboeStream->inputFormat))
                 ->setSampleRate(i_sampleRate)
                 ->setDirection(Direction::Input)
@@ -406,7 +402,7 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                     ->setErrorCallback(i_oboeStream->oboeCallback);
         }
 
-        result = m_inputBuilder.openStream(m_inputStream);
+        result = i_oboeStream->inputBuilder.openStream(i_oboeStream->inputStream);
 
         if (result != Result::OK) {
             LOGE("[OboeEngine::OpenStream]\t Oboe couldn't open the input stream: %s",
@@ -414,7 +410,8 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
             return paUnanticipatedHostError;
         }
 
-        m_inputStream->setBufferSizeInFrames(m_inputStream->getFramesPerBurst() * g_numberOfBuffers);
+        i_oboeStream->inputStream->setBufferSizeInFrames(i_oboeStream->inputStream->getFramesPerBurst() *
+                                                         g_numberOfBuffers);
         i_oboeStream->inputBuffers =
                 (void **) PaUtil_AllocateZeroInitializedMemory(g_numberOfBuffers * sizeof(int32_t * ));
 
@@ -428,14 +425,14 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                 for (int j = 0; j < i; ++j)
                     PaUtil_FreeMemory(i_oboeStream->inputBuffers[j]);
                 PaUtil_FreeMemory(i_oboeStream->inputBuffers);
-                m_inputStream->close();
+                i_oboeStream->inputStream->close();
                 error = paInsufficientMemory;
                 break;
             }
         }
         i_oboeStream->currentInputBuffer = 0;
     } else {
-        m_outputBuilder.setChannelCount(i_oboeStream->bufferProcessor.outputChannelCount)
+        i_oboeStream->outputBuilder.setChannelCount(i_oboeStream->bufferProcessor.outputChannelCount)
                 ->setFormat(PaToOboeFormat(i_oboeStream->outputFormat))
                 ->setSampleRate(i_sampleRate)
                 ->setDirection(Direction::Output)
@@ -445,18 +442,19 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                 ->setFramesPerCallback(i_oboeStream->framesPerHostCallback);
 
         if (!(i_oboeStream->isBlocking)) {
-            m_outputBuilder.setDataCallback(i_oboeStream->oboeCallback)
+            i_oboeStream->outputBuilder.setDataCallback(i_oboeStream->oboeCallback)
                     ->setErrorCallback(i_oboeStream->oboeCallback);
         }
 
-        result = m_outputBuilder.openStream(m_outputStream);
+        result = i_oboeStream->outputBuilder.openStream(m_outputStream);
         if (result != Result::OK) {
             LOGE("[OboeEngine::OpenStream]\t Oboe couldn't open the output stream: %s",
                  convertToText(result));
             return paUnanticipatedHostError;
         }
 
-        m_outputStream->setBufferSizeInFrames(m_outputStream->getFramesPerBurst() * g_numberOfBuffers);
+        i_oboeStream->outputStream->setBufferSizeInFrames(i_oboeStream->outputStream->getFramesPerBurst() *
+                                                          g_numberOfBuffers);
         i_oboeStream->outputBuffers =
                 (void **) PaUtil_AllocateZeroInitializedMemory(g_numberOfBuffers * sizeof(int32_t * ));
 
@@ -470,7 +468,7 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                 for (int j = 0; j < i; ++j)
                     PaUtil_FreeMemory(i_oboeStream->outputBuffers[j]);
                 PaUtil_FreeMemory(i_oboeStream->outputBuffers);
-                m_outputStream->close();
+                i_oboeStream->outputStream->close();
                 error = paInsufficientMemory;
                 break;
             }
@@ -491,13 +489,13 @@ bool OboeEngine::startStream(OboeStream *i_oboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
 
     if (i_oboeStream->hasInput) {
-        inputResult = m_inputStream->requestStart();
+        inputResult = i_oboeStream->inputStream->requestStart();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::startStream]\t Oboe couldn't start the input stream: %s",
                  convertToText(inputResult));
     }
     if (i_oboeStream->hasOutput) {
-        outputResult = m_outputStream->requestStart();
+        outputResult = i_oboeStream->outputStream->requestStart();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::startStream]\t Oboe couldn't start the output stream: %s",
                  convertToText(outputResult));
@@ -516,13 +514,13 @@ bool OboeEngine::stopStream(OboeStream *i_oboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
 
     if (i_oboeStream->hasInput) {
-        inputResult = m_inputStream->requestStop();
+        inputResult = i_oboeStream->inputStream->requestStop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::stopStream]\t Oboe couldn't stop the input stream: %s",
                  convertToText(inputResult));
     }
     if (i_oboeStream->hasOutput) {
-        outputResult = m_outputStream->requestStop();
+        outputResult = i_oboeStream->outputStream->requestStop();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::stopStream]\t Oboe couldn't stop the output stream: %s",
                  convertToText(outputResult));
@@ -537,28 +535,28 @@ bool OboeEngine::stopStream(OboeStream *i_oboeStream) {
  *          audio devices change while a stream is started.
  * @return  true if the stream is restarted successfully, false otherwise.
  */
-bool OboeEngine::restartStream(int i_direction) {
+bool OboeEngine::restartStream(OboeStream* i_oboeStream, int i_direction) {
     bool outcome = true;
     Result result;
 
     switch (i_direction) {
         case 1: //output-only
             //stopping and closing
-            result = m_outputStream->stop();
+            result = i_oboeStream->outputStream->stop();
             if (result != Result::OK)
                 LOGW("[OboeEngine::restartStream]\t Oboe couldn't stop the output stream: %s",
                      convertToText(result));
-            result = m_outputStream->close();
+            result = i_oboeStream->outputStream->close();
             if (result != Result::OK)
                 LOGW("[OboeEngine::restartStream]\t Oboe couldn't close the output stream: %s",
                      convertToText(result));
 
             //reopening and restarting
-            result = outputBuilder.openStream(m_outputStream);
+            result = i_oboeStream->outputBuilder.openStream(i_oboeStream->outputStream);
             if (result != Result::OK)
                 LOGE("[OboeEngine::restartStream]\t Oboe couldn't reopen the output stream: %s",
                      convertToText(result));
-            result = m_outputStream->start();
+            result = i_oboeStream->outputStream->start();
             if (result != Result::OK) {
                 LOGE("[OboeEngine::restartStream]\t Oboe couldn't restart the output stream: %s",
                      convertToText(result));
@@ -568,21 +566,21 @@ bool OboeEngine::restartStream(int i_direction) {
 
         case 2: //input-only
             //stopping and closing
-            result = m_inputStream->stop();
+            result = i_oboeStream->inputStream->stop();
             if (result != Result::OK)
                 LOGW("[OboeEngine::restartStream]\t Oboe couldn't stop the input stream: %s",
                      convertToText(result));
-            result = m_inputStream->close();
+            result = i_oboeStream->inputStream->close();
             if (result != Result::OK)
                 LOGW("[OboeEngine::restartStream]\t Oboe couldn't close the input stream: %s",
                      convertToText(result));
 
             //reopening and restarting
-            result = inputBuilder.openStream(m_inputStream);
+            result = inputBuilder.openStream(i_oboeStream->inputStream);
             if (result != Result::OK)
                 LOGE("[OboeEngine::restartStream]\t Oboe couldn't reopen the input stream: %s",
                      convertToText(result));
-            result = m_inputStream->start();
+            result = i_oboeStream->inputStream->start();
             if (result != Result::OK) {
                 LOGE("[OboeEngine::restartStream]\t Oboe couldn't restart the input stream: %s",
                      convertToText(result));
@@ -593,7 +591,7 @@ bool OboeEngine::restartStream(int i_direction) {
         default:
             // unspecified direction or both directions: restart both streams
             LOGW("[OboeEngine::restartStream]\t Unspecified direction, restarting both streams");
-            outcome = (restartStream(1) && restartStream(2));
+            outcome = (restartStream(i_oboeStream, 1) && restartStream(i_oboeStream, 2));
             break;
     }
 
@@ -618,14 +616,14 @@ bool OboeEngine::closeStream(OboeStream *i_oboeStream) {
     }
 
     if (hasOutput) {
-        outputResult = m_outputStream->close();
+        outputResult = i_oboeStream->outputStream->close();
         if (outputResult == Result::ErrorClosed) {
             outputResult = Result::OK;
             LOGW("[OboeEngine::closeStream]\t Tried to close output stream, but was already closed.");
         }
     }
     if (hasInput) {
-        inputResult = m_inputStream->close();
+        inputResult = i_oboeStream->inputStream->close();
         if (inputResult == Result::ErrorClosed) {
             inputResult = Result::OK;
             LOGW("[OboeEngine::closeStream]\t Tried to close input stream, but was already closed.");
@@ -652,21 +650,21 @@ bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
     }
 
     if (hasInput) {
-        inputResult = m_inputStream->stop();
+        inputResult = i_oboeStream->inputStream->stop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to stop: %s",
                  convertToText(inputResult));
-        inputResult = m_inputStream->close();
-        if (m_inputResult != Result::OK)
+        inputResult = i_oboeStream->inputStream->close();
+        if (i_oboeStream->inputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to close: %s",
                  convertToText(inputResult));
     }
     if (hasOutput) {
-        outputResult = m_outputStream->stop();
-        if (m_outputResult != Result::OK)
+        outputResult = i_oboeStream->outputStream->stop();
+        if (i_oboeStream->outputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the output stream to stop: %s",
-                 convertToText(m_outputResult));
-        outputResult = m_outputStream->close();
+                 convertToText(outputResult));
+        outputResult = i_oboeStream->outputStream->close();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the output stream to close: %s",
                  convertToText(outputResult));
@@ -684,14 +682,14 @@ bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
  *          different from ErrorDisconnected. In case of ErrorDisconnected, the function returns
  *          true if the stream is successfully restarted, and false otherwise.
  */
-bool OboeEngine::writeStream(const void *i_buffer, int32_t i_framesToWrite) {
+bool OboeEngine::writeStream(OboeStream *i_oboeStream, const void *i_buffer, int32_t i_framesToWrite) {
     bool outcome = true;
 
-    ResultWithValue <int32_t> result = m_outputStream->write(i_buffer, i_framesToWrite, TIMEOUT_NS);
+    ResultWithValue <int32_t> result = i_oboeStream->outputStream->write(i_buffer, i_framesToWrite, TIMEOUT_NS);
 
     // If the stream is interrupted because the device suddenly changes, restart the stream.
     if (result.error() == Result::ErrorDisconnected) {
-        if (OboeEngine::restartStream(1))
+        if (restartStream(i_oboeStream, 1))
             return true;
     }
 
@@ -711,14 +709,14 @@ bool OboeEngine::writeStream(const void *i_buffer, int32_t i_framesToWrite) {
  *          different from ErrorDisconnected. In case of ErrorDisconnected, the function returns
  *          true if the stream is successfully restarted, and false otherwise.
  */
-bool OboeEngine::readStream(void *i_buffer, int32_t i_framesToRead) {
+bool OboeEngine::readStream(OboeStream *i_oboeStream, void *i_buffer, int32_t i_framesToRead) {
     bool outcome = true;
 
-    ResultWithValue <int32_t> result = m_inputStream->read(i_buffer, i_framesToRead, TIMEOUT_NS);
+    ResultWithValue <int32_t> result = i_oboeStream->inputStream->read(i_buffer, i_framesToRead, TIMEOUT_NS);
 
     // If the stream is interrupted because the device suddenly changes, restart the stream.
     if (result.error() == Result::ErrorDisconnected) {
-        if (OboeEngine::restartStream(2))
+        if (restartStream(i_oboeStream, 2))
             return true;
     }
 
@@ -837,8 +835,8 @@ OboeCallback::onAudioReady(AudioStream *i_audioStream, void *i_audioData, int32_
     if (m_oboeStreamHolder->callbackResult == paContinue
         || (m_oboeStreamHolder->callbackResult == paComplete
             && !PaUtil_IsBufferProcessorOutputEmpty(&m_oboeStreamHolder->bufferProcessor))) {
-        m_framesProcessed = PaUtil_EndBufferProcessing(&oboeStream->bufferProcessor,
-                                                       &oboeStream->callbackResult);
+        m_framesProcessed = PaUtil_EndBufferProcessing(&m_oboeStreamHolder->bufferProcessor,
+                                                       &m_oboeStreamHolder->callbackResult);
     }
 
     /* enqueue a buffer only when there are frames to be processed,
@@ -883,7 +881,7 @@ void OboeCallback::onErrorAfterClose(AudioStream *i_audioStream, Result i_error)
     if (i_error == oboe::Result::ErrorDisconnected) {
         OboeEngine* oboeEngine = m_oboeStreamHolder->getEngineAddress();
         LOGW("[OboeEngine::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
-        if (!oboeEngine->restartStream(0))
+        if (!oboeEngine->restartStream(m_oboeStreamHolder, 0))
             LOGE("[OboeEngine::onErrorAfterClose]\t Couldn't restart stream(s)");
     } else
         LOGE("[OboeEngine::onErrorAfterClose]\t Error was %s", oboe::convertToText(i_error));
