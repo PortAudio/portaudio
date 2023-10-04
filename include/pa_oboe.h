@@ -50,6 +50,7 @@
  * @brief Android Oboe-specific PortAudio API extension header file.
  */
 
+#include "portaudio.h"
 #include "oboe/Oboe.h"
 
 #ifdef __cplusplus
