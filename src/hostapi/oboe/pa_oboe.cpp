@@ -166,6 +166,7 @@ PerformanceMode g_inputPerfMode = PerformanceMode::LowLatency;
 PerformanceMode g_outputPerfMode = PerformanceMode::LowLatency;
 
 class OboeEngine;
+class OboeCallback;
 
 /**
  * Stream structure, useful to store relevant information. It's needed by Portaudio.
@@ -190,6 +191,7 @@ typedef struct OboeStream {
     PaSampleFormat inputFormat;
     PaSampleFormat outputFormat;
 
+    OboeCallback *oboeCallback;
     // Buffers are managed by the callback function in Oboe.
     void **outputBuffers;
     int currentOutputBuffer;
@@ -207,9 +209,33 @@ private:
     OboeEngine *oboeEngineAddress;
 } OboeStream;
 
+/**
+ * Callback class for OboeStream. Will be used for non-blocking streams.
+ */
+class OboeCallback: public AudioStreamCallback {
+public:
+    OboeCallback(){ m_oboeStreamHolder = (OboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(OboeStream)); }
+    //Callback function for non-blocking streams
+    DataCallbackResult onAudioReady(AudioStream *audioStream, void *audioData,
+                                    int32_t numFrames) override;
+
+    void onErrorAfterClose(AudioStream *audioStream, oboe::Result error) override;
+
+    void setStreamHolder(OboeStream* oboeStream){ m_oboeStreamHolder = oboeStream; }
+
+    void resetCallbackCounters();
+
+private:
+    //callback utils
+    OboeStream *m_oboeStreamHolder;
+    unsigned long m_framesProcessed{};
+    PaStreamCallbackTimeInfo m_timeInfo{};
+    struct timespec m_timeSpec{};
+};
+
 
 /**
- * Stream engine of the host API - Oboe. We allocate only one instance of the engine, and
+ * Stream engine of the host API - Oboe. We allocate only one instance of the engine per PaOboe_Initialize call, and
  * we call its functions when we want to operate directly on Oboe. More infos on each functions are
  * provided right before their implementations.
  */
@@ -233,14 +259,6 @@ public:
 
     bool abortStream(OboeStream *oboeStream);
 
-    //Callback function for non-blocking streams and some callback utils
-    DataCallbackResult onAudioReady(AudioStream *audioStream, void *audioData,
-                                    int32_t numFrames) override;
-
-    void onErrorAfterClose(AudioStream *audioStream, oboe::Result error) override;
-
-    void resetCallbackCounters();
-
     //Blocking read/write functions
     bool writeStream(const void *buffer, int32_t framesToWrite);
 
@@ -250,18 +268,11 @@ public:
     OboeStream *allocateOboeStream();
 
 private:
-    OboeStream *m_oboeStreamHolder;
-
     //The only instances of output and input streams that will be used, and their builders
     std::shared_ptr <AudioStream> m_outputStream;
     AudioStreamBuilder m_outputBuilder;
     std::shared_ptr <AudioStream> m_inputStream;
     AudioStreamBuilder m_inputBuilder;
-
-    //callback utils
-    unsigned long m_framesProcessed{};
-    PaStreamCallbackTimeInfo m_timeInfo{};
-    struct timespec m_timeSpec{};
 
     //Conversion utils
     static AudioFormat PaToOboeFormat(PaSampleFormat paFormat);
@@ -291,14 +302,12 @@ typedef struct PaOboeHostApiRepresentation {
 /**
  * \brief   Initializes an instance of the engine.
  */
-OboeEngine::OboeEngine() {
-    m_oboeStreamHolder = allocateOboeStream();
-}
+OboeEngine::OboeEngine() {}
 
 
 /**
- * \brief   Tries to open a stream with the direction @direction, sample rate @sampleRate and/or
- *          channel count @channelCount. It then checks if the stream was in fact opened with the
+ * \brief   Tries to open a stream with the direction i_direction, sample rate i_sampleRate and/or
+ *          channel count i_channelCount. It then checks if the stream was in fact opened with the
  *          desired settings, and then closes the stream. It's used to see if the requested
  *          parameters are supported by the devices that are going to be used.
  * @param   direction the Direction of the stream;
@@ -357,7 +366,7 @@ bool OboeEngine::tryStream(Direction i_direction, int32_t i_sampleRate, int32_t 
 
 
 /**
- * \brief   Opens an audio stream of oboeStream with a specific direction, sample rate and,
+ * \brief   Opens an audio stream with a specific direction, sample rate and,
  *          depending on the direction of the stream, sets its usage (if
  *          direction == Ditrction::Output) or its preset (if direction == Direction::Input).
  *          Moreover, this function checks if the stream is blocking, and sets its callback
@@ -376,6 +385,12 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
     PaError error = paNoError;
     Result result;
 
+    if(!(i_oboeStream->isBlocking)){
+        i_oboeStream->oboeCallback = new OboeCallback();
+        i_oboeStream->oboeCallback->setStreamHolder(i_oboeStream);
+        i_oboeStream->oboeCallback->resetCallbackCounters();
+    }
+
     if (i_direction == Direction::Input) {
         m_inputBuilder.setChannelCount(i_oboeStream->bufferProcessor.inputChannelCount)
                 ->setFormat(PaToOboeFormat(i_oboeStream->inputFormat))
@@ -387,9 +402,8 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                 ->setFramesPerCallback(i_oboeStream->framesPerHostCallback);
 
         if (!(i_oboeStream->isBlocking)) {
-            resetCallbackCounters();
-            m_inputBuilder.setDataCallback(this)
-                    ->setErrorCallback(this);
+            m_inputBuilder.setDataCallback(i_oboeStream->oboeCallback)
+                    ->setErrorCallback(i_oboeStream->oboeCallback);
         }
 
         result = m_inputBuilder.openStream(m_inputStream);
@@ -431,9 +445,8 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                 ->setFramesPerCallback(i_oboeStream->framesPerHostCallback);
 
         if (!(i_oboeStream->isBlocking)) {
-            resetCallbackCounters();
-            m_outputBuilder.setDataCallback(this)
-                    ->setErrorCallback(this);
+            m_outputBuilder.setDataCallback(i_oboeStream->oboeCallback)
+                    ->setErrorCallback(i_oboeStream->oboeCallback);
         }
 
         result = m_outputBuilder.openStream(m_outputStream);
@@ -664,116 +677,6 @@ bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
 
 
 /**
- * \brief   Oboe's callback routine. FIXME: implement onErrorAfterClose correctly
- */
-DataCallbackResult
-OboeEngine::onAudioReady(AudioStream *i_audioStream, void *i_audioData, int32_t i_numFrames) {
-
-    clock_gettime(CLOCK_REALTIME, &m_timeSpec);
-    m_timeInfo.currentTime = (PaTime)(m_timeSpec.tv_sec + (m_timeSpec.tv_nsec / 1000000000.0));
-    m_timeInfo.outputBufferDacTime = (PaTime)(m_oboeStreamHolder->framesPerHostCallback
-                                              /
-                                              m_oboeStreamHolder->streamRepresentation.streamInfo.sampleRate
-                                              + m_timeInfo.currentTime);
-    m_timeInfo.inputBufferAdcTime = (PaTime)(m_oboeStreamHolder->framesPerHostCallback
-                                             /
-                                             m_oboeStreamHolder->streamRepresentation.streamInfo.sampleRate
-                                             + m_timeInfo.currentTime);
-
-    /* check if StopStream or AbortStream was called */
-    if (m_oboeStreamHolder->doStop) {
-        m_oboeStreamHolder->callbackResult = paComplete;
-    } else if (m_oboeStreamHolder->doAbort) {
-        m_oboeStreamHolder->callbackResult = paAbort;
-    }
-
-    PaUtil_BeginCpuLoadMeasurement(&m_oboeStreamHolder->cpuLoadMeasurer);
-    PaUtil_BeginBufferProcessing(&m_oboeStreamHolder->bufferProcessor,
-                                 &m_timeInfo, m_oboeStreamHolder->cbFlags);
-
-    if (m_oboeStreamHolder->hasOutput) {
-        m_oboeStreamHolder->outputBuffers[m_oboeStreamHolder->currentOutputBuffer] = i_audioData;
-        PaUtil_SetOutputFrameCount(&m_oboeStreamHolder->bufferProcessor, i_numFrames);
-        PaUtil_SetInterleavedOutputChannels(&m_oboeStreamHolder->bufferProcessor, 0,
-                                            (void *) ((PaInt16 **) m_oboeStreamHolder->outputBuffers)[
-                                                    m_oboeStreamHolder->currentOutputBuffer],
-                                            0);
-    }
-    if (m_oboeStreamHolder->hasInput) {
-        i_audioData = m_oboeStreamHolder->inputBuffers[m_oboeStreamHolder->currentInputBuffer];
-        PaUtil_SetInputFrameCount(&m_oboeStreamHolder->bufferProcessor, 0);
-        PaUtil_SetInterleavedInputChannels(&m_oboeStreamHolder->bufferProcessor, 0,
-                                           (void *) ((PaInt16 **) m_oboeStreamHolder->inputBuffers)[
-                                                   m_oboeStreamHolder->currentInputBuffer],
-                                           0);
-    }
-
-    /* continue processing user buffers if cbresult is paContinue or if cbresult is  paComplete and userBuffers aren't empty yet  */
-    if (m_oboeStreamHolder->callbackResult == paContinue
-        || (m_oboeStreamHolder->callbackResult == paComplete
-            && !PaUtil_IsBufferProcessorOutputEmpty(&m_oboeStreamHolder->bufferProcessor))) {
-        m_framesProcessed = PaUtil_EndBufferProcessing(&oboeStream->bufferProcessor,
-                                                       &oboeStream->callbackResult);
-    }
-
-    /* enqueue a buffer only when there are frames to be processed,
-     * this will be 0 when paComplete + empty buffers or paAbort
-     */
-    if (m_framesProcessed > 0) {
-        if (m_oboeStreamHolder->hasOutput) {
-            m_oboeStreamHolder->currentOutputBuffer =
-                    (m_oboeStreamHolder->currentOutputBuffer + 1) % g_numberOfBuffers;
-        }
-        if (m_oboeStreamHolder->hasInput) {
-            m_oboeStreamHolder->currentInputBuffer = (m_oboeStreamHolder->currentInputBuffer + 1) % g_numberOfBuffers;
-        }
-    }
-
-    PaUtil_EndCpuLoadMeasurement(&m_oboeStreamHolder->cpuLoadMeasurer, m_framesProcessed);
-
-    /* StopStream was called */
-    if (m_framesProcessed == 0 && m_oboeStreamHolder->doStop) {
-        m_oboeStreamHolder->oboeCallbackResult = DataCallbackResult::Stop;
-    }
-
-        /* if AbortStream or StopStream weren't called, stop from the cb */
-    else if (m_framesProcessed == 0 && !(m_oboeStreamHolder->doAbort || m_oboeStreamHolder->doStop)) {
-        m_oboeStreamHolder->isActive = false;
-        m_oboeStreamHolder->isStopped = true;
-        if (m_oboeStreamHolder->streamRepresentation.streamFinishedCallback != nullptr)
-            m_oboeStreamHolder->streamRepresentation.streamFinishedCallback(
-                    m_oboeStreamHolder->streamRepresentation.userData);
-        m_oboeStreamHolder->oboeCallbackResult = DataCallbackResult::Stop; //TODO: Resume this test (onAudioReady)
-    }
-
-    return m_oboeStreamHolder->oboeCallbackResult;
-}
-
-
-/**
- * \brief   If the data callback ends without returning DataCallbackResult::Stop, this routine tells
- *          what error occurred.
- */
-void OboeEngine::onErrorAfterClose(AudioStream *i_audioStream, Result i_error) {
-    if (i_error == oboe::Result::ErrorDisconnected) {
-        LOGW("[OboeEngine::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
-        if (!restartStream(0))
-            LOGE("[OboeEngine::onErrorAfterClose]\t Couldn't restart stream(s)");
-    } else
-        LOGE("[OboeEngine::onErrorAfterClose]\t Error was %s", oboe::convertToText(i_error));
-}
-
-
-/**
- * \brief   Resets callback counters (called at the start of each iteration of onAudioReady
- */
-void OboeEngine::resetCallbackCounters() {
-    m_framesProcessed = 0;
-    m_timeInfo = {0, 0, 0};
-}
-
-
-/**
  * \brief   Writes frames on the output stream of oboeStream. Used by blocking streams.
  * @param   buffer The buffer that we want to write on the output stream;
  * @param   framesToWrite The number of frames that we want to write.
@@ -882,6 +785,117 @@ int32_t OboeEngine::getSelectedDevice(Direction i_direction) {
         return g_inputDeviceId;
     else
         return g_outputDeviceId;
+}
+
+/*----------------------------- OboeCallback functions implementations -----------------------------*/
+/**
+ * \brief   Oboe's callback routine.
+ */
+DataCallbackResult
+OboeCallback::onAudioReady(AudioStream *i_audioStream, void *i_audioData, int32_t i_numFrames) {
+
+    clock_gettime(CLOCK_REALTIME, &m_timeSpec);
+    m_timeInfo.currentTime = (PaTime)(m_timeSpec.tv_sec + (m_timeSpec.tv_nsec / 1000000000.0));
+    m_timeInfo.outputBufferDacTime = (PaTime)(m_oboeStreamHolder->framesPerHostCallback
+                                              /
+                                              m_oboeStreamHolder->streamRepresentation.streamInfo.sampleRate
+                                              + m_timeInfo.currentTime);
+    m_timeInfo.inputBufferAdcTime = (PaTime)(m_oboeStreamHolder->framesPerHostCallback
+                                             /
+                                             m_oboeStreamHolder->streamRepresentation.streamInfo.sampleRate
+                                             + m_timeInfo.currentTime);
+
+    /* check if StopStream or AbortStream was called */
+    if (m_oboeStreamHolder->doStop) {
+        m_oboeStreamHolder->callbackResult = paComplete;
+    } else if (m_oboeStreamHolder->doAbort) {
+        m_oboeStreamHolder->callbackResult = paAbort;
+    }
+
+    PaUtil_BeginCpuLoadMeasurement(&m_oboeStreamHolder->cpuLoadMeasurer);
+    PaUtil_BeginBufferProcessing(&m_oboeStreamHolder->bufferProcessor,
+                                 &m_timeInfo, m_oboeStreamHolder->cbFlags);
+
+    if (m_oboeStreamHolder->hasOutput) {
+        m_oboeStreamHolder->outputBuffers[m_oboeStreamHolder->currentOutputBuffer] = i_audioData;
+        PaUtil_SetOutputFrameCount(&m_oboeStreamHolder->bufferProcessor, i_numFrames);
+        PaUtil_SetInterleavedOutputChannels(&m_oboeStreamHolder->bufferProcessor, 0,
+                                            (void *) ((PaInt16 **) m_oboeStreamHolder->outputBuffers)[
+                                                    m_oboeStreamHolder->currentOutputBuffer],
+                                            0);
+    }
+    if (m_oboeStreamHolder->hasInput) {
+        i_audioData = m_oboeStreamHolder->inputBuffers[m_oboeStreamHolder->currentInputBuffer];
+        PaUtil_SetInputFrameCount(&m_oboeStreamHolder->bufferProcessor, 0);
+        PaUtil_SetInterleavedInputChannels(&m_oboeStreamHolder->bufferProcessor, 0,
+                                           (void *) ((PaInt16 **) m_oboeStreamHolder->inputBuffers)[
+                                                   m_oboeStreamHolder->currentInputBuffer],
+                                           0);
+    }
+
+    /* continue processing user buffers if cbresult is paContinue or if cbresult is  paComplete and userBuffers aren't empty yet  */
+    if (m_oboeStreamHolder->callbackResult == paContinue
+        || (m_oboeStreamHolder->callbackResult == paComplete
+            && !PaUtil_IsBufferProcessorOutputEmpty(&m_oboeStreamHolder->bufferProcessor))) {
+        m_framesProcessed = PaUtil_EndBufferProcessing(&oboeStream->bufferProcessor,
+                                                       &oboeStream->callbackResult);
+    }
+
+    /* enqueue a buffer only when there are frames to be processed,
+     * this will be 0 when paComplete + empty buffers or paAbort
+     */
+    if (m_framesProcessed > 0) {
+        if (m_oboeStreamHolder->hasOutput) {
+            m_oboeStreamHolder->currentOutputBuffer =
+                    (m_oboeStreamHolder->currentOutputBuffer + 1) % g_numberOfBuffers;
+        }
+        if (m_oboeStreamHolder->hasInput) {
+            m_oboeStreamHolder->currentInputBuffer = (m_oboeStreamHolder->currentInputBuffer + 1) % g_numberOfBuffers;
+        }
+    }
+
+    PaUtil_EndCpuLoadMeasurement(&m_oboeStreamHolder->cpuLoadMeasurer, m_framesProcessed);
+
+    /* StopStream was called */
+    if (m_framesProcessed == 0 && m_oboeStreamHolder->doStop) {
+        m_oboeStreamHolder->oboeCallbackResult = DataCallbackResult::Stop;
+    }
+
+        /* if AbortStream or StopStream weren't called, stop from the cb */
+    else if (m_framesProcessed == 0 && !(m_oboeStreamHolder->doAbort || m_oboeStreamHolder->doStop)) {
+        m_oboeStreamHolder->isActive = false;
+        m_oboeStreamHolder->isStopped = true;
+        if (m_oboeStreamHolder->streamRepresentation.streamFinishedCallback != nullptr)
+            m_oboeStreamHolder->streamRepresentation.streamFinishedCallback(
+                    m_oboeStreamHolder->streamRepresentation.userData);
+        m_oboeStreamHolder->oboeCallbackResult = DataCallbackResult::Stop; //TODO: Resume this test (onAudioReady)
+    }
+
+    return m_oboeStreamHolder->oboeCallbackResult;
+}
+
+
+/**
+ * \brief   If the data callback ends without returning DataCallbackResult::Stop, this routine tells
+ *          what error occurred.
+ */
+void OboeCallback::onErrorAfterClose(AudioStream *i_audioStream, Result i_error) {
+    if (i_error == oboe::Result::ErrorDisconnected) {
+        OboeEngine* oboeEngine = m_oboeStreamHolder->getEngineAddress();
+        LOGW("[OboeEngine::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
+        if (!oboeEngine->restartStream(0))
+            LOGE("[OboeEngine::onErrorAfterClose]\t Couldn't restart stream(s)");
+    } else
+        LOGE("[OboeEngine::onErrorAfterClose]\t Error was %s", oboe::convertToText(i_error));
+}
+
+
+/**
+ * \brief   Resets callback counters (called at the start of each iteration of onAudioReady
+ */
+void OboeCallback::resetCallbackCounters() {
+    m_framesProcessed = 0;
+    m_timeInfo = {0, 0, 0};
 }
 
 
@@ -1367,8 +1381,6 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
 
-
-    //TODO: add a function that lets the user choose usage and preset
     Usage androidOutputUsage = Usage::VoiceCommunication;
     InputPreset androidInputPreset = InputPreset::Generic;
 
@@ -1624,7 +1636,6 @@ static PaError StartStream(PaStream *i_paStream) {
         }
     }
 
-    /* Start the processing thread.*/
     if (!oboeStream->isBlocking) {
         oboeStream->callbackResult = paContinue;
         oboeStream->oboeCallbackResult = DataCallbackResult::Continue;
