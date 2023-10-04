@@ -541,17 +541,6 @@ bool OboeEngine::restartStream(OboeStream* i_oboeStream, int i_direction) {
 
     switch (i_direction) {
         case 1: //output-only
-            //stopping and closing
-            result = i_oboeStream->outputStream->stop();
-            if (result != Result::OK)
-                LOGW("[OboeEngine::restartStream]\t Oboe couldn't stop the output stream: %s",
-                     convertToText(result));
-            result = i_oboeStream->outputStream->close();
-            if (result != Result::OK)
-                LOGW("[OboeEngine::restartStream]\t Oboe couldn't close the output stream: %s",
-                     convertToText(result));
-
-            //reopening and restarting
             result = i_oboeStream->outputBuilder.openStream(i_oboeStream->outputStream);
             if (result != Result::OK)
                 LOGE("[OboeEngine::restartStream]\t Oboe couldn't reopen the output stream: %s",
@@ -565,17 +554,6 @@ bool OboeEngine::restartStream(OboeStream* i_oboeStream, int i_direction) {
             break;
 
         case 2: //input-only
-            //stopping and closing
-            result = i_oboeStream->inputStream->stop();
-            if (result != Result::OK)
-                LOGW("[OboeEngine::restartStream]\t Oboe couldn't stop the input stream: %s",
-                     convertToText(result));
-            result = i_oboeStream->inputStream->close();
-            if (result != Result::OK)
-                LOGW("[OboeEngine::restartStream]\t Oboe couldn't close the input stream: %s",
-                     convertToText(result));
-
-            //reopening and restarting
             result = inputBuilder.openStream(i_oboeStream->inputStream);
             if (result != Result::OK)
                 LOGE("[OboeEngine::restartStream]\t Oboe couldn't reopen the input stream: %s",
