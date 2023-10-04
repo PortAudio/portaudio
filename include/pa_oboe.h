@@ -104,7 +104,7 @@ void PaOboe_SetNativeBufferSize(unsigned long bufferSize);
  * buffer size when doing this, and use the sample rate defined in AudioManager's
  * android.media.property.OUTPUT_SAMPLE_RATE.
  */
-void PaOboe_SetNumberOfBuffers(unsigned buffers);
+void PaOboe_SetNumberOfBuffers(unsigned numberOfBuffers);
 
 #ifdef __cplusplus
 }
