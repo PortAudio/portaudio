@@ -715,7 +715,7 @@ bool OboeEngine::readStream(OboeStream *i_oboeStream, void *i_buffer, int32_t i_
 
 
 /**
- * \brief   Allocates the memory of an OboeStream, and sets its address in it.
+ * \brief   Allocates the memory of an OboeStream, and sets its EngineAddress to this.
  * @return  the address of the oboeStream.
  */
 OboeStream *OboeEngine::allocateOboeStream() {
@@ -1159,7 +1159,7 @@ static void Terminate(struct PaUtilHostApiRepresentation *i_hostApi) {
     auto *oboeHostApi = (PaOboeHostApiRepresentation *) i_hostApi;
 
     if (!(oboeHostApi->oboeEngine->closeStream(nullptr)))
-        LOGW("[PaOboe - Terminate]\t Couldn't close the streams correctly - see OboeEngine::CloseStream logs.");
+        LOGI("[PaOboe - Terminate]\t The streams were probably already closed - see OboeEngine::CloseStream logs.");
 
     if (oboeHostApi->oboeEngine != nullptr)
         delete oboeHostApi->oboeEngine;
