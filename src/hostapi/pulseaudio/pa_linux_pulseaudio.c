@@ -758,7 +758,6 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
         pulseaudioHostApi = NULL;
     }
 
-    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
     return result;
 }
 
