@@ -81,7 +81,6 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,MODULE_NAME, __VA_ARGS__)
 #define LOGF(...) __android_log_print(ANDROID_LOG_FATAL,MODULE_NAME, __VA_ARGS__)
 
-// Copied from @{pa_opensles.c}.
 #define ENSURE(expr, errorText)                                             \
     do                                                                      \
     {                                                                       \
@@ -212,7 +211,7 @@ typedef struct OboeStream {
     AudioStreamBuilder inputBuilder;
 
 private:
-    OboeEngine *oboeEngineAddress;
+    OboeEngine *oboeEngineAddress = nullptr;
 } OboeStream;
 
 /**
@@ -242,7 +241,7 @@ private:
 
 /**
  * Stream engine of the host API - Oboe. We allocate only one instance of the engine per OboeStream, and
- * we call its functions when we want to operate directly on Oboe. More infos on each function are
+ * we call its functions when we want to operate directly on Oboe. More information on each function is
  * provided right before its implementation.
  */
 class OboeEngine {
@@ -363,7 +362,7 @@ bool OboeEngine::tryStream(Direction i_direction, int32_t i_sampleRate, int32_t 
 /**
  * \brief   Opens an audio stream with a specific direction, sample rate and,
  *          depending on the direction of the stream, sets its usage (if
- *          direction == Ditrction::Output) or its preset (if direction == Direction::Input).
+ *          direction == Direction::Output) or its preset (if direction == Direction::Input).
  *          Moreover, this function checks if the stream is blocking, and sets its callback
  *          function if not.
  * @param   oboeStream The stream we want to open
@@ -481,8 +480,9 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
 
 
 /**
- * \brief   Starts oboeStream - both input and output audiostreams are checked
+ * \brief   Starts oboeStream - both input and output AudioStreams of the OboeStream are checked
  *          and requested to be started.
+ * @param   oboeStream The stream we want to start.
  * @return  true if the streams we wanted to start are started successfully, false otherwise.
  */
 bool OboeEngine::startStream(OboeStream *i_oboeStream) {
@@ -506,8 +506,9 @@ bool OboeEngine::startStream(OboeStream *i_oboeStream) {
 
 
 /**
- * \brief   Stops oboeStream - both input and output audiostreams are checked
+ * \brief   Stops oboeStream - both input and output AudioStreams of the OboeStream are checked
  *          and requested to be stopped.
+ * @param   oboeStream The stream we want to stop.
  * @return  true if the streams we wanted to stop are stopped successfully, false otherwise.
  */
 bool OboeEngine::stopStream(OboeStream *i_oboeStream) {
@@ -531,8 +532,11 @@ bool OboeEngine::stopStream(OboeStream *i_oboeStream) {
 
 
 /**
- * \brief   Called when it's needed to restart the oboeStream's audio stream(s), mainly when the
- *          audio devices change while a stream is started.
+ * \brief   Called when it's needed to restart the OboeStream's audio stream(s) when the audio device(s) change
+ *          while a stream is started. Oboe will stop and close said streams in that case,
+ *          so this function just reopens and restarts them.
+ * @param   oboeStream The stream we want to restart.
+ * @param   direction The direction(s) of the stream that have to be restarted (1 for output, 2 for input, 0 for both).
  * @return  true if the stream is restarted successfully, false otherwise.
  */
 bool OboeEngine::restartStream(OboeStream* i_oboeStream, int i_direction) {
@@ -578,8 +582,9 @@ bool OboeEngine::restartStream(OboeStream* i_oboeStream, int i_direction) {
 
 
 /**
- * \brief   Closes oboeStream - both input and output audiostreams are checked
+ * \brief   Closes oboeStream - both input and output AudioStreams of the OboeStream are checked
  *          and closed if active.
+ * @param   oboeStream The stream we want to close.
  * @return  true if the stream is closed successfully, otherwise returns false.
  */
 bool OboeEngine::closeStream(OboeStream *i_oboeStream) {
@@ -613,7 +618,8 @@ bool OboeEngine::closeStream(OboeStream *i_oboeStream) {
 
 
 /**
- * \brief   Stops oboeStream - both input and output audiostreams are checked and forcefully stopped.
+ * \brief   Stops oboeStream - both input and output AudioStreams of the OboeStream are checked and forcefully stopped.
+ * @param   oboeStream The stream we want to abort.
  * @return  true if the output stream and the input stream are stopped successfully, false otherwise.
  */
 bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
@@ -654,6 +660,7 @@ bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
 
 /**
  * \brief   Writes frames on the output stream of oboeStream. Used by blocking streams.
+ * @param   oboeStream The stream we want to write onto.
  * @param   buffer The buffer that we want to write on the output stream;
  * @param   framesToWrite The number of frames that we want to write.
  * @return  true if the buffer is written correctly, false if the write function returns an error
@@ -681,6 +688,7 @@ bool OboeEngine::writeStream(OboeStream *i_oboeStream, const void *i_buffer, int
 
 /**
  * \brief   Reads frames from the input stream of oboeStream. Used by blocking streams.
+ * @param   oboeStream The stream we want to read from.
  * @param   buffer The buffer that we want to read from the input stream;
  * @param   framesToWrite The number of frames that we want to read.
  * @return  true if the buffer is read correctly, false if the read function returns an error
@@ -707,7 +715,7 @@ bool OboeEngine::readStream(OboeStream *i_oboeStream, void *i_buffer, int32_t i_
 
 
 /**
- * \brief   Allocates the memory of oboeStream.
+ * \brief   Allocates the memory of an OboeStream, and sets its address in it.
  * @return  the address of the oboeStream.
  */
 OboeStream *OboeEngine::allocateOboeStream() {
@@ -809,7 +817,8 @@ OboeCallback::onAudioReady(AudioStream *i_audioStream, void *i_audioData, int32_
                                            0);
     }
 
-    /* continue processing user buffers if cbresult is paContinue or if cbresult is  paComplete and userBuffers aren't empty yet  */
+    /* continue processing user buffers if callback result is paContinue or
+     * if it is paComplete and userBuffers aren't empty yet  */
     if (m_oboeStreamHolder->callbackResult == paContinue
         || (m_oboeStreamHolder->callbackResult == paComplete
             && !PaUtil_IsBufferProcessorOutputEmpty(&m_oboeStreamHolder->bufferProcessor))) {
@@ -1003,7 +1012,7 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **i_hostApi, PaHostApiInde
     }
 
     *i_hostApi = &oboeHostApi->inheritedHostApiRep;
-    // Initialization of infos.
+    // Info initialization.
     (*i_hostApi)->info.structVersion = 1;
     (*i_hostApi)->info.type = paInDevelopment;
     (*i_hostApi)->info.name = "android Oboe";
@@ -1134,7 +1143,7 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **i_hostApi, PaHostApiInde
             PaUtil_DestroyAllocationGroup(oboeHostApi->allocations);
         }
 
-        PaUtil_FreeMemory(boeHostApi);
+        PaUtil_FreeMemory(oboeeHostApi);
     }
     LOGE("[PaOboe - Initialize]\t Initialization failed. Error code: %d", result);
     return result;
@@ -1401,7 +1410,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
         oboeStream->inputFormat = hostInputSampleFormat;
     } else {
         inputChannelCount = 0;
-        inputSampleFormat = hostInputSampleFormat = paFloat32; /* Surpress 'uninitialised var' warnings. */
+        inputSampleFormat = hostInputSampleFormat = paFloat32; /* Suppress 'uninitialised var' warnings. */
         oboeStream->inputFormat = hostInputSampleFormat;
     }
 
@@ -1508,7 +1517,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
                  oboeStream->framesPerHostCallback) / i_sampleRate;
         ENSURE(InitializeInputStream(oboeStream, oboeHostApi,
                                      androidInputPreset, i_sampleRate),
-               "Initializing inputstream failed")
+               "Initializing input stream failed")
     } else { oboeStream->hasInput = false; }
 
     if (outputChannelCount > 0) {
@@ -1519,7 +1528,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
                  + oboeStream->framesPerHostCallback) / i_sampleRate;
         ENSURE(InitializeOutputStream(oboeStream, oboeHostApi,
                                       androidOutputUsage, i_sampleRate),
-               "Initializing outputstream failed");
+               "Initializing output stream failed");
     } else { oboeStream->hasOutput = false; }
 
     *i_paStream = (PaStream *) oboeStream;
