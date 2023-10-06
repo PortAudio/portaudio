@@ -164,12 +164,17 @@ Default is to use the pin category.
 #define DYNAMIC_GUID(data) {data}
 #define _NTRTL_ /* Turn off default definition of DEFINE_GUIDEX */
 #undef DEFINE_GUID
+#ifdef DECLSPEC_SELECTANY
+#define PA_DECLSPEC_SELECTANY DECLSPEC_SELECTANY
+#else
+#define PA_DECLSPEC_SELECTANY
+#endif
 #if defined(__clang__) || (defined(_MSVC_TRADITIONAL) && !_MSVC_TRADITIONAL) /* clang-cl and new msvc preprocessor: avoid too many arguments error */
-    #define DEFINE_GUID(n, ...) EXTERN_C const GUID DECLSPEC_SELECTANY n = {__VA_ARGS__}
+    #define DEFINE_GUID(n, ...) EXTERN_C const GUID PA_DECLSPEC_SELECTANY n = {__VA_ARGS__}
     #define DEFINE_GUID_THUNK(n, ...) DEFINE_GUID(n, __VA_ARGS__)
     #define DEFINE_GUIDEX(n) DEFINE_GUID_THUNK(n, STATIC_##n)
 #else
-    #define DEFINE_GUID(n, data) EXTERN_C const GUID DECLSPEC_SELECTANY n = {data}
+    #define DEFINE_GUID(n, data) EXTERN_C const GUID PA_DECLSPEC_SELECTANY n = {data}
     #define DEFINE_GUID_THUNK(n, data) DEFINE_GUID(n, data)
     #define DEFINE_GUIDEX(n) DEFINE_GUID_THUNK(n, STATIC_##n)
 #endif /* __clang__, !_MSVC_TRADITIONAL */
