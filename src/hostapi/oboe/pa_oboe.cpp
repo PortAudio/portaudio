@@ -384,6 +384,12 @@ PaError OboeEngine::openStream(OboeStream *i_oboeStream, Direction i_direction, 
                                Usage i_androidOutputUsage, InputPreset i_androidInputPreset) {
     PaError error = paNoError;
     Result result;
+
+    if (i_oboeStream == nullptr) {
+        LOGE("[OboeEngine::openStream]\t i_oboeStream is a nullptr.");
+        return paInternalError;
+    }
+
     OboeMediator* mediator = i_oboeStream->oboeMediator;
 
     if(!(i_oboeStream->isBlocking)){
@@ -594,26 +600,22 @@ bool OboeEngine::restartStream(OboeStream* i_oboeStream, int i_direction) {
  */
 bool OboeEngine::closeStream(OboeStream *i_oboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
-    bool hasOutput = true, hasInput = true;
-    OboeMediator* mediator;
 
     if (i_oboeStream == nullptr) {
-        LOGW("[OboeEngine::closeStream]\t i_oboeStream is a nullptr. Aborting both oboe streams of the terminable mediator");
-        mediator = m_terminableMediator;
-    } else {
-        mediator = i_oboeStream->oboeMediator;
-        hasInput = i_oboeStream->hasInput;
-        hasOutput = i_oboeStream->hasOutput;
+        LOGE("[OboeEngine::closeStream]\t i_oboeStream is a nullptr.");
+        return false;
     }
 
-    if (hasOutput) {
+    OboeMediator* mediator = i_oboeStream->oboeMediator;
+
+    if (i_oboeStream->hasOutput) {
         outputResult = mediator->m_outputStream->close();
         if (outputResult == Result::ErrorClosed) {
             outputResult = Result::OK;
             LOGW("[OboeEngine::closeStream]\t Tried to close output stream, but was already closed.");
         }
     }
-    if (hasInput) {
+    if (i_oboeStream->hasInput) {
         inputResult = mediator->m_inputStream->close();
         if (inputResult == Result::ErrorClosed) {
             inputResult = Result::OK;
@@ -632,19 +634,15 @@ bool OboeEngine::closeStream(OboeStream *i_oboeStream) {
  */
 bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
-    bool hasOutput = true, hasInput = true;
-    OboeMediator* mediator;
 
     if (i_oboeStream == nullptr) {
-        LOGW("[OboeEngine::abortStream]\t i_oboeStream is a nullptr. Aborting both oboe streams of the terminable mediator");
-        mediator = m_terminableMediator;
-    } else {
-        mediator = i_oboeStream->oboeMediator;
-        hasInput = i_oboeStream->hasInput;
-        hasOutput = i_oboeStream->hasOutput;
+        LOGE("[OboeEngine::abortStream]\t i_oboeStream is a nullptr.");
+        return false;
     }
 
-    if (hasInput) {
+    OboeMediator* mediator = i_oboeStream->oboeMediator;
+
+    if (i_oboeStream->hasInput) {
         inputResult = mediator->m_inputStream->stop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to stop: %s",
@@ -654,7 +652,7 @@ bool OboeEngine::abortStream(OboeStream *i_oboeStream) {
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to close: %s",
                  convertToText(inputResult));
     }
-    if (hasOutput) {
+    if (i_oboeStream->hasOutput) {
         outputResult = mediator->m_outputStream->stop();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the output stream to stop: %s",
@@ -732,7 +730,6 @@ bool OboeEngine::readStream(OboeStream *i_oboeStream, void *i_buffer, int32_t i_
  * @return  the address of the oboeStream.
  */
 void OboeEngine::constructOboeStream(OboeStream* i_oboeStream) {
-    i_oboeStream = (OboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(OboeStream));
     m_terminableMediator = i_oboeStream->oboeMediator = new OboeMediator(i_oboeStream);
     i_oboeStream->oboeMediator->setEngine(this);
 }
@@ -1176,9 +1173,6 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **i_hostApi, PaHostApiInde
 static void Terminate(struct PaUtilHostApiRepresentation *i_hostApi) {
     auto *oboeHostApi = (PaOboeHostApiRepresentation *) i_hostApi;
 
-    if (!(oboeHostApi->oboeEngine->closeStream(nullptr)))
-        LOGI("[PaOboe - Terminate]\t The streams were probably already closed - see OboeEngine::CloseStream logs.");
-
     if (oboeHostApi->oboeEngine != nullptr)
         delete oboeHostApi->oboeEngine;
 
@@ -1386,7 +1380,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *i_hostApi,
     Usage androidOutputUsage = Usage::VoiceCommunication;
     InputPreset androidInputPreset = InputPreset::Generic;
 
-    OboeStream* oboeStream;
+    OboeStream* oboeStream = (OboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(OboeStream));;
     oboeHostApi->oboeEngine->constructOboeStream(oboeStream);
 
     if (!oboeStream) {
