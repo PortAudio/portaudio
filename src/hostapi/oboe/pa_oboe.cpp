@@ -276,9 +276,6 @@ public:
     void constructOboeStream(OboeStream* oboeStream);
 
 private:
-    std::shared_ptr <AudioStream> mTestStream;
-    AudioStreamBuilder mTestBuilder;
-
     OboeMediator* mTerminableMediator;
 
     //Conversion utils
@@ -314,26 +311,28 @@ OboeEngine::OboeEngine() {}
 
 /**
  * \brief   Tries to open a stream with the direction direction, sample rate sampleRate and/or
- *          channel count channelCount. It then checks if the stream was in fact opened with the
- *          desired settings, and then closes the stream. It's used to see if the requested
+ *          channel count channelCount. It then closes the stream. It's used to see if the requested
  *          parameters are supported by the devices that are going to be used.
  * @param   direction the Direction of the stream;
  * @param   sampleRate the sample rate we want to try;
  * @param   channelCount the channel count we want to try;
- * @return  true if the requested sample rate / channel count is supported by the device, false if
- *          they aren't, or if tryStream couldn't open a stream.
+ * @return  true if the stream was opened with Result::OK, false otherwise.
  */
 bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t channelCount) {
     Result result;
     bool outcome = false;
 
-    mTestBuilder.setDeviceId(getSelectedDevice(direction))
+    std::shared_ptr <AudioStream> stream;
+    AudioStreamBuilder builder;
+
+    builder.setDeviceId(getSelectedDevice(direction))
             // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
+            // FIXME: if needed, modify this format to whatever you require
             ->setFormat(AudioFormat::Float)
             ->setDirection(direction)
             ->setSampleRate(sampleRate)
             ->setChannelCount(channelCount)
-            ->openStream(mTestStream);
+            ->openStream(stream);
 
     if (result != Result::OK) {
         LOGE("[OboeEngine::TryStream]\t Couldn't open the stream in TryStream. Error: %s",
@@ -341,24 +340,7 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
         return outcome;
     }
 
-    if (sampleRate != kUnspecified) {
-        outcome = (sampleRate == mTestBuilder.getSampleRate());
-        if (!outcome) {
-            LOGW("[OboeEngine::TryStream]\t Tried sampleRate = %d, built sampleRate = %d",
-                 sampleRate, mTestBuilder.getSampleRate());
-        }
-    } else if (channelCount != kUnspecified) {
-        outcome = (channelCount == mTestBuilder.getChannelCount());
-        if (!outcome) {
-            LOGW("[OboeEngine::TryStream]\t Tried channelCount = %d, built channelCount = %d",
-                 channelCount, mTestBuilder.getChannelCount());
-        }
-    } else {
-        LOGE("[OboeEngine::TryStream]\t Logical failure. This message should NEVER occur.");
-        outcome = false;
-    }
-
-    mTestStream->close();
+    stream->close();
 
     return outcome;
 }
