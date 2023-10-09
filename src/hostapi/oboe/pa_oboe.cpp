@@ -161,8 +161,8 @@ using namespace oboe;
 int32_t paOboe_inputDeviceId = kUnspecified;
 int32_t paOboe_outputDeviceId = kUnspecified;
 
-PerformanceMode paOboe_inputPerfMode = PerformanceMode::LowLatency;
-PerformanceMode paOboe_outputPerfMode = PerformanceMode::LowLatency;
+PerformanceMode paOboe_inputPerformanceMode = PerformanceMode::LowLatency;
+PerformanceMode paOboe_outputPerformanceMode = PerformanceMode::LowLatency;
 
 class OboeEngine;
 class OboeMediator;
@@ -170,7 +170,7 @@ class OboeMediator;
 /**
  * Stream structure, useful to store relevant information. It's needed by Portaudio.
  */
-typedef struct OboeStream {
+typedef struct PaOboeStream {
     PaUtilStreamRepresentation streamRepresentation;
     PaUtilCpuLoadMeasurer cpuLoadMeasurer;
     PaUtilBufferProcessor bufferProcessor;
@@ -200,13 +200,13 @@ typedef struct OboeStream {
     unsigned bytesPerFrame;
 
     OboeMediator* oboeMediator;
-} OboeStream;
+} PaOboeStream;
 
 
 class OboeMediator: public AudioStreamCallback{
 public:
-    OboeMediator(OboeStream* oboeStream) {
-        mOboeCallbackStream = oboeStream;
+    OboeMediator(PaOboeStream* paOboeStream) {
+        mOboeCallbackStream = paOboeStream;
     }
 
     //Callback function for non-blocking streams
@@ -222,8 +222,8 @@ public:
     OboeEngine *getEngine() { return mOboeEngine; }
     void setEngine(OboeEngine *oboeEngine) { mOboeEngine = oboeEngine; }
 
-    OboeStream *getStreamAddress() { return mOboeCallbackStream; }
-    void setCallbackStream(OboeStream *oboeStream) { mOboeCallbackStream = oboeStream; }
+    PaOboeStream *getStreamAddress() { return mOboeCallbackStream; }
+    void setCallbackStream(PaOboeStream *paOboeStream) { mOboeCallbackStream = paOboeStream; }
 
     //The only instances of output and input streams that will be used, and their builders
     std::shared_ptr <AudioStream> mOutputStream;
@@ -235,7 +235,7 @@ private:
     OboeEngine *mOboeEngine;
 
     //callback utils
-    OboeStream *mOboeCallbackStream;
+    PaOboeStream *mOboeCallbackStream;
     unsigned long mFramesProcessed{};
     PaStreamCallbackTimeInfo mTimeInfo{};
     struct timespec mTimeSpec{};
@@ -243,7 +243,7 @@ private:
 
 
 /**
- * Stream engine of the host API - Oboe. We allocate only one instance of the engine per OboeStream, and
+ * Stream engine of the host API - Oboe. We allocate only one instance of the engine per PaOboeStream, and
  * we call its functions when we want to operate directly on Oboe. More information on each function is
  * provided right before its implementation.
  */
@@ -254,26 +254,26 @@ public:
     //Stream-managing functions
     bool tryStream(Direction direction, int32_t sampleRate, int32_t channelCount);
 
-    PaError openStream(OboeStream *oboeStream, Direction direction, int32_t sampleRate,
+    PaError openStream(PaOboeStream *paOboeStream, Direction direction, int32_t sampleRate,
                        Usage outputUsage, InputPreset inputPreset);
 
-    bool startStream(OboeStream *oboeStream);
+    bool startStream(PaOboeStream *paOboeStream);
 
-    bool stopStream(OboeStream *oboeStream);
+    bool stopStream(PaOboeStream *paOboeStream);
 
-    bool restartStream(OboeStream *oboeStream, int direction);
+    bool restartStream(PaOboeStream *paOboeStream, int direction);
 
-    bool closeStream(OboeStream *oboeStream);
+    bool closeStream(PaOboeStream *paOboeStream);
 
-    bool abortStream(OboeStream *oboeStream);
+    bool abortStream(PaOboeStream *paOboeStream);
 
     //Blocking read/write functions
-    bool writeStream(OboeStream *oboeStream, const void *buffer, int32_t framesToWrite);
+    bool writeStream(PaOboeStream *paOboeStream, const void *buffer, int32_t framesToWrite);
 
-    bool readStream(OboeStream *oboeStream, void *buffer, int32_t framesToRead);
+    bool readStream(PaOboeStream *paOboeStream, void *buffer, int32_t framesToRead);
 
     //Engine utils
-    void constructOboeStream(OboeStream* oboeStream);
+    void constructPaOboeStream(PaOboeStream* paOboeStream);
 
 private:
     OboeMediator* mTerminableMediator;
@@ -352,7 +352,7 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
  *          direction == Direction::Output) or its preset (if direction == Direction::Input).
  *          Moreover, this function checks if the stream is blocking, and sets its callback
  *          function if not.
- * @param   oboeStream The stream we want to open
+ * @param   paOboeStream The stream we want to open
  * @param   direction The Oboe::Direction of the stream we want to open;
  * @param   sampleRate The sample rate of the stream we want to open;
  * @param   androidOutputUsage The Oboe::Usage of the output stream we want to open
@@ -362,33 +362,33 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
  * @return  paNoError if everything goes as expected, paUnanticipatedHostError if Oboe fails to open
  *          a stream, and paInsufficientMemory if the memory allocation of the buffers fails.
  */
-PaError OboeEngine::openStream(OboeStream *oboeStream, Direction direction, int32_t sampleRate,
+PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, int32_t sampleRate,
                                Usage androidOutputUsage, InputPreset androidInputPreset) {
     PaError error = paNoError;
     Result result;
 
-    if (oboeStream == nullptr) {
-        LOGE("[OboeEngine::openStream]\t oboeStream is a nullptr.");
+    if (paOboeStream == nullptr) {
+        LOGE("[OboeEngine::openStream]\t paOboeStream is a nullptr.");
         return paInternalError;
     }
 
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
-    if(!(oboeStream->isBlocking)){
+    if(!(paOboeStream->isBlocking)){
         mediator->resetCallbackCounters();
     }
 
     if (direction == Direction::Input) {
-        mediator->mInputBuilder.setChannelCount(oboeStream->bufferProcessor.inputChannelCount)
-                ->setFormat(PaToOboeFormat(oboeStream->inputFormat))
+        mediator->mInputBuilder.setChannelCount(paOboeStream->bufferProcessor.inputChannelCount)
+                ->setFormat(PaToOboeFormat(paOboeStream->inputFormat))
                 ->setSampleRate(sampleRate)
                 ->setDirection(Direction::Input)
                 ->setDeviceId(getSelectedDevice(Direction::Input))
-                ->setPerformanceMode(paOboe_inputPerfMode)
+                ->setPerformanceMode(paOboe_inputPerformanceMode)
                 ->setInputPreset(androidInputPreset)
-                ->setFramesPerCallback(oboeStream->framesPerHostCallback);
+                ->setFramesPerCallback(paOboeStream->framesPerHostCallback);
 
-        if (!(oboeStream->isBlocking)) {
+        if (!(paOboeStream->isBlocking)) {
             mediator->setInputCallback();
         }
 
@@ -402,36 +402,36 @@ PaError OboeEngine::openStream(OboeStream *oboeStream, Direction direction, int3
 
         mediator->minputStream->setBufferSizeInFrames(mediator->mInputStream->getFramesPerBurst() *
                                                                paOboe_numberOfBuffers);
-        oboeStream->inputBuffers =
+        paOboeStream->inputBuffers =
                 (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(int32_t * ));
 
         for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
-            oboeStream->inputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
-                    oboeStream->framesPerHostCallback *
-                    oboeStream->bytesPerFrame *
-                    oboeStream->bufferProcessor.inputChannelCount);
+            paOboeStream->inputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
+                    paOboeStream->framesPerHostCallback *
+                            paOboeStream->bytesPerFrame *
+                            paOboeStream->bufferProcessor.inputChannelCount);
 
-            if (!oboeStream->inputBuffers[i]) {
+            if (!paOboeStream->inputBuffers[i]) {
                 for (int j = 0; j < i; ++j)
-                    PaUtil_FreeMemory(oboeStream->inputBuffers[j]);
-                PaUtil_FreeMemory(oboeStream->inputBuffers);
+                    PaUtil_FreeMemory(paOboeStream->inputBuffers[j]);
+                PaUtil_FreeMemory(paOboeStream->inputBuffers);
                 mediator->mInputStream->close();
                 error = paInsufficientMemory;
                 break;
             }
         }
-        oboeStream->currentInputBuffer = 0;
+        paOboeStream->currentInputBuffer = 0;
     } else {
-        mediator->mOutputBuilder.setChannelCount(oboeStream->bufferProcessor.outputChannelCount)
-                ->setFormat(PaToOboeFormat(oboeStream->outputFormat))
+        mediator->mOutputBuilder.setChannelCount(paOboeStream->bufferProcessor.outputChannelCount)
+                ->setFormat(PaToOboeFormat(paOboeStream->outputFormat))
                 ->setSampleRate(sampleRate)
                 ->setDirection(Direction::Output)
                 ->setDeviceId(getSelectedDevice(Direction::Output))
-                ->setPerformanceMode(paOboe_outputPerfMode)
+                ->setPerformanceMode(paOboe_outputPerformanceMode)
                 ->setUsage(androidOutputUsage)
-                ->setFramesPerCallback(oboeStream->framesPerHostCallback);
+                ->setFramesPerCallback(paOboeStream->framesPerHostCallback);
 
-        if (!(oboeStream->isBlocking)) {
+        if (!(paOboeStream->isBlocking)) {
             mediator->setOutputCallback();
         }
 
@@ -444,25 +444,25 @@ PaError OboeEngine::openStream(OboeStream *oboeStream, Direction direction, int3
 
         mediator->mOutputStream->setBufferSizeInFrames(mediator->mOutputStream->getFramesPerBurst() *
                                                                 paOboe_numberOfBuffers);
-        oboeStream->outputBuffers =
+        paOboeStream->outputBuffers =
                 (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(int32_t * ));
 
         for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
-            oboeStream->outputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
-                    oboeStream->framesPerHostCallback *
-                    oboeStream->bytesPerFrame *
-                    oboeStream->bufferProcessor.outputChannelCount);
+            paOboeStream->outputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
+                    paOboeStream->framesPerHostCallback *
+                            paOboeStream->bytesPerFrame *
+                            paOboeStream->bufferProcessor.outputChannelCount);
 
-            if (!oboeStream->outputBuffers[i]) {
+            if (!paOboeStream->outputBuffers[i]) {
                 for (int j = 0; j < i; ++j)
-                    PaUtil_FreeMemory(oboeStream->outputBuffers[j]);
-                PaUtil_FreeMemory(oboeStream->outputBuffers);
+                    PaUtil_FreeMemory(paOboeStream->outputBuffers[j]);
+                PaUtil_FreeMemory(paOboeStream->outputBuffers);
                 mediator->mOutputStream->close();
                 error = paInsufficientMemory;
                 break;
             }
         }
-        oboeStream->currentOutputBuffer = 0;
+        paOboeStream->currentOutputBuffer = 0;
     }
 
     return error;
@@ -470,22 +470,22 @@ PaError OboeEngine::openStream(OboeStream *oboeStream, Direction direction, int3
 
 
 /**
- * \brief   Starts oboeStream - both input and output AudioStreams of the OboeStream are checked
+ * \brief   Starts paOboeStream - both input and output AudioStreams of the paOboeStream are checked
  *          and requested to be started.
- * @param   oboeStream The stream we want to start.
+ * @param   paOboeStream The stream we want to start.
  * @return  true if the streams we wanted to start are started successfully, false otherwise.
  */
-bool OboeEngine::startStream(OboeStream *oboeStream) {
+bool OboeEngine::startStream(PaOboeStream *paOboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
-    if (oboeStream->hasInput) {
+    if (paOboeStream->hasInput) {
         inputResult = mediator->mInputStream->requestStart();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::startStream]\t Oboe couldn't start the input stream: %s",
                  convertToText(inputResult));
     }
-    if (oboeStream->hasOutput) {
+    if (paOboeStream->hasOutput) {
         outputResult = mediator->mOutputStream->requestStart();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::startStream]\t Oboe couldn't start the output stream: %s",
@@ -497,22 +497,22 @@ bool OboeEngine::startStream(OboeStream *oboeStream) {
 
 
 /**
- * \brief   Stops oboeStream - both input and output AudioStreams of the OboeStream are checked
+ * \brief   Stops paOboeStream - both input and output AudioStreams of the PaOboeStream are checked
  *          and requested to be stopped.
- * @param   oboeStream The stream we want to stop.
+ * @param   paOboeStream The stream we want to stop.
  * @return  true if the streams we wanted to stop are stopped successfully, false otherwise.
  */
-bool OboeEngine::stopStream(OboeStream *oboeStream) {
+bool OboeEngine::stopStream(PaOboeStream *paOboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
-    if (oboeStream->hasInput) {
+    if (paOboeStream->hasInput) {
         inputResult = mediator->mInputStream->requestStop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::stopStream]\t Oboe couldn't stop the input stream: %s",
                  convertToText(inputResult));
     }
-    if (oboeStream->hasOutput) {
+    if (paOboeStream->hasOutput) {
         outputResult = mediator->mOutputStream->requestStop();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::stopStream]\t Oboe couldn't stop the output stream: %s",
@@ -524,17 +524,17 @@ bool OboeEngine::stopStream(OboeStream *oboeStream) {
 
 
 /**
- * \brief   Called when it's needed to restart the OboeStream's audio stream(s) when the audio device(s) change
+ * \brief   Called when it's needed to restart the PaOboeStream's audio stream(s) when the audio device(s) change
  *          while a stream is started. Oboe will stop and close said streams in that case,
  *          so this function just reopens and restarts them.
- * @param   oboeStream The stream we want to restart.
+ * @param   paOboeStream The stream we want to restart.
  * @param   direction The direction(s) of the stream that have to be restarted (1 for output, 2 for input, 3 for both).
  * @return  true if the stream is restarted successfully, false otherwise.
  */
-bool OboeEngine::restartStream(OboeStream* oboeStream, int direction) {
+bool OboeEngine::restartStream(PaOboeStream* paOboeStream, int direction) {
     bool outcome = true;
     Result result;
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
     switch (direction) {
         case 1: //output-only
@@ -566,7 +566,7 @@ bool OboeEngine::restartStream(OboeStream* oboeStream, int direction) {
         default:
             // unspecified direction or both directions: restart both streams
             LOGW("[OboeEngine::restartStream]\t Unspecified direction, restarting both streams");
-            outcome = (restartStream(oboeStream, 1) && restartStream(oboeStream, 2));
+            outcome = (restartStream(paOboeStream, 1) && restartStream(paOboeStream, 2));
             break;
     }
 
@@ -575,29 +575,29 @@ bool OboeEngine::restartStream(OboeStream* oboeStream, int direction) {
 
 
 /**
- * \brief   Closes oboeStream - both input and output AudioStreams of the OboeStream are checked
+ * \brief   Closes paOboeStream - both input and output AudioStreams of the PaOboeStream are checked
  *          and closed if active.
- * @param   oboeStream The stream we want to close.
+ * @param   paOboeStream The stream we want to close.
  * @return  true if the stream is closed successfully, otherwise returns false.
  */
-bool OboeEngine::closeStream(OboeStream *oboeStream) {
+bool OboeEngine::closeStream(PaOboeStream *paOboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
 
-    if (oboeStream == nullptr) {
-        LOGE("[OboeEngine::closeStream]\t oboeStream is a nullptr.");
+    if (paOboeStream == nullptr) {
+        LOGE("[OboeEngine::closeStream]\t paOboeStream is a nullptr.");
         return false;
     }
 
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
-    if (oboeStream->hasOutput) {
+    if (paOboeStream->hasOutput) {
         outputResult = mediator->mOutputStream->close();
         if (outputResult == Result::ErrorClosed) {
             outputResult = Result::OK;
             LOGW("[OboeEngine::closeStream]\t Tried to close output stream, but was already closed.");
         }
     }
-    if (oboeStream->hasInput) {
+    if (paOboeStream->hasInput) {
         inputResult = mediator->mInputStream->close();
         if (inputResult == Result::ErrorClosed) {
             inputResult = Result::OK;
@@ -610,21 +610,21 @@ bool OboeEngine::closeStream(OboeStream *oboeStream) {
 
 
 /**
- * \brief   Stops oboeStream - both input and output AudioStreams of the OboeStream are checked and forcefully stopped.
- * @param   oboeStream The stream we want to abort.
+ * \brief   Stops paOboeStream - both input and output AudioStreams of the PaOboeStream are checked and forcefully stopped.
+ * @param   paOboeStream The stream we want to abort.
  * @return  true if the output stream and the input stream are stopped successfully, false otherwise.
  */
-bool OboeEngine::abortStream(OboeStream *oboeStream) {
+bool OboeEngine::abortStream(PaOboeStream *paOboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
 
-    if (oboeStream == nullptr) {
-        LOGE("[OboeEngine::abortStream]\t oboeStream is a nullptr.");
+    if (paOboeStream == nullptr) {
+        LOGE("[OboeEngine::abortStream]\t paOboeStream is a nullptr.");
         return false;
     }
 
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
-    if (oboeStream->hasInput) {
+    if (paOboeStream->hasInput) {
         inputResult = mediator->mInputStream->stop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to stop: %s",
@@ -634,7 +634,7 @@ bool OboeEngine::abortStream(OboeStream *oboeStream) {
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to close: %s",
                  convertToText(inputResult));
     }
-    if (oboeStream->hasOutput) {
+    if (paOboeStream->hasOutput) {
         outputResult = mediator->mOutputStream->stop();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the output stream to stop: %s",
@@ -650,23 +650,23 @@ bool OboeEngine::abortStream(OboeStream *oboeStream) {
 
 
 /**
- * \brief   Writes frames on the output stream of oboeStream. Used by blocking streams.
- * @param   oboeStream The stream we want to write onto.
+ * \brief   Writes frames on the output stream of paOboeStream. Used by blocking streams.
+ * @param   paOboeStream The stream we want to write onto.
  * @param   buffer The buffer that we want to write on the output stream;
  * @param   framesToWrite The number of frames that we want to write.
  * @return  true if the buffer is written correctly, false if the write function returns an error
  *          different from ErrorDisconnected. In case of ErrorDisconnected, the function returns
  *          true if the stream is successfully restarted, and false otherwise.
  */
-bool OboeEngine::writeStream(OboeStream *oboeStream, const void buffer, int32_t framesToWrite) {
+bool OboeEngine::writeStream(PaOboeStream *paOboeStream, const void buffer, int32_t framesToWrite) {
     bool outcome = true;
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
     ResultWithValue <int32_t> result = mediator->mOutputStream->write(buffer, framesToWrite, TIMEOUT_NS);
 
     // If the stream is interrupted because the device suddenly changes, restart the stream.
     if (result.error() == Result::ErrorDisconnected) {
-        if (restartStream(oboeStream, 1))
+        if (restartStream(paOboeStream, 1))
             return true;
     }
 
@@ -679,23 +679,23 @@ bool OboeEngine::writeStream(OboeStream *oboeStream, const void buffer, int32_t 
 
 
 /**
- * \brief   Reads frames from the input stream of oboeStream. Used by blocking streams.
- * @param   oboeStream The stream we want to read from.
+ * \brief   Reads frames from the input stream of paOboeStream. Used by blocking streams.
+ * @param   paOboeStream The stream we want to read from.
  * @param   buffer The buffer that we want to read from the input stream;
  * @param   framesToWrite The number of frames that we want to read.
  * @return  true if the buffer is read correctly, false if the read function returns an error
  *          different from ErrorDisconnected. In case of ErrorDisconnected, the function returns
  *          true if the stream is successfully restarted, and false otherwise.
  */
-bool OboeEngine::readStream(OboeStream *oboeStream, void *buffer, int32_t framesToRead) {
+bool OboeEngine::readStream(PaOboeStream *paOboeStream, void *buffer, int32_t framesToRead) {
     bool outcome = true;
-    OboeMediator* mediator = oboeStream->oboeMediator;
+    OboeMediator* mediator = paOboeStream->oboeMediator;
 
     ResultWithValue <int32_t> result = mediator->mInputStream->read(buffer, framesToRead, TIMEOUT_NS);
 
     // If the stream is interrupted because the device suddenly changes, restart the stream.
     if (result.error() == Result::ErrorDisconnected) {
-        if (restartStream(oboeStream, 2))
+        if (restartStream(paOboeStream, 2))
             return true;
     }
 
@@ -708,12 +708,12 @@ bool OboeEngine::readStream(OboeStream *oboeStream, void *buffer, int32_t frames
 
 
 /**
- * \brief   Allocates the memory of an OboeStream, and sets its EngineAddress to this.
- * @return  the address of the oboeStream.
+ * \brief   Allocates the memory of a PaOboeStream, and sets its EngineAddress to this.
+ * @return  the address of the paOboeStream.
  */
-void OboeEngine::constructOboeStream(OboeStream* oboeStream) {
-    mTerminableMediator = oboeStream->oboeMediator = new OboeMediator(oboeStream);
-    oboeStream->oboeMediator->setEngine(this);
+void OboeEngine::constructPaOboeStream(PaOboeStream* paOboeStream) {
+    mTerminableMediator = paOboeStream->oboeMediator = new OboeMediator(paOboeStream);
+    paOboeStream->oboeMediator->setEngine(this);
 }
 
 
@@ -1282,7 +1282,7 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
 
 /**
  * \brief   Calls OboeEngine::openStream to open the outputStream and a Generic input preset.
- * @param   oboeStream is the OboeStream we want to initialize in the output direction.
+ * @param   paOboeStream is the PaOboeStream we want to initialize in the output direction.
  * @param   oboeHostApi points towards a OboeHostApiRepresentation (see struct defined at the top of
  *              this file);
  * @param   androidOutputUsage is an attribute that expresses why we are opening the output stream.
@@ -1292,10 +1292,10 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
  *              the correct amount of memory.
  * @return  the value returned by OboeEngine::openStream.
  */
-static PaError InitializeOutputStream(OboeStream* oboeStream, PaOboeHostApiRepresentation *oboeHostApi,
+static PaError InitializeOutputStream(PaOboeStream* paOboeStream, PaOboeHostApiRepresentation *oboeHostApi,
                                       Usage androidOutputUsage, double sampleRate) {
 
-    return oboeHostApi->oboeEngine->openStream(oboeStream,
+    return oboeHostApi->oboeEngine->openStream(paOboeStream,
                                                  Direction::Output,
                                                  sampleRate,
                                                  androidOutputUsage,
@@ -1305,7 +1305,7 @@ static PaError InitializeOutputStream(OboeStream* oboeStream, PaOboeHostApiRepre
 
 /**
  * \brief   Calls OboeEngine::openStream to open the outputStream and a Generic input preset.
- * @param   oboeStream is the OboeStream we want to initialize in the input direction.
+ * @param   paOboeStream is the PaOboeStream we want to initialize in the input direction.
  * @param   oboeHostApi points towards a OboeHostApiRepresentation (see struct defined at the top of
  *              this file);
  * @param   androidInputPreset is an attribute that defines the audio source. This information
@@ -1315,10 +1315,10 @@ static PaError InitializeOutputStream(OboeStream* oboeStream, PaOboeHostApiRepre
  *              the correct amount of memory.
  * @return  the value returned by OboeEngine::openStream.
  */
-static PaError InitializeInputStream(OboeStream* oboeStream, PaOboeHostApiRepresentation *oboeHostApi,
+static PaError InitializeInputStream(PaOboeStream* paOboeStream, PaOboeHostApiRepresentation *oboeHostApi,
                                      InputPreset androidInputPreset, double sampleRate) {
 
-    return oboeHostApi->oboeEngine->openStream(oboeStream,
+    return oboeHostApi->oboeEngine->openStream(paOboeStream,
                                                  Direction::Input,
                                                  sampleRate,
                                                  Usage::Media,   //Usage won't be used, so we put the default value.
@@ -1327,11 +1327,11 @@ static PaError InitializeInputStream(OboeStream* oboeStream, PaOboeHostApiRepres
 
 
 /**
- * \brief   Opens the portaudio audio stream - while initializing our OboeStream.
+ * \brief   Opens the portaudio audio stream - while initializing our PaOboeStream.
  * @param   hostApi points towards a *HostApiRepresentation, which is a structure representing the
  *              interface to a host API (see struct in "pa_hostapi.h");
  * @param   paStream points to a pointer to a PaStream, which is an audio stream structure used and built
- *              by portaudio, which will hold the information of our OboeStream;
+ *              by portaudio, which will hold the information of our PaOboeStream;
  * @param   inputParameters points towards the parameters given to the input stream;
  * @param   outputParameters points towards the parameters given to the output stream;
  * @param   sampleRate the sample rate we want for our stream;
@@ -1362,10 +1362,10 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     Usage androidOutputUsage = Usage::VoiceCommunication;
     InputPreset androidInputPreset = InputPreset::Generic;
 
-    OboeStream* oboeStream = (OboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(OboeStream));;
-    oboeHostApi->oboeEngine->constructOboeStream(oboeStream);
+    PaOboeStream* paOboeStream = (PaOboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(PaOboeStream));;
+    oboeHostApi->oboeEngine->constructPaOboeStream(paOboeStream);
 
-    if (!oboeStream) {
+    if (!paOboeStream) {
         error = paInsufficientMemory;
         goto error;
     }
@@ -1402,11 +1402,11 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
          *  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options */
         hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paFloat32, inputSampleFormat);
-        oboeStream->inputFormat = hostInputSampleFormat;
+        paOboeStream->inputFormat = hostInputSampleFormat;
     } else {
         inputChannelCount = 0;
         inputSampleFormat = hostInputSampleFormat = paFloat32; /* Suppress 'uninitialised var' warnings. */
-        oboeStream->inputFormat = hostInputSampleFormat;
+        paOboeStream->inputFormat = hostInputSampleFormat;
     }
 
     if (outputParameters) {
@@ -1443,11 +1443,11 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
          */
         hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paFloat32, outputSampleFormat);
-        oboeStream->outputFormat = hostOutputSampleFormat;
+        paOboeStream->outputFormat = hostOutputSampleFormat;
     } else {
         outputChannelCount = 0;
         outputSampleFormat = hostOutputSampleFormat = paFloat32;
-        oboeStream->outputFormat = hostOutputSampleFormat;
+        paOboeStream->outputFormat = hostOutputSampleFormat;
     }
 
     /* validate platform specific flags */
@@ -1467,18 +1467,18 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     }
 
     if (streamCallback) {
-        PaUtil_InitializeStreamRepresentation(&(oboeStream->streamRepresentation),
+        PaUtil_InitializeStreamRepresentation(&(paOboeStream->streamRepresentation),
                                               &oboeHostApi->callbackStreamInterface,
                                               streamCallback, userData);
     } else {
-        PaUtil_InitializeStreamRepresentation(&(oboeStream->streamRepresentation),
+        PaUtil_InitializeStreamRepresentation(&(paOboeStream->streamRepresentation),
                                               &oboeHostApi->blockingStreamInterface,
                                               streamCallback, userData);
     }
 
-    PaUtil_InitializeCpuLoadMeasurer(&(oboeStream->cpuLoadMeasurer), sampleRate);
+    PaUtil_InitializeCpuLoadMeasurer(&(paOboeStream->cpuLoadMeasurer), sampleRate);
 
-    error = PaUtil_InitializeBufferProcessor(&(oboeStream->bufferProcessor),
+    error = PaUtil_InitializeBufferProcessor(&(paOboeStream->bufferProcessor),
                                              inputChannelCount,
                                              inputSampleFormat,
                                              hostInputSampleFormat,
@@ -1493,45 +1493,45 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     if (error != paNoError)
         goto error;
 
-    oboeStream->streamRepresentation.streamInfo.sampleRate = sampleRate;
-    oboeStream->isBlocking = (streamCallback == nullptr);
-    oboeStream->framesPerHostCallback = framesPerHostBuffer;
-    oboeStream->bytesPerFrame = sizeof(int16_t);
-    oboeStream->cbFlags = 0;
-    oboeStream->isStopped = true;
-    oboeStream->isActive = false;
+    paOboeStream->streamRepresentation.streamInfo.sampleRate = sampleRate;
+    paOboeStream->isBlocking = (streamCallback == nullptr);
+    paOboeStream->framesPerHostCallback = framesPerHostBuffer;
+    paOboeStream->bytesPerFrame = sizeof(int16_t);
+    paOboeStream->cbFlags = 0;
+    paOboeStream->isStopped = true;
+    paOboeStream->isActive = false;
 
-    if (!(oboeStream->isBlocking)) {}
+    if (!(paOboeStream->isBlocking)) {}
 //        PaUnixThreading_Initialize(); TODO: see if threading works with this version of PortAudio
 
     if (inputChannelCount > 0) {
-        oboeStream->hasInput = true;
-        oboeStream->streamRepresentation.streamInfo.inputLatency =
+        paOboeStream->hasInput = true;
+        paOboeStream->streamRepresentation.streamInfo.inputLatency =
                 ((PaTime) PaUtil_GetBufferProcessorInputLatencyFrames(
-                        &(oboeStream->bufferProcessor)) +
-                 oboeStream->framesPerHostCallback) / sampleRate;
-        ENSURE(InitializeInputStream(oboeStream, oboeHostApi,
+                        &(paOboeStream->bufferProcessor)) +
+                        paOboeStream->framesPerHostCallback) / sampleRate;
+        ENSURE(InitializeInputStream(paOboeStream, oboeHostApi,
                                      androidInputPreset, sampleRate),
                "Initializing input stream failed")
-    } else { oboeStream->hasInput = false; }
+    } else { paOboeStream->hasInput = false; }
 
     if (outputChannelCount > 0) {
-        oboeStream->hasOutput = true;
-        oboeStream->streamRepresentation.streamInfo.outputLatency =
+        paOboeStream->hasOutput = true;
+        paOboeStream->streamRepresentation.streamInfo.outputLatency =
                 ((PaTime) PaUtil_GetBufferProcessorOutputLatencyFrames(
-                        &oboeStream->bufferProcessor)
-                 + oboeStream->framesPerHostCallback) / sampleRate;
-        ENSURE(InitializeOutputStream(oboeStream, oboeHostApi,
+                        &paOboeStream->bufferProcessor)
+                 + paOboeStream->framesPerHostCallback) / sampleRate;
+        ENSURE(InitializeOutputStream(paOboeStream, oboeHostApi,
                                       androidOutputUsage, sampleRate),
                "Initializing output stream failed");
-    } else { oboeStream->hasOutput = false; }
+    } else { paOboeStream->hasOutput = false; }
 
-    *paStream = (PaStream *) oboeStream;
+    *paStream = (PaStream *) paOboeStream;
     return error;
 
     error:
-    if (oboeStream)
-        PaUtil_FreeMemory(oboeStream);
+    if (paOboeStream)
+        PaUtil_FreeMemory(paOboeStream);
 
     LOGE("[PaOboe - OpenStream]\t Error opening stream(s). Error code: %d", error);
 
@@ -1544,32 +1544,32 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
  *          the stream(s). When CloseStream() is called, the multi-api layer ensures that the stream
  *          has already been stopped or aborted.
  * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  paNoError, but warns in the logs if OboeEngine::closeStream failed.
  */
 static PaError CloseStream(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    auto *oboeEngine = oboeStream->oboeMediator->getEngine();
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
 
-    if (!(oboeEngine->closeStream(oboeStream)))
+    if (!(oboeEngine->closeStream(paOboeStream)))
         LOGW("[PaOboe - CloseStream]\t Some errors have occurred in closing oboe streams - see OboeEngine::CloseStream logs.");
 
-    PaUtil_TerminateBufferProcessor(&oboeStream->bufferProcessor);
-    PaUtil_TerminateStreamRepresentation(&oboeStream->streamRepresentation);
+    PaUtil_TerminateBufferProcessor(&paOboeStream->bufferProcessor);
+    PaUtil_TerminateStreamRepresentation(&paOboeStream->streamRepresentation);
 
     for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
-        if (oboeStream->hasOutput)
-            PaUtil_FreeMemory(oboeStream->outputBuffers[i]);
-        if (oboeStream->hasInput)
-            PaUtil_FreeMemory(oboeStream->inputBuffers[i]);
+        if (paOboeStream->hasOutput)
+            PaUtil_FreeMemory(paOboeStream->outputBuffers[i]);
+        if (paOboeStream->hasInput)
+            PaUtil_FreeMemory(paOboeStream->inputBuffers[i]);
     }
 
-    if (oboeStream->hasOutput)
-        PaUtil_FreeMemory(oboeStream->outputBuffers);
-    if (oboeStream->hasInput)
-        PaUtil_FreeMemory(oboeStream->inputBuffers);
+    if (paOboeStream->hasOutput)
+        PaUtil_FreeMemory(paOboeStream->outputBuffers);
+    if (paOboeStream->hasInput)
+        PaUtil_FreeMemory(paOboeStream->inputBuffers);
 
-    PaUtil_FreeMemory(oboeStream);
+    PaUtil_FreeMemory(paOboeStream);
     return paNoError;
 }
 
@@ -1577,55 +1577,55 @@ static PaError CloseStream(PaStream *paStream) {
 /**
  * \brief   Allocates the memory of the buffers necessary to start a stream, both for output and
  *          input, then calls OboeEngine::startStream.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  paNoError if no errors occur, paUnanticipatedHostError if OboeEngine::startStream fails.
  */
 static PaError StartStream(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    auto *oboeEngine = oboeStream->oboeMediator->getEngine();
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
 
-    PaUtil_ResetBufferProcessor(&oboeStream->bufferProcessor);
+    PaUtil_ResetBufferProcessor(&paOboeStream->bufferProcessor);
 
     //Checking if the stream(s) are already active.
     //TODO: check if it's working as expected (extensive testing needed, no problem spotted with situational tests)
-    if (oboeStream->isActive) {
+    if (paOboeStream->isActive) {
         LOGW("[PaOboe - StartStream]\t Stream was already active, stopping...");
         StopStream(paStream);
         LOGW("[PaOboe - StartStream]\t Restarting...");
         StartStream(paStream);
     }
 
-    oboeStream->currentOutputBuffer = 0;
-    oboeStream->currentInputBuffer = 0;
+    paOboeStream->currentOutputBuffer = 0;
+    paOboeStream->currentInputBuffer = 0;
 
     /* Initialize buffers */
     for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
-        if (oboeStream->hasOutput) {
-            memset(oboeStream->outputBuffers[oboeStream->currentOutputBuffer], 0,
-                   oboeStream->framesPerHostCallback * oboeStream->bytesPerFrame *
-                        oboeStream->bufferProcessor.outputChannelCount);
-            oboeStream->currentOutputBuffer = (oboeStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
+        if (paOboeStream->hasOutput) {
+            memset(paOboeStream->outputBuffers[paOboeStream->currentOutputBuffer], 0,
+                   paOboeStream->framesPerHostCallback * paOboeStream->bytesPerFrame *
+                           paOboeStream->bufferProcessor.outputChannelCount);
+            paOboeStream->currentOutputBuffer = (paOboeStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
         }
-        if (oboeStream->hasInput) {
-            memset(oboeStream->inputBuffers[oboeStream->currentInputBuffer], 0,
-                   oboeStream->framesPerHostCallback * oboeStream->bytesPerFrame *
-                        oboeStream->bufferProcessor.inputChannelCount);
-            oboeStream->currentInputBuffer = (oboeStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
+        if (paOboeStream->hasInput) {
+            memset(paOboeStream->inputBuffers[paOboeStream->currentInputBuffer], 0,
+                   paOboeStream->framesPerHostCallback * paOboeStream->bytesPerFrame *
+                           paOboeStream->bufferProcessor.inputChannelCount);
+            paOboeStream->currentInputBuffer = (paOboeStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
         }
     }
 
-    if (!oboeStream->isBlocking) {
-        oboeStream->callbackResult = paContinue;
-        oboeStream->oboeCallbackResult = DataCallbackResult::Continue;
+    if (!paOboeStream->isBlocking) {
+        paOboeStream->callbackResult = paContinue;
+        paOboeStream->oboeCallbackResult = DataCallbackResult::Continue;
     }
 
-    oboeStream->isStopped = false;
-    oboeStream->isActive = true;
-    oboeStream->doStop = false;
-    oboeStream->doAbort = false;
+    paOboeStream->isStopped = false;
+    paOboeStream->isActive = true;
+    paOboeStream->doStop = false;
+    paOboeStream->doAbort = false;
 
-    if (!(oboeEngine->startStream(oboeStream)))
+    if (!(oboeEngine->startStream(paOboeStream)))
         return paUnanticipatedHostError;
     else
         return paNoError;
@@ -1635,31 +1635,31 @@ static PaError StartStream(PaStream *paStream) {
 /**
  * \brief   Ends the stream callback, if the stream is not blocking, and calls
  *          OboeEngine::stopStream.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
- * @return  paNoError if no errors occur, paUnanticipatedHostError if OboeStream::stopStream fails.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
+ * @return  paNoError if no errors occur, paUnanticipatedHostError if OboeEngine::stopStream fails.
  */
 static PaError StopStream(PaStream *paStream) {
     PaError error = paNoError;
-    auto *oboeStream = (OboeStream *) paStream;
-    auto *oboeEngine = oboeStream->oboeMediator->getEngine();
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
 
-    if (oboeStream->isStopped) {
+    if (paOboeStream->isStopped) {
         LOGW("[PaOboe - StopStream]\t Stream was already stopped.");
     } else {
-        if (!(oboeStream->isBlocking)) {
-            oboeStream->doStop = true;
+        if (!(paOboeStream->isBlocking)) {
+            paOboeStream->doStop = true;
         }
-        if (!(oboeEngine->stopStream(oboeStream))) {
+        if (!(oboeEngine->stopStream(paOboeStream))) {
             LOGE("[PaOboe - StopStream]\t Couldn't stop the stream(s) correctly - see OboeEngine::StopStream logs.");
             error = paUnanticipatedHostError;
         }
 
-        oboeStream->isActive = false;
-        oboeStream->isStopped = true;
-        if (oboeStream->streamRepresentation.streamFinishedCallback != nullptr)
-            oboeStream->streamRepresentation.streamFinishedCallback(
-                    oboeStream->streamRepresentation.userData);
+        paOboeStream->isActive = false;
+        paOboeStream->isStopped = true;
+        if (paOboeStream->streamRepresentation.streamFinishedCallback != nullptr)
+            paOboeStream->streamRepresentation.streamFinishedCallback(
+                    paOboeStream->streamRepresentation.userData);
     }
 
     return error;
@@ -1669,31 +1669,31 @@ static PaError StopStream(PaStream *paStream) {
 /**
  * \brief   Aborts the stream callback, if the stream is not blocking, and calls
  *          OboeEngine::abortStream.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
- * @return  paNoError if no errors occur, paUnanticipatedHostError if OboeStream::abortStream fails.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
+ * @return  paNoError if no errors occur, paUnanticipatedHostError if OboeEngine::abortStream fails.
  */
 static PaError AbortStream(PaStream *paStream) {
     PaError error = paNoError;
-    auto *oboeStream = (OboeStream *) paStream;
-    auto *oboeEngine = oboeStream->oboeMediator->getEngine();
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
     LOGI("[PaOboe - AbortStream]\t Aborting stream.");
 
-    if (!oboeStream->isBlocking) {
-        oboeStream->doAbort = true;
+    if (!paOboeStream->isBlocking) {
+        paOboeStream->doAbort = true;
     }
 
     /* stop immediately so enqueue has no effect */
-    if (!(oboeEngine->abortStream(oboeStream))) {
+    if (!(oboeEngine->abortStream(paOboeStream))) {
         LOGE("[PaOboe - AbortStream]\t Couldn't abort the stream - see OboeEngine::abortStream logs.");
         error = paUnanticipatedHostError;
     }
 
-    oboeStream->isActive = false;
-    oboeStream->isStopped = true;
-    if (oboeStream->streamRepresentation.streamFinishedCallback != nullptr)
-        oboeStream->streamRepresentation.streamFinishedCallback(
-                oboeStream->streamRepresentation.userData);
+    paOboeStream->isActive = false;
+    paOboeStream->isStopped = true;
+    if (paOboeStream->streamRepresentation.streamFinishedCallback != nullptr)
+        paOboeStream->streamRepresentation.streamFinishedCallback(
+                paOboeStream->streamRepresentation.userData);
 
     return error;
 }
@@ -1701,27 +1701,27 @@ static PaError AbortStream(PaStream *paStream) {
 
 /**
  * \brief   Copies an input stream buffer by buffer, and calls OboeEngine::readStream.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream;
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream;
  * @param   buffer is the address of the first sample of the buffer;
  * @param   frames is the total number of frames to read.
  * @return  paInternalError if OboeEngine::readStream fails, paNoError otherwise.
  */
 static PaError ReadStream(PaStream *paStream, void *buffer, unsigned long frames) {
-    auto *oboeStream = (OboeStream *) paStream;
-    auto *oboeEngine = oboeStream->oboeMediator->getEngine();
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
     void *userBuffer = buffer;
     unsigned framesToRead;
     PaError error = paNoError;
 
     while (frames > 0) {
-        framesToRead = PA_MIN(oboeStream->framesPerHostCallback, frames);
+        framesToRead = PA_MIN(paOboeStream->framesPerHostCallback, frames);
 
-        if (!(oboeEngine->readStream(oboeStream, userBuffer, framesToRead *
-                                                 oboeStream->bufferProcessor.inputChannelCount)))
+        if (!(oboeEngine->readStream(paOboeStream, userBuffer, framesToRead *
+                paOboeStream->bufferProcessor.inputChannelCount)))
             error = paInternalError;
 
-        oboeStream->currentInputBuffer = (oboeStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
+        paOboeStream->currentInputBuffer = (paOboeStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
         frames -= framesToRead;
     }
 
@@ -1731,27 +1731,27 @@ static PaError ReadStream(PaStream *paStream, void *buffer, unsigned long frames
 
 /**
  * \brief   Copies an output stream buffer by buffer, and calls OboeEngine::writeStream.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream;
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream;
  * @param   buffer is the address of the first sample of the buffer;
  * @param   frames is the total number of frames to write.
  * @return  paInternalError if OboeEngine::writeStream fails, paNoError otherwise.
  */
 static PaError WriteStream(PaStream *paStream, const void *buffer, unsigned long frames) {
-    auto *oboeStream = (OboeStream *) paStream;
-    auto *oboeEngine = oboeStream->oboeMediator->getEngine();
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
     const void *userBuffer = buffer;
     unsigned framesToWrite;
     PaError error = paNoError;
 
     while (frames > 0) {
-        framesToWrite = PA_MIN(oboeStream->framesPerHostCallback, frames);
+        framesToWrite = PA_MIN(paOboeStream->framesPerHostCallback, frames);
 
-        if (!(oboeEngine->writeStream(oboeStream, userBuffer, framesToWrite *
-                                                  oboeStream->bufferProcessor.outputChannelCount)))
+        if (!(oboeEngine->writeStream(paOboeStream, userBuffer, framesToWrite *
+                paOboeStream->bufferProcessor.outputChannelCount)))
             error = paInternalError;
 
-        oboeStream->currentOutputBuffer = (oboeStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
+        paOboeStream->currentOutputBuffer = (paOboeStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
         frames -= framesToWrite;
     }
 
@@ -1763,56 +1763,56 @@ static PaError WriteStream(PaStream *paStream, const void *buffer, unsigned long
 
 /**
  * \brief   Function needed by portaudio to understand how many frames can be read without waiting.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  the minimum number of frames that can be read without waiting.
  */
 static signed long GetStreamReadAvailable(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    return oboeStream->framesPerHostCallback * (paOboe_numberOfBuffers - oboeStream->currentInputBuffer);
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    return paOboeStream->framesPerHostCallback * (paOboe_numberOfBuffers - paOboeStream->currentInputBuffer);
 }
 
 
 /**
  * \brief   Function needed by portaudio to understand how many frames can be written without waiting.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  the minimum number of frames that can be written without waiting.
  */
 static signed long GetStreamWriteAvailable(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    return oboeStream->framesPerHostCallback * (paOboe_numberOfBuffers - oboeStream->currentOutputBuffer);
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    return paOboeStream->framesPerHostCallback * (paOboe_numberOfBuffers - paOboeStream->currentOutputBuffer);
 }
 
 
 /**
  * \brief   Function needed by portaudio to understand if the stream is stopped.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  one (1) when the stream is stopped, or zero (0) when the stream is running.
  */
 static PaError IsStreamStopped(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    return oboeStream->isStopped;
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    return paOboeStream->isStopped;
 }
 
 
 /**
  * \brief   Function needed by portaudio to understand if the stream is active.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  one (1) when the stream is active (ie playing or recording audio), or zero (0) otherwise.
  */
 static PaError IsStreamActive(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    return oboeStream->isActive;
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    return paOboeStream->isActive;
 }
 
 
 /**
  * \brief   Function needed by portaudio to get the stream time in seconds.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  The stream's current time in seconds, or 0 if an error occurred.
  */
 static PaTime GetStreamTime(PaStream *paStream) {
@@ -1822,8 +1822,8 @@ static PaTime GetStreamTime(PaStream *paStream) {
 
 /**
  * \brief   Function needed by portaudio to retrieve CPU usage information for the specified stream.
- * @param   s points to to a PaStream, which is an audio stream structure used and built by
- *              portaudio, which holds the information of our OboeStream.
+ * @param   paStream points to to a PaStream, which is an audio stream structure used and built by
+ *              portaudio, which holds the information of our PaOboeStream.
  * @return  A floating point value, typically between 0.0 and 1.0, where 1.0 indicates that the
  *          stream callback is consuming the maximum number of CPU cycles possible to maintain
  *          real-time operation. A value of 0.5 would imply that PortAudio and the stream callback
@@ -1832,8 +1832,8 @@ static PaTime GetStreamTime(PaStream *paStream) {
  *          occurs.
  */
 static double GetStreamCpuLoad(PaStream *paStream) {
-    auto *oboeStream = (OboeStream *) paStream;
-    return PaUtil_GetCpuLoad(&oboeStream->cpuLoadMeasurer);
+    auto *paOboeStream = (PaOboeStream *) paStream;
+    return PaUtil_GetCpuLoad(&paOboeStream->cpuLoadMeasurer);
 }
 
 
@@ -1864,9 +1864,9 @@ void PaOboe_SetSelectedDevice(Direction direction, int32_t deviceID) {
 
 void PaOboe_SetPerformanceMode(oboe::Direction direction, oboe::PerformanceMode performanceMode) {
     if (direction == Direction::Input) {
-        paOboe_inputPerfMode = performanceMode;
+        paOboe_inputPerformanceMode = performanceMode;
     } else {
-        paOboe_outputPerfMode = performanceMode;
+        paOboe_outputPerformanceMode = performanceMode;
     }
 }
 
