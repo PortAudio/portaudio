@@ -320,7 +320,6 @@ OboeEngine::OboeEngine() {}
  */
 bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t channelCount) {
     Result result;
-    bool outcome = false;
 
     std::shared_ptr <AudioStream> stream;
     AudioStreamBuilder builder;
@@ -337,12 +336,12 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
     if (result != Result::OK) {
         LOGE("[OboeEngine::TryStream]\t Couldn't open the stream in TryStream. Error: %s",
              convertToText(result));
-        return outcome;
+        return false;
     }
 
     stream->close();
 
-    return outcome;
+    return true;
 }
 
 
