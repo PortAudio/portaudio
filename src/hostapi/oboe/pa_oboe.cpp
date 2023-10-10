@@ -72,6 +72,9 @@
 
 #include "pa_oboe.h"
 
+//FIXME: if your project needs a specific PaFormat, modify this value
+#define paOboeDefaultFormat paFloat32
+
 #define MODULE_NAME "PaOboe"
 
 #define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, MODULE_NAME, __VA_ARGS__)
@@ -1397,14 +1400,12 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                 androidInputPreset != InputPreset::VoicePerformance)
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
-        /* FIXME: Replace "paFloat32" with whatever format you prefer -
-         *  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options */
         hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(
-                paFloat32, inputSampleFormat);
+                paOboeDefaultFormat, inputSampleFormat);
         paOboeStream->inputFormat = hostInputSampleFormat;
     } else {
         inputChannelCount = 0;
-        inputSampleFormat = hostInputSampleFormat = paFloat32; /* Suppress 'uninitialised var' warnings. */
+        inputSampleFormat = hostInputSampleFormat = paOboeDefaultFormat; /* Suppress 'uninitialised var' warnings. */
         paOboeStream->inputFormat = hostInputSampleFormat;
     }
 
@@ -1437,15 +1438,12 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
                 androidOutputUsage != Usage::Game)
                 return paIncompatibleHostApiSpecificStreamInfo;
         }
-        /* FIXME: Replace "paFloat32" with whatever format you prefer -
-                  PaUtil_SelectClosestAvailableFormat is a bit faulty when working with multiple options
-         */
         hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
-                paFloat32, outputSampleFormat);
+                paOboeDefaultFormat, outputSampleFormat);
         paOboeStream->outputFormat = hostOutputSampleFormat;
     } else {
         outputChannelCount = 0;
-        outputSampleFormat = hostOutputSampleFormat = paFloat32;
+        outputSampleFormat = hostOutputSampleFormat = paOboeDefaultFormat;
         paOboeStream->outputFormat = hostOutputSampleFormat;
     }
 
@@ -1495,7 +1493,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     paOboeStream->streamRepresentation.streamInfo.sampleRate = sampleRate;
     paOboeStream->isBlocking = (streamCallback == nullptr);
     paOboeStream->framesPerHostCallback = framesPerHostBuffer;
-    paOboeStream->bytesPerFrame = sizeof(int16_t);
+    paOboeStream->bytesPerFrame = sizeof(paOboeDefaultFormat);
     paOboeStream->cbFlags = 0;
     paOboeStream->isStopped = true;
     paOboeStream->isActive = false;
