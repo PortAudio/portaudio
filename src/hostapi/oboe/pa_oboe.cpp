@@ -726,19 +726,19 @@ AudioFormat OboeEngine::PaToOboeFormat(PaSampleFormat paFormat) {
     switch (paFormat) {
         case paFloat32:
             oboeFormat = AudioFormat::Float;
-            LOGI("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: FLOAT");
+            LOGV("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: FLOAT");
             break;
         case paInt16:
             oboeFormat = AudioFormat::I16;
-            LOGI("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: I16");
+            LOGV("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: I16");
             break;
         case paInt32:
             oboeFormat = AudioFormat::I32;
-            LOGI("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: I32");
+            LOGV("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: I32");
             break;
         case paInt24:
             oboeFormat = AudioFormat::I24;
-            LOGI("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: I24");
+            LOGV("[OboeEngine::PaToOboeFormat]\t REQUESTED OBOE FORMAT: I24");
             break;
         default:
             oboeFormat = AudioFormat::Unspecified;
@@ -1369,7 +1369,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
         goto error;
     }
 
-    LOGI("[PaOboe - OpenStream]\t OpenStream called.");
+    LOGV("[PaOboe - OpenStream]\t OpenStream called.");
 
     if (inputParameters) {
         inputChannelCount = inputParameters->channelCount;
