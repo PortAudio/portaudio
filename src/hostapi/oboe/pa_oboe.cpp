@@ -399,7 +399,7 @@ PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, 
             return paUnanticipatedHostError;
         }
 
-        mediator->minputStream->setBufferSizeInFrames(mediator->mInputStream->getFramesPerBurst() *
+        mediator->mInputStream->setBufferSizeInFrames(mediator->mInputStream->getFramesPerBurst() *
                                                                paOboe_numberOfBuffers);
         paOboeStream->inputBuffers =
                 (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(int32_t * ));
@@ -657,7 +657,7 @@ bool OboeEngine::abortStream(PaOboeStream *paOboeStream) {
  *          different from ErrorDisconnected. In case of ErrorDisconnected, the function returns
  *          true if the stream is successfully restarted, and false otherwise.
  */
-bool OboeEngine::writeStream(PaOboeStream *paOboeStream, const void buffer, int32_t framesToWrite) {
+bool OboeEngine::writeStream(PaOboeStream *paOboeStream, const void *buffer, int32_t framesToWrite) {
     bool outcome = true;
     OboeMediator* mediator = paOboeStream->oboeMediator;
 
