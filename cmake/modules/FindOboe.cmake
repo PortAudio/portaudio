@@ -22,8 +22,8 @@ endif()
 
 if(NOT OBOE_DIRECTORY)
     message(AUTHOR_WARNING
-            "If you're trying to use Oboe as a Host API, please specify the directory where you
-            cloned its repository. For further information, please read src/hostapi/oboe/README.md"
+            "If you're trying to use Oboe as a Host API, please specify the directory where you "
+            "cloned its repository. For further information, please read src/hostapi/oboe/README.md"
             )
     set(OBOE_FOUND FALSE)
 else()
