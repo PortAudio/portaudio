@@ -211,11 +211,17 @@ void PaPulseAudio_Free( PaPulseAudio_HostApiRepresentation * ptr )
         ptr->timeEvent = NULL;
     }
 
-
     if( ptr->mainloop )
     {
         pa_threaded_mainloop_free( ptr->mainloop );
         ptr->mainloop = NULL;
+    }
+
+    if( ptr->allocations )
+    {
+        PaUtil_FreeAllAllocations( ptr->allocations );
+        PaUtil_DestroyAllocationGroup( ptr->allocations );
+        ptr->allocations = NULL;
     }
 
     PaUtil_FreeMemory( ptr );
@@ -529,6 +535,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     int i;
     int deviceCount;
     int ret = 0;
+    int lockTaken = 0;
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = NULL;
     PaDeviceInfo *deviceInfoArray = NULL;
 
@@ -561,6 +568,8 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
     /* Connect to server */
     PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
+
     ret = pa_context_connect( pulseaudioHostApi->context,
                                  NULL,
                                  0,
@@ -570,8 +579,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     {
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                            "PulseAudio_Initialize: Can't connect to server");
-        result = paNotInitialized;
-        PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+        result = paUnanticipatedHostError;
         goto error;
     }
 
@@ -588,7 +596,11 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                 ret = 1;
                 break;
             case PA_CONTEXT_TERMINATED:
+                PA_DEBUG( "PaPulseAudio_Initialize: Pulseaudio server terminated stream" );
+                goto error;
+                break;
             case PA_CONTEXT_FAILED:
+                PA_DEBUG( "PaPulseAudio_Initialize: Pulseaudio server failed to initialize" );
                 goto error;
                 break;
             case PA_CONTEXT_UNCONNECTED:
@@ -742,18 +754,18 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                       PaUtil_DummyGetWriteAvailable );
 
     PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
     return result;
 
     error:
 
     if( pulseaudioHostApi )
     {
-        if( pulseaudioHostApi->allocations )
+        if( lockTaken )
         {
-            PaUtil_FreeAllAllocations( pulseaudioHostApi->allocations );
-            PaUtil_DestroyAllocationGroup( pulseaudioHostApi->allocations );
+            PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+            lockTaken = 0;
         }
-
         PaPulseAudio_Free( pulseaudioHostApi );
         pulseaudioHostApi = NULL;
     }
@@ -766,12 +778,6 @@ void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 {
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi =
         (PaPulseAudio_HostApiRepresentation *) hostApi;
-
-    if( pulseaudioHostApi->allocations )
-    {
-        PaUtil_FreeAllAllocations( pulseaudioHostApi->allocations );
-        PaUtil_DestroyAllocationGroup( pulseaudioHostApi->allocations );
-    }
 
     PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
     pa_context_disconnect( pulseaudioHostApi->context );
