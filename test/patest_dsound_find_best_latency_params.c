@@ -36,16 +36,17 @@
  * license above.
  */
 
+#define  _WIN32_WINNT 0x0501 /* for GetNativeSystemInfo */
+
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
 
-#define  _WIN32_WINNT 0x0501 /* for GetNativeSystemInfo */
 #include <windows.h>
 //#include <mmsystem.h>   /* required when using pa_win_wmme.h */
 
 #include <conio.h>      /* for _getch */
-
+#include <tchar.h>
 
 #include "portaudio.h"
 #include "pa_win_ds.h"
@@ -100,7 +101,7 @@ static void printWindowsVersionInfo( FILE *fp )
 
     memset( &osVersionInfoEx, 0, sizeof(OSVERSIONINFOEX) );
     osVersionInfoEx.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-    GetVersionEx( &osVersionInfoEx );
+    GetVersionEx( (LPOSVERSIONINFO) &osVersionInfoEx );
 
 
     if( osVersionInfoEx.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS ){
@@ -201,7 +202,7 @@ static void printWindowsVersionInfo( FILE *fp )
 
 
     fprintf( fp, "OS name and edition: %s %s\n", osName, osProductType );
-    fprintf( fp, "OS version: %d.%d.%d %S\n",
+    _ftprintf( fp, TEXT("OS version: %d.%d.%d %s\n"),
                 osVersionInfoEx.dwMajorVersion, osVersionInfoEx.dwMinorVersion,
                 osVersionInfoEx.dwBuildNumber, osVersionInfoEx.szCSDVersion );
     fprintf( fp, "Processor architecture: %s\n", processorArchitecture );
@@ -405,9 +406,9 @@ int main(int argc, char* argv[])
     if( argc >= 2 ){
         deviceIndex = -1;
         if( sscanf( argv[1], "%d", &deviceIndex ) != 1 )
-            usage(dsoundHostApiInfo);
+            usage(dsoundHostApiIndex);
         if( deviceIndex < 0 || deviceIndex >= Pa_GetDeviceCount() || Pa_GetDeviceInfo(deviceIndex)->hostApi != dsoundHostApiIndex ){
-            usage(dsoundHostApiInfo);
+            usage(dsoundHostApiIndex);
         }
     }
 

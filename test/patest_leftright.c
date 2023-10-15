@@ -57,7 +57,7 @@
 #define M_PI  (3.14159265)
 #endif
 #define TABLE_SIZE   (200)
-#define BALANCE_DELTA  (0.001)
+#define BALANCE_DELTA  (0.001f)
 
 typedef struct
 {
@@ -161,11 +161,11 @@ int main(void)
     for( i=0; i<4; i++ )
     {
         printf("Hear low sound on left side.\n");
-        data.targetBalance = 0.01;
+        data.targetBalance = 0.01f;
         Pa_Sleep( 1000 );
 
         printf("Hear high sound on right side.\n");
-        data.targetBalance = 0.99;
+        data.targetBalance = 0.99f;
         Pa_Sleep( 1000 );
     }
 

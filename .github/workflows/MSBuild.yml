@@ -4,12 +4,12 @@ on: [push, pull_request]
 
 env:
   # Path to the solution file relative to the root of the project.
-  SOLUTION_FILE_PATH: ./build/msvc/portaudio.sln
-  VCPROJ_FILE_PATH: ./build/msvc/portaudio.vcproj
-  VCXPROJ_FILE_PATH: ./build/msvc/portaudio.vcxproj
-  VCXPROJ_FILTERS_FILE_PATH: ./build/msvc/portaudio.vcxproj.filters
-  VCXPROJ_USER_FILE_PATH: ./build/msvc/portaudio.vcxproj.user
-  DEF_FILE_PATH: ./build/msvc/portaudio.def
+  SOLUTION_FILE_PATH: ./msvc/portaudio.sln
+  VCPROJ_FILE_PATH: ./msvc/portaudio.vcproj
+  VCXPROJ_FILE_PATH: ./msvc/portaudio.vcxproj
+  VCXPROJ_FILTERS_FILE_PATH: ./msvc/portaudio.vcxproj.filters
+  VCXPROJ_USER_FILE_PATH: ./msvc/portaudio.vcxproj.user
+  DEF_FILE_PATH: ./msvc/portaudio.def
 
 jobs:
   build:

@@ -175,7 +175,7 @@
         PaError paError = (expr); \
         if( UNLIKELY( paError < paNoError ) ) \
         { \
-            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = paError; \
             goto error; \
         } \
@@ -186,7 +186,7 @@
     do { \
         if( UNLIKELY( (expr) == 0 ) ) \
         { \
-            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = (paError); \
             goto error; \
         } \
@@ -203,7 +203,7 @@
         HPI_GetErrorText( hpiError, szError ); \
         PA_DEBUG(( "HPI error %d occurred: %s\n", hpiError, szError )); \
         /* This message will always be displayed, even if debug info is disabled */ \
-            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" )); \
+            PA_DEBUG(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             if( (paError) == paUnanticipatedHostError ) \
         { \
             PA_DEBUG(( "Host error description: %s\n", szError )); \
@@ -579,11 +579,11 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
     if( deviceCount > 0 )
     {
         /* Memory allocation */
-        PA_UNLESS_( hostApi->deviceInfos = (PaDeviceInfo**) PaUtil_GroupAllocateMemory(
+        PA_UNLESS_( hostApi->deviceInfos = (PaDeviceInfo**) PaUtil_GroupAllocateZeroInitializedMemory(
                                                hpiHostApi->allocations, sizeof(PaDeviceInfo*) * deviceCount ),
                     paInsufficientMemory );
         /* Allocate all device info structs in a contiguous block */
-        PA_UNLESS_( hpiDeviceList = (PaAsiHpiDeviceInfo*) PaUtil_GroupAllocateMemory(
+        PA_UNLESS_( hpiDeviceList = (PaAsiHpiDeviceInfo*) PaUtil_GroupAllocateZeroInitializedMemory(
                                         hpiHostApi->allocations, sizeof(PaAsiHpiDeviceInfo) * deviceCount ),
                     paInsufficientMemory );
 
@@ -640,7 +640,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 /* Make sure name string is owned by API info structure */
                 sprintf( srcName,
                          "Adapter %d (%4X) - Input Stream %d", i+1, type, j+1 );
-                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateMemory(
+                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateZeroInitializedMemory(
                                              hpiHostApi->allocations, strlen(srcName) + 1 ), paInsufficientMemory );
                 strcpy( deviceName, srcName );
                 baseDeviceInfo->name = deviceName;
@@ -682,7 +682,7 @@ static PaError PaAsiHpi_BuildDeviceList( PaAsiHpiHostApiRepresentation *hpiHostA
                 /* Make sure name string is owned by API info structure */
                 sprintf( srcName,
                          "Adapter %d (%4X) - Output Stream %d", i+1, type, j+1 );
-                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateMemory(
+                PA_UNLESS_( deviceName = (char *) PaUtil_GroupAllocateZeroInitializedMemory(
                                              hpiHostApi->allocations, strlen(srcName) + 1 ), paInsufficientMemory );
                 strcpy( deviceName, srcName );
                 baseDeviceInfo->name = deviceName;
@@ -750,7 +750,7 @@ PaError PaAsiHpi_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInd
     }
 
     /* Allocate host API structure */
-    PA_UNLESS_( hpiHostApi = (PaAsiHpiHostApiRepresentation*) PaUtil_AllocateMemory(
+    PA_UNLESS_( hpiHostApi = (PaAsiHpiHostApiRepresentation*) PaUtil_AllocateZeroInitializedMemory(
                                  sizeof(PaAsiHpiHostApiRepresentation) ), paInsufficientMemory );
     PA_UNLESS_( hpiHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
 
@@ -1622,7 +1622,7 @@ static PaError PaAsiHpi_SetupBuffers( PaAsiHpiStreamComponent *streamComp, uint3
     /* Temp buffer size should be multiple of PA host buffer size (or 1x, if using fixed blocks) */
     streamComp->tempBufferSize = paHostBufferSize;
     /* Allocate temp buffer */
-    PA_UNLESS_( streamComp->tempBuffer = (uint8_t *)PaUtil_AllocateMemory( streamComp->tempBufferSize ),
+    PA_UNLESS_( streamComp->tempBuffer = (uint8_t *)PaUtil_AllocateZeroInitializedMemory( streamComp->tempBufferSize ),
                 paInsufficientMemory );
 error:
     return result;
@@ -1682,9 +1682,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         return paInvalidFlag; /* unexpected platform-specific flag */
 
     /* Create blank stream structure */
-    PA_UNLESS_( stream = (PaAsiHpiStream *)PaUtil_AllocateMemory( sizeof(PaAsiHpiStream) ),
+    PA_UNLESS_( stream = (PaAsiHpiStream *)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAsiHpiStream) ),
                 paInsufficientMemory );
-    memset( stream, 0, sizeof(PaAsiHpiStream) );
 
     /* If the number of frames per buffer is unspecified, we have to come up with one. */
     if( framesPerHostBuffer == paFramesPerBufferUnspecified )
@@ -1719,9 +1718,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( inputParameters )
     {
         /* Create blank stream component structure */
-        PA_UNLESS_( stream->input = (PaAsiHpiStreamComponent *)PaUtil_AllocateMemory( sizeof(PaAsiHpiStreamComponent) ),
+        PA_UNLESS_( stream->input = (PaAsiHpiStreamComponent *)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAsiHpiStreamComponent) ),
                     paInsufficientMemory );
-        memset( stream->input, 0, sizeof(PaAsiHpiStreamComponent) );
         /* Create/validate format */
         PA_ENSURE_( PaAsiHpi_CreateFormat( hostApi, inputParameters, sampleRate,
                                            &stream->input->hpiDevice, &stream->input->hpiFormat ) );
@@ -1740,9 +1738,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( outputParameters )
     {
         /* Create blank stream component structure */
-        PA_UNLESS_( stream->output = (PaAsiHpiStreamComponent *)PaUtil_AllocateMemory( sizeof(PaAsiHpiStreamComponent) ),
+        PA_UNLESS_( stream->output = (PaAsiHpiStreamComponent *)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAsiHpiStreamComponent) ),
                     paInsufficientMemory );
-        memset( stream->output, 0, sizeof(PaAsiHpiStreamComponent) );
         /* Create/validate format */
         PA_ENSURE_( PaAsiHpi_CreateFormat( hostApi, outputParameters, sampleRate,
                                            &stream->output->hpiDevice, &stream->output->hpiFormat ) );
@@ -1790,7 +1787,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                                                streamCallback, userData );
         /* Pre-allocate non-interleaved user buffer pointers for blocking interface */
         PA_UNLESS_( stream->blockingUserBufferCopy =
-                        PaUtil_AllocateMemory( sizeof(void *) * PA_MAX( inputChannelCount, outputChannelCount ) ),
+                        PaUtil_AllocateZeroInitializedMemory( sizeof(void *) * PA_MAX( inputChannelCount, outputChannelCount ) ),
                     paInsufficientMemory );
         stream->callbackMode = 0;
     }

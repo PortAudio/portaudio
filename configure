@@ -747,6 +747,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_alsa
+with_audioio
 with_jack
 with_oss
 with_asihpi
@@ -1421,6 +1422,7 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-alsa             Enable support for ALSA [autodetect]
+  --with-audioio          Enable support for Solaris/NetBSD audio [autodetect]
   --with-jack             Enable support for JACK [autodetect]
   --with-oss              Enable support for OSS [autodetect]
   --with-asihpi           Enable support for ASIHPI [autodetect]
@@ -2692,6 +2694,13 @@ test -n "$target_alias" &&
 # Check whether --with-alsa was given.
 if test "${with_alsa+set}" = set; then :
   withval=$with_alsa; with_alsa=$withval
+fi
+
+
+
+# Check whether --with-audioio was given.
+if test "${with_audioio+set}" = set; then :
+  withval=$with_audioio; with_audioio=$withval
 fi
 
 
@@ -15378,6 +15387,21 @@ else
 fi
 
 fi
+have_audioio=no
+if test "x$with_audioio" != "xno"; then
+    for ac_header in sys/audioio.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/audioio.h" "ac_cv_header_sys_audioio_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_audioio_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_AUDIOIO_H 1
+_ACEOF
+ have_audioio=yes
+fi
+
+done
+
+fi
 have_libossaudio=no
 have_oss=no
 if test "x$with_oss" != "xno"; then
@@ -15842,31 +15866,12 @@ case "${host_os}" in
         $as_echo "#define PA_USE_COREAUDIO 1" >>confdefs.h
 
 
-        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Wno-deprecated -Werror"
+        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Wno-deprecated"
         LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices"
 
         if test "x$enable_mac_universal" = "xyes" ; then
-           case `xcodebuild -version | sed -n 's/Xcode \(.*\)/\1/p'` in
-
-           3.0|3.1)
-                                                                                                                              if [ -d /Developer/SDKs/MacOSX10.5.sdk ] ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.5.sdk"
-              else
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
-              fi
-              ;;
-
-           *)
-                                                                                    if xcrun --sdk macosx10.5 --show-sdk-path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.5"
-                 mac_sysroot="-isysroot $(xcrun --sdk macosx10.5 --show-sdk-path)"
-              else
-                 mac_version_min="-mmacosx-version-min=10.6"
-                 mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
-              fi
-           esac
+           mac_version_min="-mmacosx-version-min=10.6"
+           mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
 
                                  mac_arches=""
            for arch in x86_64 arm64
@@ -15895,7 +15900,42 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
            mac_version=""
         fi
         SHARED_FLAGS="$LIBS -dynamiclib $mac_arches $mac_sysroot $mac_version_min"
-        CFLAGS="-std=c99 $CFLAGS $mac_arches $mac_sysroot $mac_version_min"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=c11" >&5
+$as_echo_n "checking whether C compiler accepts -std=c11... " >&6; }
+if ${ax_cv_check_cflags___std_c11+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -std=c11"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___std_c11=yes
+else
+  ax_cv_check_cflags___std_c11=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_c11" >&5
+$as_echo "$ax_cv_check_cflags___std_c11" >&6; }
+if test "x$ax_cv_check_cflags___std_c11" = xyes; then :
+  CFLAGS="-std=c11 $CFLAGS"
+else
+  CFLAGS="-std=c99 $CFLAGS"
+fi
+
+        CFLAGS="$CFLAGS $mac_arches $mac_sysroot $mac_version_min"
         OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o"
         PADLL="libportaudio.dylib"
         ;;
@@ -16180,6 +16220,12 @@ fi
            OTHER_OBJS="$OTHER_OBJS src/hostapi/alsa/pa_linux_alsa.o"
            INCLUDES="$INCLUDES pa_linux_alsa.h"
            $as_echo "#define PA_USE_ALSA 1" >>confdefs.h
+
+        fi
+
+        if [ "$have_audioio" = "yes" ] && [ "$with_audioio" != "no" ] ; then
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/audioio/pa_unix_audioio.o"
+           $as_echo "#define PA_USE_AUDIOIO 1" >>confdefs.h
 
         fi
 
@@ -18814,10 +18860,12 @@ $as_echo "
         ;;
      *)
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result:
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
 " >&5
 $as_echo "
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
 " >&6; }

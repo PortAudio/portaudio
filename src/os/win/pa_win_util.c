@@ -65,9 +65,9 @@ static int numAllocations_ = 0;
 #endif
 
 
-void *PaUtil_AllocateMemory( long size )
+void *PaUtil_AllocateZeroInitializedMemory( long size )
 {
-    void *result = GlobalAlloc( GPTR, size );
+    void *result = GlobalAlloc( GMEM_FIXED | GMEM_ZEROINIT, size );
 
 #if PA_TRACK_MEMORY
     if( result != NULL ) numAllocations_ += 1;
@@ -157,4 +157,21 @@ double PaUtil_GetTime( void )
         return GetTickCount() * .001;
 #endif
     }
+}
+
+void PaWinUtil_SetLastSystemErrorInfo( PaHostApiTypeId hostApiType, long winError )
+{
+    wchar_t wide_msg[1024]; //PA_LAST_HOST_ERROR_TEXT_LENGTH_
+    FormatMessageW(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        winError,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        wide_msg,
+        1024,
+        NULL
+    );
+    char msg[1024];
+    WideCharToMultiByte( CP_UTF8, 0, wide_msg, -1, msg, 1024, NULL, NULL );
+    PaUtil_SetLastHostErrorInfo( hostApiType, winError, msg );
 }

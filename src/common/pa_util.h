@@ -51,6 +51,13 @@
 
 #include "portaudio.h"
 
+/** Preprocessor Utilities
+*/
+
+#define PA_STRINGIZE_HELPER(x) #x
+#define PA_STRINGIZE(x) PA_STRINGIZE_HELPER(x)
+
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -117,11 +124,14 @@ void PaUtil_SetLastHostErrorInfo( PaHostApiTypeId hostApiType, long errorCode,
  .c file
 */
 
-/** Allocate size bytes, guaranteed to be aligned to a FIXME byte boundary */
-void *PaUtil_AllocateMemory( long size );
+/** Allocate size bytes of zero-initialized memory.
+Guaranteed to be aligned to a FIXME byte boundary.
+*/
+void *PaUtil_AllocateZeroInitializedMemory( long size );
 
 
-/** Release block if non-NULL. block may be NULL */
+/** Release block allocated by PaUtil_AllocateZeroInitializedMemory()
+if block is non-NULL. block may be NULL */
 void PaUtil_FreeMemory( void *block );
 
 
@@ -143,6 +153,12 @@ void PaUtil_InitializeClock( void );
 
 
 /** Return the system time in seconds. Used to implement CPU load functions
+
+ @note Do not make assumptions about which underlying clock is used to implement
+  PaUtil_GetTime, or use the current implementation as a guide. Do not use this
+  function when a specific clock is required (e.g. when using platform APIs
+  such as pthreads). If you need to use a specific clock, use a native API that
+  returns that clock.
 
  @see PaUtil_InitializeClock
 */

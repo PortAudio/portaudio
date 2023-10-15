@@ -7,7 +7,7 @@
  *
  * Copyright (c) 1999-2018 Ross Bencina and Phil Burk
  * Copyright (c) 2006-2010 David Viens
- * Copyright (c) 2010-2018 Dmitry Kostjuchenko
+ * Copyright (c) 2010-2022 Dmitry Kostjuchenko
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -66,9 +66,7 @@ typedef enum PaWasapiFlags
     /* assign custom channel mask */
     paWinWasapiUseChannelMask           = (1 << 2),
 
-    /* select non-Event driven method of data read/write
-       Note: WASAPI Event driven core is capable of 2ms latency!!!, but Polling
-             method can only provide 15-20ms latency. */
+    /* use Polling method (Event method is the default, see details in the IMPORTANT notes) */
     paWinWasapiPolling                  = (1 << 3),
 
     /* force custom thread priority setting, must be used if PaWasapiStreamInfo::threadPriority
@@ -84,7 +82,12 @@ typedef enum PaWasapiFlags
        playback formats that do not match the current configured system settings.
        this is in particular required for streams not matching the system mixer sample rate.
        only applies in Shared mode. */
-    paWinWasapiAutoConvert              = (1 << 6)
+    paWinWasapiAutoConvert              = (1 << 6),
+
+    /* use Passthrough mode for sending encoded audio data in PCM containers to the audio device,
+       refer to Microsoft documentation "Representing Formats for IEC 61937 Transmissions" for more
+       details about data representation and stream configuration */
+    paWinWasapiPassthrough              = (1 << 7),
 }
 PaWasapiFlags;
 #define paWinWasapiExclusive             (paWinWasapiExclusive)
@@ -94,6 +97,7 @@ PaWasapiFlags;
 #define paWinWasapiThreadPriority        (paWinWasapiThreadPriority)
 #define paWinWasapiExplicitSampleFormat  (paWinWasapiExplicitSampleFormat)
 #define paWinWasapiAutoConvert           (paWinWasapiAutoConvert)
+#define paWinWasapiPassthrough           (paWinWasapiPassthrough)
 
 
 /* Stream state.
@@ -304,6 +308,61 @@ typedef enum PaWasapiStreamOption
 PaWasapiStreamOption;
 
 
+/** Passthrough format.
+
+    Format ids are obtained from the Microsoft documentation "Representing Formats for IEC 61937 Transmissions"
+    and are composed by such formula where GUID is the guid of passthrough format:
+    GUID.Data1 << 16 | GUID.Data2.
+
+ @see PaWasapiStreamPassthrough
+ @version Available as of 19.8.0
+*/
+typedef enum PaWasapiPassthroughFormat
+{
+    ePassthroughFormatPcmIec60958           = 0x00000000,
+    ePassthroughFormatDolbyDigital          = 0x00920000,
+    ePassthroughFormatMpeg1                 = 0x00030cea,
+    ePassthroughFormatMpeg3                 = 0x00040cea,
+    ePassthroughFormatMpeg2                 = 0x00050cea,
+    ePassthroughFormatAac                   = 0x00060cea,
+    ePassthroughFormatDts                   = 0x00080cea,
+    ePassthroughFormatDolbyDigitalPlus      = 0x000a0cea,
+    ePassthroughFormatDolbyDigitalPlusAtmos = 0x010a0cea,
+    ePassthroughFormatDtsHd                 = 0x000b0cea,
+    ePassthroughFormatDtsXE1                = 0x010b0cea,
+    ePassthroughFormatDtsXE2                = 0x030b0cea,
+    ePassthroughFormatDolbyMlp              = 0x000c0cea,
+    ePassthroughFormatDolbyMat20            = 0x010c0cea,
+    ePassthroughFormatDolbyMat21            = 0x030c0cea,
+    ePassthroughFormatWmaPro                = 0x01640000,
+    ePassthroughFormatAtrac                 = 0x00080cea,
+    ePassthroughFormatOneBitAudio           = 0x00090cea,
+    ePassthroughFormatDst                   = 0x000d0cea,
+}
+PaWasapiPassthroughFormat;
+
+
+/** Passthrough details.
+
+    Passthrough details provide direct link to the additional members in WAVEFORMATEXTENSIBLE_IEC61937.
+    Passthrough mode allows to pass encoded data inside the PCM containers to the audio device.
+
+    Detailed description about supported formats and examples are provided in Microsoft documentation
+    "Representing Formats for IEC 61937 Transmissions".
+
+ @see paWinWasapiPassthrough
+ @version Available as of 19.8.0
+*/
+typedef struct PaWasapiStreamPassthrough
+{
+    PaWasapiPassthroughFormat formatId;
+    unsigned int encodedSamplesPerSec;
+    unsigned int encodedChannelCount;
+    unsigned int averageBytesPerSec;
+}
+PaWasapiStreamPassthrough;
+
+
 /* Stream descriptor. */
 typedef struct PaWasapiStreamInfo
 {
@@ -349,6 +408,13 @@ typedef struct PaWasapiStreamInfo
      @version Available as of 19.6.0
     */
     PaWasapiStreamOption streamOption;
+
+    /** Passthrough details.
+     @note paWinWasapiPassthrough flag must be specified in PaWasapiStreamInfo::flags to enable Passthrough mode.
+     @see paWinWasapiPassthrough
+     @version Available as of 19.7.0
+    */
+    PaWasapiStreamPassthrough passthrough;
 }
 PaWasapiStreamInfo;
 
@@ -437,7 +503,7 @@ int PaWasapi_GetDeviceMixFormat( void *pFormat, unsigned int formatSize, PaDevic
 int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
 
 
-/** Get device IMMDevice pointer
+/** Get device IMMDevice pointer.
 
  @param device Device index.
  @param pAudioClient Pointer to pointer of IMMDevice.
@@ -445,6 +511,20 @@ int/*PaWasapiDeviceRole*/ PaWasapi_GetDeviceRole( PaDeviceIndex device );
  @return Error code indicating success or failure.
 */
 PaError PaWasapi_GetIMMDevice( PaDeviceIndex device, void **pIMMDevice );
+
+
+/** Get device loopback state:
+
+    0 - Not loopback,
+    1 - Loopback,
+    negative - PaErrorCode.
+
+ @param device Device index.
+
+ @return Non-negative value indicating loopback state or, a PaErrorCode (which is always negative)
+         if PortAudio is not initialized or an error is encountered.
+*/
+int PaWasapi_IsLoopback( PaDeviceIndex device );
 
 
 /** Boost thread priority of calling thread (MMCSS).
@@ -622,20 +702,25 @@ PaError PaWasapiWinrt_PopulateDeviceList( const unsigned short **pId, const unsi
         Provides best audio quality with low latency. Callback interface is implemented in
         two versions:
 
-        1) Event-Driven:
-        This is the most powerful WASAPI implementation which provides glitch-free
-        audio at around 3ms latency in Exclusive mode. Lowest possible latency for this mode is
+        1) Event-driven:
+        It is the most powerful data processing method which provides glitch-free audio with
+        around 3 ms latency in Exclusive mode. Lowest possible latency for this mode is
         3 ms for HD Audio class audio chips. For the Shared mode latency can not be
-        lower than 20 ms.
+        lower than 20 ms. This method consumes slightly less CPU in comparison to Polling.
+        It is the default processing method unless 'paWinWasapiPolling' is specified.
 
-        2) Poll-Driven:
-        Polling is another 2-nd method to operate with WASAPI. It is less efficient than Event-Driven
-        and provides latency at around 10-13ms. Polling must be used to overcome a system bug
-        under Windows Vista x64 when application is WOW64(32-bit) and Event-Driven method simply
-        times out (event handle is never signalled on buffer completion). Please note, such WOW64 bug
-        does not exist in Vista x86 or Windows 7.
-        Polling can be setup by specifying 'paWinWasapiPolling' flag. Our WASAPI implementation detects
-        WOW64 bug and sets 'paWinWasapiPolling' automatically.
+        2) Poll-driven:
+        Polling is an alternative to Event-driven processing. Due to its nature Polling consumes
+        slightly more CPU. This method is less efficient than Event-driven and its lowest possible
+        latency is around 10-13 ms.
+        Note: Newer Windows versions (for example 11) allow to achieve similar to Event-driven
+        low latency.
+        Note: Polling must be used to overcome system bug of Windows Vista (x64) when application
+        is WOW64 (32-bit process running on 64-bit OS) that results in WASAPI callback timeout if
+        Event-driven method is selected (event handle is never signalled on buffer completion).
+        This WOW64 bug does not exist in Windows Vista (x86) or Windows 7 or newer Windows versions.
+        Polling can be activated by specifying 'paWinWasapiPolling' flag. Our implementation
+        detects WOW64 bug and sets 'paWinWasapiPolling' automatically.
 
     Thread priority:
 
