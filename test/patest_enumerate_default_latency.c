@@ -41,6 +41,21 @@
  * license above.
  */
 
+/*
+The purpose of this test is to output data that can be combined into a survey of all host APIs.
+
+The output is printed in textile format and tested on https://textile-lang.com/ .
+The columns in the table are as follows:
+1. Indicates with an 'X' if any default latencies are zero, blank otherwise
+2. Device Number
+3. Device Name
+4. Host API
+5. Default High Input Latency
+6. Default Low Input Latency
+7. Default High Output Latency
+8. Default Low Output latency
+*/
+
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
@@ -55,6 +70,7 @@
 
 int main(void);
 
+#ifdef WIN32
 void print_clean_wstring(wchar_t* wstring)
 {
     for (int i = 0; i < wcslen(wstring); i++)
@@ -66,12 +82,12 @@ void print_clean_wstring(wchar_t* wstring)
     }
     return;
 }
+#endif
 
 int main(void)
 {
     int     i, numDevices;
     const   PaDeviceInfo *deviceInfo;
-    //PaStreamParameters inputParameters, outputParameters;
     PaError err;
 
     err = Pa_Initialize();
@@ -88,6 +104,9 @@ int main(void)
         err = numDevices;
         goto error;
     }
+
+    // Header for the table
+    printf("|_. Default Latency Zero? |_. Device Number |_. Device Name |_. Host API |_. Default High Input Latency |_. Default Low Input Latency |_. Default High Output Latency |_. Default Low Output latency |\n");
 
     for( i=0; i<numDevices; i++ )
     {
@@ -113,12 +132,10 @@ int main(void)
             MultiByteToWideChar(CP_UTF8, 0, deviceInfo->name, -1, wideName, MAX_PATH - 1);
             printf(" == ");
             print_clean_wstring(wideName);
-            printf(" == | ");            
+            printf(" == | ");
         }
 #else
-        printf(" == ");
-        printf("%s", deviceInfo->name);
-        printf(" == | ");
+        printf(" == %s == | ", deviceInfo->name);
 #endif
         printf("%s | ", Pa_GetHostApiInfo(deviceInfo->hostApi)->name);
         printf("%8.4f | ", defaultHighInputLatency);
