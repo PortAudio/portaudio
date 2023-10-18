@@ -51,6 +51,7 @@
  */
 
 #include "portaudio.h"
+//TODO: remove oboe/Oboe.h from here, so user doesn't have to include Oboe in their project
 #include "oboe/Oboe.h"
 
 #ifdef __cplusplus

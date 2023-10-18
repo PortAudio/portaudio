@@ -213,10 +213,10 @@ public:
     }
 
     //Callback function for non-blocking streams
-    DataCallbackResult onAudioReady(AudioStream *audioStream, void *audioData,
+    DataCallbackResult onAudioReady(AudioStream *oboeStream, void *audioData,
                                     int32_t numFrames) override;
     //Callback utils
-    void onErrorAfterClose(AudioStream *audioStream, oboe::Result error) override;
+    void onErrorAfterClose(AudioStream *oboeStream, oboe::Result error) override;
     void resetCallbackCounters();
     void setOutputCallback() { mOutputBuilder.setDataCallback(this)->setErrorCallback(this); }
     void setInputCallback() { mInputBuilder.setDataCallback(this)->setErrorCallback(this); }
@@ -324,7 +324,7 @@ OboeEngine::OboeEngine() {}
 bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t channelCount) {
     Result result;
 
-    std::shared_ptr <AudioStream> stream;
+    std::shared_ptr <AudioStream> oboeStream;
     AudioStreamBuilder builder;
 
     builder.setDeviceId(getSelectedDevice(direction))
@@ -334,7 +334,7 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
             ->setDirection(direction)
             ->setSampleRate(sampleRate)
             ->setChannelCount(channelCount)
-            ->openStream(stream);
+            ->openStream(oboeStream);
 
     if (result != Result::OK) {
         LOGE("[OboeEngine::TryStream]\t Couldn't open the stream in TryStream. Error: %s",
@@ -342,7 +342,7 @@ bool OboeEngine::tryStream(Direction direction, int32_t sampleRate, int32_t chan
         return false;
     }
 
-    stream->close();
+    oboeStream->close();
 
     return true;
 }
@@ -405,7 +405,7 @@ PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, 
         mediator->mInputStream->setBufferSizeInFrames(mediator->mInputStream->getFramesPerBurst() *
                                                                paOboe_numberOfBuffers);
         paOboeStream->inputBuffers =
-                (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(int32_t * ));
+                (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(paOboeDefaultFormat * ));
 
         for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
             paOboeStream->inputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
@@ -770,7 +770,7 @@ int32_t OboeEngine::getSelectedDevice(Direction direction) {
  * \brief   Oboe's callback routine.
  */
 DataCallbackResult
-OboeMediator::onAudioReady(AudioStream *audioStream, void *audioData, int32_t numFrames) {
+OboeMediator::onAudioReady(AudioStream *oboeStream, void *audioData, int32_t numFrames) {
 
     clock_gettime(CLOCK_REALTIME, &mTimeSpec);
     mTimeInfo.currentTime = (PaTime)(mTimeSpec.tv_sec + (mTimeSpec.tv_nsec / 1000000000.0));
@@ -858,7 +858,7 @@ OboeMediator::onAudioReady(AudioStream *audioStream, void *audioData, int32_t nu
  * \brief   If the data callback ends without returning DataCallbackResult::Stop, this routine tells
  *          what error occurred, and tries to restart the stream if the error was ErrorDisconnected.
  */
-void OboeMediator::onErrorAfterClose(AudioStream *audioStream, Result error) {
+void OboeMediator::onErrorAfterClose(AudioStream *oboeStream, Result error) {
     if (error == oboe::Result::ErrorDisconnected) {
         OboeEngine* oboeEngine = getEngine();
         LOGW("[OboeMediator::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
