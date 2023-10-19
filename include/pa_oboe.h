@@ -51,8 +51,6 @@
  */
 
 #include "portaudio.h"
-//TODO: remove oboe/Oboe.h from here, so user doesn't have to include Oboe in their project
-#include "oboe/Oboe.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,29 +60,57 @@ extern "C" {
 #define LOW_LATENCY_MS 300.0 //Arbitrary value used to automatically determine if low latency performance mode is doable
 
 /**
- *  The android stream type and recording preset as defined in Definitions.h
+ * Enum class that emulates Oboe::Direction.
+ */
+enum class PaOboe_Direction: int32_t { Output = 0, Input = 1 };
+
+/**
+ * Enum class that emulates Oboe::Usage.
+ */
+enum class PaOboe_Usage : int32_t {
+    Media = 1 , VoiceCommunication = 2 , VoiceCommunicationSignalling = 3 , Alarm = 4 ,
+    Notification = 5 , NotificationRingtone = 6 , NotificationEvent = 10 , AssistanceAccessibility = 11 ,
+    AssistanceNavigationGuidance = 12 , AssistanceSonification = 13 , Game = 14 , Assistant = 16
+};
+
+/**
+ * Enum class that emulates Oboe::InputPreset
+ */
+enum class PaOboe_InputPreset : int32_t {
+    Generic = 1 , Camcorder = 5 , VoiceRecognition = 6 , VoiceCommunication = 7 ,
+    Unprocessed = 9 , VoicePerformance = 10
+}
+
+/**
+ * Enum class that emulates Oboe::PerformanceMode
+ */
+enum class PaOboe_PerformanceMode : int32_t { None = 10 , PowerSaving = 11 , LowLatency = 12 }
+
+/**
+ *  The android stream type and recording preset as defined in Oboe.
  */
 typedef struct PaOboeStreamInfo {
-    oboe::Usage androidOutputUsage;
-    oboe::InputPreset androidInputPreset;
+    PaOboe_Usage androidOutputUsage;
+    PaOboe_InputPreset androidInputPreset;
 } PaOboeStreamInfo;
 
 
 /**
- * Provide PA Oboe with the ID of the device the user chose - oboe cannot build a device list,
+ * Provide PaOboe with the ID of the device the user chose - oboe cannot build a device list,
  * but can select the device if provided with its ID.
  * @param direction - the direction of the stream for which we want to set the device.
- * @param deviceID - the ID of the device chosen by the user.
+ * @param deviceID - the ID of the chosen device chosen by the user.
  */
-void PaOboe_SetSelectedDevice(oboe::Direction direction, int32_t deviceID);
+void PaOboe_SetSelectedDevice(PaOboe_Direction direction, int32_t deviceID);
 
 
 /**
- * Provide PA Oboe with the performance mode chosen by the user.
- * @param  direction - the direction of the stream for which we want to set the performance mode.
- * @param  performanceMode - the performance mode chosen by the user.
+ * \brief   Provide PaOboe with the performance mode chosen by the user. If this method isn't called, the default mode
+ *          is LowLatency.
+ * @param   direction - the direction of the stream for which we want to set the performance mode.
+ * @param   performanceMode - the performance mode chosen by the user.
  */
-void PaOboe_SetPerformanceMode(oboe::Direction direction, oboe::PerformanceMode performanceMode);
+void PaOboe_SetPerformanceMode(PaOboe_Direction direction, PaOboe_PerformanceMode performanceMode);
 
 
 /**

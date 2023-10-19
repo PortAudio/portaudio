@@ -1212,13 +1212,13 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
         /* validate inputStreamInfo */
         if (inputParameters->hostApiSpecificStreamInfo) {
             // Only has an effect on ANDROID_API>=28.
-            InputPreset androidRecordingPreset =
+            InputPreset androidInputPreset =
                     ((PaOboeStreamInfo *) inputParameters->hostApiSpecificStreamInfo)->androidInputPreset;
-            if (androidRecordingPreset != InputPreset::Generic &&
-                androidRecordingPreset != InputPreset::Camcorder &&
-                androidRecordingPreset != InputPreset::VoiceRecognition &&
-                androidRecordingPreset != InputPreset::VoiceCommunication &&
-                androidRecordingPreset != InputPreset::VoicePerformance) {
+            if (androidInputPreset != InputPreset::Generic &&
+                androidInputPreset != InputPreset::Camcorder &&
+                androidInputPreset != InputPreset::VoiceRecognition &&
+                androidInputPreset != InputPreset::VoiceCommunication &&
+                androidInputPreset != InputPreset::VoicePerformance) {
                 return paIncompatibleHostApiSpecificStreamInfo;
             }
         }
@@ -1361,6 +1361,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
 
+    //Initialization to generic values, in the event that these hostApiSpecificStreamInfo were not set
     Usage androidOutputUsage = Usage::VoiceCommunication;
     InputPreset androidInputPreset = InputPreset::Generic;
 
@@ -1393,12 +1394,6 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
             // Only has an effect on ANDROID_API>=28.
             androidInputPreset =
                     ((PaOboeStreamInfo *) outputParameters->hostApiSpecificStreamInfo)->androidInputPreset;
-            if (androidInputPreset != InputPreset::Generic &&
-                androidInputPreset != InputPreset::Camcorder &&
-                androidInputPreset != InputPreset::VoiceRecognition &&
-                androidInputPreset != InputPreset::VoiceCommunication &&
-                androidInputPreset != InputPreset::VoicePerformance)
-                return paIncompatibleHostApiSpecificStreamInfo;
         }
         hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paOboeDefaultFormat, inputSampleFormat);
@@ -1428,15 +1423,6 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
         if (outputParameters->hostApiSpecificStreamInfo) {
             androidOutputUsage =
                     ((PaOboeStreamInfo *) outputParameters->hostApiSpecificStreamInfo)->androidOutputUsage;
-            if (androidOutputUsage != Usage::Media &&
-                androidOutputUsage != Usage::Notification &&
-                androidOutputUsage != Usage::NotificationEvent &&
-                androidOutputUsage != Usage::NotificationRingtone &&
-                androidOutputUsage != Usage::VoiceCommunication &&
-                androidOutputUsage != Usage::VoiceCommunicationSignalling &&
-                androidOutputUsage != Usage::Alarm &&
-                androidOutputUsage != Usage::Game)
-                return paIncompatibleHostApiSpecificStreamInfo;
         }
         hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paOboeDefaultFormat, outputSampleFormat);
@@ -1851,7 +1837,7 @@ static unsigned long GetApproximateLowBufferSize() {
 
 /*----------------------------- Implementation of PaOboe.h functions -----------------------------*/
 
-void PaOboe_SetSelectedDevice(Direction direction, int32_t deviceID) {
+void PaOboe_SetSelectedDevice(PaOboe_Direction direction, int32_t deviceID) {
     LOGI("[PaOboe - SetSelectedDevice] Selecting device...");
     if (direction == Direction::Input)
         paOboe_inputDeviceId = deviceID;
@@ -1859,7 +1845,7 @@ void PaOboe_SetSelectedDevice(Direction direction, int32_t deviceID) {
         paOboe_outputDeviceId = deviceID;
 }
 
-void PaOboe_SetPerformanceMode(oboe::Direction direction, oboe::PerformanceMode performanceMode) {
+void PaOboe_SetPerformanceMode(PaOboe_Direction direction, PaOboe_PerformanceMode performanceMode) {
     if (direction == Direction::Input) {
         paOboe_inputPerformanceMode = performanceMode;
     } else {
