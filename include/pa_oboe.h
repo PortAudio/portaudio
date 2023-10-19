@@ -79,12 +79,12 @@ enum class PaOboe_Usage : int32_t {
 enum class PaOboe_InputPreset : int32_t {
     Generic = 1 , Camcorder = 5 , VoiceRecognition = 6 , VoiceCommunication = 7 ,
     Unprocessed = 9 , VoicePerformance = 10
-}
+};
 
 /**
  * Enum class that emulates Oboe::PerformanceMode
  */
-enum class PaOboe_PerformanceMode : int32_t { None = 10 , PowerSaving = 11 , LowLatency = 12 }
+enum class PaOboe_PerformanceMode : int32_t { None = 10 , PowerSaving = 11 , LowLatency = 12 };
 
 /**
  *  The android stream type and recording preset as defined in Oboe.
