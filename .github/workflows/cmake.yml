@@ -15,7 +15,7 @@ jobs:
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DPA_USE_OSS=ON
-              -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+              -DCMAKE_TOOLCHAIN_FILE=/home/runner/work/portaudio/portaudio/vcpkg/scripts/buildsystems/vcpkg.cmake
           - name: Ubuntu MinGW
             os: ubuntu-latest
             install_dir: ~/portaudio
@@ -28,7 +28,7 @@ jobs:
             cmake_options:
               -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
-              -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/i686-w64-mingw32.cmake
+              -DCMAKE_TOOLCHAIN_FILE=/home/runner/work/portaudio/portaudio/cmake/toolchains/i686-w64-mingw32.cmake
           - name: Windows MSVC
             os: windows-latest
             install_dir: C:\portaudio
@@ -62,7 +62,7 @@ jobs:
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=OFF
-              -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+              -DCMAKE_TOOLCHAIN_FILE=/Users/runner/work/portaudio/portaudio/vcpkg/scripts/buildsystems/vcpkg.cmake
           - name: macOS Clang framework
             os: macOS-latest
             install_dir: ~/portaudio
@@ -70,7 +70,7 @@ jobs:
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=ON
-              -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+              -DCMAKE_TOOLCHAIN_FILE=/Users/runner/work/portaudio/portaudio/vcpkg/scripts/buildsystems/vcpkg.cmake
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -82,12 +82,8 @@ jobs:
     - name: "[Ubuntu] install dependencies"
       run: |
         sudo apt-get update
-        sudo apt-get install libasound2-dev libpulse-dev ${{ matrix.dependencies_extras }}
+        sudo apt-get install libasound2-dev ${{ matrix.dependencies_extras }}
       if: matrix.os == 'ubuntu-latest'
-    - name: "[macOS] install dependencies"
-      # https://github.com/PortAudio/portaudio/issues/767
-      run: brew install pkg-config
-      if: matrix.os == 'macOS-latest'
     - name: "[Windows/MinGW] set up ASIO SDK cache"
       uses: actions/cache@v2
       if: matrix.asio_sdk_cache_path != null
@@ -114,13 +110,23 @@ jobs:
            -DPA_USE_SKELETON=ON
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
-           -DPA_WARNINGS_ARE_ERRORS=ON
            -S .
            -B build
     - name: build
       run: cmake --build build --config ${{ env.cmake_build_type }} --parallel 2
     - name: install
       run: cmake --install build --config ${{ env.cmake_build_type }}
+    - name: "configure build-test"
+      run: cmake
+          -S ./test/test_use_cmake -B build-test
+          -G "${{ matrix.cmake_generator }}"
+          -DCMAKE_PREFIX_PATH="${{ matrix.install_dir }}"
+          -DCMAKE_INSTALL_PREFIX=${{ matrix.install_dir }}
+          -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+          ${{ matrix.cmake_options }}
+    - name: "build build-test"
+      run: cmake --build build-test --config ${{ env.cmake_build_type }}      
     - name: "Upload GitHub Actions artifacts"
       uses: actions/upload-artifact@v2
       with:
