@@ -633,7 +633,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     const char *pulseaudioName = NULL;
     pa_operation *pulseaudioOperation = NULL;
     int waitLoop = 0;
-    unsigned int pulseaudioReqFrameSize = (1024 * 2);
+    unsigned int pulseaudioReqFrameSize = stream->suggestedLatencyUSecs;
 
     stream->isActive = 0;
     stream->isStopped = 1;

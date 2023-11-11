@@ -1115,6 +1115,16 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
         stream->inputDevice = inputParameters->device;
 
+        /* Convert positive suggestedLatency from seconds to microseconds, otherwise default to zero. */
+        if (inputParameters->suggestedLatency >= 0)
+        {
+            stream->suggestedLatencyUSecs = (unsigned int) (inputParameters->suggestedLatency * 1e6 + 1.0f);
+        }
+        else
+        {
+            stream->suggestedLatencyUSecs = 0;
+        }
+
         /*
          * This is too much as most of the time there is not much
          * stuff in buffer but it's enough if we are doing blocked
@@ -1227,6 +1237,16 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 
         stream->outputDevice = outputParameters->device;
+
+        /* Convert positive suggestedLatency from seconds to microseconds, otherwise default to zero. */
+        if (outputParameters->suggestedLatency >= 0)
+        {
+            stream->suggestedLatencyUSecs = (unsigned int) (outputParameters->suggestedLatency * 1e6 + 1.0f);
+        }
+        else
+        {
+            stream->suggestedLatencyUSecs = 0;
+        }
     }
 
     else
