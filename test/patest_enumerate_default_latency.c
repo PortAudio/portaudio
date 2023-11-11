@@ -46,14 +46,15 @@ The purpose of this test is to output data that can be combined into a survey of
 
 The output is printed in textile format and tested on https://textile-lang.com/ .
 The columns in the table are as follows:
-1. Indicates with an 'X' if any default latencies are zero, blank otherwise
+1. Indicates with an 'X' if any default latencies for available channels are zero, blank otherwise
 2. Device Number
-3. Device Name
-4. Host API
-5. Default High Input Latency
-6. Default Low Input Latency
-7. Default High Output Latency
-8. Default Low Output latency
+3. Number of input/output channels
+4. Device Name
+5. Host API
+6. Default High Input Latency
+7. Default Low Input Latency
+8. Default High Output Latency
+9. Default Low Output latency
 */
 
 #include <stdio.h>
@@ -106,7 +107,7 @@ int main(void)
     }
 
     // Header for the table
-    printf("|_. Default Latency Zero? |_. Device Number |_. Device Name |_. Host API |_. Default High Input Latency |_. Default Low Input Latency |_. Default High Output Latency |_. Default Low Output latency |\n");
+    printf("|_. Default Latency Zero? |_. Device Number |_. I/O Channels |_. Device Name |_. Host API |_. Default High Input Latency |_. Default Low Input Latency |_. Default High Output Latency |_. Default Low Output latency |\n");
 
     for( i=0; i<numDevices; i++ )
     {
@@ -118,14 +119,21 @@ int main(void)
         float defaultHighOutputLatency = deviceInfo->defaultHighOutputLatency;
         float defaultLowOutputLatency = deviceInfo->defaultLowOutputLatency;
 
-        if (defaultHighInputLatency == 0 ||
-            defaultLowInputLatency == 0 ||
-            defaultHighOutputLatency == 0 ||
-            defaultLowOutputLatency == 0) {
-            isLatencyZero = 1;
+        if (deviceInfo->maxInputChannels > 0) {
+            if (defaultHighInputLatency == 0 || defaultLowInputLatency == 0) {
+                isLatencyZero = 1;
+            }
         }
+
+        if (deviceInfo->maxOutputChannels > 0) {
+            if (defaultHighOutputLatency == 0 || defaultLowOutputLatency == 0) {
+                isLatencyZero = 1;
+            }
+        }
+        
         char marker = isLatencyZero ? 'X' : ' ';
         printf("| %c | %3d | ", marker, i);
+        printf("%d/%d | ", deviceInfo->maxInputChannels, deviceInfo->maxOutputChannels);
 #ifdef WIN32
         {   /* Use wide char on windows, so we can show UTF-8 encoded device names */
             wchar_t wideName[MAX_PATH];
