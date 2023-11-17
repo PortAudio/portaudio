@@ -1,6 +1,6 @@
 /** @file patest_enumerate_default_latency.c
     @ingroup test_src
-    @brief List available devices in table format
+    @brief List default latencies of available devices in table format
     @author Vimal Krishna
 */
 /*
@@ -107,7 +107,7 @@ int main(void)
     }
 
     // Header for the table
-    printf("|_. Default Latency Zero? |_. Device Number |_. I/O Channels |_. Device Name |_. Host API |_. Default High Input Latency |_. Default Low Input Latency |_. Default High Output Latency |_. Default Low Output latency |\n");
+    printf("|_. Bad Default Latency? |_. Device Number |_. I/O Channels |_. Device Name |_. Host API |_. Default High Input Latency |_. Default Low Input Latency |_. Default High Output Latency |_. Default Low Output latency |\n");
 
     for( i=0; i<numDevices; i++ )
     {
@@ -130,7 +130,6 @@ int main(void)
                 isLatencyZero = 1;
             }
         }
-        
         char marker = isLatencyZero ? 'X' : ' ';
         printf("| %c | %3d | ", marker, i);
         printf("%d/%d | ", deviceInfo->maxInputChannels, deviceInfo->maxOutputChannels);
