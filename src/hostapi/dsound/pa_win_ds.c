@@ -2029,15 +2029,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     PaUtil_InitializeCpuLoadMeasurer( &stream->cpuLoadMeasurer, sampleRate );
 
+    /* These are all the formats that can be represented in WAVEFORMATEX */
+    const PaSampleFormat nativeFormats = paUInt8 | paInt16 | paInt24 | paInt32 | paFloat32;
 
     if( inputParameters )
     {
-        /* IMPLEMENT ME - establish which  host formats are available */
-        PaSampleFormat nativeInputFormats = paInt16;
-        /* PaSampleFormat nativeFormats = paUInt8 | paInt16 | paInt24 | paInt32 | paFloat32; */
-
         hostInputSampleFormat =
-            PaUtil_SelectClosestAvailableFormat( nativeInputFormats, inputParameters->sampleFormat );
+            PaUtil_SelectClosestAvailableFormat( nativeFormats, inputParameters->sampleFormat );
     }
     else
     {
@@ -2046,12 +2044,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( outputParameters )
     {
-        /* IMPLEMENT ME - establish which  host formats are available */
-        PaSampleFormat nativeOutputFormats = paInt16;
-        /* PaSampleFormat nativeOutputFormats = paUInt8 | paInt16 | paInt24 | paInt32 | paFloat32; */
-
         hostOutputSampleFormat =
-            PaUtil_SelectClosestAvailableFormat( nativeOutputFormats, outputParameters->sampleFormat );
+            PaUtil_SelectClosestAvailableFormat( nativeFormats, outputParameters->sampleFormat );
     }
     else
     {
