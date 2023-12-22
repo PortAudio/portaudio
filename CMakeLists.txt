@@ -386,6 +386,11 @@ elseif(UNIX)
   endif()
 endif()
 
+# Make sure PA_USE_ALSA is available as it is used for PortAudioConfig.cmake configuration
+if (NOT PA_USE_ALSA)
+    set(PA_USE_ALSA OFF)
+endif()
+
 # Add public headers to sources of PortAudio (used by some IDEs to list them in project tree)
 source_group("Public Header Files" FILES ${PORTAUDIO_PUBLIC_HEADERS})
 target_sources(PortAudio PRIVATE ${PORTAUDIO_PUBLIC_HEADERS})
