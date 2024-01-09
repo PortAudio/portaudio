@@ -40,8 +40,10 @@ list(APPEND JACK_LINK_LIBRARIES Regex::regex)
 
 if(NOT CMAKE_USE_PTHREADS_INIT)
     # This CMake find module is provided by the pthreads port in vcpkg.
-    find_package(pthreads)
-    list(APPEND JACK_LINK_LIBRARIES PThreads4W::PThreads4W)
+    find_package(pthreads QUIET)
+    if(pthreads_FOUND)
+        list(APPEND JACK_LINK_LIBRARIES PThreads4W::PThreads4W)
+    endif()
 endif()
 
 if(CMAKE_USE_PTHREADS_INIT OR TARGET PThreads4W::PThreads4W)
