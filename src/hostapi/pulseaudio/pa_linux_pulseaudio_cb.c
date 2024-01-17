@@ -622,6 +622,49 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     return result;
 }
 
+PaError _PaPulseAudio_WaitStreamState( pa_threaded_mainloop *mainloop, pa_stream * stream )
+{
+    pa_stream_state_t state = PA_STREAM_UNCONNECTED;
+    unsigned int wait = 0;
+    PaError result = paNoError;
+
+    while( wait < 1000 )
+    {
+        pa_threaded_mainloop_wait( mainloop );
+        PaPulseAudio_Lock( mainloop );
+        state = pa_stream_get_state( stream );
+        PaPulseAudio_UnLock( mainloop );
+
+        switch(state)
+        {
+            case PA_STREAM_READY:
+                result = paNoError;
+                wait = 10000;
+                break;
+            case PA_STREAM_FAILED:
+                PA_DEBUG( ("Portaudio %s: Creating stream failed. (PA_STREAM_FAILED)",
+                           __FUNCTION__) );
+                result = paNotInitialized;
+                wait = 10000;
+                break;
+            case PA_STREAM_TERMINATED:
+                PA_DEBUG( ("Portaudio %s: Stream terminated. (PA_STREAM_TERMINATED)",
+                           __FUNCTION__) );
+                result = paNotInitialized;
+                wait = 10000;
+                break;
+        }
+
+        /* Creating can take some time */
+        if( state != PA_STREAM_CREATING )
+        {
+            wait ++;
+        }
+    }
+
+    return result;
+}
+
 PaError PaPulseAudio_StartStreamCb( PaStream * s )
 {
     PaError ret = paNoError;
@@ -717,16 +760,10 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         {
             PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
             /* Zero means success */
-            if( ! pa_stream_connect_record( stream->inputStream,
+            if( pa_stream_connect_record( stream->inputStream,
                                             pulseaudioName,
                                             &stream->inputBufferAttr,
                                             pulseaudioStreamFlags ) )
-            {
-                pa_stream_set_started_callback( stream->inputStream,
-                                                PaPulseAudio_StreamStartedCb,
-                                                stream );
-            }
-            else
             {
                 PA_DEBUG( ("Portaudio %s: Can't read audio!\n",
                           __FUNCTION__) );
@@ -735,23 +772,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             }
             PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
-            for( waitLoop = 0; waitLoop < 100; waitLoop ++ )
+            if( _PaPulseAudio_WaitStreamState( pulseaudioHostApi->mainloop, stream->outputStream ) != paNoError )
             {
-                PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
-                pulseaudioState = pa_stream_get_state( stream->inputStream );
-                PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
-
-                if( pulseaudioState == PA_STREAM_READY )
-                {
-                    break;
-                }
-                else if( pulseaudioState == PA_STREAM_FAILED ||
-                         pulseaudioState == PA_STREAM_TERMINATED )
-                {
-                    goto startstreamcb_error;
-                }
-
-                usleep(10000);
+                goto startstreamcb_error;
             }
         }
         else
@@ -825,21 +848,12 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             {
                 PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
 
-                if ( ! pa_stream_connect_playback( stream->outputStream,
+                if ( pa_stream_connect_playback( stream->outputStream,
                                                    pulseaudioName,
                                                    &stream->outputBufferAttr,
                                                    pulseaudioStreamFlags,
                                                    NULL,
                                                    NULL ) )
-                {
-                    pa_stream_set_underflow_callback( stream->outputStream,
-                                                      PaPulseAudio_StreamUnderflowCb,
-                                                      stream);
-                    pa_stream_set_started_callback( stream->outputStream,
-                                                    PaPulseAudio_StreamStartedCb,
-                                                    stream );
-                }
-                else
                 {
                     PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
                               __FUNCTION__) );
@@ -847,23 +861,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                 }
                 PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
-                for( waitLoop = 0; waitLoop < 100; waitLoop ++ )
+                if( _PaPulseAudio_WaitStreamState( pulseaudioHostApi->mainloop, stream->outputStream ) != paNoError )
                 {
-                    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
-                    pulseaudioState = pa_stream_get_state( stream->outputStream );
-                    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
-
-                    if( pulseaudioState = PA_STREAM_READY )
-                    {
-                        break;
-                    }
-                    else if( pulseaudioState == PA_STREAM_FAILED  ||
-                             pulseaudioState == PA_STREAM_TERMINATED )
-                    {
-                        goto startstreamcb_error;
-                    }
-
-                    usleep(10000);
+                    goto startstreamcb_error;
                 }
 
             }

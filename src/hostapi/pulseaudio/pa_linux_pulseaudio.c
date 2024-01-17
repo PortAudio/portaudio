@@ -67,29 +67,19 @@ extern char *__progname;
 /* PulseAudio specific functions */
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
-    pa_context_state_t state;
+    int retCode = paNotInitialized;
 
+    if ( ptr == NULL )
+    {
+        return retCode;
+    }
 
-    /* Sanity check if ptr if NULL don't go anywhere or
-     * it will SIGSEGV
+    pa_context_state_t state = pa_context_get_state( ptr->context );
+
+    /* Check if contenxt if good.
+     * If it is then check state
      */
-    if( !ptr )
-    {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_CheckConnection: Host API is NULL! Can't do anything about it" );
-        return -1;
-    }
-
-    if( !ptr->context || !ptr->mainloop )
-    {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_CheckConnection: PulseAudio context or mainloop are NULL" );
-        return -1;
-    }
-
-    state = pa_context_get_state(ptr->context);
-
-    if( !PA_CONTEXT_IS_GOOD(state) )
+    if( PA_CONTEXT_IS_GOOD(state) )
     {
         switch( state )
         {
@@ -97,20 +87,45 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
              * https://freedesktop.org/software/pulseaudio/doxygen/def_8h.html
              */
 
+            case PA_CONTEXT_READY:
+                retCode = paNoError;
+            break;
+
+            case PA_CONTEXT_CONNECTING:
+            case PA_CONTEXT_AUTHORIZING:
+            case PA_CONTEXT_SETTING_NAME:
+                /* These are just here if they are needed in future */
+            break;
+        }
+    }
+    else
+    {
+        retCode = paUnanticipatedHostError;
+
+        switch( state )
+        {
+            /* These can be found from
+             * https://freedesktop.org/software/pulseaudio/doxygen/def_8h.html
+             */
+
             case PA_CONTEXT_UNCONNECTED:
-               PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                                  "PaPulseAudio_CheckConnection: The context hasn't been connected yet (PA_CONTEXT_UNCONNECTED)" );
+                PA_DEBUG( ("Portaudio %s: Can't connect to server. (PA_CONTEXT_UNCONNECTED)",
+                           __FUNCTION__) );
+            break;
+
+            case PA_CONTEXT_TERMINATED:
+                PA_DEBUG( ("Portaudio %s: Connection terminated to Pulseaudio server. (PA_CONTEXT_TERMINATED)",
+                           __FUNCTION__) );
             break;
 
             case PA_CONTEXT_FAILED:
-               PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                                  "PaPulseAudio_CheckConnection: The connection failed or was disconnected. (PA_CONTEXT_FAILED)" );
+                PA_DEBUG( ("Portaudio %s: Connection failed or was disconnected from Pulseaudio server. (PA_CONTEXT_FAILED)",
+                           __FUNCTION__) );
             break;
         }
-
-        return -1;
     }
-    return 0;
+
+    return retCode;
 }
 
 /* Create HostAPI presensentation */
@@ -447,7 +462,10 @@ void PaPulseAudio_SourceListCb( pa_context * c,
 void PaPulseAudio_StreamStateCb( pa_stream * s,
                                  void *userdata )
 {
+    PaPulseAudio_Stream *stream = (PaPulseAudio_Stream *) userdata;
     const pa_buffer_attr *pulseaudioBufferAttr = NULL;
+    pa_stream_state_t state = PA_STREAM_UNCONNECTED;
+
     /* If you need debug pring enable these
      * char cmt[PA_CHANNEL_MAP_SNPRINT_MAX], sst[PA_SAMPLE_SPEC_SNPRINT_MAX];
      */
@@ -461,11 +479,10 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
         return;
     }
 
-    switch( pa_stream_get_state(s) )
-    {
-        case PA_STREAM_TERMINATED:
-            break;
+    state = pa_stream_get_state(s);
 
+    switch( state )
+    {
         case PA_STREAM_CREATING:
             break;
 
@@ -475,8 +492,6 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
                 PA_DEBUG( ("Portaudio %s: Can get buffer attr: '%s'\n",
                            __FUNCTION__,
                            pa_strerror(pa_context_errno(pa_stream_get_context(s) ) )) );
-                PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_StreamStateCb: Can't get Stream pa_buffer_attr" );
             }
             else
             {
@@ -487,9 +502,15 @@ void PaPulseAudio_StreamStateCb( pa_stream * s,
             }
             break;
 
+        case PA_STREAM_TERMINATED:
+            PA_DEBUG( ("Portaudio %s: PA_STREAM_TERMINATED '%s'\n",
+                      __FUNCTION__,
+                      pa_strerror( pa_context_errno( pa_stream_get_context( s ) ) )) );
+            break;
+
         case PA_STREAM_FAILED:
         default:
-            PA_DEBUG( ("Portaudio %s: FAILED '%s'\n",
+            PA_DEBUG( ("Portaudio %s: PA_STREAM_FAILED '%s'\n",
                       __FUNCTION__,
                       pa_strerror( pa_context_errno( pa_stream_get_context( s ) ) )) );
 
@@ -511,17 +532,17 @@ void PaPulseAudio_StreamUnderflowCb( pa_stream *s,
     /* If this is null we have big problems and we probably are out of memory */
     if( !s )
     {
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                           "PaPulseAudio_StreamUnderflowCb: Invalid stream" );
+        PA_DEBUG( ("Portaudio %s: Invalid stream",
+                   __FUNCTION__) );
         return;
     }
 
     stream->outputUnderflows++;
     pulseaudioOutputSampleSpec = (pa_buffer_attr *)pa_stream_get_buffer_attr(s);
-    PA_DEBUG( ("Portaudio %s: PulseAudio '%s' with delay: %ld stream has underflowed\n", __FUNCTION__, pa_stream_get_device_name(s), pulseaudioOutputSampleSpec->tlength) );
-
-    PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
-                                       "PaPulseAudio_StreamUnderflowCb: Pulseaudio stream underflow");
+    PA_DEBUG( ("Portaudio %s: PulseAudio '%s' with delay: %ld stream has underflowed\n",
+               __FUNCTION__,
+               pa_stream_get_device_name(s),
+               pulseaudioOutputSampleSpec->tlength) );
 
     pa_threaded_mainloop_signal( stream->mainloop,
                                  0 );
@@ -577,6 +598,8 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
     if( ret < 0 )
     {
+        PA_DEBUG( ("Portaudio %s: Can't connect to server",
+                   __FUNCTION__) );
         PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
                                            "PulseAudio_Initialize: Can't connect to server");
         result = paUnanticipatedHostError;
@@ -590,24 +613,16 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     {
         pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
 
-        switch( pa_context_get_state( pulseaudioHostApi->context ) )
+        result = PaPulseAudio_CheckConnection( pulseaudioHostApi );
+
+        if( result != paNotInitialized && result != paNoError )
         {
-            case PA_CONTEXT_READY:
-                ret = 1;
-                break;
-            case PA_CONTEXT_TERMINATED:
-                PA_DEBUG( "PaPulseAudio_Initialize: Pulseaudio server terminated stream" );
-                goto error;
-                break;
-            case PA_CONTEXT_FAILED:
-                PA_DEBUG( "PaPulseAudio_Initialize: Pulseaudio server failed to initialize" );
-                goto error;
-                break;
-            case PA_CONTEXT_UNCONNECTED:
-            case PA_CONTEXT_CONNECTING:
-            case PA_CONTEXT_AUTHORIZING:
-            case PA_CONTEXT_SETTING_NAME:
-                break;
+            goto error;
+        }
+
+        if( result == paNoError )
+        {
+            ret = 1;
         }
     }
 
@@ -1224,6 +1239,10 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             pa_stream_set_started_callback( stream->outputStream,
                                             PaPulseAudio_StreamStartedCb,
                                             stream );
+            pa_stream_set_underflow_callback( stream->outputStream,
+                                              PaPulseAudio_StreamUnderflowCb,
+                                              stream);
+
         }
 
         else
