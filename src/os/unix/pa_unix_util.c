@@ -284,9 +284,7 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
     memset( self, 0, sizeof (PaUnixThread) );
     PaUnixMutex_Initialize( &self->mtx );
     PA_ASSERT_CALL( pthread_condattr_init( &cattr ), 0 );
-#if defined(CLOCK_MONOTONIC) && !defined(__APPLE__)
-    PA_ASSERT_CALL( pthread_condattr_setclock( &cattr, CLOCK_MONOTONIC ), 0 );
-#endif
+    self->condClockId = PaPthreadUtil_NegotiateCondAttrClock( &cattr );
     PA_ASSERT_CALL( pthread_cond_init( &self->cond, &cattr), 0 );
 
     self->parentWaiting = 0 != waitForChild;
@@ -366,23 +364,23 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
 
     if( self->parentWaiting )
     {
-        PaTime till;
+        PaTime now, deadline;
         struct timespec ts;
         int res = 0;
-        PaTime now;
 
         PA_ENSURE( PaUnixMutex_Lock( &self->mtx ) );
 
         /* Wait for stream to be started */
-        now = PaUtil_GetTime();
-        till = now + waitForChild;
+        PaPthreadUtil_GetTime( self->condClockId, &ts );
+        now = ts.tv_sec + ts.tv_nsec * 1e9;
+        deadline = now + waitForChild;
 
         while( self->parentWaiting && !res )
         {
             if( waitForChild > 0 )
             {
-                ts.tv_sec = (time_t) floor( till );
-                ts.tv_nsec = (long) ((till - floor( till )) * 1e9);
+                ts.tv_sec = (time_t) floor( deadline );
+                ts.tv_nsec = (long) ((deadline - floor( deadline )) * 1e9);
                 res = pthread_cond_timedwait( &self->cond, &self->mtx.mtx, &ts );
             }
             else
