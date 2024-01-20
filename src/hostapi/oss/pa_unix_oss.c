@@ -63,21 +63,11 @@
 #include <limits.h>
 #include <semaphore.h>
 
-#ifdef HAVE_SYS_SOUNDCARD_H
-# include <sys/soundcard.h>
-# ifdef __NetBSD__
-#  define DEVICE_NAME_BASE           "/dev/audio"
-# else
-#  define DEVICE_NAME_BASE           "/dev/dsp"
-# endif
-#elif defined(HAVE_LINUX_SOUNDCARD_H)
-# include <linux/soundcard.h>
-# define DEVICE_NAME_BASE            "/dev/dsp"
-#elif defined(HAVE_MACHINE_SOUNDCARD_H)
-# include <machine/soundcard.h> /* JH20010905 */
-# define DEVICE_NAME_BASE            "/dev/audio"
+#include <sys/soundcard.h>
+#ifdef __NetBSD__
+# define DEVICE_NAME_BASE           "/dev/audio"
 #else
-# error No sound card header file
+# define DEVICE_NAME_BASE           "/dev/dsp"
 #endif
 
 #include "portaudio.h"
