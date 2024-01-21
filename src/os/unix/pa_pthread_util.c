@@ -114,7 +114,7 @@ int PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
     t1970 = t1601 - SYSTEM_TIME_TO_UNIX_TIME_OFFSET;
 
     ts->tv_sec = (time_t) (t1970 / (UINT64)10000000UL);
-    ts->tv_nsec = (long long) ((t1970 - ((UINT64)ts->tv_sec * (UINT64)10000000UL)) * (UINT64)100UL);
+    ts->tv_nsec = (long) ((t1970 - ((UINT64)ts->tv_sec * (UINT64)10000000UL)) * (UINT64)100UL);
     return 0; /* success */
 #else
     /* fall back to gettimeofday for Apple and when clock_gettime is unavailable */
