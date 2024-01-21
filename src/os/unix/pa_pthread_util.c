@@ -94,19 +94,17 @@ void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
        The conversion from SystemTime to Unix time is based on this code: https://stackoverflow.com/a/26085827
        with reference to the pthreads4w code linked above.
     */
-    SYSTEMTIME st;
     FILETIME ft;
-    __int64 t1601;
+    UINT64 t1601; /* 100ns units since 00:00:00 UTC January 1, 1601 */
+    UINT64 t1970; /* 100ns units since 00:00:00 UTC January 1, 1970 */
 
-    GetSystemTime( &st );
-    SystemTimeToFileTime( &st, &ft );
-    t1601 = ((__int64)ft.dwLowDateTime );
-    t1601 += ((__int64)ft.dwHighDateTime) << 32;
+    GetSystemTimeAsFileTime( &ft );
+    t1601 = ((UINT64)ft.dwHighDateTime << 32) + (UINT64)ft.dwLowDateTime;
+#define SYSTEM_TIME_TO_UNIX_TIME_OFFSET (((UINT64)27111902UL << 32) + (UINT64)3577643008UL)
+    t1970 = t1601 - SYSTEM_TIME_TO_UNIX_TIME_OFFSET;
 
-#define WIN32SYSTEM_TIME_TO_UNIX_TIME_OFFSET ( ((__int64)27111902UL << 32) + (__int64)3577643008UL )
-    ts->tv_sec  = (time_t) ((t1601 - WIN32SYSTEM_TIME_TO_UNIX_TIME_OFFSET) / 10000000L);
-    ts->tv_nsec = (long long) (st.wMilliseconds * 1000000);
-
+    ts->tv_sec  = (time_t) (t1970 / (UINT64)10000000UL);
+    ts->tv_nsec = (long long) ((t1970 - ((UINT64)ts->tv_sec * (UINT64)10000000UL)) * (UINT64)100UL);
 #else
     /* fallback to gettimeofday for Apple and when clock_gettime is unavailable */
     struct timeval tv;
