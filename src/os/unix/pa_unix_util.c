@@ -372,7 +372,7 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
 
         /* Wait for stream to be started */
         PaPthreadUtil_GetTime( self->condClockId, &ts );
-        now = ts.tv_sec + ts.tv_nsec * 1e9;
+        now = ts.tv_sec + ts.tv_nsec * 1e-9;
         deadline = now + waitForChild;
 
         while( self->parentWaiting && !res )
