@@ -39,6 +39,8 @@
 
 #if !PAUTIL_USE_POSIX_ADVANCED_REALTIME && (defined(WIN32) || defined(_WIN32))
 #include <windows.h>
+#else
+#include <errno.h>
 #endif
 
 #include "pa_pthread_util.h"
@@ -83,7 +85,13 @@ PaUtilClockId PaPthreadUtil_NegotiateCondAttrClock( pthread_condattr_t *cattr )
 void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 {
 #if PAUTIL_USE_POSIX_ADVANCED_REALTIME
-    clock_gettime(clockId, ts);
+    if ( clock_gettime(clockId, ts) != 0 )
+    {
+        ts->tv_sec = 0;
+        ts->tv_nsec = 0;
+        PA_DEBUG(( "%s: clock_gettime failed with errno %d\n", __FUNCTION__, errno));
+    }
+
 #else /* not PAUTIL_USE_POSIX_ADVANCED_REALTIME */
 
 #if defined(WIN32) || defined(_WIN32)
@@ -108,9 +116,17 @@ void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 #else
     /* fallback to gettimeofday for Apple and when clock_gettime is unavailable */
     struct timeval tv;
-    gettimeofday(&tv, NULL);
-    ts->tv_sec  = tv.tv_sec;
-    ts->tv_nsec = tv.tv_usec * 1000;
+    if ( gettimeofday(&tv, NULL) == 0 )
+    {
+        ts->tv_sec = tv.tv_sec;
+        ts->tv_nsec = tv.tv_usec * 1000UL;
+    }
+    else
+    {
+        ts->tv_sec = 0;
+        ts->tv_nsec = 0;
+        PA_DEBUG(( "%s: gettimeofday failed with errno %d\n", __FUNCTION__, errno));
+    }
 #endif
 
 #endif
