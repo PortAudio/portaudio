@@ -87,9 +87,12 @@ void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 #else /* not PAUTIL_USE_POSIX_ADVANCED_REALTIME */
 
 #if defined(WIN32) || defined(_WIN32)
-    /* On Windows, assume pthreads4w, which uses Unix time derived from SystemTime as timeout reference.
-       The conversion is based on this code: https://stackoverflow.com/a/26085827
-       With reference to the pthreads4w code: https://sourceforge.net/p/pthreads4w/code/ci/master/tree/ptw32_timespec.c
+    /* On Windows, the most likely pthreads implementations are pthreads4w,
+       and winpthread via mingw-w64. Both use Unix time derived from Win32 SystemTime as the time base:
+         https://sourceforge.net/p/pthreads4w/code/ci/master/tree/ptw32_timespec.c
+         https://sourceforge.net/p/mingw-w64/mingw-w64/ci/master/tree/mingw-w64-libraries/winpthreads/src/misc.c
+       The conversion from SystemTime to Unix time is based on this code: https://stackoverflow.com/a/26085827
+       with reference to the pthreads4w code linked above.
     */
     SYSTEMTIME st;
     FILETIME ft;
