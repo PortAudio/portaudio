@@ -82,15 +82,17 @@ PaUtilClockId PaPthreadUtil_NegotiateCondAttrClock( pthread_condattr_t *cattr )
 #endif
 }
 
-void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
+int PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 {
 #if PAUTIL_USE_POSIX_ADVANCED_REALTIME
-    if ( clock_gettime(clockId, ts) != 0 )
+    if ( clock_gettime(clockId, ts) == 0 )
     {
-        ts->tv_sec = 0;
-        ts->tv_nsec = 0;
-        PA_DEBUG(( "%s: clock_gettime failed with errno %d\n", __FUNCTION__, errno));
+        return 0; /* success */
     }
+    PA_DEBUG(( "%s: clock_gettime failed with errno %d\n", __FUNCTION__, errno));
+    ts->tv_sec = 0;
+    ts->tv_nsec = 0;
+    return -1; /* failure */
 
 #else /* not PAUTIL_USE_POSIX_ADVANCED_REALTIME */
 
@@ -113,6 +115,7 @@ void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 
     ts->tv_sec = (time_t) (t1970 / (UINT64)10000000UL);
     ts->tv_nsec = (long long) ((t1970 - ((UINT64)ts->tv_sec * (UINT64)10000000UL)) * (UINT64)100UL);
+    return 0; /* success */
 #else
     /* fall back to gettimeofday for Apple and when clock_gettime is unavailable */
     struct timeval tv;
@@ -120,13 +123,12 @@ void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
     {
         ts->tv_sec = tv.tv_sec;
         ts->tv_nsec = tv.tv_usec * 1000UL;
+        return 0; /* success */
     }
-    else
-    {
-        ts->tv_sec = 0;
-        ts->tv_nsec = 0;
-        PA_DEBUG(( "%s: gettimeofday failed with errno %d\n", __FUNCTION__, errno));
-    }
+    PA_DEBUG(( "%s: gettimeofday failed with errno %d\n", __FUNCTION__, errno));
+    ts->tv_sec = 0;
+    ts->tv_nsec = 0;
+    return -1; /* failure */
 #endif
 
 #endif

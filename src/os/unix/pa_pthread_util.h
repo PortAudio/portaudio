@@ -93,8 +93,10 @@ PaUtilClockId PaPthreadUtil_NegotiateCondAttrClock( pthread_condattr_t *cattr );
 
 /** Get the current time according to the clock referred to by clockId, as
  * previously returned by PaPthreadUtil_NegotiateCondAttrTimeoutClock().
+ *
+ * Returns 0 upon success, -1 otherwise.
 */
-void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts );
+int PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts );
 
 #ifdef __cplusplus
 }

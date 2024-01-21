@@ -364,34 +364,36 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
 
     if( self->parentWaiting )
     {
-        PaTime now, deadline;
         struct timespec ts;
+        int waitForDeadline = 0;
         int res = 0;
 
         PA_ENSURE( PaUnixMutex_Lock( &self->mtx ) );
 
         /* Wait for stream to be started */
-        PaPthreadUtil_GetTime( self->condClockId, &ts );
-        now = ts.tv_sec + ts.tv_nsec * 1e-9;
-        deadline = now + waitForChild;
+        if( waitForChild > 0.0 )
+        {
+            if( PaPthreadUtil_GetTime( self->condClockId, &ts ) == 0 )
+            {
+                PaTime now = ts.tv_sec + ts.tv_nsec * 1e-9;
+                PaTime deadline = now + waitForChild;
+                ts.tv_sec = (time_t) floor( deadline );
+                ts.tv_nsec = (long) ((deadline - floor( deadline )) * 1e9);
+                waitForDeadline = 1;
+            }
+        }
 
         while( self->parentWaiting && !res )
         {
-            if( waitForChild > 0 )
-            {
-                ts.tv_sec = (time_t) floor( deadline );
-                ts.tv_nsec = (long) ((deadline - floor( deadline )) * 1e9);
+            if( waitForDeadline )
                 res = pthread_cond_timedwait( &self->cond, &self->mtx.mtx, &ts );
-            }
             else
-            {
                 res = pthread_cond_wait( &self->cond, &self->mtx.mtx );
-            }
         }
 
         PA_ENSURE( PaUnixMutex_Unlock( &self->mtx ) );
 
-        PA_UNLESS( !res || ETIMEDOUT == res, paInternalError );
+        PA_UNLESS( !res || ETIMEDOUT == res, paInternalError ); /* FIXME: add separate check for timeout and return paTimedOut */
         PA_DEBUG(( "%s: Waited for %g seconds for stream to start\n", __FUNCTION__, PaUtil_GetTime() - now ));
         if( ETIMEDOUT == res )
         {

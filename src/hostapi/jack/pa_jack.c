@@ -1057,11 +1057,18 @@ static PaError WaitCondition( PaJackHostApiRepresentation *hostApi )
     int err = 0;
     struct timespec ts;
 
-    PaPthreadUtil_GetTime( hostApi->condClockId, &ts );
-    ts.tv_sec += 10 * 60; /* 10 minutes */
+    if( PaPthreadUtil_GetTime( hostApi->condClockId, &ts ) == 0 )
+    {
+        ts.tv_sec += 10 * 60; /* 10 minutes */
 
-    /* XXX: Best enclose in loop, in case of spurious wakeups? */
-    err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
+        /* XXX: Best enclose in loop, in case of spurious wakeups? */
+        err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
+    }
+    else
+    {
+        /* XXX: Best enclose in loop, in case of spurious wakeups? */
+        err = pthread_cond_wait( &hostApi->cond, &hostApi->mtx );
+    }
 
     /* Make sure we didn't time out */
     UNLESS( err != ETIMEDOUT, paTimedOut );
