@@ -367,6 +367,9 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
         struct timespec ts;
         int waitForDeadline = 0;
         int res = 0;
+#ifdef PA_ENABLE_DEBUG_OUTPUT
+        double startTime = PaUtil_GetTime();
+#endif
 
         PA_ENSURE( PaUnixMutex_Lock( &self->mtx ) );
 
@@ -393,8 +396,8 @@ PaError PaUnixThread_New( PaUnixThread* self, void* (*threadFunc)( void* ), void
 
         PA_ENSURE( PaUnixMutex_Unlock( &self->mtx ) );
 
-        PA_UNLESS( !res || ETIMEDOUT == res, paInternalError ); /* FIXME: add separate check for timeout and return paTimedOut */
-        PA_DEBUG(( "%s: Waited for %g seconds for stream to start\n", __FUNCTION__, PaUtil_GetTime() - now ));
+        PA_UNLESS( !res || ETIMEDOUT == res, paInternalError );
+        PA_DEBUG(( "%s: Waited for %g seconds for stream to start\n", __FUNCTION__, PaUtil_GetTime() - startTime ));
         if( ETIMEDOUT == res )
         {
             PA_ENSURE( paTimedOut );
