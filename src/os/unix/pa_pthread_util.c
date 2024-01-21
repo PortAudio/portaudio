@@ -49,12 +49,12 @@
 PaUtilClockId PaPthreadUtil_NegotiateCondAttrClock( pthread_condattr_t *cattr )
 {
 #if PAUTIL_USE_POSIX_ADVANCED_REALTIME
-    /* Set most suitable timeout clock and return its id.
-       If a clock can't be set, return the default clock.
+    /* Set most suitable timeout clock on the condattr and return its clock id.
+       If a clock can't be set, return the default clock id.
     */
     clockid_t clockId;
 
-/* try each potential clockid in order of preferences until one succeeds:*/
+/* try each potential clockid in order of preference until one succeeds: */
 #if defined(CLOCK_BOOTTIME )
     if( pthread_condattr_setclock( cattr, CLOCK_BOOTTIME ) == 0 )
         return CLOCK_BOOTTIME;
@@ -70,11 +70,11 @@ PaUtilClockId PaPthreadUtil_NegotiateCondAttrClock( pthread_condattr_t *cattr )
         return CLOCK_REALTIME;
 #endif
 
-    /* fallback to returning the current clock id*/
+    /* fall back to returning the current clock id */
     if ( pthread_condattr_getclock( cattr, &clockId) == 0 )
         return clockId;
 
-    /* fallback to returning the default expected clock id*/
+    /* fall back to returning the default expected clock id */
     PA_DEBUG(( "%s: could not configure condattr clock\n", __FUNCTION__));
     return CLOCK_REALTIME;
 #else /* not PAUTIL_USE_POSIX_ADVANCED_REALTIME */
@@ -111,10 +111,10 @@ void PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 #define SYSTEM_TIME_TO_UNIX_TIME_OFFSET (((UINT64)27111902UL << 32) + (UINT64)3577643008UL)
     t1970 = t1601 - SYSTEM_TIME_TO_UNIX_TIME_OFFSET;
 
-    ts->tv_sec  = (time_t) (t1970 / (UINT64)10000000UL);
+    ts->tv_sec = (time_t) (t1970 / (UINT64)10000000UL);
     ts->tv_nsec = (long long) ((t1970 - ((UINT64)ts->tv_sec * (UINT64)10000000UL)) * (UINT64)100UL);
 #else
-    /* fallback to gettimeofday for Apple and when clock_gettime is unavailable */
+    /* fall back to gettimeofday for Apple and when clock_gettime is unavailable */
     struct timeval tv;
     if ( gettimeofday(&tv, NULL) == 0 )
     {
