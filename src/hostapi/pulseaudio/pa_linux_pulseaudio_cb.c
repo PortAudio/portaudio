@@ -857,6 +857,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                 {
                     PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
                               __FUNCTION__) );
+                       PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
                     goto startstreamcb_error;
                 }
                 PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
