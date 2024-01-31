@@ -600,7 +600,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     {
         PA_DEBUG( ("Portaudio %s: Can't connect to server",
                    __FUNCTION__) );
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( 0,
+        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( ret,
                                            "PulseAudio_Initialize: Can't connect to server");
         result = paUnanticipatedHostError;
         goto error;
