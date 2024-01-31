@@ -772,7 +772,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             }
             PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
-            if( _PaPulseAudio_WaitStreamState( pulseaudioHostApi->mainloop, stream->outputStream ) != paNoError )
+            if( _PaPulseAudio_WaitStreamState( pulseaudioHostApi->mainloop, stream->inputStream ) != paNoError )
             {
                 goto startstreamcb_error;
             }
