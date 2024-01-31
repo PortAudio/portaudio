@@ -67,7 +67,7 @@ extern char *__progname;
 /* PulseAudio specific functions */
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
-    int retCode = paNotInitialized;
+    int retCode = -1;
 
     if ( ptr == NULL )
     {
@@ -88,7 +88,7 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
              */
 
             case PA_CONTEXT_READY:
-                retCode = paNoError;
+                retCode = PA_OK;
             break;
 
             case PA_CONTEXT_CONNECTING:
@@ -100,7 +100,7 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
     }
     else
     {
-        retCode = paUnanticipatedHostError;
+        retCode = PA_ERR_ACCESS;
 
         switch( state )
         {
@@ -615,12 +615,12 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
         result = PaPulseAudio_CheckConnection( pulseaudioHostApi );
 
-        if( result != paNotInitialized && result != paNoError )
+        if( result > PA_OK )
         {
             goto error;
         }
 
-        if( result == paNoError )
+        if( result == PA_OK )
         {
             ret = 1;
         }
