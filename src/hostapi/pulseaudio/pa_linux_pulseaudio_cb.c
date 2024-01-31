@@ -767,6 +767,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             {
                 PA_DEBUG( ("Portaudio %s: Can't read audio!\n",
                           __FUNCTION__) );
+                   PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
                 goto startstreamcb_error;
             }
