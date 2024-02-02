@@ -69,8 +69,8 @@ typedef struct PaSndioHostApiRepresentation
      * PA_SNDIO_AUDIODEVICES=default:snd/0.monitor:snd@remote/0
      */
 #define PA_SNDIO_AUDIODEVICES_MAX 16
-    PaDeviceInfo device_info[PA_SNDIO_AUDIODEVICES_MAX];
-    PaDeviceInfo *infos[PA_SNDIO_AUDIODEVICES_MAX];
+    PaDeviceInfo deviceInfos[PA_SNDIO_AUDIODEVICES_MAX];
+    PaDeviceInfo *deviceInfoPtrs[PA_SNDIO_AUDIODEVICES_MAX];
     char *audioDevices;
 } PaSndioHostApiRepresentation;
 
@@ -165,7 +165,7 @@ static int sndioGetFmt( struct sio_par *par, PaSampleFormat *fmt )
 static void *sndioThread( void *arg )
 {
     PaSndioStream *sndioStream = (PaSndioStream *)arg;
-    PaStreamCallbackTimeInfo timeinfo;
+    PaStreamCallbackTimeInfo timeInfo;
     unsigned char *data;
     unsigned todo, rblksz, wblksz;
     int n, result;
@@ -194,15 +194,15 @@ static void *sndioThread( void *arg )
                 data += n;
             }
             sndioStream->rpos += sndioStream->par.round;
-            timeinfo.inputBufferAdcTime = (double)sndioStream->realpos / sndioStream->par.rate;
+            timeInfo.inputBufferAdcTime = (double)sndioStream->realpos / sndioStream->par.rate;
         }
         if( sndioStream->mode & SIO_PLAY )
         {
-            timeinfo.outputBufferDacTime =
+            timeInfo.outputBufferDacTime =
                 (double)( sndioStream->realpos + sndioStream->par.bufsz ) / sndioStream->par.rate;
         }
-        timeinfo.currentTime = sndioStream->realpos / (double)sndioStream->par.rate;
-        PaUtil_BeginBufferProcessing( &sndioStream->bufferProcessor, &timeinfo, 0 );
+        timeInfo.currentTime = sndioStream->realpos / (double)sndioStream->par.rate;
+        PaUtil_BeginBufferProcessing( &sndioStream->bufferProcessor, &timeInfo, 0 );
         if( sndioStream->mode & SIO_PLAY )
         {
             PaUtil_SetOutputFrameCount( &sndioStream->bufferProcessor, sndioStream->par.round );
@@ -254,7 +254,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi, PaStream
     struct sio_par par;
     unsigned mode;
     int inputChannelCount, outputChannelCount;
-    PaSampleFormat inputFormat, outputFormat, SndioFormat;
+    PaSampleFormat inputFormat, outputFormat, sndioFormat;
     const char *dev;
 
     PA_DEBUG( ( "OpenStream:\n" ) );
@@ -312,11 +312,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi, PaStream
 
     if( outputPar )
     {
-        dev = sndioHostApi->device_info[outputPar->device].name;
+        dev = sndioHostApi->deviceInfos[outputPar->device].name;
     }
     else if( inputPar )
     {
-        dev = sndioHostApi->device_info[inputPar->device].name;
+        dev = sndioHostApi->deviceInfos[inputPar->device].name;
     }
     else
     {
@@ -335,7 +335,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi, PaStream
         sio_close( hdl );
         return paUnanticipatedHostError;
     }
-    if( !sndioGetFmt( &par, &SndioFormat ) )
+    if( !sndioGetFmt( &par, &sndioFormat ) )
     {
         sio_close( hdl );
         return paSampleFormatNotSupported;
@@ -371,8 +371,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi, PaStream
     PA_DEBUG( ( "inputChannelCount = %d, outputChannelCount = %d, inputFormat = "
                 "%x, outputFormat = %x\n",
                 inputChannelCount, outputChannelCount, inputFormat, outputFormat ) );
-    err = PaUtil_InitializeBufferProcessor( &sndioStream->bufferProcessor, inputChannelCount, inputFormat, SndioFormat,
-                                            outputChannelCount, outputFormat, SndioFormat, sampleRate, streamFlags,
+    err = PaUtil_InitializeBufferProcessor( &sndioStream->bufferProcessor, inputChannelCount, inputFormat, sndioFormat,
+                                            outputChannelCount, outputFormat, sndioFormat, sampleRate, streamFlags,
                                             framesPerBuffer, par.round, paUtilFixedHostBufferSize, streamCallback,
                                             userData );
     if( err )
@@ -715,9 +715,9 @@ PaError PaSndio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
         return paNoError;
 
     // Add default device
-    info = &sndioHostApi->device_info[0];
+    info = &sndioHostApi->deviceInfos[0];
     InitDeviceInfo( info, hostApiIndex, SIO_DEVANY );
-    sndioHostApi->infos[0] = info;
+    sndioHostApi->deviceInfoPtrs[0] = info;
     deviceCount = 1;
 
     // Add additional devices as specified in the PA_SNDIO_AUDIODEVICES
@@ -735,9 +735,9 @@ PaError PaSndio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
         {
             if( *device == '\0' )
                 continue;
-            info = &sndioHostApi->device_info[deviceCount];
+            info = &sndioHostApi->deviceInfos[deviceCount];
             InitDeviceInfo( info, hostApiIndex, device );
-            sndioHostApi->infos[deviceCount] = info;
+            sndioHostApi->deviceInfoPtrs[deviceCount] = info;
             deviceCount++;
         }
     }
@@ -749,7 +749,7 @@ PaError PaSndio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiInde
     ( *hostApi )->info.deviceCount = deviceCount;
     ( *hostApi )->info.defaultInputDevice = 0;
     ( *hostApi )->info.defaultOutputDevice = 0;
-    ( *hostApi )->deviceInfos = sndioHostApi->infos;
+    ( *hostApi )->deviceInfos = sndioHostApi->deviceInfoPtrs;
     ( *hostApi )->Terminate = Terminate;
     ( *hostApi )->OpenStream = OpenStream;
     ( *hostApi )->IsFormatSupported = IsFormatSupported;
