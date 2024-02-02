@@ -110,6 +110,7 @@ int PaPthreadUtil_GetTime( PaUtilClockId clockId, struct timespec *ts )
 
     GetSystemTimeAsFileTime( &ft );
     t1601 = ((UINT64)ft.dwHighDateTime << 32) + (UINT64)ft.dwLowDateTime;
+/* The following constant is 134774 days in 100ns ticks. i.e. 134774*24*3600*10000000 */
 #define SYSTEM_TIME_TO_UNIX_TIME_OFFSET (((UINT64)27111902UL << 32) + (UINT64)3577643008UL)
     t1970 = t1601 - SYSTEM_TIME_TO_UNIX_TIME_OFFSET;
 
