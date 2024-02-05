@@ -161,7 +161,7 @@ PaIosCore_Initialize(PaUtilHostApiRepresentation ** hostApi, PaHostApiIndex host
 	PaIosAUHAL *auhalHostApi = NULL;
 	PaDeviceInfo *deviceInfoArray;
 
-	auhalHostApi = (PaIosAUHAL *) PaUtil_AllocateMemory(sizeof(PaIosAUHAL));
+	auhalHostApi = (PaIosAUHAL *) PaUtil_AllocateZeroInitializedMemory(sizeof(PaIosAUHAL));
 	if (auhalHostApi == NULL) {
 		result = paInsufficientMemory;
 		goto error;
@@ -180,14 +180,14 @@ PaIosCore_Initialize(PaUtilHostApiRepresentation ** hostApi, PaHostApiIndex host
 	(*hostApi)->info.defaultOutputDevice = 0;
 	(*hostApi)->info.deviceCount = 1;
 
-	(*hostApi)->deviceInfos = (PaDeviceInfo **) PaUtil_GroupAllocateMemory(
+	(*hostApi)->deviceInfos = (PaDeviceInfo **) PaUtil_GroupAllocateZeroInitializedMemory(
 	    auhalHostApi->allocations, sizeof(PaDeviceInfo *) * 1);
 
 	if ((*hostApi)->deviceInfos == NULL) {
 		result = paInsufficientMemory;
 		goto error;
 	}
-	deviceInfoArray = (PaDeviceInfo *) PaUtil_GroupAllocateMemory(
+	deviceInfoArray = (PaDeviceInfo *) PaUtil_GroupAllocateZeroInitializedMemory(
 	    auhalHostApi->allocations, sizeof(PaDeviceInfo) * 1);
 	if (deviceInfoArray == NULL) {
 		result = paInsufficientMemory;
@@ -668,7 +668,7 @@ OpenStream(struct PaUtilHostApiRepresentation *hostApi,
 	if ((streamFlags & paPlatformSpecificFlags) != 0)
 		return paInvalidFlag;	/* unexpected platform specific flag */
 
-	stream = (PaIosCoreStream *) PaUtil_AllocateMemory(sizeof(PaIosCoreStream));
+	stream = (PaIosCoreStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(PaIosCoreStream));
 	if (!stream) {
 		result = paInsufficientMemory;
 		goto error;
