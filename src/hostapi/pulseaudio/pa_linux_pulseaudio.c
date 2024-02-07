@@ -67,6 +67,12 @@ extern char *__progname;
 /* PulseAudio specific functions */
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
+    /*
+     * This is bit hackish as -1 is consired as error
+     * but PA_ERR_* are positive and PA_OK is zero.
+     * That is why return -1 for we are waiting something
+     * to happen is 'correct'
+     */
     int retCode = -1;
 
     if ( ptr == NULL )
@@ -76,8 +82,12 @@ int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 
     pa_context_state_t state = pa_context_get_state( ptr->context );
 
-    /* Check if contenxt if good.
-     * If it is then check state
+    /* Check if context is good. If it is then check state
+     * otherwise report error
+     *
+     * Only with PA_CONTEXT_READY which means
+     * application is connected and ready report
+     * success
      */
     if( PA_CONTEXT_IS_GOOD(state) )
     {
