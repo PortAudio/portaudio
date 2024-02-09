@@ -70,7 +70,7 @@ jobs:
     - name: "Install dependencies [Ubuntu]"
       run: |
         sudo apt-get update
-        sudo apt-get install libasound2-dev libpulse-dev ${{ matrix.dependencies_extras }}
+        sudo apt-get install libasound2-dev libpulse-dev libsndio-dev ${{ matrix.dependencies_extras }}
       if: matrix.os == 'ubuntu-latest'
     - name: "Set up ASIO SDK cache [Windows/MinGW]"
       uses: actions/cache@v2

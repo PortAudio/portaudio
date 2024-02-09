@@ -149,6 +149,7 @@ SRC_DIRS = \
 	src/hostapi/pulseaudio \
 	src/hostapi/oss \
 	src/hostapi/skeleton \
+	src/hostapi/sndio \
 	src/hostapi/wasapi \
 	src/hostapi/wdmks \
 	src/hostapi/wmme \
