@@ -189,7 +189,7 @@ for dir in dirs:
 
             # 3. Correct leading whitespace / bad indenting
             if checkBadIndenting:
-                leadingWhitespaceRe = re.compile(b"^\s*")
+                leadingWhitespaceRe = re.compile(b"^\\s*")
                 commentIsOpen = False
                 previousLine = b""
                 previousIndent = 0
@@ -218,7 +218,7 @@ for dir in dirs:
                     lineNo += 1
 
             # 4. No trailing whitespace
-            trailingWhitespaceRe = re.compile(b"\s*$")
+            trailingWhitespaceRe = re.compile(b"\\s*$")
             lineNo = 1
             for line in lines:
                 m = trailingWhitespaceRe.search(line)
