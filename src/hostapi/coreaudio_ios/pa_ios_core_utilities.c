@@ -66,8 +66,7 @@
 
 #include <sys/time.h>
 
-PaError
-PaIosCore_SetUnixError(int err, int line)
+PaError PaIosCore_SetUnixError(int err, int line)
 {
     PaError ret;
     const char *errorText;
@@ -89,8 +88,7 @@ PaIosCore_SetUnixError(int err, int line)
     return (ret);
 }
 
-PaError
-PaIosCore_SetError(OSStatus error, int line, int isError)
+PaError PaIosCore_SetError(OSStatus error, int line, int isError)
 {
     PaError result;
     const char *errorType;

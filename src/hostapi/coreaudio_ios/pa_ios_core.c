@@ -105,8 +105,7 @@ static double GetStreamCpuLoad(PaStream * stream);
 /*
  * Callback called when starting or stopping a stream.
  */
-static void
-startStopCallback(
+static void startStopCallback(
     void *inRefCon,
     AudioUnit ci,
     AudioUnitPropertyID inID,
@@ -134,8 +133,8 @@ startStopCallback(
         sfc(stream->streamRepresentation.userData);
 }
 
-static void
-FillDeviceInfo(PaIosAUHAL * auhalHostApi,
+static void FillDeviceInfo(
+    PaIosAUHAL * auhalHostApi,
     PaDeviceInfo * deviceInfo,
     PaHostApiIndex hostApiIndex)
 {
@@ -154,8 +153,7 @@ FillDeviceInfo(PaIosAUHAL * auhalHostApi,
     deviceInfo->defaultHighOutputLatency = 0.080;
 }
 
-PaError
-PaIosCore_Initialize(PaUtilHostApiRepresentation ** hostApi, PaHostApiIndex hostApiIndex)
+PaError PaIosCore_Initialize(PaUtilHostApiRepresentation ** hostApi, PaHostApiIndex hostApiIndex)
 {
     PaError result = paNoError;
     PaIosAUHAL *auhalHostApi = NULL;
@@ -233,8 +231,7 @@ error:
     return (result);
 }
 
-static void
-Terminate(struct PaUtilHostApiRepresentation *hostApi)
+static void Terminate(struct PaUtilHostApiRepresentation *hostApi)
 {
     PaIosAUHAL *auhalHostApi = (PaIosAUHAL *) hostApi;
 
@@ -245,8 +242,8 @@ Terminate(struct PaUtilHostApiRepresentation *hostApi)
     PaUtil_FreeMemory(auhalHostApi);
 }
 
-static    PaError
-IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
+static PaError IsFormatSupported(
+    struct PaUtilHostApiRepresentation *hostApi,
     const PaStreamParameters * inputParameters,
     const PaStreamParameters * outputParameters,
     double sampleRate)
@@ -297,8 +294,7 @@ IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
 }
 
 /* ================================================================================= */
-static void
-InitializeDeviceProperties(PaIosCoreDeviceProperties * deviceProperties)
+static void InitializeDeviceProperties(PaIosCoreDeviceProperties * deviceProperties)
 {
     memset(deviceProperties, 0, sizeof(PaIosCoreDeviceProperties));
     deviceProperties->sampleRate = 1.0;    /* Better than random.
@@ -307,8 +303,7 @@ InitializeDeviceProperties(PaIosCoreDeviceProperties * deviceProperties)
     deviceProperties->samplePeriod = 1.0 / deviceProperties->sampleRate;
 }
 
-static    Float64
-CalculateSoftwareLatencyFromProperties(PaIosCoreStream * stream, PaIosCoreDeviceProperties * deviceProperties)
+static Float64 CalculateSoftwareLatencyFromProperties(PaIosCoreStream * stream, PaIosCoreDeviceProperties * deviceProperties)
 {
     UInt32 latencyFrames = deviceProperties->bufferFrameSize + deviceProperties->deviceLatency + deviceProperties->safetyOffset;
 
@@ -316,8 +311,7 @@ CalculateSoftwareLatencyFromProperties(PaIosCoreStream * stream, PaIosCoreDevice
                                  * sampleRate but faster */
 }
 
-static    Float64
-CalculateHardwareLatencyFromProperties(PaIosCoreStream * stream, PaIosCoreDeviceProperties * deviceProperties)
+static Float64 CalculateHardwareLatencyFromProperties(PaIosCoreStream * stream, PaIosCoreDeviceProperties * deviceProperties)
 {
     return deviceProperties->deviceLatency * deviceProperties->samplePeriod;    /* same as dividing by
                                              * sampleRate but faster */
@@ -327,8 +321,7 @@ CalculateHardwareLatencyFromProperties(PaIosCoreStream * stream, PaIosCoreDevice
  * from the device properties. The final results of this calculation
  * will be used in the audio callback function.
  */
-static void
-UpdateTimeStampOffsets(PaIosCoreStream * stream)
+static void UpdateTimeStampOffsets(PaIosCoreStream * stream)
 {
     Float64 inputSoftwareLatency = 0.0;
     Float64 inputHardwareLatency = 0.0;
@@ -351,8 +344,7 @@ UpdateTimeStampOffsets(PaIosCoreStream * stream)
     pthread_mutex_unlock(&stream->timingInformationMutex);
 }
 
-static    PaError
-OpenAndSetupOneAudioUnit(
+static PaError OpenAndSetupOneAudioUnit(
     const PaIosCoreStream * stream,
     const PaStreamParameters * inStreamParams,
     const PaStreamParameters * outStreamParams,
@@ -533,8 +525,8 @@ error:
     return (paResult);
 }
 
-static long
-computeRingBufferSize(const PaStreamParameters * inputParameters,
+static long computeRingBufferSize(
+    const PaStreamParameters * inputParameters,
     const PaStreamParameters * outputParameters,
     long inputFramesPerBuffer,
     long outputFramesPerBuffer,
@@ -583,8 +575,8 @@ computeRingBufferSize(const PaStreamParameters * inputParameters,
     return ringSize;
 }
 
-static    PaError
-OpenStream(struct PaUtilHostApiRepresentation *hostApi,
+static PaError OpenStream(
+    struct PaUtilHostApiRepresentation *hostApi,
     PaStream ** s,
     const PaStreamParameters * inputParameters,
     const PaStreamParameters * outputParameters,
@@ -937,8 +929,8 @@ GetStreamTime(PaStream * s)
  * Called by the AudioUnit API to process audio from the sound card.
  * This is where the magic happens.
  */
-static OSStatus
-AudioIOProc(void *inRefCon,
+static OSStatus AudioIOProc(
+    void *inRefCon,
     AudioUnitRenderActionFlags * ioActionFlags,
     const AudioTimeStamp * inTimeStamp,
     UInt32 inBusNumber,
@@ -1248,8 +1240,7 @@ stop_stream:
     return noErr;
 }
 
-static    PaError
-CloseStream(PaStream * s)
+static PaError CloseStream(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
     PaError result = paNoError;
@@ -1286,8 +1277,7 @@ CloseStream(PaStream * s)
     return (result);
 }
 
-static    PaError
-StartStream(PaStream * s)
+static PaError StartStream(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
     OSStatus result = noErr;
@@ -1311,8 +1301,7 @@ StartStream(PaStream * s)
 #undef ERR_WRAP
 }
 
-static OSStatus
-BlockWhileAudioUnitIsRunning(AudioUnit audioUnit, AudioUnitElement element)
+static OSStatus BlockWhileAudioUnitIsRunning(AudioUnit audioUnit, AudioUnitElement element)
 {
     Boolean isRunning;
 
@@ -1329,8 +1318,7 @@ BlockWhileAudioUnitIsRunning(AudioUnit audioUnit, AudioUnitElement element)
     return (noErr);
 }
 
-static    PaError
-FinishStoppingStream(PaIosCoreStream * stream)
+static PaError FinishStoppingStream(PaIosCoreStream * stream)
 {
     OSStatus result = noErr;
     PaError paErr;
@@ -1379,8 +1367,7 @@ FinishStoppingStream(PaIosCoreStream * stream)
 #undef ERR_WRAP
 }
 
-static    PaError
-StopStream(PaStream * s)
+static PaError StopStream(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
     PaError paErr;
@@ -1395,8 +1382,7 @@ StopStream(PaStream * s)
     return (FinishStoppingStream(stream));
 }
 
-static    PaError
-AbortStream(PaStream * s)
+static PaError AbortStream(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
 
@@ -1404,24 +1390,21 @@ AbortStream(PaStream * s)
     return (FinishStoppingStream(stream));
 }
 
-static    PaError
-IsStreamStopped(PaStream * s)
+static PaError IsStreamStopped(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
 
     return (stream->state == STOPPED);
 }
 
-static    PaError
-IsStreamActive(PaStream * s)
+static PaError IsStreamActive(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
 
     return (stream->state == ACTIVE || stream->state == STOPPING);
 }
 
-static double
-GetStreamCpuLoad(PaStream * s)
+static double GetStreamCpuLoad(PaStream * s)
 {
     PaIosCoreStream *stream = (PaIosCoreStream *) s;
 
