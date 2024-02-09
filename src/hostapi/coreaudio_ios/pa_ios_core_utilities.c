@@ -69,157 +69,157 @@
 PaError
 PaIosCore_SetUnixError(int err, int line)
 {
-	PaError ret;
-	const char *errorText;
+    PaError ret;
+    const char *errorText;
 
-	if (err == 0)
-		return paNoError;
+    if (err == 0)
+        return paNoError;
 
-	ret = paNoError;
+    ret = paNoError;
 
-	errorText = strerror(err);
+    errorText = strerror(err);
 
-	if (err == ENOMEM)
-		ret = paInsufficientMemory;
-	else
-		ret = paInternalError;
+    if (err == ENOMEM)
+        ret = paInsufficientMemory;
+    else
+        ret = paInternalError;
 
-	PaUtil_SetLastHostErrorInfo(paCoreAudio, err, errorText);
+    PaUtil_SetLastHostErrorInfo(paCoreAudio, err, errorText);
 
-	return (ret);
+    return (ret);
 }
 
 PaError
 PaIosCore_SetError(OSStatus error, int line, int isError)
 {
-	PaError result;
-	const char *errorType;
-	const char *errorText;
+    PaError result;
+    const char *errorType;
+    const char *errorText;
 
-	switch (error) {
-	case kAudioServicesNoError:
-		return paNoError;
-	case kAudioFormatUnspecifiedError:
-		errorText = "Unspecified Audio Format Error";
-		result = paInternalError;
-		break;
-	case kAudioFormatUnknownFormatError:
-		errorText = "Audio Format: Unknown Format Error";
-		result = paInternalError;
-		break;
-	case kAudioFormatBadPropertySizeError:
-		errorText = "Audio Format: Bad Property Size";
-		result = paInternalError;
-		break;
-	case kAudioFormatUnsupportedPropertyError:
-		errorText = "Audio Format: Unsupported Property Error";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InvalidProperty:
-		errorText = "Audio Unit: Invalid Property";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InvalidParameter:
-		errorText = "Audio Unit: Invalid Parameter";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_NoConnection:
-		errorText = "Audio Unit: No Connection";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_FailedInitialization:
-		errorText = "Audio Unit: Initialization Failed";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_TooManyFramesToProcess:
-		errorText = "Audio Unit: Too Many Frames";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_IllegalInstrument:
-		errorText = "Audio Unit: Illegal Instrument";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InstrumentTypeNotFound:
-		errorText = "Audio Unit: Instrument Type Not Found";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InvalidFile:
-		errorText = "Audio Unit: Invalid File";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_UnknownFileType:
-		errorText = "Audio Unit: Unknown File Type";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_FileNotSpecified:
-		errorText = "Audio Unit: File Not Specified";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_FormatNotSupported:
-		errorText = "Audio Unit: Format Not Supported";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_Uninitialized:
-		errorText = "Audio Unit: Unitialized";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InvalidScope:
-		errorText = "Audio Unit: Invalid Scope";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_PropertyNotWritable:
-		errorText = "Audio Unit: PropertyNotWritable";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InvalidPropertyValue:
-		errorText = "Audio Unit: Invalid Property Value";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_PropertyNotInUse:
-		errorText = "Audio Unit: Property Not In Use";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_Initialized:
-		errorText = "Audio Unit: Initialized";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_InvalidOfflineRender:
-		errorText = "Audio Unit: Invalid Offline Render";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_Unauthorized:
-		errorText = "Audio Unit: Unauthorized";
-		result = paInternalError;
-		break;
-	case kAudioUnitErr_CannotDoInCurrentContext:
-		errorText = "Audio Unit: cannot do in current context";
-		result = paInternalError;
-		break;
-	default:
-		errorText = "Unknown Error";
-		result = paInternalError;
-		break;
-	}
+    switch (error) {
+    case kAudioServicesNoError:
+        return paNoError;
+    case kAudioFormatUnspecifiedError:
+        errorText = "Unspecified Audio Format Error";
+        result = paInternalError;
+        break;
+    case kAudioFormatUnknownFormatError:
+        errorText = "Audio Format: Unknown Format Error";
+        result = paInternalError;
+        break;
+    case kAudioFormatBadPropertySizeError:
+        errorText = "Audio Format: Bad Property Size";
+        result = paInternalError;
+        break;
+    case kAudioFormatUnsupportedPropertyError:
+        errorText = "Audio Format: Unsupported Property Error";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InvalidProperty:
+        errorText = "Audio Unit: Invalid Property";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InvalidParameter:
+        errorText = "Audio Unit: Invalid Parameter";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_NoConnection:
+        errorText = "Audio Unit: No Connection";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_FailedInitialization:
+        errorText = "Audio Unit: Initialization Failed";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_TooManyFramesToProcess:
+        errorText = "Audio Unit: Too Many Frames";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_IllegalInstrument:
+        errorText = "Audio Unit: Illegal Instrument";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InstrumentTypeNotFound:
+        errorText = "Audio Unit: Instrument Type Not Found";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InvalidFile:
+        errorText = "Audio Unit: Invalid File";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_UnknownFileType:
+        errorText = "Audio Unit: Unknown File Type";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_FileNotSpecified:
+        errorText = "Audio Unit: File Not Specified";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_FormatNotSupported:
+        errorText = "Audio Unit: Format Not Supported";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_Uninitialized:
+        errorText = "Audio Unit: Unitialized";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InvalidScope:
+        errorText = "Audio Unit: Invalid Scope";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_PropertyNotWritable:
+        errorText = "Audio Unit: PropertyNotWritable";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InvalidPropertyValue:
+        errorText = "Audio Unit: Invalid Property Value";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_PropertyNotInUse:
+        errorText = "Audio Unit: Property Not In Use";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_Initialized:
+        errorText = "Audio Unit: Initialized";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_InvalidOfflineRender:
+        errorText = "Audio Unit: Invalid Offline Render";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_Unauthorized:
+        errorText = "Audio Unit: Unauthorized";
+        result = paInternalError;
+        break;
+    case kAudioUnitErr_CannotDoInCurrentContext:
+        errorText = "Audio Unit: cannot do in current context";
+        result = paInternalError;
+        break;
+    default:
+        errorText = "Unknown Error";
+        result = paInternalError;
+        break;
+    }
 
-	if (isError)
-		errorType = "Error";
-	else
-		errorType = "Warning";
+    if (isError)
+        errorType = "Error";
+    else
+        errorType = "Warning";
 
-	char str[20];
+    char str[20];
 
-	/* see if it appears to be a 4-char-code */
-	*(UInt32 *) (str + 1) = CFSwapInt32HostToBig(error);
+    /* see if it appears to be a 4-char-code */
+    *(UInt32 *) (str + 1) = CFSwapInt32HostToBig(error);
 
-	if (isprint(str[1]) && isprint(str[2]) && isprint(str[3]) && isprint(str[4])) {
-		str[0] = str[5] = '\'';
-		str[6] = '\0';
-	} else {
-		/* no, format it as an integer */
-		snprintf(str, sizeof(str), "%d", (int)error);
-	}
+    if (isprint(str[1]) && isprint(str[2]) && isprint(str[3]) && isprint(str[4])) {
+        str[0] = str[5] = '\'';
+        str[6] = '\0';
+    } else {
+        /* no, format it as an integer */
+        snprintf(str, sizeof(str), "%d", (int)error);
+    }
 
-	PaUtil_SetLastHostErrorInfo(paCoreAudio, error, errorText);
+    PaUtil_SetLastHostErrorInfo(paCoreAudio, error, errorText);
 
-	return (result);
+    return (result);
 }

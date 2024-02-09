@@ -15,7 +15,7 @@
  * Olivier Tristan for feedback and testing
  * Glenn Zelniker and Z-Systems engineering for sponsoring the Blocking I/O
  * interface.
- * 
+ *
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
@@ -41,13 +41,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -76,7 +76,7 @@
 #define MAX(a, b)  (((a)<(b))?(b):(a))
 #endif
 
-#define ERR(ios_error) PaIosCore_SetError(ios_error, __LINE__, 1 ) 
+#define ERR(ios_error) PaIosCore_SetError(ios_error, __LINE__, 1 )
 #define WARNING(ios_error) PaIosCore_SetError(ios_error, __LINE__, 0 )
 
 
@@ -114,8 +114,8 @@
 # define VVDBUG(MSG)
 #endif
 
-#define	UNIX_ERR(err) \
-	PaIosCore_SetUnixError(err, __LINE__)
+#define UNIX_ERR(err) \
+    PaIosCore_SetUnixError(err, __LINE__)
 
 PaError PaIosCore_SetUnixError(int err, int line);
 PaError PaIosCore_SetError(OSStatus error, int line, int isError);

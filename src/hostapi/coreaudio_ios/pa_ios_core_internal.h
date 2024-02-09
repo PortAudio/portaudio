@@ -15,7 +15,7 @@
  * Olivier Tristan for feedback and testing
  * Glenn Zelniker and Z-Systems engineering for sponsoring the Blocking I/O
  * interface.
- * 
+ *
  *
  * Based on the Open Source API proposed by Ross Bencina
  * Copyright (c) 1999-2002 Ross Bencina, Phil Burk
@@ -41,13 +41,13 @@
  */
 
 /*
- * The text above constitutes the entire PortAudio license; however, 
+ * The text above constitutes the entire PortAudio license; however,
  * the PortAudio community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
- * they can be incorporated into the canonical version. It is also 
- * requested that these non-binding requests be included along with the 
+ * they can be incorporated into the canonical version. It is also
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
@@ -89,7 +89,7 @@ PaError PaIosCore_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiInd
 }
 #endif /* __cplusplus */
 
-#define	RING_BUFFER_ADVANCE_DENOMINATOR 4
+#define RING_BUFFER_ADVANCE_DENOMINATOR 4
 
 PaError ReadStream(PaStream* stream, void *buffer, unsigned long frames);
 PaError WriteStream(PaStream* stream, const void *buffer, unsigned long frames);
@@ -140,21 +140,21 @@ typedef struct PaIosCoreStream
     AudioTimeStamp startTime;
     volatile uint32_t xrunFlags; /* PaStreamCallbackFlags*/
     volatile enum {
-       STOPPED          = 0, /* playback is completely stopped,
-                                and the user has called StopStream(). */
-       CALLBACK_STOPPED = 1, /* callback has requested stop,
-                                but user has not yet called StopStream(). */
-       STOPPING         = 2, /* The stream is in the process of closing
-                                because the user has called StopStream.
-                                This state is just used internally;
-                                externally it is indistinguishable from
-                                ACTIVE.*/
-       ACTIVE           = 3  /* The stream is active and running. */
+        STOPPED          = 0, /* playback is completely stopped,
+                                 and the user has called StopStream(). */
+        CALLBACK_STOPPED = 1, /* callback has requested stop,
+                                 but user has not yet called StopStream(). */
+        STOPPING         = 2, /* The stream is in the process of closing
+                                 because the user has called StopStream.
+                                 This state is just used internally;
+                                 externally it is indistinguishable from
+                                 ACTIVE.*/
+        ACTIVE           = 3  /* The stream is active and running. */
     } state;
     double sampleRate;
     PaIosCoreDeviceProperties  inputProperties;
     PaIosCoreDeviceProperties  outputProperties;
-    
+
     /* data updated by main thread and notifications, protected by timingInformationMutex */
     int timingInformationMutexIsInitialized;
     pthread_mutex_t timingInformationMutex;
@@ -163,7 +163,7 @@ typedef struct PaIosCoreStream
     Float64 timestampOffsetCombined;
     Float64 timestampOffsetInputDevice;
     Float64 timestampOffsetOutputDevice;
-	
+
     /* Offsets in seconds to be applied to Apple timestamps to convert them to PA timestamps.
      * While the io proc is active, the following values are only accessed and manipulated by the ioproc */
     Float64 timestampOffsetCombined_ioProcCopy;
