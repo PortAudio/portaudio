@@ -240,7 +240,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     /*
      * When stopped we should stop feeding or recording right away
      */
-    if( stream->isStopped )
+    if( stream->isStopped && stream->pulseaudioIsStopped )
     {
         return paStreamIsStopped;
     }
@@ -250,7 +250,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
      * starting Portaudio stream or Portaudio stream
      * is stopped
      */
-    if( !stream->pulseaudioIsActive )
+    if( !stream->isActive && stream->pulseaudioIsActive )
     {
         if(stream->outputStream)
         {
@@ -408,7 +408,7 @@ void PaPulseAudio_StreamRecordCb( pa_stream * s,
 {
     PaPulseAudio_Stream *pulseaudioStream = (PaPulseAudio_Stream *) userdata;
 
-    if( !pulseaudioStream->pulseaudioIsActive )
+    if( pulseaudioStream->isActive && !pulseaudioStream->pulseaudioIsActive )
     {
         pulseaudioStream->pulseaudioIsActive = 1;
         pulseaudioStream->pulseaudioIsStopped= 0;
@@ -436,7 +436,7 @@ void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
 {
     PaPulseAudio_Stream *pulseaudioStream = (PaPulseAudio_Stream *) userdata;
 
-    if( !pulseaudioStream->inputStream && !pulseaudioStream->pulseaudioIsActive )
+    if( !pulseaudioStream->inputStream && (pulseaudioStream->isActive && !pulseaudioStream->pulseaudioIsActive) )
     {
         pulseaudioStream->pulseaudioIsActive = 1;
         pulseaudioStream->pulseaudioIsStopped = 0;
@@ -508,14 +508,11 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY )
     {
         PaPulseAudio_Lock(stream->mainloop);
-        /**
-         * Pause stream so it stops faster
-         */
+        /* Pause stream so it stops faster */
         pulseaudioOperation = pa_stream_cork( stream->outputStream,
                                               1,
                                               PaPulseAudio_CorkSuccessCb,
                                               stream );
-
         PaPulseAudio_UnLock( stream->mainloop );
 
         while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
@@ -523,7 +520,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
             pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
             waitLoop ++;
 
-            if(waitLoop > 250)
+            if(waitLoop > 256)
             {
                 break;
             }
@@ -543,15 +540,11 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && pa_stream_get_state( stream->inputStream ) == PA_STREAM_READY )
     {
         PaPulseAudio_Lock( stream->mainloop );
-
-        /**
-         * Pause stream so it stops so it stops faster
-         */
+        /* Pause stream so it stops so it stops faster */
         pulseaudioOperation = pa_stream_cork( stream->inputStream,
                                               1,
                                               PaPulseAudio_CorkSuccessCb,
                                               stream );
-
         PaPulseAudio_UnLock( stream->mainloop );
 
         while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
@@ -559,7 +552,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
             pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
             waitLoop ++;
 
-            if(waitLoop > 250)
+            if(waitLoop > 256)
             {
                 break;
             }
@@ -736,10 +729,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                                                     inputDevice]) );
         }
 
-        pa_stream_set_read_callback( stream->inputStream,
-                                     PaPulseAudio_StreamRecordCb,
-                                     stream );
-
         PaDeviceIndex defaultInputDevice;
         PaError result = PaUtil_DeviceIndexToHostApiDeviceIndex(
                 &defaultInputDevice,
@@ -761,9 +750,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
             /* Zero means success */
             if( pa_stream_connect_record( stream->inputStream,
-                                            pulseaudioName,
-                                            &stream->inputBufferAttr,
-                                            pulseaudioStreamFlags ) )
+                                          pulseaudioName,
+                                          &stream->inputBufferAttr,
+                                          pulseaudioStreamFlags ) )
             {
                 PA_DEBUG( ("Portaudio %s: Can't read audio!\n",
                           __FUNCTION__) );
@@ -795,10 +784,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
          */
         stream->outputBufferAttr.tlength = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->outputSampleSpec );
-
-        pa_stream_set_write_callback( stream->outputStream,
-                                      PaPulseAudio_StreamPlaybackCb,
-                                      stream );
 
         /* Just keep on trucking if we are just corked */
         if( pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY
@@ -890,6 +875,26 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     /* Stream is now active */
     stream->isActive = 1;
     stream->isStopped = 0;
+
+    /* Start callback here after we can be
+     * sure that everything is correct
+     */
+    if( stream->inputStream )
+    {
+        pa_stream_set_read_callback( stream->inputStream,
+                                     PaPulseAudio_StreamRecordCb,
+                                     stream );
+    }
+
+    /* Output playback cb is not needed it there
+     * is feeding reading cb
+     */
+    if( stream->outputStream && !stream->inputStream )
+    {
+        pa_stream_set_write_callback( stream->outputStream,
+                                      PaPulseAudio_StreamPlaybackCb,
+                                      stream );
+    }
 
     /* Allways unlock.. so we don't get locked */
     startstreamcb_end:
