@@ -106,11 +106,8 @@
  */
 #define paVersion  paMakeVersionNumber(paVersionMajor, paVersionMinor, paVersionSubMinor)
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-
-#define PA_VERSION_STRING_ TOSTRING(paVersionMajor) "." TOSTRING(paVersionMinor) "." TOSTRING(paVersionSubMinor)
-#define PA_VERSION_TEXT_   "PortAudio V" PA_VERSION_STRING_ "-devel, revision " TOSTRING(PA_GIT_REVISION)
+#define PA_VERSION_STRING_ PA_STRINGIZE(paVersionMajor) "." PA_STRINGIZE(paVersionMinor) "." PA_STRINGIZE(paVersionSubMinor)
+#define PA_VERSION_TEXT_   "PortAudio V" PA_VERSION_STRING_ "-devel, revision " PA_STRINGIZE(PA_GIT_REVISION)
 
 int Pa_GetVersion( void )
 {
@@ -126,7 +123,7 @@ static PaVersionInfo versionInfo_ = {
     /*.versionMajor =*/ paVersionMajor,
     /*.versionMinor =*/ paVersionMinor,
     /*.versionSubMinor =*/ paVersionSubMinor,
-    /*.versionControlRevision =*/ TOSTRING(PA_GIT_REVISION),
+    /*.versionControlRevision =*/ PA_STRINGIZE(PA_GIT_REVISION),
     /*.versionText =*/ PA_VERSION_TEXT_
 };
 
@@ -157,6 +154,7 @@ static PaUtilHostApiRepresentation **hostApis_ = 0;
 static int hostApisCount_ = 0;
 static int defaultHostApiIndex_ = 0;
 static int initializationCount_ = 0;
+static int initializing_ = 0;
 static int deviceCount_ = 0;
 
 PaUtilStreamRepresentation *firstOpenStream_ = NULL;
@@ -204,7 +202,7 @@ static PaError InitializeHostApis( void )
 
     initializerCount = CountHostApiInitializers();
 
-    hostApis_ = (PaUtilHostApiRepresentation**)PaUtil_AllocateMemory(
+    hostApis_ = (PaUtilHostApiRepresentation**)PaUtil_AllocateZeroInitializedMemory(
             sizeof(PaUtilHostApiRepresentation*) * initializerCount );
     if( !hostApis_ )
     {
@@ -363,8 +361,21 @@ PaError Pa_Initialize( void )
         ++initializationCount_;
         result = paNoError;
     }
+    else if( initializing_ )
+    {
+        // a concurrent initialization is already running
+        PA_DEBUG(("Attempting to re-enter Pa_Initialize(), aborting!\n"));
+        result = paCanNotInitializeRecursively;
+    }
     else
     {
+        // set initializing_ here to
+        // let recursive calls execute the if branch above.
+        // This can happen if a driver like FlexAsio itself uses portaudio
+        // and avoids a stack overflow in the user application.
+        // https://github.com/PortAudio/portaudio/issues/766
+        initializing_ = 1;
+
         PA_VALIDATE_TYPE_SIZES;
         PA_VALIDATE_ENDIANNESS;
 
@@ -374,6 +385,8 @@ PaError Pa_Initialize( void )
         result = InitializeHostApis();
         if( result == paNoError )
             ++initializationCount_;
+
+        initializing_ = 0;
     }
 
     PA_LOGAPI_EXIT_PAERROR( "Pa_Initialize", result );
@@ -456,6 +469,7 @@ const char *Pa_GetErrorText( PaError errorCode )
     case paCanNotWriteToAnInputOnlyStream:      result = "Can't write to an input only stream"; break;
     case paIncompatibleStreamHostApi: result = "Incompatible stream host API"; break;
     case paBadBufferPtr:             result = "Bad buffer pointer"; break;
+    case paCanNotInitializeRecursively: result = "PortAudio can not be initialized recursively"; break;
     default:
         if( errorCode > 0 )
             result = "Invalid error code (value greater than zero)";
@@ -865,7 +879,7 @@ static int SampleFormatIsValid( PaSampleFormat format )
         - if supplied its hostApi field matches the output device's host Api
 
     double sampleRate
-        - is not an 'absurd' rate (less than 1000. or greater than 384000.)
+        - is not an 'absurd' rate (less than 1000. or greater than 768000.)
         - sampleRate is NOT validated against device capabilities
 
     PaStreamFlags streamFlags
@@ -1006,7 +1020,7 @@ static PaError ValidateOpenStreamParameters(
 
 
     /* Check for absurd sample rates. */
-    if( (sampleRate < 1000.0) || (sampleRate > 384000.0) )
+    if( (sampleRate < 1000.0) || (sampleRate > 768000.0) )
         return paInvalidSampleRate;
 
     if( ((streamFlags & ~paPlatformSpecificFlags) & ~(paClipOff | paDitherOff | paNeverDropInput | paPrimeOutputBuffersUsingStreamCallback ) ) != 0 )

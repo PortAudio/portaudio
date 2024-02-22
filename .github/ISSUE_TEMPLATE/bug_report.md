@@ -32,3 +32,5 @@ Error messages or logs longer than a page should be attached as a .txt file.
 
 **Additional context**
 Add any other context about the problem here.
+
+Note: PortAudio is a community supported project. If you have a solution, please create a Pull Request for us to consider.

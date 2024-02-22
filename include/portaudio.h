@@ -151,7 +151,8 @@ typedef enum PaErrorCode
     paCanNotReadFromAnOutputOnlyStream,
     paCanNotWriteToAnInputOnlyStream,
     paIncompatibleStreamHostApi,
-    paBadBufferPtr
+    paBadBufferPtr,
+    paCanNotInitializeRecursively
 } PaErrorCode;
 
 
@@ -287,7 +288,10 @@ typedef enum PaHostApiTypeId
     paWDMKS=11,
     paJACK=12,
     paWASAPI=13,
-    paAudioScienceHPI=14
+    paAudioScienceHPI=14,
+    paAudioIO=15,
+    paPulseAudio=16,
+    paSndio=17
 } PaHostApiTypeId;
 
 
@@ -916,7 +920,7 @@ PaError Pa_OpenStream( PaStream** stream,
  @param numOutputChannels The number of channels of sound to be delivered to the
  stream callback or passed to Pa_WriteStream. It can range from 1 to the value
  of maxOutputChannels in the PaDeviceInfo record for the default output device.
- If 0 the stream is opened as an output-only stream.
+ If 0 the stream is opened as an input-only stream.
 
  @param sampleFormat The sample format of both the input and output buffers
  provided to the callback or passed to and from Pa_ReadStream and Pa_WriteStream.
@@ -1129,6 +1133,10 @@ double Pa_GetStreamCpuLoad( PaStream* stream );
  the entire buffer has been filled - this may involve waiting for the operating
  system to supply the data.
 
+ Reading from a stream that is stopped is not currently supported. In particular,
+ it is not possible to drain the read buffer by calling Pa_ReadStream after
+ calling Pa_StopStream.
+
  @param stream A pointer to an open stream previously created with Pa_OpenStream.
 
  @param buffer A pointer to a buffer of sample frames. The buffer contains
@@ -1154,6 +1162,10 @@ PaError Pa_ReadStream( PaStream* stream,
 /** Write samples to an output stream. This function doesn't return until the
  entire buffer has been written - this may involve waiting for the operating
  system to consume the data.
+
+ Writing to a stream that is stopped is not currently supported. In particular,
+ it is not possible to prefill the write buffer by calling Pa_WriteStream
+ prior to calling Pa_StartStream.
 
  @param stream A pointer to an open stream previously created with Pa_OpenStream.
 
@@ -1181,6 +1193,9 @@ PaError Pa_WriteStream( PaStream* stream,
 /** Retrieve the number of frames that can be read from the stream without
  waiting.
 
+ When the stream is stopped the return value of Pa_GetStreamReadAvailable is not
+ defined.
+
  @return Returns a non-negative value representing the maximum number of frames
  that can be read from the stream without blocking or busy waiting or, a
  PaErrorCode (which are always negative) if PortAudio is not initialized or an
@@ -1191,6 +1206,9 @@ signed long Pa_GetStreamReadAvailable( PaStream* stream );
 
 /** Retrieve the number of frames that can be written to the stream without
  waiting.
+
+ When the stream is stopped the return value of Pa_GetStreamWriteAvailable is not
+ defined.
 
  @return Returns a non-negative value representing the maximum number of frames
  that can be written to the stream without blocking or busy waiting or, a

@@ -215,7 +215,7 @@ float MaximumAbsDifference( float* sourceBuffer, float* referenceBuffer, int cou
     return result;
 }
 
-int main( const char **argv, int argc )
+int main( int argc, const char **argv )
 {
     PaUtilTriangularDitherGenerator ditherState;
     PaUtilConverter *converter;
@@ -227,6 +227,9 @@ int main( const char **argv, int argc )
     int passFailMatrix[SAMPLE_FORMAT_COUNT][SAMPLE_FORMAT_COUNT]; // [source][destination]
     float noiseAmplitudeMatrix[SAMPLE_FORMAT_COUNT][SAMPLE_FORMAT_COUNT]; // [source][destination]
     float amp;
+
+    (void) argc; /* Unused. */
+    (void) argv; /* Unused. */
 
 #define FLAG_COMBINATION_COUNT (4)
     PaStreamFlags flagCombinations[FLAG_COMBINATION_COUNT] = { paNoFlag, paClipOff, paDitherOff, paClipOff | paDitherOff };
