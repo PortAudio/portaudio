@@ -63,6 +63,7 @@
 #include <jack/jack.h>
 
 #include "pa_util.h"
+#include "pa_pthread_util.h"
 #include "pa_hostapi.h"
 #include "pa_stream.h"
 #include "pa_process.h"
@@ -168,6 +169,7 @@ typedef struct
 
     pthread_mutex_t mtx;
     pthread_cond_t cond;
+    PaUtilClockId condClockId;
     unsigned long inputBase, outputBase;
 
     /* For dealing with the process thread */
@@ -758,6 +760,7 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
     int activated = 0;
     jack_status_t jackStatus = 0;
     *hostApi = NULL;    /* Initialize to NULL */
+    pthread_condattr_t cattr;
 
     UNLESS( jackHostApi = (PaJackHostApiRepresentation*)
         PaUtil_AllocateZeroInitializedMemory( sizeof(PaJackHostApiRepresentation) ), paInsufficientMemory );
@@ -765,7 +768,10 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
 
     mainThread_ = pthread_self();
     ASSERT_CALL( pthread_mutex_init( &jackHostApi->mtx, NULL ), 0 );
-    ASSERT_CALL( pthread_cond_init( &jackHostApi->cond, NULL ), 0 );
+
+    ASSERT_CALL( pthread_condattr_init( &cattr ), 0 );
+    jackHostApi->condClockId = PaPthreadUtil_NegotiateCondAttrClock( &cattr );
+    ASSERT_CALL( pthread_cond_init( &jackHostApi->cond, &cattr), 0 );
 
     /* Try to become a client of the JACK server.  If we cannot do
      * this, then this API cannot be used.
@@ -1049,13 +1055,20 @@ static PaError WaitCondition( PaJackHostApiRepresentation *hostApi )
 {
     PaError result = paNoError;
     int err = 0;
-    PaTime pt = PaUtil_GetTime();
     struct timespec ts;
 
-    ts.tv_sec = (time_t) floor( pt + 10 * 60 /* 10 minutes */ );
-    ts.tv_nsec = (long) ((pt - floor( pt )) * 1000000000);
-    /* XXX: Best enclose in loop, in case of spurious wakeups? */
-    err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
+    if( PaPthreadUtil_GetTime( hostApi->condClockId, &ts ) == 0 )
+    {
+        ts.tv_sec += 10 * 60; /* 10 minutes */
+
+        /* XXX: Best enclose in loop, in case of spurious wakeups? */
+        err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
+    }
+    else
+    {
+        /* XXX: Best enclose in loop, in case of spurious wakeups? */
+        err = pthread_cond_wait( &hostApi->cond, &hostApi->mtx );
+    }
 
     /* Make sure we didn't time out */
     UNLESS( err != ETIMEDOUT, paTimedOut );

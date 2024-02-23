@@ -16238,7 +16238,7 @@ else
 fi
 
         CFLAGS="$CFLAGS $mac_arches $mac_sysroot $mac_version_min"
-        OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o"
+        OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/os/unix/pa_pthread_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o"
         PADLL="libportaudio.dylib"
         ;;
 
@@ -16597,7 +16597,7 @@ fi
               ;;
         esac
 
-        OTHER_OBJS="$OTHER_OBJS src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o"
+        OTHER_OBJS="$OTHER_OBJS src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/os/unix/pa_pthread_util.o"
 esac
 CFLAGS="$CFLAGS $THREAD_CFLAGS"
 
