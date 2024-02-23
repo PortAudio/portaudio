@@ -1304,17 +1304,6 @@ PaError PaAsio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
                 continue;
             }
 
-            // Blacklist dynamic loading of JackRouter ASIO driver by 64-bit applications.
-            // This causes an instant crash due to a long-standing address translation error.
-            //   https://github.com/jackaudio/jack2/issues/332
-            //   https://github.com/jackaudio/jack2/issues/275
-
-            if (sizeof(void*)>4 && strcmp (names[i],"JackRouter") == 0)
-            {
-                PA_DEBUG(("BLACKLISTED!!!\n"));
-                continue;
-            }
-
 
             if( IsDebuggerPresent_ && IsDebuggerPresent_() )
             {
