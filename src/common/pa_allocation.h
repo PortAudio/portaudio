@@ -80,11 +80,12 @@ PaUtilAllocationGroup* PaUtil_CreateAllocationGroup( void );
 */
 void PaUtil_DestroyAllocationGroup( PaUtilAllocationGroup* group );
 
-/** Allocate a block of memory though an allocation group.
+/** Allocate a block of memory through the specified allocation group.
+The allocated block is zero-initialized.
 */
-void* PaUtil_GroupAllocateMemory( PaUtilAllocationGroup* group, long size );
+void* PaUtil_GroupAllocateZeroInitializedMemory( PaUtilAllocationGroup* group, long size );
 
-/** Free a block of memory that was previously allocated though an allocation
+/** Free a block of memory that was allocated through the specified allocation
  group. Calling this function is a relatively time consuming operation.
  Under normal circumstances clients should call PaUtil_FreeAllAllocations to
  free all allocated blocks simultaneously.

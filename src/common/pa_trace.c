@@ -120,7 +120,7 @@ static const unsigned kMagik = 0xcafebabe;
 
 int PaUtil_InitializeHighSpeedLog( LogHandle* phLog, unsigned maxSizeInBytes )
 {
-    PaHighPerformanceLog* pLog = (PaHighPerformanceLog*)PaUtil_AllocateMemory(sizeof(PaHighPerformanceLog));
+    PaHighPerformanceLog* pLog = (PaHighPerformanceLog*)PaUtil_AllocateZeroInitializedMemory(sizeof(PaHighPerformanceLog));
     if (pLog == 0)
     {
         return paInsufficientMemory;
@@ -128,7 +128,7 @@ int PaUtil_InitializeHighSpeedLog( LogHandle* phLog, unsigned maxSizeInBytes )
     assert(phLog != 0);
     *phLog = pLog;
 
-    pLog->data = (char*)PaUtil_AllocateMemory(maxSizeInBytes);
+    pLog->data = (char*)PaUtil_AllocateZeroInitializedMemory(maxSizeInBytes);
     if (pLog->data == 0)
     {
         PaUtil_FreeMemory(pLog);

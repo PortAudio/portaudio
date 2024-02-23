@@ -50,7 +50,7 @@
 #include "pa_debugprint.h"
 
 #include "pa_win_coinitialize.h"
-
+#include "pa_win_util.h"
 
 #if (defined(WIN32) && (defined(_MSC_VER) && (_MSC_VER >= 1200))) && !defined(_WIN32_WCE) && !(defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)) /* MSC version 6 and above */
 #pragma comment( lib, "ole32.lib" )
@@ -88,20 +88,7 @@ PaError PaWinUtil_CoInitialize( PaHostApiTypeId hostApiType, PaWinUtilComInitial
         if( hr == E_OUTOFMEMORY )
             return paInsufficientMemory;
 
-        {
-            char *lpMsgBuf;
-            FormatMessage(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-                NULL,
-                hr,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                (LPTSTR) &lpMsgBuf,
-                0,
-                NULL
-            );
-            PaUtil_SetLastHostErrorInfo( hostApiType, hr, lpMsgBuf );
-            LocalFree( lpMsgBuf );
-        }
+        PaWinUtil_SetLastSystemErrorInfo( hostApiType, hr );
 
         return paUnanticipatedHostError;
     }

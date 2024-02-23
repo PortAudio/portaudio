@@ -36,10 +36,13 @@ Please feel free to join. See http://www.portaudio.com for details.
     src/hostapi/alsa        = Advanced Linux Sound Architecture (ALSA)
     src/hostapi/asihpi      = AudioScience HPI
     src/hostapi/asio        = ASIO for Windows and Macintosh
+    src/hostapi/audioio     = /dev/audio (Solaris/NetBSD Audio)
     src/hostapi/coreaudio   = Macintosh Core Audio for OS X
     src/hostapi/dsound      = Windows Direct Sound
     src/hostapi/jack        = JACK Audio Connection Kit
     src/hostapi/oss         = Unix Open Sound System (OSS)
+    src/hostapi/pulseaudio  = Sound system for POSIX OSes
+    src/hostapi/sndio       = Small audio and MIDI framework (sndio)
     src/hostapi/wasapi      = Windows Vista WASAPI
     src/hostapi/wdmks       = Windows WDM Kernel Streaming
     src/hostapi/wmme        = Windows MultiMedia Extensions (MME)

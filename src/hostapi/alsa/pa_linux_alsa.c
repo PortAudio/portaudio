@@ -220,8 +220,10 @@ _PA_DEFINE_FUNC(snd_config_update_free_global);
 _PA_DEFINE_FUNC(snd_pcm_status);
 _PA_DEFINE_FUNC(snd_pcm_status_sizeof);
 _PA_DEFINE_FUNC(snd_pcm_status_get_tstamp);
+_PA_DEFINE_FUNC(snd_pcm_status_get_htstamp);
 _PA_DEFINE_FUNC(snd_pcm_status_get_state);
 _PA_DEFINE_FUNC(snd_pcm_status_get_trigger_tstamp);
+_PA_DEFINE_FUNC(snd_pcm_status_get_trigger_htstamp);
 _PA_DEFINE_FUNC(snd_pcm_status_get_delay);
 #define alsa_snd_pcm_status_alloca(ptr) __alsa_snd_alloca(ptr, snd_pcm_status)
 
@@ -239,7 +241,7 @@ _PA_DEFINE_FUNC(snd_output_stdio_attach);
 
 /* Redefine 'PA_ALSA_PATHNAME' to a different Alsa library name if desired. */
 #ifndef PA_ALSA_PATHNAME
-    #define PA_ALSA_PATHNAME "libasound.so"
+    #define PA_ALSA_PATHNAME "libasound.so.2"
 #endif
 static const char *g_AlsaLibName = PA_ALSA_PATHNAME;
 
@@ -499,8 +501,10 @@ static int PaAlsa_LoadLibrary()
     _PA_LOAD_FUNC(snd_pcm_status);
     _PA_LOAD_FUNC(snd_pcm_status_sizeof);
     _PA_LOAD_FUNC(snd_pcm_status_get_tstamp);
+    _PA_LOAD_FUNC(snd_pcm_status_get_htstamp);
     _PA_LOAD_FUNC(snd_pcm_status_get_state);
     _PA_LOAD_FUNC(snd_pcm_status_get_trigger_tstamp);
+    _PA_LOAD_FUNC(snd_pcm_status_get_trigger_htstamp);
     _PA_LOAD_FUNC(snd_pcm_status_get_delay);
 
     _PA_LOAD_FUNC(snd_card_next);
@@ -571,7 +575,7 @@ static void PaAlsa_CloseLibrary()
             { \
                 PaUtil_SetLastHostErrorInfo( paALSA, __pa_unsure_error_id, alsa_snd_strerror( __pa_unsure_error_id ) ); \
             } \
-            PaUtil_DebugPrint( "Expression '" #expr "' failed in '" __FILE__ "', line: " STRINGIZE( __LINE__ ) "\n" ); \
+            PaUtil_DebugPrint( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" ); \
             if( (code) == paUnanticipatedHostError ) \
                 PA_DEBUG(( "Host error description: %s\n", alsa_snd_strerror( __pa_unsure_error_id ) )); \
             result = (code); \
@@ -745,7 +749,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     if (!PaAlsa_LoadLibrary())
         return paHostApiNotFound;
 
-    PA_UNLESS( alsaHostApi = (PaAlsaHostApiRepresentation*) PaUtil_AllocateMemory(
+    PA_UNLESS( alsaHostApi = (PaAlsaHostApiRepresentation*) PaUtil_AllocateZeroInitializedMemory(
                 sizeof(PaAlsaHostApiRepresentation) ), paInsufficientMemory );
     PA_UNLESS( alsaHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
     alsaHostApi->hostApiIndex = hostApiIndex;
@@ -839,7 +843,8 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     PaError result = paNoError;
     snd_pcm_hw_params_t *hwParams;
     snd_pcm_uframes_t alsaBufferFrames, alsaPeriodFrames;
-    unsigned int minChans, maxChans;
+    unsigned int minChans = 0;
+    unsigned int maxChans = 0;
     int* minChannels, * maxChannels;
     double * defaultLowLatency, * defaultHighLatency, * defaultSampleRate =
         &devInfo->baseDeviceInfo.defaultSampleRate;
@@ -897,9 +902,22 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
 
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_min( hwParams, &minChans ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_max( hwParams, &maxChans ), paUnanticipatedHostError );
-    assert( maxChans <= INT_MAX );
-    assert( maxChans > 0 );    /* Weird linking issue could cause wrong version of ALSA symbols to be called,
+    const unsigned int kReasonableMaxChannels = 1024;
+    if( maxChans > kReasonableMaxChannels )
+    {
+        PA_DEBUG(( "%s: maxChans = %u, which is unreasonably high\n", __FUNCTION__, maxChans ));
+        result = paUnanticipatedHostError;
+        goto error;
+    }
+    else if( maxChans == 0 )
+    {
+        /* Weird linking issue could cause wrong version of ALSA symbols to be called,
                                    resulting in zeroed values */
+        PA_DEBUG(( "%s: minChans = %u, maxChans = %u, linking problem?\n",
+                __FUNCTION__, minChans, maxChans ));
+        result = paUnanticipatedHostError;
+        goto error;
+    }
 
     /* XXX: Limit to sensible number (ALSA plugins accept a crazy amount of channels)? */
     if( isPlug && maxChans > 128 )
@@ -1052,7 +1070,7 @@ static PaError PaAlsa_StrDup( PaAlsaHostApiRepresentation *alsaApi,
 
     /* PA_DEBUG(("PaStrDup %s %d\n", src, len)); */
 
-    PA_UNLESS( *dst = (char *)PaUtil_GroupAllocateMemory( alsaApi->allocations, len ),
+    PA_UNLESS( *dst = (char *)PaUtil_GroupAllocateZeroInitializedMemory( alsaApi->allocations, len ),
             paInsufficientMemory );
     strncpy( *dst, src, len );
 
@@ -1280,7 +1298,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
         char *cardName;
         int devIdx = -1;
         snd_ctl_t *ctl;
-        char buf[50];
+        char buf[66];
 
         snprintf( alsaCardName, sizeof (alsaCardName), "hw:%d", cardIdx );
 
@@ -1328,7 +1346,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
 
             /* The length of the string written by snprintf plus terminating 0 */
             len = snprintf( NULL, 0, "%s: %s (%s)", cardName, infoName, buf ) + 1;
-            PA_UNLESS( deviceName = (char *)PaUtil_GroupAllocateMemory( alsaApi->allocations, len ),
+            PA_UNLESS( deviceName = (char *)PaUtil_GroupAllocateZeroInitializedMemory( alsaApi->allocations, len ),
                     paInsufficientMemory );
             snprintf( deviceName, len, "%s: %s (%s)", cardName, infoName, buf );
 
@@ -1393,10 +1411,10 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
             }
             PA_DEBUG(( "%s: Found plugin [%s] of type [%s]\n", __FUNCTION__, idStr, tpStr ));
 
-            PA_UNLESS( alsaDeviceName = (char*)PaUtil_GroupAllocateMemory( alsaApi->allocations,
+            PA_UNLESS( alsaDeviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory( alsaApi->allocations,
                                                             strlen(idStr) + 6 ), paInsufficientMemory );
             strcpy( alsaDeviceName, idStr );
-            PA_UNLESS( deviceName = (char*)PaUtil_GroupAllocateMemory( alsaApi->allocations,
+            PA_UNLESS( deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory( alsaApi->allocations,
                                                             strlen(idStr) + 1 ), paInsufficientMemory );
             strcpy( deviceName, idStr );
 
@@ -1430,11 +1448,11 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
         PA_DEBUG(( "%s: Iterating over ALSA plugins failed: %s\n", __FUNCTION__, alsa_snd_strerror( res ) ));
 
     /* allocate deviceInfo memory based on the number of devices */
-    PA_UNLESS( baseApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateMemory(
+    PA_UNLESS( baseApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory(
             alsaApi->allocations, sizeof(PaDeviceInfo*) * (numDeviceNames) ), paInsufficientMemory );
 
     /* allocate all device info structs in a contiguous block */
-    PA_UNLESS( deviceInfoArray = (PaAlsaDeviceInfo*)PaUtil_GroupAllocateMemory(
+    PA_UNLESS( deviceInfoArray = (PaAlsaDeviceInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
             alsaApi->allocations, sizeof(PaAlsaDeviceInfo) * numDeviceNames ), paInsufficientMemory );
 
     /* Loop over list of cards, filling in info. If a device is deemed unavailable (can't get name),
@@ -1923,7 +1941,7 @@ static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, Pa
     if( !callbackMode && !self->userInterleaved )
     {
         /* Pre-allocate non-interleaved user provided buffers */
-        PA_UNLESS( self->userBuffers = PaUtil_AllocateMemory( sizeof (void *) * self->numUserChannels ),
+        PA_UNLESS( self->userBuffers = PaUtil_AllocateZeroInitializedMemory( sizeof (void *) * self->numUserChannels ),
                 paInsufficientMemory );
     }
 
@@ -2179,7 +2197,7 @@ static PaError PaAlsaStream_Initialize( PaAlsaStream *self, PaAlsaHostApiReprese
 
     assert( self->capture.nfds || self->playback.nfds );
 
-    PA_UNLESS( self->pfds = (struct pollfd*)PaUtil_AllocateMemory( ( self->capture.nfds +
+    PA_UNLESS( self->pfds = (struct pollfd*)PaUtil_AllocateZeroInitializedMemory( ( self->capture.nfds +
                     self->playback.nfds ) * sizeof( struct pollfd ) ), paInsufficientMemory );
 
     PaUtil_InitializeCpuLoadMeasurer( &self->cpuLoadMeasurer, sampleRate );
@@ -2690,7 +2708,7 @@ static PaError PaAlsaStream_DetermineFramesPerBuffer( PaAlsaStream* self, double
     PA_UNLESS( framesPerHostBuffer != 0, paInternalError );
     self->maxFramesPerHostBuffer = framesPerHostBuffer;
 
-    if( !self->playback.canMmap || !accurate )
+    if( (self->playback.pcm && !self->playback.canMmap) || !accurate )
     {
         /* Don't know the exact size per host buffer */
         *hostBufferSizeMode = paUtilBoundedHostBufferSize;
@@ -2838,7 +2856,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         framesPerBuffer = atoi( getenv("PA_ALSA_PERIODSIZE") );
     }
 
-    PA_UNLESS( stream = (PaAlsaStream*)PaUtil_AllocateMemory( sizeof(PaAlsaStream) ), paInsufficientMemory );
+    PA_UNLESS( stream = (PaAlsaStream*)PaUtil_AllocateZeroInitializedMemory( sizeof(PaAlsaStream) ), paInsufficientMemory );
     PA_ENSURE( PaAlsaStream_Initialize( stream, alsaHostApi, inputParameters, outputParameters, sampleRate,
                 framesPerBuffer, callback, streamFlags, userData ) );
 
@@ -3156,6 +3174,28 @@ static PaError IsStreamActive( PaStream *s )
     return stream->isActive;
 }
 
+/** Extract audio/trigger htstamp from status and convert into PaTime (seconds).
+ *
+ * trigger is boolean:  trigger stampstamp vs audio timestamp.  If delay is non-NULL, return delay in
+ * frames.  */
+static PaTime StatusToTime( const snd_pcm_status_t *status, int trigger, snd_pcm_uframes_t* delay )
+{
+    snd_htimestamp_t timestamp;
+    if ( trigger )
+    {
+        alsa_snd_pcm_status_get_trigger_htstamp( status, &timestamp );
+    }
+    else
+    {
+        alsa_snd_pcm_status_get_htstamp( status, &timestamp );
+    }
+    if ( delay )
+    {
+        *delay = alsa_snd_pcm_status_get_delay( status );
+    }
+    return timestamp.tv_sec + ( (PaTime)timestamp.tv_nsec * 1e-9 );
+}
+
 static PaTime GetStreamTime( PaStream *s )
 {
     PaAlsaStream *stream = (PaAlsaStream*)s;
@@ -3179,8 +3219,7 @@ static PaTime GetStreamTime( PaStream *s )
         alsa_snd_pcm_status( stream->playback.pcm, status );
     }
 
-    alsa_snd_pcm_status_get_tstamp( status, &timestamp );
-    return timestamp.tv_sec + (PaTime)timestamp.tv_usec / 1e6;
+    return StatusToTime( status, 0, NULL );
 }
 
 static double GetStreamCpuLoad( PaStream* s )
@@ -3276,7 +3315,7 @@ static PaError PaAlsaStream_HandleXrun( PaAlsaStream *self )
         if( alsa_snd_pcm_status_get_state( st ) == SND_PCM_STATE_XRUN )
         {
             alsa_snd_pcm_status_get_trigger_tstamp( st, &t );
-            self->underrun = now * 1000 - ( (PaTime)t.tv_sec * 1000 + (PaTime)t.tv_usec / 1000 );
+            self->underrun = ( now - StatusToTime( st, 1, NULL ) ) * 1000;
 
             if( !self->playback.canMmap )
             {
@@ -3295,8 +3334,7 @@ static PaError PaAlsaStream_HandleXrun( PaAlsaStream *self )
         alsa_snd_pcm_status( self->capture.pcm, st );
         if( alsa_snd_pcm_status_get_state( st ) == SND_PCM_STATE_XRUN )
         {
-            alsa_snd_pcm_status_get_trigger_tstamp( st, &t );
-            self->overrun = now * 1000 - ((PaTime) t.tv_sec * 1000 + (PaTime) t.tv_usec / 1000);
+            self->overrun = ( now - StatusToTime( st, 1, NULL ) ) * 1000;
 
             if (!self->capture.canMmap)
             {
@@ -3408,37 +3446,29 @@ static void OnExit( void *data )
 
 static void CalculateTimeInfo( PaAlsaStream *stream, PaStreamCallbackTimeInfo *timeInfo )
 {
-    snd_pcm_status_t *capture_status, *playback_status;
-    snd_timestamp_t capture_timestamp, playback_timestamp;
+    snd_pcm_status_t *status;
     PaTime capture_time = 0., playback_time = 0.;
 
-    alsa_snd_pcm_status_alloca( &capture_status );
-    alsa_snd_pcm_status_alloca( &playback_status );
+    alsa_snd_pcm_status_alloca( &status );
 
     if( stream->capture.pcm )
     {
         snd_pcm_sframes_t capture_delay;
 
-        alsa_snd_pcm_status( stream->capture.pcm, capture_status );
-        alsa_snd_pcm_status_get_tstamp( capture_status, &capture_timestamp );
+        alsa_snd_pcm_status( stream->capture.pcm, status );
+        capture_time = StatusToTime( status, 0, &capture_delay );
 
-        capture_time = capture_timestamp.tv_sec +
-            ( (PaTime)capture_timestamp.tv_usec / 1000000.0 );
         timeInfo->currentTime = capture_time;
-
-        capture_delay = alsa_snd_pcm_status_get_delay( capture_status );
-        timeInfo->inputBufferAdcTime = timeInfo->currentTime -
+        timeInfo->inputBufferAdcTime = capture_time -
             (PaTime)capture_delay / stream->streamRepresentation.streamInfo.sampleRate;
     }
     if( stream->playback.pcm )
     {
         snd_pcm_sframes_t playback_delay;
+        PaTime playback_time;
 
-        alsa_snd_pcm_status( stream->playback.pcm, playback_status );
-        alsa_snd_pcm_status_get_tstamp( playback_status, &playback_timestamp );
-
-        playback_time = playback_timestamp.tv_sec +
-            ((PaTime)playback_timestamp.tv_usec / 1000000.0);
+        alsa_snd_pcm_status( stream->playback.pcm, status );
+        playback_time = StatusToTime( status, 0, &playback_delay );
 
         if( stream->capture.pcm ) /* Full duplex */
         {
@@ -3450,7 +3480,6 @@ static void CalculateTimeInfo( PaAlsaStream *stream, PaStreamCallbackTimeInfo *t
         else
             timeInfo->currentTime = playback_time;
 
-        playback_delay = alsa_snd_pcm_status_get_delay( playback_status );
         timeInfo->outputBufferDacTime = timeInfo->currentTime +
             (PaTime)playback_delay / stream->streamRepresentation.streamInfo.sampleRate;
     }
@@ -3497,10 +3526,18 @@ static PaError PaAlsaStreamComponent_EndProcessing( PaAlsaStreamComponent *self,
     if( self->canMmap )
         res = alsa_snd_pcm_mmap_commit( self->pcm, self->offset, numFrames );
 
-    if( res == -EPIPE || res == -ESTRPIPE )
+    if( res == -EPIPE )
     {
         *xrun = 1;
     }
+    // ESTRPIPE is provided by the Linux kernel headers, and is unavailable
+    // on the BSDs, which can still use alsalib.
+#if defined(ESTRPIPE) && ESTRPIPE != EPIPE
+    else if( res == -ESTRPIPE )
+    {
+        *xrun = 1;
+    }
+#endif
     else
     {
         ENSURE_( res, paUnanticipatedHostError );
@@ -4067,11 +4104,20 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
             }
             res = alsa_snd_pcm_readn( self->pcm, bufs, *numFrames );
         }
-        if( res == -EPIPE || res == -ESTRPIPE )
+        if( res == -EPIPE )
         {
             *xrun = 1;
             *numFrames = 0;
         }
+        // ESTRPIPE is provided by the Linux kernel headers, and is unavailable
+        // on the BSDs, which can still use alsalib.
+#if defined(ESTRPIPE) && ESTRPIPE != EPIPE
+        else if( res == -ESTRPIPE )
+        {
+            *xrun = 1;
+            *numFrames = 0;
+        }
+#endif
     }
 
 end:
@@ -4620,6 +4666,7 @@ PaError PaAlsa_GetStreamInputCard( PaStream* s, int* card )
     PaError result = paNoError;
     snd_pcm_info_t* pcmInfo;
 
+    stream = NULL;
     PA_ENSURE( GetAlsaStreamPointer( s, &stream ) );
 
     /* XXX: More descriptive error? */
@@ -4639,6 +4686,7 @@ PaError PaAlsa_GetStreamOutputCard( PaStream* s, int* card )
     PaError result = paNoError;
     snd_pcm_info_t* pcmInfo;
 
+    stream = NULL;
     PA_ENSURE( GetAlsaStreamPointer( s, &stream ) );
 
     /* XXX: More descriptive error? */

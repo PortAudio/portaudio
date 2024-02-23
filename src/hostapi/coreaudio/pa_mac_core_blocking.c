@@ -195,6 +195,7 @@ PaError initializeBlioRingBuffers(
                 data );
         assert( !err );
     }
+    (void) err; /* Prevent "unused variable" warnings. */
 
     result = resetBlioRingBuffers( blio );
     if( result )
@@ -372,6 +373,7 @@ int BlioCallback( const void *input, void *output, unsigned long frameCount,
         /*printf( "reading %d\n", toRead );*/
         framesTransferred = PaUtil_WriteRingBuffer( &blio->inputRingBuffer, input, framesToTransfer );
         assert( framesToTransfer == framesTransferred );
+        (void) framesTransferred; /* Prevent "unused variable" warnings. */
 #ifdef PA_MAC__BLIO_MUTEX
         /* Priority inversion. See notes below. */
         blioSetIsInputEmpty( blio, false );

@@ -120,8 +120,8 @@ typedef struct LoopbackContext_s
     volatile int       minInputOutputDelta;
     volatile int       maxInputOutputDelta;
 
-    int                minFramesPerBuffer;
-    int                maxFramesPerBuffer;
+    unsigned long      minFramesPerBuffer;
+    unsigned long      maxFramesPerBuffer;
     int                primingCount;
     TestParameters    *test;
     volatile int       done;
@@ -849,7 +849,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
         {
             double latencyMSec;
 
-            printf( "%4d-%4d | ",
+            printf( "%4lu-%4lu | ",
                    loopbackContext.minFramesPerBuffer,
                    loopbackContext.maxFramesPerBuffer
                    );
@@ -909,7 +909,7 @@ error:
 }
 
 /*******************************************************************/
-static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice )
+static void PaQa_MakeTestParameters( TestParameters *testParamsPtr, PaDeviceIndex inputDevice, PaDeviceIndex outputDevice, const UserOptions *userOptions )
 {
     memset( testParamsPtr, 0, sizeof(TestParameters) );
 
@@ -933,11 +933,7 @@ static void PaQa_SetDefaultTestParameters( TestParameters *testParamsPtr, PaDevi
     testParamsPtr->outputParameters.channelCount = testParamsPtr->samplesPerFrame;
     testParamsPtr->outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputDevice )->defaultLowOutputLatency;
     //testParamsPtr->outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputDevice )->defaultHighOutputLatency;
-}
 
-/*******************************************************************/
-static void PaQa_OverrideTestParameters( TestParameters *testParamsPtr,  UserOptions *userOptions )
-{
     // Check to see if a specific value was requested.
     if( userOptions->sampleRate >= 0 )
     {
@@ -972,7 +968,6 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
     int iRate;
     int iSize;
     int iFormat;
-    int savedValue;
     TestParameters testParams;
     const PaDeviceInfo *inputDeviceInfo = Pa_GetDeviceInfo( inputDevice );
     const PaDeviceInfo *outputDeviceInfo = Pa_GetDeviceInfo( outputDevice );
@@ -996,18 +991,17 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
     printf( "=============== Analysing Loopback %d to %d =====================\n", outputDevice, inputDevice  );
     printf( "   Devices: %s => %s\n", outputDeviceInfo->name, inputDeviceInfo->name);
 
-    PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
-
-    PaQa_OverrideTestParameters( &testParams, userOptions );
+    PaQa_MakeTestParameters( &testParams, inputDevice, outputDevice, userOptions );
 
     // Loop though combinations of audio parameters.
     for( iFlags=0; iFlags<numFlagSettings; iFlags++ )
     {
         int numRuns = 0;
 
-        testParams.flags = flagSettings[iFlags];
+        TestParameters flagTestParams = testParams;
+        flagTestParams.flags = flagSettings[iFlags];
         printf( "\n************ Mode = %s ************\n",
-               (( testParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
+               (( flagTestParams.flags & 1 ) ? s_FlagOnNames[0] : s_FlagOffNames[0]) );
 
         printf("|-   requested  -|-  stream info latency  -|- measured ------------------------------\n");
         printf("|-sRate-|-fr/buf-|- in    - out   - total -|- over/under/calls for in, out -|- frm/buf -|-latency-|- channel results -\n");
@@ -1015,20 +1009,18 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
         // Loop though various sample rates.
         if( userOptions->sampleRate < 0 )
         {
-            savedValue = testParams.sampleRate;
             for( iRate=0; iRate<numRates; iRate++ )
             {
                 int numBadChannels;
 
                 // SAMPLE RATE
-                testParams.sampleRate = sampleRates[iRate];
-                testParams.maxFrames = (int) (PAQA_TEST_DURATION * testParams.sampleRate);
+                TestParameters srTestParams = flagTestParams;
+                srTestParams.sampleRate = sampleRates[iRate];
+                srTestParams.maxFrames = (int) (PAQA_TEST_DURATION * srTestParams.sampleRate);
 
-                numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+                numBadChannels = PaQa_SingleLoopBackTest( userOptions, &srTestParams );
                 totalBadChannels += numBadChannels;
             }
-            testParams.sampleRate = savedValue;
-            testParams.maxFrames = (int) (PAQA_TEST_DURATION * testParams.sampleRate);
             printf( "\n" );
             numRuns += 1;
         }
@@ -1036,48 +1028,48 @@ static int PaQa_AnalyzeLoopbackConnection( UserOptions *userOptions, PaDeviceInd
         // Loop through various buffer sizes.
         if( userOptions->framesPerBuffer < 0 )
         {
-            savedValue = testParams.framesPerBuffer;
             for( iSize=0; iSize<numBufferSizes; iSize++ )
             {
                 int numBadChannels;
 
                 // BUFFER SIZE
-                testParams.framesPerBuffer = framesPerBuffers[iSize];
+                TestParameters bsTestParams = flagTestParams;
+                bsTestParams.framesPerBuffer = framesPerBuffers[iSize];
 
-                numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+                numBadChannels = PaQa_SingleLoopBackTest( userOptions, &bsTestParams );
                 totalBadChannels += numBadChannels;
             }
-            testParams.framesPerBuffer = savedValue;
             printf( "\n" );
             numRuns += 1;
         }
         // Run one with single parameters in case we did not do a series.
         if( numRuns == 0 )
         {
-            int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+            int numBadChannels = PaQa_SingleLoopBackTest( userOptions, &flagTestParams );
             totalBadChannels += numBadChannels;
         }
     }
 
     printf("\nTest Sample Formats using Half Duplex IO -----\n" );
 
-    PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
-    testParams.flags = PAQA_FLAG_TWO_STREAMS;
     for( iFlags= 0; iFlags<4; iFlags++ )
     {
+        TestParameters flagTestParams = testParams;
+        flagTestParams.flags = PAQA_FLAG_TWO_STREAMS;
         // Cycle through combinations of flags.
-        testParams.streamFlags = 0;
-        if( iFlags & 1 ) testParams.streamFlags |= paClipOff;
-        if( iFlags & 2 ) testParams.streamFlags |= paDitherOff;
+        flagTestParams.streamFlags = 0;
+        if( iFlags & 1 ) flagTestParams.streamFlags |= paClipOff;
+        if( iFlags & 2 ) flagTestParams.streamFlags |= paDitherOff;
 
         for( iFormat=0; iFormat<numSampleFormats; iFormat++ )
         {
             int numBadChannels;
             PaSampleFormat format = sampleFormats[ iFormat ];
-            testParams.inputParameters.sampleFormat = format;
-            testParams.outputParameters.sampleFormat = format;
-            printf("Sample format = %d = %s, PaStreamFlags = 0x%02X\n", (int) format, sampleFormatNames[iFormat], (unsigned int) testParams.streamFlags );
-            numBadChannels = PaQa_SingleLoopBackTest( userOptions, &testParams );
+            TestParameters formatTestParams = flagTestParams;
+            formatTestParams.inputParameters.sampleFormat = format;
+            formatTestParams.outputParameters.sampleFormat = format;
+            printf("Sample format = %d = %s, PaStreamFlags = 0x%02X\n", (int) format, sampleFormatNames[iFormat], (unsigned int) formatTestParams.streamFlags );
+            numBadChannels = PaQa_SingleLoopBackTest( userOptions, &formatTestParams);
             totalBadChannels += numBadChannels;
         }
     }
@@ -1185,9 +1177,7 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
         (outputDeviceInfo->defaultLowOutputLatency * 1000.0),
         (outputDeviceInfo->defaultHighOutputLatency * 1000.0) );
 
-    PaQa_SetDefaultTestParameters( &testParams, inputDevice, outputDevice );
-
-    PaQa_OverrideTestParameters( &testParams, userOptions );
+    PaQa_MakeTestParameters( &testParams, inputDevice, outputDevice, userOptions );
 
     testParams.maxFrames = (int) (LOOPBACK_DETECTION_DURATION_SECONDS * testParams.sampleRate);
     minAmplitude = testParams.amplitude / 4.0;
@@ -1361,7 +1351,8 @@ int TestSampleFormatConversion( void )
     const char charInput[] = { 127, 64, -64, -128 };
     const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
     const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
-    const int intInput[] = { 2147483647, 2147483647/2, -1073741824 /*-2147483648/2 doesn't work in msvc*/, -2147483648 };
+    const int int_minus_2147483648 = (-2147483647 - 1); /*"-2147483648" as a signed integer. See PR #814*/
+    const int intInput[] = { 2147483647, 2147483647/2, int_minus_2147483648/2, int_minus_2147483648 };
 
     float floatOutput[4];
     short shortOutput[4];

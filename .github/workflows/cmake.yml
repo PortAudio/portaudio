@@ -1,0 +1,128 @@
+name: CMake build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu GCC
+            os: ubuntu-latest
+            vcpkg_triplet: x64-linux
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DPA_USE_OSS=ON
+          - name: Ubuntu MinGW
+            os: ubuntu-latest
+            asio_sdk_cache_path: asiosdk.zip
+            dependencies_extras: mingw-w64
+            vcpkg_triplet: x64-mingw-static
+            cmake_generator: "Unix Makefiles"
+            # FIXME: linking vcpkg Jack fais due to MinGW-W64 linker assertion. Disable Jack for this build.
+            cmake_options:
+              -DPA_USE_ASIO=ON
+              -DPA_USE_JACK=OFF
+              -DASIO_SDK_ZIP_PATH=asiosdk.zip
+          - name: Windows MSVC
+            os: windows-latest
+            vcpkg_triplet: x64-windows
+            cmake_generator: "Visual Studio 17 2022"
+            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
+            # asiosdk instead of asiosdk.zip.
+            asio_sdk_cache_path: "asiosdk.zip"
+            # Somehow CMake fails to find the toolchain file if a relative path is used on Windows.
+            cmake_options:
+              -DPA_USE_ASIO=ON
+              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
+          - name: Windows MinGW
+            os: windows-latest
+            vcpkg_triplet: x64-mingw-static
+            cmake_generator: "MinGW Makefiles"
+            # ASIO_SDK_ZIP_PATH needs to be quoted or CMake will save the download to
+            # asiosdk instead of asiosdk.zip.
+            asio_sdk_cache_path: "asiosdk.zip"
+            # Somehow CMake fails to find the toolchain file if a relative path is used on Windows.
+            cmake_options:
+              -DPA_USE_ASIO=ON
+              -DASIO_SDK_ZIP_PATH="asiosdk.zip"
+          - name: macOS Clang
+            os: macOS-latest
+            vcpkg_triplet: x64-osx
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DCMAKE_FRAMEWORK=OFF
+          - name: macOS Clang framework
+            os: macOS-latest
+            vcpkg_triplet: x64-osx
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DCMAKE_FRAMEWORK=ON
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+    env:
+      cmake_build_type: RelWithDebInfo
+    steps:
+    - name: Checkout PortAudio Git repository
+      uses: actions/checkout@v2
+    - name: "Install dependencies [Ubuntu]"
+      run: |
+        sudo apt-get update
+        sudo apt-get install libasound2-dev libpulse-dev libsndio-dev ${{ matrix.dependencies_extras }}
+      if: matrix.os == 'ubuntu-latest'
+    - name: "Set up ASIO SDK cache [Windows/MinGW]"
+      uses: actions/cache@v2
+      if: matrix.asio_sdk_cache_path != null
+      with:
+        path: ${{ matrix.asio_sdk_cache_path }}
+        key: ${{ hashFiles('.github/asiosdk-version.txt') }}
+               
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v7
+      if: ${{ matrix.vcpkg_triplet }} != null
+      with:
+        vcpkgDirectory: ${{ github.workspace }}/../vcpkg
+        vcpkgTriplet: ${{ matrix.vcpkg_triplet }}
+        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
+        additionalCachedPaths: build/vcpkg_installed
+        # vcpkg commit: [libxml2] Fix ICU support option, hash: ca9ac0b, date: Dec 1, 2023, https://github.com/microsoft/vcpkg/commits
+        vcpkgGitCommitId: ca9ac0ba65965937fb66783c4f726c2c755ad9d9
+        # Required when using vcpkg.json manifest in repository
+        setupOnly: true
+        
+    - name: Configure PortAudio library
+      run: cmake
+           -G "${{ matrix.cmake_generator }}"
+           ${{ matrix.cmake_options }}
+           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/../vcpkg/scripts/buildsystems/vcpkg.cmake
+           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/../out
+           -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
+           -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+           -DPA_USE_SKELETON=ON
+           -DPA_BUILD_TESTS=ON
+           -DPA_BUILD_EXAMPLES=ON
+           -DPA_WARNINGS_ARE_ERRORS=ON
+           -S .
+           -B ${{ github.workspace }}/build
+    - name: Build PortAudio library
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
+    - name: Install PortAudio library
+      run: cmake --install ${{ github.workspace }}/build --config ${{ env.cmake_build_type }}
+     
+      # Required for vcpkg packages to be found by CMake's find_package()
+    - name: Enter build-test
+      run: cd ${{ github.workspace }}/test/test_use_cmake     
+    - name: Configure build-test
+      run: cmake
+           -G "${{ matrix.cmake_generator }}"
+           ${{ matrix.cmake_options }}
+           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/../vcpkg/scripts/buildsystems/vcpkg.cmake
+           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/../out
+           -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
+           -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+           -S .
+           -B ${{ github.workspace }}/build-test
+    - name: Build build-test
+      run: cmake --build ${{ github.workspace }}/build-test --config ${{ env.cmake_build_type }}

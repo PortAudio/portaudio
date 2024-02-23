@@ -648,8 +648,12 @@ OTHER_OBJS
 LT_AGE
 LT_REVISION
 LT_CURRENT
+PULSE_LIBS
+PULSE_CFLAGS
 JACK_LIBS
 JACK_CFLAGS
+SNDIO_LIBS
+SNDIO_CFLAGS
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
@@ -747,7 +751,10 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_alsa
+with_audioio
+with_sndio
 with_jack
+with_pulseaudio
 with_oss
 with_asihpi
 with_winapi
@@ -782,8 +789,12 @@ CXXCPP
 PKG_CONFIG
 PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
+SNDIO_CFLAGS
+SNDIO_LIBS
 JACK_CFLAGS
-JACK_LIBS'
+JACK_LIBS
+PULSE_CFLAGS
+PULSE_LIBS'
 ac_subdirs_all='bindings/cpp'
 
 # Initialize some variables set by options.
@@ -1421,7 +1432,10 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-alsa             Enable support for ALSA [autodetect]
+  --with-audioio          Enable support for Solaris/NetBSD audio [autodetect]
+  --with-sndio            Enable support for sndio [autodetect]
   --with-jack             Enable support for JACK [autodetect]
+  --with-pulseaudio       Enable support for PulseAudio [autodetect]
   --with-oss              Enable support for OSS [autodetect]
   --with-asihpi           Enable support for ASIHPI [autodetect]
   --with-winapi           Select Windows API support
@@ -1452,8 +1466,14 @@ Some influential environment variables:
               directories to add to pkg-config's search path
   PKG_CONFIG_LIBDIR
               path overriding pkg-config's built-in search path
+  SNDIO_CFLAGS
+              C compiler flags for SNDIO, overriding pkg-config
+  SNDIO_LIBS  linker flags for SNDIO, overriding pkg-config
   JACK_CFLAGS C compiler flags for JACK, overriding pkg-config
   JACK_LIBS   linker flags for JACK, overriding pkg-config
+  PULSE_CFLAGS
+              C compiler flags for PULSE, overriding pkg-config
+  PULSE_LIBS  linker flags for PULSE, overriding pkg-config
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -2696,9 +2716,30 @@ fi
 
 
 
+# Check whether --with-audioio was given.
+if test "${with_audioio+set}" = set; then :
+  withval=$with_audioio; with_audioio=$withval
+fi
+
+
+
+# Check whether --with-sndio was given.
+if test "${with_sndio+set}" = set; then :
+  withval=$with_sndio; with_sndio=$withval
+fi
+
+
+
 # Check whether --with-jack was given.
 if test "${with_jack+set}" = set; then :
   withval=$with_jack; with_jack=$withval
+fi
+
+
+
+# Check whether --with-pulseaudio was given.
+if test "${with_pulseaudio+set}" = set; then :
+  withval=$with_pulseaudio; with_pulseaudio=$withval
 fi
 
 
@@ -15333,114 +15374,8 @@ else
 fi
 
 fi
-have_asihpi=no
-if test "x$with_asihpi" != "xno"; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for HPI_SubSysCreate in -lhpi" >&5
-$as_echo_n "checking for HPI_SubSysCreate in -lhpi... " >&6; }
-if ${ac_cv_lib_hpi_HPI_SubSysCreate+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lhpi -lm $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char HPI_SubSysCreate ();
-int
-main ()
-{
-return HPI_SubSysCreate ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_hpi_HPI_SubSysCreate=yes
-else
-  ac_cv_lib_hpi_HPI_SubSysCreate=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_hpi_HPI_SubSysCreate" >&5
-$as_echo "$ac_cv_lib_hpi_HPI_SubSysCreate" >&6; }
-if test "x$ac_cv_lib_hpi_HPI_SubSysCreate" = xyes; then :
-  have_asihpi=yes
-else
-  have_asihpi=no
-fi
-
-fi
-have_libossaudio=no
-have_oss=no
-if test "x$with_oss" != "xno"; then
-    for ac_header in sys/soundcard.h linux/soundcard.h machine/soundcard.h
-do :
-  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
-if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
- have_oss=yes
-fi
-
-done
-
-    if test "x$have_oss" = "xyes"; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for _oss_ioctl in -lossaudio" >&5
-$as_echo_n "checking for _oss_ioctl in -lossaudio... " >&6; }
-if ${ac_cv_lib_ossaudio__oss_ioctl+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lossaudio  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char _oss_ioctl ();
-int
-main ()
-{
-return _oss_ioctl ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_ossaudio__oss_ioctl=yes
-else
-  ac_cv_lib_ossaudio__oss_ioctl=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ossaudio__oss_ioctl" >&5
-$as_echo "$ac_cv_lib_ossaudio__oss_ioctl" >&6; }
-if test "x$ac_cv_lib_ossaudio__oss_ioctl" = xyes; then :
-  have_libossaudio=yes
-else
-  have_libossaudio=no
-fi
-
-    fi
-fi
-have_jack=no
-if test "x$with_jack" != "xno"; then
+have_sndio=no
+if test "x$with_sndio" != "xno"; then
 
 
 
@@ -15563,6 +15498,323 @@ $as_echo "no" >&6; }
 fi
 
 pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SNDIO" >&5
+$as_echo_n "checking for SNDIO... " >&6; }
+
+if test -n "$SNDIO_CFLAGS"; then
+    pkg_cv_SNDIO_CFLAGS="$SNDIO_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"sndio\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "sndio") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SNDIO_CFLAGS=`$PKG_CONFIG --cflags "sndio" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$SNDIO_LIBS"; then
+    pkg_cv_SNDIO_LIBS="$SNDIO_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"sndio\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "sndio") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SNDIO_LIBS=`$PKG_CONFIG --libs "sndio" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        SNDIO_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "sndio" 2>&1`
+        else
+	        SNDIO_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "sndio" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$SNDIO_PKG_ERRORS" >&5
+
+	have_sndio=no
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	have_sndio=no
+else
+	SNDIO_CFLAGS=$pkg_cv_SNDIO_CFLAGS
+	SNDIO_LIBS=$pkg_cv_SNDIO_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	have_sndio=yes
+fi
+fi
+have_asihpi=no
+if test "x$with_asihpi" != "xno"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for HPI_SubSysCreate in -lhpi" >&5
+$as_echo_n "checking for HPI_SubSysCreate in -lhpi... " >&6; }
+if ${ac_cv_lib_hpi_HPI_SubSysCreate+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lhpi -lm $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char HPI_SubSysCreate ();
+int
+main ()
+{
+return HPI_SubSysCreate ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_hpi_HPI_SubSysCreate=yes
+else
+  ac_cv_lib_hpi_HPI_SubSysCreate=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_hpi_HPI_SubSysCreate" >&5
+$as_echo "$ac_cv_lib_hpi_HPI_SubSysCreate" >&6; }
+if test "x$ac_cv_lib_hpi_HPI_SubSysCreate" = xyes; then :
+  have_asihpi=yes
+else
+  have_asihpi=no
+fi
+
+fi
+have_audioio=no
+if test "x$with_audioio" != "xno"; then
+    for ac_header in sys/audioio.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/audioio.h" "ac_cv_header_sys_audioio_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_audioio_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_AUDIOIO_H 1
+_ACEOF
+ have_audioio=yes
+fi
+
+done
+
+fi
+have_libossaudio=no
+have_oss=no
+if test "x$with_oss" != "xno"; then
+    for ac_header in sys/soundcard.h linux/soundcard.h machine/soundcard.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+ have_oss=yes
+fi
+
+done
+
+    if test "x$have_oss" = "xyes"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for _oss_ioctl in -lossaudio" >&5
+$as_echo_n "checking for _oss_ioctl in -lossaudio... " >&6; }
+if ${ac_cv_lib_ossaudio__oss_ioctl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lossaudio  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char _oss_ioctl ();
+int
+main ()
+{
+return _oss_ioctl ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_ossaudio__oss_ioctl=yes
+else
+  ac_cv_lib_ossaudio__oss_ioctl=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ossaudio__oss_ioctl" >&5
+$as_echo "$ac_cv_lib_ossaudio__oss_ioctl" >&6; }
+if test "x$ac_cv_lib_ossaudio__oss_ioctl" = xyes; then :
+  have_libossaudio=yes
+else
+  have_libossaudio=no
+fi
+
+    fi
+fi
+if [ "x$with_jack" != "xno" ] || [ "x$with_pulseaudio" != "xno" ]; then
+
+
+
+
+
+
+
+if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
+	if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}pkg-config", so it can be a program name with args.
+set dummy ${ac_tool_prefix}pkg-config; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_PKG_CONFIG+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $PKG_CONFIG in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_PKG_CONFIG="$PKG_CONFIG" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_PKG_CONFIG="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+PKG_CONFIG=$ac_cv_path_PKG_CONFIG
+if test -n "$PKG_CONFIG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PKG_CONFIG" >&5
+$as_echo "$PKG_CONFIG" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_path_PKG_CONFIG"; then
+  ac_pt_PKG_CONFIG=$PKG_CONFIG
+  # Extract the first word of "pkg-config", so it can be a program name with args.
+set dummy pkg-config; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_PKG_CONFIG+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_PKG_CONFIG in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_PKG_CONFIG="$ac_pt_PKG_CONFIG" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ac_pt_PKG_CONFIG="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_PKG_CONFIG=$ac_cv_path_ac_pt_PKG_CONFIG
+if test -n "$ac_pt_PKG_CONFIG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_PKG_CONFIG" >&5
+$as_echo "$ac_pt_PKG_CONFIG" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_pt_PKG_CONFIG" = x; then
+    PKG_CONFIG=""
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    PKG_CONFIG=$ac_pt_PKG_CONFIG
+  fi
+else
+  PKG_CONFIG="$ac_cv_path_PKG_CONFIG"
+fi
+
+fi
+if test -n "$PKG_CONFIG"; then
+	_pkg_min_version=0.9.0
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking pkg-config is at least version $_pkg_min_version" >&5
+$as_echo_n "checking pkg-config is at least version $_pkg_min_version... " >&6; }
+	if $PKG_CONFIG --atleast-pkgconfig-version $_pkg_min_version; then
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		PKG_CONFIG=""
+	fi
+fi
+fi
+have_jack=no
+if test "x$with_jack" != "xno"; then
+
+pkg_failed=no
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for JACK" >&5
 $as_echo_n "checking for JACK... " >&6; }
 
@@ -15631,6 +15883,80 @@ else
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 	have_jack=yes
+fi
+fi
+have_pulse=no
+if test "x$with_pulseaudio" != "xno"; then
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PULSE" >&5
+$as_echo_n "checking for PULSE... " >&6; }
+
+if test -n "$PULSE_CFLAGS"; then
+    pkg_cv_PULSE_CFLAGS="$PULSE_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libpulse\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libpulse") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_PULSE_CFLAGS=`$PKG_CONFIG --cflags "libpulse" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$PULSE_LIBS"; then
+    pkg_cv_PULSE_LIBS="$PULSE_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libpulse\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libpulse") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_PULSE_LIBS=`$PKG_CONFIG --libs "libpulse" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        PULSE_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libpulse" 2>&1`
+        else
+	        PULSE_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libpulse" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$PULSE_PKG_ERRORS" >&5
+
+	have_pulse=no
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	have_pulse=no
+else
+	PULSE_CFLAGS=$pkg_cv_PULSE_CFLAGS
+	PULSE_LIBS=$pkg_cv_PULSE_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	have_pulse=yes
 fi
 fi
 
@@ -15842,31 +16168,12 @@ case "${host_os}" in
         $as_echo "#define PA_USE_COREAUDIO 1" >>confdefs.h
 
 
-        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Wno-deprecated -Werror"
+        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix -Wno-deprecated"
         LIBS="-framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices"
 
         if test "x$enable_mac_universal" = "xyes" ; then
-           case `xcodebuild -version | sed -n 's/Xcode \(.*\)/\1/p'` in
-
-           3.0|3.1)
-                                                                                                                              if [ -d /Developer/SDKs/MacOSX10.5.sdk ] ; then
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.5.sdk"
-              else
-                 mac_version_min="-mmacosx-version-min=10.3"
-                 mac_sysroot="-isysroot /Developer/SDKs/MacOSX10.4u.sdk"
-              fi
-              ;;
-
-           *)
-                                                                                    if xcrun --sdk macosx10.5 --show-sdk-path >/dev/null 2>&1 ; then
-                 mac_version_min="-mmacosx-version-min=10.5"
-                 mac_sysroot="-isysroot $(xcrun --sdk macosx10.5 --show-sdk-path)"
-              else
-                 mac_version_min="-mmacosx-version-min=10.6"
-                 mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
-              fi
-           esac
+           mac_version_min="-mmacosx-version-min=10.6"
+           mac_sysroot="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
 
                                  mac_arches=""
            for arch in x86_64 arm64
@@ -15895,7 +16202,42 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
            mac_version=""
         fi
         SHARED_FLAGS="$LIBS -dynamiclib $mac_arches $mac_sysroot $mac_version_min"
-        CFLAGS="-std=c99 $CFLAGS $mac_arches $mac_sysroot $mac_version_min"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=c11" >&5
+$as_echo_n "checking whether C compiler accepts -std=c11... " >&6; }
+if ${ax_cv_check_cflags___std_c11+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -std=c11"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___std_c11=yes
+else
+  ax_cv_check_cflags___std_c11=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_c11" >&5
+$as_echo "$ax_cv_check_cflags___std_c11" >&6; }
+if test "x$ax_cv_check_cflags___std_c11" = xyes; then :
+  CFLAGS="-std=c11 $CFLAGS"
+else
+  CFLAGS="-std=c99 $CFLAGS"
+fi
+
+        CFLAGS="$CFLAGS $mac_arches $mac_sysroot $mac_version_min"
         OTHER_OBJS="src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o src/hostapi/coreaudio/pa_mac_core.o src/hostapi/coreaudio/pa_mac_core_utilities.o src/hostapi/coreaudio/pa_mac_core_blocking.o src/common/pa_ringbuffer.o"
         PADLL="libportaudio.dylib"
         ;;
@@ -16183,12 +16525,41 @@ fi
 
         fi
 
+        if [ "$have_audioio" = "yes" ] && [ "$with_audioio" != "no" ] ; then
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/audioio/pa_unix_audioio.o"
+           $as_echo "#define PA_USE_AUDIOIO 1" >>confdefs.h
+
+        fi
+
+        if [ "$have_sndio" = "yes" -a "$with_sndio" != "no" ] ; then
+           DLL_LIBS="$DLL_LIBS $SNDIO_LIBS"
+           CFLAGS="$CFLAGS $SNDIO_CFLAGS"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/sndio/pa_sndio.o"
+           $as_echo "#define PA_USE_SNDIO 1" >>confdefs.h
+
+        fi
+
         if [ "$have_jack" = "yes" ] && [ "$with_jack" != "no" ] ; then
            DLL_LIBS="$DLL_LIBS $JACK_LIBS"
            CFLAGS="$CFLAGS $JACK_CFLAGS"
-           OTHER_OBJS="$OTHER_OBJS src/hostapi/jack/pa_jack.o src/common/pa_ringbuffer.o"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/jack/pa_jack.o"
            INCLUDES="$INCLUDES pa_jack.h"
            $as_echo "#define PA_USE_JACK 1" >>confdefs.h
+
+        fi
+
+        if [ "$have_pulse" = "yes" ] || [ "$have_jack" = "yes" ] ; then
+           OTHER_OBJS="$OTHER_OBJS src/common/pa_ringbuffer.o"
+        fi
+
+        if [ "$have_pulse" = "yes" ] && [ "$with_pulse" != "no" ] ; then
+           INCLUDES="$INCLUDES pa_linux_pulseaudio.h"
+           DLL_LIBS="$DLL_LIBS $PULSE_LIBS"
+           CFLAGS="$CFLAGS $PULSE_CFLAGS"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_cb.o"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio_block.o"
+           OTHER_OBJS="$OTHER_OBJS src/hostapi/pulseaudio/pa_linux_pulseaudio.o"
+                      $as_echo "#define PA_USE_PULSEAUDIO 1" >>confdefs.h
 
         fi
 
@@ -18814,12 +19185,18 @@ $as_echo "
         ;;
      *)
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result:
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
+  PulseAudio .................. $have_pulse
+  Sndio ....................... $have_sndio
 " >&5
 $as_echo "
+  AudioIO ..................... $have_audioio
   OSS ......................... $have_oss
   JACK ........................ $have_jack
+  PulseAudio .................. $have_pulse
+  Sndio ....................... $have_sndio
 " >&6; }
         ;;
 esac

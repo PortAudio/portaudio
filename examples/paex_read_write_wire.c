@@ -98,8 +98,8 @@ int main(void)
     int numChannels;
 
     printf("patest_read_write_wire.c\n"); fflush(stdout);
-    printf("sizeof(int) = %lu\n", sizeof(int)); fflush(stdout);
-    printf("sizeof(long) = %lu\n", sizeof(long)); fflush(stdout);
+    printf("sizeof(int) = %lu\n", (unsigned long) sizeof(int)); fflush(stdout);
+    printf("sizeof(long) = %lu\n", (unsigned long) sizeof(long)); fflush(stdout);
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error2;
