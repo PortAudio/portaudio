@@ -190,6 +190,7 @@ PaError PaAsio_SetStreamSampleRate( PaStream* stream, double sampleRate );
 
 
 #define paAsioUseChannelSelectors      (0x01)
+#define paAsioUseMessageCallback       (0x02)
 
 typedef struct PaAsioStreamInfo{
     unsigned long size;             /**< sizeof(PaAsioStreamInfo) */
@@ -210,9 +211,9 @@ typedef struct PaAsioStreamInfo{
     */
     int *channelSelectors;
 
-    /** ASIO message callback and user-defined parameter.
+    /** ASIO message callback.
+        Include paAsioUseMessageCallback in flags to enable.
         Unsupported in Blocking I/O mode.
-        Set to NULL if unused.
         If a callback is supplied for both input and output, it will be called twice!
     */
     PaAsio_MessageCallback *messageCallback;

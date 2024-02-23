@@ -1905,6 +1905,12 @@ static PaError ValidateAsioSpecificStreamInfo(
                 }
             }
         }
+
+        if( streamInfo->flags && paAsioUseMessageCallback )
+        {
+            if( streamInfo->version < 2 || !streamInfo->messageCallback )
+                return paIncompatibleHostApiSpecificStreamInfo;
+        }
     }
 
     return paNoError;
@@ -2757,18 +2763,20 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->postOutput = driverInfo->postOutput;
     stream->isStopped = 1;
     stream->isActive = 0;
-    
+
+    stream->messageCallback[0] = NULL;
+    stream->messageCallback[1] = NULL;
     if( usingBlockingIo )
     {
         /* Disable message callback due to policy of overwriting userData above. */
-        stream->messageCallback[0] = NULL;
-        stream->messageCallback[1] = NULL;
     }
     else
     {
         /* Message callback may be defined in versions >= 2 of ASIO streamInfo. */
-        stream->messageCallback[0] = ( (  inputStreamInfo &&  inputStreamInfo->version >= 2 ) ?  inputStreamInfo->messageCallback : NULL );
-        stream->messageCallback[1] = ( ( outputStreamInfo && outputStreamInfo->version >= 2 ) ? outputStreamInfo->messageCallback : NULL );
+        if(  inputStreamInfo && ( inputStreamInfo->flags & paAsioUseMessageCallback) )
+            stream->messageCallback[0] = inputStreamInfo->messageCallback;
+        if( outputStreamInfo && (outputStreamInfo->flags & paAsioUseMessageCallback) )
+            stream->messageCallback[1] = outputStreamInfo->messageCallback;
     }
 
     asioHostApi->openAsioDeviceIndex = asioDeviceIndex;
