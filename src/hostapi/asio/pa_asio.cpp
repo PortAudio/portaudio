@@ -1876,6 +1876,10 @@ static PaError ValidateAsioSpecificStreamInfo(
     {
         switch( streamInfo->version )
         {
+        case 0:
+            /* NOTE: Struct version 0 is invalid, possibly indicative of uninitialized data. */
+            return paIncompatibleHostApiSpecificStreamInfo;
+
         case 1:
             /* NOTE: V1 structure's size is smaller by one pointer. */
             if( streamInfo->size < sizeof( PaAsioStreamInfo ) - sizeof(PaAsio_MessageCallback*) )
@@ -1888,7 +1892,10 @@ static PaError ValidateAsioSpecificStreamInfo(
             break;
 
         default:
-            return paIncompatibleHostApiSpecificStreamInfo;
+            /* Newer versions of the struct must be larger. */
+            if( streamInfo->size < sizeof( PaAsioStreamInfo ) )
+                return paIncompatibleHostApiSpecificStreamInfo;
+            break;
         }
 
         if( streamInfo->flags & paAsioUseChannelSelectors )
