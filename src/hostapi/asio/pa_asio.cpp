@@ -1881,12 +1881,12 @@ static PaError ValidateAsioSpecificStreamInfo(
             if( streamInfo->size < sizeof( PaAsioStreamInfo ) - sizeof(PaAsio_MessageCallback*) )
                 return paIncompatibleHostApiSpecificStreamInfo;
             break;
-            
+
         case 2:
             if( streamInfo->size != sizeof( PaAsioStreamInfo ) )
                 return paIncompatibleHostApiSpecificStreamInfo;
             break;
-            
+
         default:
             return paIncompatibleHostApiSpecificStreamInfo;
         }
@@ -3216,9 +3216,9 @@ previousTime = paTimeInfo.currentTime;
 static long fireMessageCallback( PaAsioStream *asioStream, long messageType, long value, void* message, double* opt )
 {
     void *userData = asioStream->streamRepresentation.userData;
-        
+
     long ret = 0;
-    
+
     /* Fire callbacks and determine whether one and/or the other handles the message. */
     if( asioStream->messageCallback[0] )
     {
@@ -3228,7 +3228,7 @@ static long fireMessageCallback( PaAsioStream *asioStream, long messageType, lon
     {
         if( (*asioStream->messageCallback[1])( messageType, value, message, opt, userData ) ) ret = 1;
     }
-    
+
     return ret;
 }
 
@@ -3246,14 +3246,14 @@ static void sampleRateChanged(ASIOSampleRate sRate)
     double opt = sRate;
 
     PA_DEBUG( ("asioSampleRateChanged : %f hz\n", opt));
-    
+
     if (!theAsioStream)
     {
         /* Some ASIO drivers will fire messages during OpenStream.  We ignore them. */
         PA_DEBUG( ("    ...message blocked, device not open yet.\n"));
         return;
     }
-    
+
     fireMessageCallback( theAsioStream, paAsioSampleRateChanged, 0, 0, &opt );
 }
 
@@ -3355,10 +3355,10 @@ static long asioMessages(long selector, long value, void* message, double* opt)
             ret = 0;
             break;
     }
-    
+
     if( doClientCallback != 0 )
         ret = fireMessageCallback( theAsioStream, paAsioMessageType, value, message, opt );
-    
+
     return ret;
 }
 
