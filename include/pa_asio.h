@@ -139,6 +139,7 @@ typedef enum PaAsioMessageType
     paAsioLatenciesChanged = 5,
     
 } PaAsioMessageType;
+
 /** ASIO message callback, set in PaAsioStreamInfo.
     Do not call PortAudio or PaAsio functions inside this callback!
  
