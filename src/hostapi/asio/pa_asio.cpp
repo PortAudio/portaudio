@@ -1913,7 +1913,7 @@ static PaError ValidateAsioSpecificStreamInfo(
             }
         }
 
-        if( streamInfo->flags && paAsioUseMessageCallback )
+        if( streamInfo->flags & paAsioUseMessageCallback )
         {
             if( streamInfo->version < 2 || !streamInfo->messageCallback )
                 return paIncompatibleHostApiSpecificStreamInfo;
