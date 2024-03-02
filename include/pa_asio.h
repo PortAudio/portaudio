@@ -127,7 +127,7 @@ typedef enum PaAsioMessageType
         params:
             none.
     */
-    paAsioResyncRequest     = 4, 
+    paAsioResyncRequest     = 4,
 
     /** Informs the application that the driver's latencies have changed.
         FIXME: The only way to query the new latencies is to reset the stream.
@@ -142,16 +142,16 @@ typedef enum PaAsioMessageType
 
 /** ASIO message callback, set in PaAsioStreamInfo.
     Do not call PortAudio or PaAsio functions inside this callback!
- 
+
  @param value Message-specific integer value.
  Indicates buffer size in paAsioBufferSizeChange.
- 
+
  @param message Message-specific pointer value.
  Unused as of the ASIO 2.2 SDK.
- 
+
  @param opt Message-specific double value.
  opt[0] indicates sample rate in paAsioSampleRateChange.
- 
+
  @param userData The value of a user supplied pointer passed to
  Pa_OpenStream() intended for storing synthesis data etc.
 
