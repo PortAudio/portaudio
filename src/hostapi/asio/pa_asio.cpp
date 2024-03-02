@@ -1892,24 +1892,22 @@ static PaError ValidateAsioSpecificStreamInfo(
             break;
 
         default:
-            /* Newer versions of the struct must be larger. */
+            /* Newer versions of the struct must not be smaller. */
             if( streamInfo->size < sizeof( PaAsioStreamInfo ) )
                 return paIncompatibleHostApiSpecificStreamInfo;
             break;
         }
 
         if( streamInfo->flags & paAsioUseChannelSelectors )
-        {
             *channelSelectors = streamInfo->channelSelectors;
 
-            if( !(*channelSelectors) )
-                return paIncompatibleHostApiSpecificStreamInfo;
+        if( !(*channelSelectors) )
+            return paIncompatibleHostApiSpecificStreamInfo;
 
-            for( int i=0; i < streamParameters->channelCount; ++i ){
-                if( (*channelSelectors)[i] < 0
-                        || (*channelSelectors)[i] >= deviceChannelCount ){
-                    return paInvalidChannelCount;
-                }
+        for( int i=0; i < streamParameters->channelCount; ++i ){
+            if( (*channelSelectors)[i] < 0
+                    || (*channelSelectors)[i] >= deviceChannelCount ){
+                return paInvalidChannelCount;
             }
         }
 
