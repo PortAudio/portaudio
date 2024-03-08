@@ -2778,7 +2778,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     else
     {
         /* Message callback may be defined in versions >= 2 of ASIO streamInfo. */
-        if(  inputStreamInfo && ( inputStreamInfo->flags & paAsioUseMessageCallback) )
+        if( inputStreamInfo && ( inputStreamInfo->flags & paAsioUseMessageCallback) )
             stream->messageCallback[0] = inputStreamInfo->messageCallback;
         if( outputStreamInfo && (outputStreamInfo->flags & paAsioUseMessageCallback) )
             stream->messageCallback[1] = outputStreamInfo->messageCallback;
