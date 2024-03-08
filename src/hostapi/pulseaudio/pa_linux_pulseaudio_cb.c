@@ -237,37 +237,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
     }
 
-    /*
-     * When stopped we should stop feeding or recording right away
-     */
-    if( stream->isStopped )
-    {
-        return paStreamIsStopped;
-    }
-
-    /*
-     * This can be called before we have reached out
-     * starting Portaudio stream or Portaudio stream
-     * is stopped
-     */
-    if( !stream->pulseaudioIsActive )
-    {
-        if(stream->outputStream)
-        {
-            bufferData = pulseaudioSampleBuffer;
-            memset( bufferData, 0x00, length);
-
-            pa_stream_write( stream->outputStream,
-                             bufferData,
-                             length,
-                             NULL,
-                             0,
-                             PA_SEEK_RELATIVE );
-        }
-
-        return paContinue;
-    }
-
     /* If we have input which is mono and
      * output which is stereo. We have to copy
      * mono to monomono which is stereo.
@@ -279,6 +248,22 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     {
         pulseaudioInputBytes /= 2;
     }
+
+    if( !stream->isActive && stream->pulseaudioIsActive && stream->outputStream)
+    {
+        bufferData = pulseaudioSampleBuffer;
+        memset( bufferData, 0x00, length);
+
+        pa_stream_write( stream->outputStream,
+                         bufferData,
+                         length,
+                         NULL,
+                         0,
+                         PA_SEEK_RELATIVE );
+
+        return paContinue;
+    }
+
 
     while(1)
     {
@@ -408,12 +393,6 @@ void PaPulseAudio_StreamRecordCb( pa_stream * s,
 {
     PaPulseAudio_Stream *pulseaudioStream = (PaPulseAudio_Stream *) userdata;
 
-    if( !pulseaudioStream->pulseaudioIsActive )
-    {
-        pulseaudioStream->pulseaudioIsActive = 1;
-        pulseaudioStream->pulseaudioIsStopped= 0;
-    }
-
     _PaPulseAudio_Read( pulseaudioStream, length );
 
     /* Let's handle when output happens if Duplex
@@ -435,12 +414,6 @@ void PaPulseAudio_StreamPlaybackCb( pa_stream * s,
                                     void *userdata )
 {
     PaPulseAudio_Stream *pulseaudioStream = (PaPulseAudio_Stream *) userdata;
-
-    if( !pulseaudioStream->inputStream && !pulseaudioStream->pulseaudioIsActive )
-    {
-        pulseaudioStream->pulseaudioIsActive = 1;
-        pulseaudioStream->pulseaudioIsStopped = 0;
-    }
 
     if( pulseaudioStream->bufferProcessor.streamCallback )
     {
@@ -508,14 +481,11 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY )
     {
         PaPulseAudio_Lock(stream->mainloop);
-        /**
-         * Pause stream so it stops faster
-         */
+        /* Pause stream so it stops faster */
         pulseaudioOperation = pa_stream_cork( stream->outputStream,
                                               1,
                                               PaPulseAudio_CorkSuccessCb,
                                               stream );
-
         PaPulseAudio_UnLock( stream->mainloop );
 
         while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
@@ -523,7 +493,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
             pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
             waitLoop ++;
 
-            if(waitLoop > 250)
+            if(waitLoop > 256)
             {
                 break;
             }
@@ -543,15 +513,11 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && pa_stream_get_state( stream->inputStream ) == PA_STREAM_READY )
     {
         PaPulseAudio_Lock( stream->mainloop );
-
-        /**
-         * Pause stream so it stops so it stops faster
-         */
+        /* Pause stream so it stops so it stops faster */
         pulseaudioOperation = pa_stream_cork( stream->inputStream,
                                               1,
                                               PaPulseAudio_CorkSuccessCb,
                                               stream );
-
         PaPulseAudio_UnLock( stream->mainloop );
 
         while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
@@ -559,7 +525,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
             pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
             waitLoop ++;
 
-            if(waitLoop > 250)
+            if(waitLoop > 256)
             {
                 break;
             }
@@ -622,6 +588,49 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     return result;
 }
 
+PaError _PaPulseAudio_WaitStreamState( pa_threaded_mainloop *mainloop, pa_stream * stream )
+{
+    pa_stream_state_t state = PA_STREAM_UNCONNECTED;
+    unsigned int wait = 0;
+    PaError result = paNoError;
+
+    while( wait < 1000 )
+    {
+        pa_threaded_mainloop_wait( mainloop );
+        PaPulseAudio_Lock( mainloop );
+        state = pa_stream_get_state( stream );
+        PaPulseAudio_UnLock( mainloop );
+
+        switch(state)
+        {
+            case PA_STREAM_READY:
+                result = paNoError;
+                wait = 10000;
+                break;
+            case PA_STREAM_FAILED:
+                PA_DEBUG( ("Portaudio %s: Creating stream failed. (PA_STREAM_FAILED)",
+                           __FUNCTION__) );
+                result = paNotInitialized;
+                wait = 10000;
+                break;
+            case PA_STREAM_TERMINATED:
+                PA_DEBUG( ("Portaudio %s: Stream terminated. (PA_STREAM_TERMINATED)",
+                           __FUNCTION__) );
+                result = paNotInitialized;
+                wait = 10000;
+                break;
+        }
+
+        /* Creating can take some time */
+        if( state != PA_STREAM_CREATING )
+        {
+            wait ++;
+        }
+    }
+
+    return result;
+}
+
 PaError PaPulseAudio_StartStreamCb( PaStream * s )
 {
     PaError ret = paNoError;
@@ -637,8 +646,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     stream->isActive = 0;
     stream->isStopped = 1;
-    stream->pulseaudioIsActive = 0;
-    stream->pulseaudioIsStopped = 1;
+    stream->pulseaudioIsActive = 1;
+    stream->pulseaudioIsStopped = 0;
     stream->missedBytes = 0;
 
     /* Ready the processor */
@@ -693,10 +702,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                                                     inputDevice]) );
         }
 
-        pa_stream_set_read_callback( stream->inputStream,
-                                     PaPulseAudio_StreamRecordCb,
-                                     stream );
-
         PaDeviceIndex defaultInputDevice;
         PaError result = PaUtil_DeviceIndexToHostApiDeviceIndex(
                 &defaultInputDevice,
@@ -717,41 +722,22 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         {
             PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
             /* Zero means success */
-            if( ! pa_stream_connect_record( stream->inputStream,
-                                            pulseaudioName,
-                                            &stream->inputBufferAttr,
-                                            pulseaudioStreamFlags ) )
-            {
-                pa_stream_set_started_callback( stream->inputStream,
-                                                PaPulseAudio_StreamStartedCb,
-                                                stream );
-            }
-            else
+            if( pa_stream_connect_record( stream->inputStream,
+                                          pulseaudioName,
+                                          &stream->inputBufferAttr,
+                                          pulseaudioStreamFlags ) )
             {
                 PA_DEBUG( ("Portaudio %s: Can't read audio!\n",
                           __FUNCTION__) );
+                PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
                 goto startstreamcb_error;
             }
             PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
-            for( waitLoop = 0; waitLoop < 100; waitLoop ++ )
+            if( _PaPulseAudio_WaitStreamState( pulseaudioHostApi->mainloop, stream->inputStream ) != paNoError )
             {
-                PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
-                pulseaudioState = pa_stream_get_state( stream->inputStream );
-                PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
-
-                if( pulseaudioState == PA_STREAM_READY )
-                {
-                    break;
-                }
-                else if( pulseaudioState == PA_STREAM_FAILED ||
-                         pulseaudioState == PA_STREAM_TERMINATED )
-                {
-                    goto startstreamcb_error;
-                }
-
-                usleep(10000);
+                goto startstreamcb_error;
             }
         }
         else
@@ -771,10 +757,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
          */
         stream->outputBufferAttr.tlength = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->outputSampleSpec );
-
-        pa_stream_set_write_callback( stream->outputStream,
-                                      PaPulseAudio_StreamPlaybackCb,
-                                      stream );
 
         /* Just keep on trucking if we are just corked */
         if( pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY
@@ -825,45 +807,34 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             {
                 PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
 
-                if ( ! pa_stream_connect_playback( stream->outputStream,
+                /* This is only needed when making non duplex
+                 * as when duplexing then input should feed
+                 * output and we don't need playback callback
+                 */
+                if( !stream->inputStream )
+                {
+                    pa_stream_set_write_callback( stream->outputStream,
+                                                  PaPulseAudio_StreamPlaybackCb,
+                                                  stream );
+                }
+
+                if ( pa_stream_connect_playback( stream->outputStream,
                                                    pulseaudioName,
                                                    &stream->outputBufferAttr,
                                                    pulseaudioStreamFlags,
                                                    NULL,
                                                    NULL ) )
                 {
-                    pa_stream_set_underflow_callback( stream->outputStream,
-                                                      PaPulseAudio_StreamUnderflowCb,
-                                                      stream);
-                    pa_stream_set_started_callback( stream->outputStream,
-                                                    PaPulseAudio_StreamStartedCb,
-                                                    stream );
-                }
-                else
-                {
                     PA_DEBUG( ("Portaudio %s: Can't write audio!\n",
                               __FUNCTION__) );
+                    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
                     goto startstreamcb_error;
                 }
                 PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
-                for( waitLoop = 0; waitLoop < 100; waitLoop ++ )
+                if( _PaPulseAudio_WaitStreamState( pulseaudioHostApi->mainloop, stream->outputStream ) != paNoError )
                 {
-                    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
-                    pulseaudioState = pa_stream_get_state( stream->outputStream );
-                    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
-
-                    if( pulseaudioState = PA_STREAM_READY )
-                    {
-                        break;
-                    }
-                    else if( pulseaudioState == PA_STREAM_FAILED  ||
-                             pulseaudioState == PA_STREAM_TERMINATED )
-                    {
-                        goto startstreamcb_error;
-                    }
-
-                    usleep(10000);
+                    goto startstreamcb_error;
                 }
 
             }
@@ -888,6 +859,16 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     /* Stream is now active */
     stream->isActive = 1;
     stream->isStopped = 0;
+
+    /* Start callback here after we can be
+     * sure that everything is correct
+     */
+    if( stream->inputStream )
+    {
+        pa_stream_set_read_callback( stream->inputStream,
+                                     PaPulseAudio_StreamRecordCb,
+                                     stream );
+    }
 
     /* Allways unlock.. so we don't get locked */
     startstreamcb_end:
