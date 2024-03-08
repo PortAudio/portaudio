@@ -68,7 +68,7 @@ extern char *__progname;
 int PaPulseAudio_CheckConnection( PaPulseAudio_HostApiRepresentation * ptr )
 {
     /*
-     * This is bit hackish as -1 is consired as error
+     * This is bit hackish as -1 is considered as an error
      * but PA_ERR_* are positive and PA_OK is zero.
      * That is why return -1 for we are waiting something
      * to happen is 'correct'
