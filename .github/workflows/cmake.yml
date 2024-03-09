@@ -59,6 +59,12 @@ jobs:
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=ON
+          - name: iOS Clang cross compilation
+            os: macOS-latest
+            vcpkg_triplet: arm64-ios
+            cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DCMAKE_SYSTEM_NAME=iOS
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
