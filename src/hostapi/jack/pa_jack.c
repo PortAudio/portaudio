@@ -451,6 +451,15 @@ BlockingWaitEmpty( PaStream *s )
 
 /* ---- jack driver ---- */
 
+/* like jack_port_get_latency_range() but only returns the minimum value */
+static jack_nframes_t port_get_min_latency( jack_port_t *port, jack_latency_callback_mode_t mode )
+{
+    jack_latency_range_t range;
+
+    jack_port_get_latency_range( port, mode, &range );
+    return range.min;
+}
+
 /* copy null terminated string source to destination, escaping regex characters with '\\' in the process */
 static void copy_string_and_escape_regex_chars( char *destination, const char *source, size_t destbuffersize )
 {
@@ -636,7 +645,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         {
             jack_port_t *p = jack_port_by_name( jackApi->jack_client, clientPorts[0] );
             curDevInfo->defaultLowInputLatency = curDevInfo->defaultHighInputLatency =
-                jack_port_get_latency( p ) / globalSampleRate;
+                port_get_min_latency( p, JackCaptureLatency ) / globalSampleRate;
 
             for( i = 0; clientPorts[i] != NULL; i++)
             {
@@ -657,7 +666,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         {
             jack_port_t *p = jack_port_by_name( jackApi->jack_client, clientPorts[0] );
             curDevInfo->defaultLowOutputLatency = curDevInfo->defaultHighOutputLatency =
-                jack_port_get_latency( p ) / globalSampleRate;
+                port_get_min_latency( p, JackPlaybackLatency ) / globalSampleRate;
 
             for( i = 0; clientPorts[i] != NULL; i++)
             {
@@ -1364,10 +1373,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     bpInitialized = 1;
 
     if( stream->num_incoming_connections > 0 )
-        stream->streamRepresentation.streamInfo.inputLatency = (jack_port_get_latency( stream->remote_output_ports[0] )
+        stream->streamRepresentation.streamInfo.inputLatency =
+            (port_get_min_latency( stream->remote_output_ports[0], JackCaptureLatency )
             + PaUtil_GetBufferProcessorInputLatencyFrames( &stream->bufferProcessor )) / sampleRate;
     if( stream->num_outgoing_connections > 0 )
-        stream->streamRepresentation.streamInfo.outputLatency = (jack_port_get_latency( stream->remote_input_ports[0] )
+        stream->streamRepresentation.streamInfo.outputLatency =
+            (port_get_min_latency( stream->remote_input_ports[0], JackPlaybackLatency )
             + PaUtil_GetBufferProcessorOutputLatencyFrames( &stream->bufferProcessor )) / sampleRate;
 
     stream->streamRepresentation.streamInfo.sampleRate = jackSr;
@@ -1428,11 +1439,11 @@ static PaError RealProcess( PaJackStream *stream, jack_nframes_t frames )
 
     timeInfo.currentTime = (jack_frame_time( stream->jack_client ) - stream->t0) / sr;
     if( stream->num_incoming_connections > 0 )
-        timeInfo.inputBufferAdcTime = timeInfo.currentTime - jack_port_get_latency( stream->remote_output_ports[0] )
-            / sr;
+        timeInfo.inputBufferAdcTime = timeInfo.currentTime -
+            port_get_min_latency( stream->remote_output_ports[0], JackCaptureLatency ) / sr;
     if( stream->num_outgoing_connections > 0 )
-        timeInfo.outputBufferDacTime = timeInfo.currentTime + jack_port_get_latency( stream->remote_input_ports[0] )
-            / sr;
+        timeInfo.outputBufferDacTime = timeInfo.currentTime +
+            port_get_min_latency( stream->remote_input_ports[0], JackPlaybackLatency ) / sr;
 
     PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 
