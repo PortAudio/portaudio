@@ -55,6 +55,7 @@
 #include "pa_stream.h"
 #include "pa_cpuload.h"
 #include "pa_process.h"
+#include "portaudio.h"
 
 
 /* prototypes for functions declared in this file */
@@ -113,6 +114,9 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
  host errors */
 #define PA_WEBAUDIO_SET_LAST_HOST_ERROR( errorCode, errorText ) \
     PaUtil_SetLastHostErrorInfo( paInDevelopment, errorCode, errorText )
+
+/* This buffer size is fixed for AudioWorkletProcessor */
+#define PA_WEBAUDIO_FRAME_COUNT 128
 
 /* PaWebAudioHostApiRepresentation - host api datastructure specific to this implementation */
 
@@ -395,7 +399,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
     PaWebAudioHostApiRepresentation *webAudioHostApi = (PaWebAudioHostApiRepresentation*)hostApi;
     PaWebAudioStream *stream = 0;
-    unsigned long framesPerHostBuffer = 128; // This buffer size is fixed for AudioWorkletProcessor
+    unsigned long framesPerHostBuffer = PA_WEBAUDIO_FRAME_COUNT;
     int inputChannelCount, outputChannelCount;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
@@ -430,6 +434,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         inputSampleFormat = hostInputSampleFormat = paInt16; /* Suppress 'uninitialised var' warnings. */
     }
 
+    // Web Audio always uses non-interleaved, 32-bit float buffers
+    // See https://github.com/emscripten-core/emscripten/blob/2ba2078b/system/include/emscripten/webaudio.h#L100-L105
+    hostOutputSampleFormat = paFloat32 | paNonInterleaved;
+
     if( outputParameters )
     {
         outputChannelCount = outputParameters->channelCount;
@@ -448,15 +456,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         /* validate outputStreamInfo */
         if( outputParameters->hostApiSpecificStreamInfo )
             return paIncompatibleHostApiSpecificStreamInfo; /* this implementation doesn't use custom stream info */
-
-        /* IMPLEMENT ME - establish which  host formats are available */
-        hostOutputSampleFormat =
-            PaUtil_SelectClosestAvailableFormat( paInt16 /* native formats */, outputSampleFormat );
     }
     else
     {
         outputChannelCount = 0;
-        outputSampleFormat = hostOutputSampleFormat = paInt16; /* Suppress 'uninitialized var' warnings. */
+        outputSampleFormat = hostOutputSampleFormat;
     }
 
     /*
@@ -643,20 +647,22 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
 
     if (numInputs > 0) {
         assert(numInputs == 1);
+        const AudioSampleFrame input = inputs[0];
         PaUtil_SetInputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
-        PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
-                0, /* first channel of inputBuffer is channel 0 */
-                inputs[0].data,
-                inputs[0].numberOfChannels );
+        for (int i = 0; i < input.numberOfChannels; i++)
+        {
+            PaUtil_SetNonInterleavedInputChannel( &stream->bufferProcessor, i, input.data + PA_WEBAUDIO_FRAME_COUNT * i );
+        }
     }
 
     if (numOutputs > 0) {
         assert(numOutputs == 1);
+        AudioSampleFrame output = outputs[0];
         PaUtil_SetOutputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
-        PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
-                0, /* first channel of outputBuffer is channel 0 */
-                outputs[0].data,
-                outputs[0].numberOfChannels );
+        for (int i = 0; i < output.numberOfChannels; i++)
+        {
+            PaUtil_SetNonInterleavedOutputChannel( &stream->bufferProcessor, i, output.data + PA_WEBAUDIO_FRAME_COUNT * i );
+        }
     }
 
     /* you must pass a valid value of callback result to PaUtil_EndBufferProcessing()
