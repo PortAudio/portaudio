@@ -413,6 +413,7 @@ elseif(UNIX)
         target_compile_options(PortAudio PUBLIC -pthread)
         target_link_options(PortAudio PUBLIC
           -sASYNCIFY
+          -sASYNCIFY_IMPORTS=emscripten_asm_const_int
           -sAUDIO_WORKLET
           -sWASM_WORKERS
           -sEXPORTED_RUNTIME_METHODS=emscriptenGetAudioObject

@@ -721,7 +721,9 @@ static PaError StartStream( PaStream *s )
     PA_DEBUG(("Resuming audio context...\n"));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
-        context.resume();
+        Asyncify.handleAsync(async () => {
+            await context.resume();
+        });
     }, stream->context);
 
     return result;
@@ -738,7 +740,9 @@ static PaError StopStream( PaStream *s )
     PA_DEBUG(("Suspending audio context upon stop...\n"));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
-        context.suspend();
+        Asyncify.handleAsync(async () => {
+            await context.suspend();
+        });
     }, stream->context);
 
     return result;
@@ -755,7 +759,9 @@ static PaError AbortStream( PaStream *s )
     PA_DEBUG(("Suspending audio context upon abort...\n"));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
-        context.suspend();
+        Asyncify.handleAsync(async () => {
+            await context.suspend();
+        });
     }, stream->context);
 
     return result;
