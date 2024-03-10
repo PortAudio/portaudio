@@ -43,6 +43,7 @@
 */
 
 
+#include <emscripten/webaudio.h>
 #include <string.h> /* strlen() */
 
 #include "pa_util.h"
@@ -110,7 +111,7 @@ typedef struct
 
     PaUtilAllocationGroup *allocations;
 
-    /* implementation specific data goes here */
+    EMSCRIPTEN_WEBAUDIO_T context;
 }
 PaWebAudioHostApiRepresentation;
 
@@ -135,6 +136,8 @@ PaError PaWebAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
         result = paInsufficientMemory;
         goto error;
     }
+
+    webAudioHostApi->context = emscripten_create_audio_context(0);
 
     *hostApi = &webAudioHostApi->inheritedHostApiRep;
     (*hostApi)->info.structVersion = 1;

@@ -408,7 +408,7 @@ elseif(UNIX)
           src/hostapi/webaudio/pa_webaudio.c
         )
         target_compile_definitions(PortAudio PUBLIC PA_USE_WEBAUDIO=1)
-        target_link_options(PortAudio PUBLIC -sASYNCIFY)
+        target_link_options(PortAudio PUBLIC -sASYNCIFY -sAUDIO_WORKLET -sWASM_WORKERS)
         set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_WEBAUDIO=1")
       endif()
 
