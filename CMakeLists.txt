@@ -409,7 +409,12 @@ elseif(UNIX)
         )
         target_compile_definitions(PortAudio PUBLIC PA_USE_WEBAUDIO=1)
         target_compile_options(PortAudio PUBLIC -pthread)
-        target_link_options(PortAudio PUBLIC -sASYNCIFY -sAUDIO_WORKLET -sWASM_WORKERS)
+        target_link_options(PortAudio PUBLIC
+          -sASYNCIFY
+          -sAUDIO_WORKLET
+          -sWASM_WORKERS
+          -sEXPORTED_RUNTIME_METHODS=emscriptenGetAudioObject
+        )
         set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_WEBAUDIO=1")
       endif()
 

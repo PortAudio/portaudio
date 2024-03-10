@@ -146,11 +146,20 @@ PaError PaWebAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
     (*hostApi)->info.name = "Web Audio";
 
     (*hostApi)->info.defaultInputDevice = paNoDevice;  /* IMPLEMENT ME */
-    (*hostApi)->info.defaultOutputDevice = paNoDevice; /* IMPLEMENT ME */
+    (*hostApi)->info.defaultOutputDevice = 0;
 
     (*hostApi)->info.deviceCount = 0;
 
-    deviceCount = 0; /* IMPLEMENT ME */
+    // TODO: Add proper support for multiple devices
+    // https://developer.chrome.com/blog/audiocontext-setsinkid
+    // https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/setSinkId
+
+    int defaultSampleRate = EM_ASM_INT({
+        const context = Module.emscriptenGetAudioObject($0);
+        return context.sampleRate;
+    }, webAudioHostApi->context);
+
+    deviceCount = 1; /* IMPLEMENT ME */
 
     if( deviceCount > 0 )
     {
@@ -176,7 +185,7 @@ PaError PaWebAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
             PaDeviceInfo *deviceInfo = &deviceInfoArray[i];
             deviceInfo->structVersion = 2;
             deviceInfo->hostApi = hostApiIndex;
-            deviceInfo->name = 0; /* IMPLEMENT ME: allocate block and copy name eg:
+            deviceInfo->name = "Default"; /* IMPLEMENT ME: allocate block and copy name eg:
                 deviceName = (char*)PaUtil_GroupAllocateZeroInitializedMemory( webAudioHostApi->allocations, strlen(srcName) + 1 );
                 if( !deviceName )
                 {
@@ -188,14 +197,14 @@ PaError PaWebAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
             */
 
             deviceInfo->maxInputChannels = 0;  /* IMPLEMENT ME */
-            deviceInfo->maxOutputChannels = 0;  /* IMPLEMENT ME */
+            deviceInfo->maxOutputChannels = 2;  /* IMPLEMENT ME */
 
             deviceInfo->defaultLowInputLatency = 0.;  /* IMPLEMENT ME */
             deviceInfo->defaultLowOutputLatency = 0.;  /* IMPLEMENT ME */
             deviceInfo->defaultHighInputLatency = 0.;  /* IMPLEMENT ME */
             deviceInfo->defaultHighOutputLatency = 0.;  /* IMPLEMENT ME */
 
-            deviceInfo->defaultSampleRate = 0.; /* IMPLEMENT ME */
+            deviceInfo->defaultSampleRate = defaultSampleRate;
 
             (*hostApi)->deviceInfos[i] = deviceInfo;
             ++(*hostApi)->info.deviceCount;
