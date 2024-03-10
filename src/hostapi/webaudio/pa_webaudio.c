@@ -109,6 +109,7 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
                                            int numOutputs, AudioSampleFrame *outputBuffer,
                                            int numParams, const AudioParamFrame *params,
                                            void *userData );
+void WebAudioSuspendContextSync( EMSCRIPTEN_WEBAUDIO_T context );
 
 /* IMPLEMENT ME: a macro like the following one should be used for reporting
  host errors */
@@ -551,6 +552,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     PA_DEBUG(("Creating audio context...\n"));
     stream->context = emscripten_create_audio_context( &opts );
+    WebAudioSuspendContextSync( stream->context );
 
     PA_DEBUG(("Starting Wasm Audio Worklet thread...\n"));
     emscripten_start_wasm_audio_worklet_thread_async(
@@ -714,6 +716,17 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
 }
 
 
+void WebAudioSuspendContextSync( EMSCRIPTEN_WEBAUDIO_T context )
+{
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        Asyncify.handleAsync(async () => {
+            await context.suspend();
+        });
+    }, context);
+}
+
+
 /*
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
@@ -725,10 +738,7 @@ static PaError CloseStream( PaStream* s )
 
     /* additional stream closing + cleanup */
 
-    EM_ASM({
-        const context = emscriptenGetAudioObject($0);
-        context.close();
-    }, stream->context);
+    emscripten_destroy_audio_context( stream->context );
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
@@ -778,12 +788,7 @@ static PaError StopStream( PaStream *s )
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
     PA_DEBUG(("Suspending audio context upon stop...\n"));
-    EM_ASM({
-        const context = emscriptenGetAudioObject($0);
-        Asyncify.handleAsync(async () => {
-            await context.suspend();
-        });
-    }, stream->context);
+    WebAudioSuspendContextSync( stream->context );
 
     return result;
 }
@@ -797,12 +802,7 @@ static PaError AbortStream( PaStream *s )
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
     PA_DEBUG(("Suspending audio context upon abort...\n"));
-    EM_ASM({
-        const context = emscriptenGetAudioObject($0);
-        Asyncify.handleAsync(async () => {
-            await context.suspend();
-        });
-    }, stream->context);
+    WebAudioSuspendContextSync( stream->context );
 
     return result;
 }
