@@ -25,6 +25,10 @@ jobs:
               -DPA_USE_ASIO=ON
               -DPA_USE_JACK=OFF
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
+          - name: Ubuntu Emscripten
+            os: ubuntu-latest
+            vcpkg_triplet: wasm32-emscripten
+            cmake_generator: "Unix Makefiles"
           - name: Windows MSVC
             os: windows-latest
             vcpkg_triplet: x64-windows
@@ -72,6 +76,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install libasound2-dev libpulse-dev libsndio-dev ${{ matrix.dependencies_extras }}
       if: matrix.os == 'ubuntu-latest'
+    - name: Set up Emscripten SDK
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: '3.1.55'
+      if: startsWith(matrix.vcpkg_triplet, 'wasm32-')
     - name: "Set up ASIO SDK cache [Windows/MinGW]"
       uses: actions/cache@v2
       if: matrix.asio_sdk_cache_path != null
