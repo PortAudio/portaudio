@@ -29,6 +29,8 @@ jobs:
             os: ubuntu-latest
             vcpkg_triplet: wasm32-emscripten
             cmake_generator: "Unix Makefiles"
+            cmake_options:
+              -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
           - name: Windows MSVC
             os: windows-latest
             vcpkg_triplet: x64-windows
