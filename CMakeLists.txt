@@ -32,8 +32,10 @@ if(PA_WARNINGS_ARE_ERRORS)
             # Do *NOT* add warnings to this list. Instead, fix your code so that it doesn't produce the warning.
             # TODO: fix the offending code so that we don't have to exclude specific warnings anymore.
             -Wno-error=deprecated-declarations  # https://github.com/PortAudio/portaudio/issues/213 https://github.com/PortAudio/portaudio/issues/641
-            -Wno-error=stringop-overflow
         )
+        if (NOT EMSCRIPTEN)
+            add_compile_options(-Wno-error=stringop-overflow)
+        endif()
         if (CMAKE_C_COMPILER_ID MATCHES "Clang")
              # Don't fail on older clang versions that don't recognize the latest warnings in the list above.
              # Note that unrecognized warning options are not a fatal error on GCC, and in fact, GCC will choke on this option. Hence the conditional.
