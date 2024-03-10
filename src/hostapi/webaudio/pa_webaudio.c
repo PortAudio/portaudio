@@ -122,8 +122,6 @@ typedef struct
     PaUtilStreamInterface blockingStreamInterface;
 
     PaUtilAllocationGroup *allocations;
-
-    EMSCRIPTEN_WEBAUDIO_T context;
 }
 PaWebAudioHostApiRepresentation;
 
@@ -149,8 +147,6 @@ PaError PaWebAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
         goto error;
     }
 
-    webAudioHostApi->context = emscripten_create_audio_context(0);
-
     *hostApi = &webAudioHostApi->inheritedHostApiRep;
     (*hostApi)->info.structVersion = 1;
     (*hostApi)->info.type = paInDevelopment;            /* IMPLEMENT ME: change to correct type id */
@@ -165,10 +161,7 @@ PaError PaWebAudio_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiI
     // https://developer.chrome.com/blog/audiocontext-setsinkid
     // https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/setSinkId
 
-    int defaultSampleRate = EM_ASM_INT({
-        const context = Module.emscriptenGetAudioObject($0);
-        return context.sampleRate;
-    }, webAudioHostApi->context);
+    int defaultSampleRate = 44100;
 
     deviceCount = 1; /* IMPLEMENT ME */
 
@@ -375,9 +368,8 @@ typedef struct PaWebAudioStream
     PaUtilCpuLoadMeasurer cpuLoadMeasurer;
     PaUtilBufferProcessor bufferProcessor;
 
-    /* IMPLEMENT ME:
-            - implementation specific data goes here
-    */
+    EMSCRIPTEN_WEBAUDIO_T context;
+
     unsigned long framesPerHostCallback; /* just an example */
 }
 PaWebAudioStream;
@@ -547,11 +539,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     /* additional stream setup + opening */
 
-    EMSCRIPTEN_WEBAUDIO_T context = webAudioHostApi->context;
+    PA_DEBUG(("Creating audio context..."));
+    stream->context = emscripten_create_audio_context(0);
 
     PA_DEBUG(("Starting Wasm Audio Worklet thread..."));
     emscripten_start_wasm_audio_worklet_thread_async(
-            context,
+            stream->context,
             WASM_AUDIO_WORKLET_THREAD_STACK,
             sizeof(WASM_AUDIO_WORKLET_THREAD_STACK),
             &WasmAudioWorkletThreadInitialized,
@@ -701,10 +694,12 @@ static PaError CloseStream( PaStream* s )
     PaError result = paNoError;
     PaWebAudioStream *stream = (PaWebAudioStream*)s;
 
-    /*
-        IMPLEMENT ME:
-            - additional stream closing + cleanup
-    */
+    /* additional stream closing + cleanup */
+
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        context.close();
+    }, stream->context);
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
@@ -723,6 +718,12 @@ static PaError StartStream( PaStream *s )
 
     /* IMPLEMENT ME, see portaudio.h for required behavior */
 
+    PA_DEBUG(("Resuming audio context..."));
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        context.resume();
+    }, stream->context);
+
     /* suppress unused function warning. the code in WebAudioHostProcessingLoop or
        something similar should be implemented to feed samples to and from the
        host after StartStream() is called.
@@ -738,10 +739,13 @@ static PaError StopStream( PaStream *s )
     PaError result = paNoError;
     PaWebAudioStream *stream = (PaWebAudioStream*)s;
 
-    /* suppress unused variable warnings */
-    (void) stream;
+    /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    /* IMPLEMENT ME, see portaudio.h for required behavior */
+    PA_DEBUG(("Suspending audio context upon stop..."));
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        context.suspend();
+    }, stream->context);
 
     return result;
 }
@@ -752,10 +756,13 @@ static PaError AbortStream( PaStream *s )
     PaError result = paNoError;
     PaWebAudioStream *stream = (PaWebAudioStream*)s;
 
-    /* suppress unused variable warnings */
-    (void) stream;
+    /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    /* IMPLEMENT ME, see portaudio.h for required behavior */
+    PA_DEBUG(("Suspending audio context upon abort..."));
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        context.suspend();
+    }, stream->context);
 
     return result;
 }
