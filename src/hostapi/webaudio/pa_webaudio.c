@@ -716,19 +716,13 @@ static PaError StartStream( PaStream *s )
 
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
-    /* IMPLEMENT ME, see portaudio.h for required behavior */
+    /* TODO: Check if this is right, see portaudio.h for required behavior */
 
     PA_DEBUG(("Resuming audio context..."));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
         context.resume();
     }, stream->context);
-
-    /* suppress unused function warning. the code in WebAudioHostProcessingLoop or
-       something similar should be implemented to feed samples to and from the
-       host after StartStream() is called.
-    */
-    (void) WebAudioHostProcessingLoop;
 
     return result;
 }
