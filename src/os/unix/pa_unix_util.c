@@ -51,6 +51,10 @@
 #include <math.h>
 #include <errno.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #if defined(__APPLE__) && !defined(HAVE_MACH_ABSOLUTE_TIME)
 #define HAVE_MACH_ABSOLUTE_TIME
 #endif
@@ -111,7 +115,9 @@ int PaUtil_CountCurrentlyAllocatedBlocks( void )
 
 void Pa_Sleep( long msec )
 {
-#ifdef HAVE_NANOSLEEP
+#ifdef __EMSCRIPTEN__
+    emscripten_sleep(msec);
+#elif defined(HAVE_NANOSLEEP)
     struct timespec req = {0}, rem = {0};
     PaTime time = msec / 1.e3;
     req.tv_sec = (time_t)time;
