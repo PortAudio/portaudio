@@ -547,12 +547,7 @@ error:
     return result;
 }
 
-/*
-    ExampleHostProcessingLoop() illustrates the kind of processing which may
-    occur in a host implementation.
-
-*/
-static void ExampleHostProcessingLoop( void *inputBuffer, void *outputBuffer, void *userData )
+static void WebAudioHostProcessingLoop( void *inputBuffer, void *outputBuffer, void *userData )
 {
     PaWebAudioStream *stream = (PaWebAudioStream*)userData;
     PaStreamCallbackTimeInfo timeInfo = {0,0,0}; /* IMPLEMENT ME */
@@ -668,11 +663,11 @@ static PaError StartStream( PaStream *s )
 
     /* IMPLEMENT ME, see portaudio.h for required behavior */
 
-    /* suppress unused function warning. the code in ExampleHostProcessingLoop or
+    /* suppress unused function warning. the code in WebAudioHostProcessingLoop or
        something similar should be implemented to feed samples to and from the
        host after StartStream() is called.
     */
-    (void) ExampleHostProcessingLoop;
+    (void) WebAudioHostProcessingLoop;
 
     return result;
 }
