@@ -719,12 +719,22 @@ static PaError StartStream( PaStream *s )
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
     PA_DEBUG(("Resuming audio context...\n"));
-    EM_ASM({
-        const context = emscriptenGetAudioObject($0);
-        Asyncify.handleAsync(async () => {
-            await context.resume();
-        });
-    }, stream->context);
+    emscripten_resume_audio_context_sync(stream->context);
+
+    /*
+        Resuming the context is only allowed after the user has interacted with
+        the page e.g. by clicking somewhere. To make sure that the context is
+        actually running, we use a sleep-wait loop that periodically reattempts
+        to resume the context.
+
+        TODO: Find a more elegant solution
+    */
+
+    while (!IsStreamActive(stream)) {
+        PA_DEBUG(("Audio context is not running yet, waiting for user interaction...\n"));
+        emscripten_sleep(500);
+        emscripten_resume_audio_context_sync(stream->context);
+    }
 
     return result;
 }
