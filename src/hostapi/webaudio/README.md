@@ -23,5 +23,8 @@ You can now run the examples in a local browser using `emrun`, for example
 emrun build/examples/paex_sine.html
 ```
 
+> [!IMPORTANT]
+> Due to browser policies you have to interact with the site at least once (e.g. by clicking anywhere) before audio contexts can be started. `Pa_StartStream` will (from the C/C++ perspective) block until this happens. Under the hood this is handled asynchronously using Asyncify.
+
 > [!TIP]
 > You can customize the browser e.g. by setting `--browser=firefox` and also pass arguments to the browser with `--browser-args`
