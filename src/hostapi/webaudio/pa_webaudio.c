@@ -550,7 +550,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     };
 
     PA_DEBUG(("Creating audio context...\n"));
-    stream->context = emscripten_create_audio_context(&opts);
+    stream->context = emscripten_create_audio_context( &opts );
 
     PA_DEBUG(("Starting Wasm Audio Worklet thread...\n"));
     emscripten_start_wasm_audio_worklet_thread_async(
@@ -558,7 +558,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             WASM_AUDIO_WORKLET_THREAD_STACK,
             sizeof(WASM_AUDIO_WORKLET_THREAD_STACK),
             &WasmAudioWorkletThreadInitialized,
-            stream);
+            stream );
 
     stream->framesPerHostCallback = framesPerHostBuffer;
 
@@ -577,7 +577,7 @@ static void WasmAudioWorkletThreadInitialized( EMSCRIPTEN_WEBAUDIO_T context,
                                                EM_BOOL success,
                                                void *userData )
 {
-    if (!success) return; // Check browser console for detailed errors
+    if ( !success ) return; // Check browser console for detailed errors
 
     WebAudioWorkletProcessorCreateOptions opts = {
             .name = "portaudio-stream",
@@ -585,14 +585,14 @@ static void WasmAudioWorkletThreadInitialized( EMSCRIPTEN_WEBAUDIO_T context,
 
     PA_DEBUG(("Creating Wasm Audio Worklet processor...\n"));
     emscripten_create_wasm_audio_worklet_processor_async(
-            context, &opts, &WasmAudioWorkletProcessorCreated, userData);
+            context, &opts, &WasmAudioWorkletProcessorCreated, userData );
 }
 
 static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
                                               EM_BOOL success,
                                               void *userData )
 {
-    if (!success) return; // Check browser console for detailed errors
+    if ( !success ) return; // Check browser console for detailed errors
 
     int outputChannelCounts[1] = { 2 };
     EmscriptenAudioWorkletNodeCreateOptions opts = {
@@ -602,7 +602,7 @@ static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
 
     PA_DEBUG(("Creating Wasm Audio Worklet node...\n"));
     EMSCRIPTEN_AUDIO_WORKLET_NODE_T node = emscripten_create_wasm_audio_worklet_node(
-            context, "portaudio-stream", &opts, &WebAudioHostProcessingLoop, userData);
+            context, "portaudio-stream", &opts, &WebAudioHostProcessingLoop, userData );
 
     PA_DEBUG(("Connecting node to audio context destination...\n"));
     EM_ASM({
@@ -645,23 +645,27 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
         PaUtil_SetNonInterleaved*Channel() or PaUtil_Set*Channel() here.
     */
 
-    if (numInputs > 0) {
+    if ( numInputs > 0 )
+    {
         assert(numInputs == 1);
         const AudioSampleFrame input = inputs[0];
         PaUtil_SetInputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
         for (int i = 0; i < input.numberOfChannels; i++)
         {
-            PaUtil_SetNonInterleavedInputChannel( &stream->bufferProcessor, i, input.data + PA_WEBAUDIO_FRAME_COUNT * i );
+            PaUtil_SetNonInterleavedInputChannel(
+                    &stream->bufferProcessor, i, input.data + PA_WEBAUDIO_FRAME_COUNT * i );
         }
     }
 
-    if (numOutputs > 0) {
+    if ( numOutputs > 0 )
+    {
         assert(numOutputs == 1);
         AudioSampleFrame output = outputs[0];
         PaUtil_SetOutputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
         for (int i = 0; i < output.numberOfChannels; i++)
         {
-            PaUtil_SetNonInterleavedOutputChannel( &stream->bufferProcessor, i, output.data + PA_WEBAUDIO_FRAME_COUNT * i );
+            PaUtil_SetNonInterleavedOutputChannel(
+                    &stream->bufferProcessor, i, output.data + PA_WEBAUDIO_FRAME_COUNT * i );
         }
     }
 
@@ -744,7 +748,7 @@ static PaError StartStream( PaStream *s )
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
     PA_DEBUG(("Resuming audio context...\n"));
-    emscripten_resume_audio_context_sync(stream->context);
+    emscripten_resume_audio_context_sync( stream->context );
 
     /*
         Resuming the context is only allowed after the user has interacted with
@@ -755,10 +759,11 @@ static PaError StartStream( PaStream *s )
         TODO: Find a more elegant solution
     */
 
-    while (!IsStreamActive(stream)) {
+    while ( !IsStreamActive(stream) )
+    {
         PA_DEBUG(("Audio context is not running yet, waiting for user interaction...\n"));
-        emscripten_sleep(500);
-        emscripten_resume_audio_context_sync(stream->context);
+        emscripten_sleep( 500 );
+        emscripten_resume_audio_context_sync( stream->context );
     }
 
     return result;
@@ -809,7 +814,7 @@ static PaError IsStreamStopped( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    return emscripten_audio_context_state(stream->context) != AUDIO_CONTEXT_STATE_RUNNING;
+    return emscripten_audio_context_state( stream->context ) != AUDIO_CONTEXT_STATE_RUNNING;
 }
 
 
@@ -819,7 +824,7 @@ static PaError IsStreamActive( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    return emscripten_audio_context_state(stream->context) == AUDIO_CONTEXT_STATE_RUNNING;
+    return emscripten_audio_context_state( stream->context ) == AUDIO_CONTEXT_STATE_RUNNING;
 }
 
 
