@@ -594,6 +594,13 @@ static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
     PA_DEBUG(("Creating Wasm Audio Worklet node...\n"));
     EMSCRIPTEN_AUDIO_WORKLET_NODE_T node = emscripten_create_wasm_audio_worklet_node(
             context, "portaudio-stream", &opts, &WebAudioHostProcessingLoop, userData);
+
+    PA_DEBUG(("Connecting node to audio context destination...\n"));
+    EM_ASM({
+        const node = emscriptenGetAudioObject($0);
+        const context = emscriptenGetAudioObject($1);
+        node.connect(context.destination);
+    }, node, context);
 }
 
 static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame *inputs,
