@@ -14,8 +14,14 @@ emcmake cmake -B build -DPA_BUILD_EXAMPLES=ON
 cmake --build build
 ```
 
+> [!TIP]
+> For debug logging, set `-DPA_ENABLE_DEBUG_OUTPUT=ON`
+
 You can now run the examples in a local browser using `emrun`, for example
 
 ```sh
 emrun build/examples/paex_sine.html
 ```
+
+> [!TIP]
+> You can customize the browser e.g. by setting `--browser=firefox` and also pass arguments to the browser with `--browser-args`
