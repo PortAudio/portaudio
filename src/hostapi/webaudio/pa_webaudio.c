@@ -772,12 +772,12 @@ static PaError IsStreamStopped( PaStream *s )
 {
     PaWebAudioStream *stream = (PaWebAudioStream*)s;
 
-    /* suppress unused variable warnings */
-    (void) stream;
+    /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    /* IMPLEMENT ME, see portaudio.h for required behavior */
-
-    return 0;
+    return EM_ASM_INT({
+        const context = emscriptenGetAudioObject($0);
+        return context.state === 'suspended' ? 1 : 0;
+    }, stream->context);
 }
 
 
@@ -785,12 +785,12 @@ static PaError IsStreamActive( PaStream *s )
 {
     PaWebAudioStream *stream = (PaWebAudioStream*)s;
 
-    /* suppress unused variable warnings */
-    (void) stream;
+    /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    /* IMPLEMENT ME, see portaudio.h for required behavior */
-
-    return 0;
+    return EM_ASM_INT({
+        const context = emscriptenGetAudioObject($0);
+        return context.state === 'running' ? 1 : 0;
+    }, stream->context);
 }
 
 
