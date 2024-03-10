@@ -43,6 +43,7 @@
 */
 
 
+#include <assert.h>
 #include <emscripten/webaudio.h>
 #include <string.h> /* strlen() */
 #include <stdint.h>
@@ -394,7 +395,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
     PaWebAudioHostApiRepresentation *webAudioHostApi = (PaWebAudioHostApiRepresentation*)hostApi;
     PaWebAudioStream *stream = 0;
-    unsigned long framesPerHostBuffer = framesPerBuffer; /* these may not be equivalent for all implementations */
+    unsigned long framesPerHostBuffer = 128; // This buffer size is fixed for AudioWorkletProcessor
     int inputChannelCount, outputChannelCount;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
@@ -595,8 +596,8 @@ static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
             context, "portaudio-stream", &opts, &WebAudioHostProcessingLoop, userData);
 }
 
-static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame *inputBuffer,
-                                           int numOutputs, AudioSampleFrame *outputBuffer,
+static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame *inputs,
+                                           int numOutputs, AudioSampleFrame *outputs,
                                            int numParams, const AudioParamFrame *params,
                                            void *userData )
 {
@@ -628,17 +629,23 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
         PaUtil_SetNonInterleaved*Channel() or PaUtil_Set*Channel() here.
     */
 
-    PaUtil_SetInputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
-    PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
-            0, /* first channel of inputBuffer is channel 0 */
-            (void *)inputBuffer,
-            0 ); /* 0 - use inputChannelCount passed to init buffer processor */
+    if (numInputs > 0) {
+        assert(numInputs == 1);
+        PaUtil_SetInputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
+        PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
+                0, /* first channel of inputBuffer is channel 0 */
+                inputs[0].data,
+                inputs[0].numberOfChannels );
+    }
 
-    PaUtil_SetOutputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
-    PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
-            0, /* first channel of outputBuffer is channel 0 */
-            outputBuffer,
-            0 ); /* 0 - use outputChannelCount passed to init buffer processor */
+    if (numOutputs > 0) {
+        assert(numOutputs == 1);
+        PaUtil_SetOutputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
+        PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
+                0, /* first channel of outputBuffer is channel 0 */
+                outputs[0].data,
+                outputs[0].numberOfChannels );
+    }
 
     /* you must pass a valid value of callback result to PaUtil_EndBufferProcessing()
         in general you would pass paContinue for normal operation, and
