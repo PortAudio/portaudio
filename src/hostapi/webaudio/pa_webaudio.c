@@ -45,6 +45,7 @@
 
 #include <emscripten/webaudio.h>
 #include <string.h> /* strlen() */
+#include <stdint.h>
 
 #include "pa_util.h"
 #include "pa_allocation.h"
@@ -96,6 +97,16 @@ static PaError WriteStream( PaStream* stream, const void *buffer, unsigned long 
 static signed long GetStreamReadAvailable( PaStream* stream );
 static signed long GetStreamWriteAvailable( PaStream* stream );
 
+static void WasmAudioWorkletThreadInitialized( EMSCRIPTEN_WEBAUDIO_T context,
+                                               EM_BOOL success,
+                                               void *userData );
+static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
+                                              EM_BOOL success,
+                                              void *userData );
+static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame *inputBuffer,
+                                           int numOutputs, AudioSampleFrame *outputBuffer,
+                                           int numParams, const AudioParamFrame *params,
+                                           void *userData );
 
 /* IMPLEMENT ME: a macro like the following one should be used for reporting
  host errors */
@@ -371,6 +382,11 @@ typedef struct PaWebAudioStream
 }
 PaWebAudioStream;
 
+/* Must be a multiple of (and aligned to) 16 bytes. See
+    - https://emscripten.org/docs/api_reference/wasm_audio_worklets.html#programming-example
+    - https://github.com/emscripten-core/emscripten/blob/2ba2078b/system/include/emscripten/webaudio.h#L70 */
+uint8_t WASM_AUDIO_WORKLET_THREAD_STACK[4096];
+
 /* see pa_hostapi.h for a list of validity guarantees made about OpenStream parameters */
 
 static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
@@ -529,10 +545,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->streamRepresentation.streamInfo.sampleRate = sampleRate;
 
 
-    /*
-        IMPLEMENT ME:
-            - additional stream setup + opening
-    */
+    /* additional stream setup + opening */
+
+    EMSCRIPTEN_WEBAUDIO_T context = webAudioHostApi->context;
+
+    PA_DEBUG(("Starting Wasm Audio Worklet thread..."));
+    emscripten_start_wasm_audio_worklet_thread_async(
+            context,
+            WASM_AUDIO_WORKLET_THREAD_STACK,
+            sizeof(WASM_AUDIO_WORKLET_THREAD_STACK),
+            &WasmAudioWorkletThreadInitialized,
+            stream);
 
     stream->framesPerHostCallback = framesPerHostBuffer;
 
@@ -547,7 +570,42 @@ error:
     return result;
 }
 
-static void WebAudioHostProcessingLoop( void *inputBuffer, void *outputBuffer, void *userData )
+static void WasmAudioWorkletThreadInitialized( EMSCRIPTEN_WEBAUDIO_T context,
+                                               EM_BOOL success,
+                                               void *userData )
+{
+    if (!success) return; // Check browser console for detailed errors
+
+    WebAudioWorkletProcessorCreateOptions opts = {
+            .name = "portaudio-stream",
+    };
+
+    PA_DEBUG(("Creating Wasm Audio Worklet processor..."));
+    emscripten_create_wasm_audio_worklet_processor_async(
+            context, &opts, &WasmAudioWorkletProcessorCreated, userData);
+}
+
+static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
+                                              EM_BOOL success,
+                                              void *userData )
+{
+    if (!success) return; // Check browser console for detailed errors
+
+    int outputChannelCounts[1] = { 2 };
+    EmscriptenAudioWorkletNodeCreateOptions opts = {
+            .numberOfInputs = 0,
+            .numberOfOutputs = 1,
+    };
+
+    PA_DEBUG(("Creating Wasm Audio Worklet node..."));
+    EMSCRIPTEN_AUDIO_WORKLET_NODE_T node = emscripten_create_wasm_audio_worklet_node(
+            context, "portaudio-stream", &opts, &WebAudioHostProcessingLoop, userData);
+}
+
+static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame *inputBuffer,
+                                           int numOutputs, AudioSampleFrame *outputBuffer,
+                                           int numParams, const AudioParamFrame *params,
+                                           void *userData )
 {
     PaWebAudioStream *stream = (PaWebAudioStream*)userData;
     PaStreamCallbackTimeInfo timeInfo = {0,0,0}; /* IMPLEMENT ME */
@@ -580,7 +638,7 @@ static void WebAudioHostProcessingLoop( void *inputBuffer, void *outputBuffer, v
     PaUtil_SetInputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
     PaUtil_SetInterleavedInputChannels( &stream->bufferProcessor,
             0, /* first channel of inputBuffer is channel 0 */
-            inputBuffer,
+            (void *)inputBuffer,
             0 ); /* 0 - use inputChannelCount passed to init buffer processor */
 
     PaUtil_SetOutputFrameCount( &stream->bufferProcessor, 0 /* default to host buffer size */ );
@@ -629,6 +687,8 @@ static void WebAudioHostProcessingLoop( void *inputBuffer, void *outputBuffer, v
         if( stream->streamRepresentation.streamFinishedCallback != 0 )
             stream->streamRepresentation.streamFinishedCallback( stream->streamRepresentation.userData );
     }
+
+    return callbackResult == paContinue;
 }
 
 
