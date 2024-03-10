@@ -540,8 +540,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     /* additional stream setup + opening */
 
+    EmscriptenWebAudioCreateAttributes opts = {
+            .latencyHint = "playback", // One of "balanced", "interactive" or "playback"
+            .sampleRate = sampleRate,
+    };
+
     PA_DEBUG(("Creating audio context...\n"));
-    stream->context = emscripten_create_audio_context(0);
+    stream->context = emscripten_create_audio_context(&opts);
 
     PA_DEBUG(("Starting Wasm Audio Worklet thread...\n"));
     emscripten_start_wasm_audio_worklet_thread_async(
