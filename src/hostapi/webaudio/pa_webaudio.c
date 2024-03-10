@@ -539,10 +539,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     /* additional stream setup + opening */
 
-    PA_DEBUG(("Creating audio context..."));
+    PA_DEBUG(("Creating audio context...\n"));
     stream->context = emscripten_create_audio_context(0);
 
-    PA_DEBUG(("Starting Wasm Audio Worklet thread..."));
+    PA_DEBUG(("Starting Wasm Audio Worklet thread...\n"));
     emscripten_start_wasm_audio_worklet_thread_async(
             stream->context,
             WASM_AUDIO_WORKLET_THREAD_STACK,
@@ -573,7 +573,7 @@ static void WasmAudioWorkletThreadInitialized( EMSCRIPTEN_WEBAUDIO_T context,
             .name = "portaudio-stream",
     };
 
-    PA_DEBUG(("Creating Wasm Audio Worklet processor..."));
+    PA_DEBUG(("Creating Wasm Audio Worklet processor...\n"));
     emscripten_create_wasm_audio_worklet_processor_async(
             context, &opts, &WasmAudioWorkletProcessorCreated, userData);
 }
@@ -590,7 +590,7 @@ static void WasmAudioWorkletProcessorCreated( EMSCRIPTEN_WEBAUDIO_T context,
             .numberOfOutputs = 1,
     };
 
-    PA_DEBUG(("Creating Wasm Audio Worklet node..."));
+    PA_DEBUG(("Creating Wasm Audio Worklet node...\n"));
     EMSCRIPTEN_AUDIO_WORKLET_NODE_T node = emscripten_create_wasm_audio_worklet_node(
             context, "portaudio-stream", &opts, &WebAudioHostProcessingLoop, userData);
 }
@@ -718,7 +718,7 @@ static PaError StartStream( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    PA_DEBUG(("Resuming audio context..."));
+    PA_DEBUG(("Resuming audio context...\n"));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
         context.resume();
@@ -735,7 +735,7 @@ static PaError StopStream( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    PA_DEBUG(("Suspending audio context upon stop..."));
+    PA_DEBUG(("Suspending audio context upon stop...\n"));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
         context.suspend();
@@ -752,7 +752,7 @@ static PaError AbortStream( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    PA_DEBUG(("Suspending audio context upon abort..."));
+    PA_DEBUG(("Suspending audio context upon abort...\n"));
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
         context.suspend();
