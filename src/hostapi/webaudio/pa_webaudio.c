@@ -791,10 +791,7 @@ static PaError IsStreamStopped( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    return EM_ASM_INT({
-        const context = emscriptenGetAudioObject($0);
-        return context.state === 'suspended' ? 1 : 0;
-    }, stream->context);
+    return emscripten_audio_context_state(stream->context) != AUDIO_CONTEXT_STATE_RUNNING;
 }
 
 
@@ -804,10 +801,7 @@ static PaError IsStreamActive( PaStream *s )
 
     /* TODO: Check if this is right, see portaudio.h for required behavior */
 
-    return EM_ASM_INT({
-        const context = emscriptenGetAudioObject($0);
-        return context.state === 'running' ? 1 : 0;
-    }, stream->context);
+    return emscripten_audio_context_state(stream->context) == AUDIO_CONTEXT_STATE_RUNNING;
 }
 
 
