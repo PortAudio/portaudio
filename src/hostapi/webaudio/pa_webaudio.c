@@ -48,6 +48,7 @@
 
 #include "pa_util.h"
 #include "pa_allocation.h"
+#include "pa_debugprint.h"
 #include "pa_hostapi.h"
 #include "pa_stream.h"
 #include "pa_cpuload.h"
