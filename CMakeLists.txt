@@ -412,12 +412,19 @@ elseif(UNIX)
         target_compile_definitions(PortAudio PUBLIC PA_USE_WEBAUDIO=1)
         target_compile_options(PortAudio PUBLIC -pthread)
         target_link_options(PortAudio PUBLIC
-          -sASYNCIFY
-          -sASYNCIFY_IMPORTS=emscripten_asm_const_int
           -sAUDIO_WORKLET
           -sWASM_WORKERS
           -sEXPORTED_RUNTIME_METHODS=emscriptenGetAudioObject
         )
+
+        option(PA_WEBAUDIO_ASYNCIFY "Build with -sASYNCIFY and use async operations. Recommended when intending to call PortAudio from the main thread to avoid blocking." ON)
+        if(PA_WEBAUDIO_ASYNCIFY)
+          target_compile_definitions(PortAudio PUBLIC PA_WEBAUDIO_ASYNCIFY=1)
+          target_link_options(PortAudio PUBLIC
+            -sASYNCIFY
+            -sASYNCIFY_IMPORTS=emscripten_asm_const_int
+          )
+        endif()
         set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_WEBAUDIO=1")
       endif()
 

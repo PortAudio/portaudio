@@ -53,6 +53,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/threading.h>
 #endif
 
 #if defined(__APPLE__) && !defined(HAVE_MACH_ABSOLUTE_TIME)
@@ -116,7 +117,11 @@ int PaUtil_CountCurrentlyAllocatedBlocks( void )
 void Pa_Sleep( long msec )
 {
 #ifdef __EMSCRIPTEN__
+#ifdef PA_WEBAUDIO_ASYNCIFY
     emscripten_sleep(msec);
+#else
+    emscripten_thread_sleep(msec);
+#endif
 #elif defined(HAVE_NANOSLEEP)
     struct timespec req = {0}, rem = {0};
     PaTime time = msec / 1.e3;

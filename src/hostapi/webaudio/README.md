@@ -15,6 +15,9 @@ cmake --build build
 ```
 
 > [!TIP]
+> By default PortAudio will be built with `-sASYNCIFY`. This makes it safe to be called from the main thread, but also introduces overhead and potentially other issues when the application already uses other asynchronous operations. PortAudio can also be built without Asyncify (i.e. using synchronous/blocking operations) by setting `-DPA_WEBAUDIO_ASYNCIFY=OFF`, in that case it is recommended to call PortAudio from a worker thread to avoid blocking the main thread (which may result in locking up the UI or in worse cases deadlock the application, e.g. if PortAudio waits for user interaction, as it does during `Pa_StartStream`). This can be done automatically using `-sPROXY_TO_PTHREAD`.
+
+> [!TIP]
 > For debug logging, set `-DPA_ENABLE_DEBUG_OUTPUT=ON`
 
 You can now run the examples in a local browser using `emrun`, for example

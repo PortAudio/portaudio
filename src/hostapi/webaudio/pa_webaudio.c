@@ -718,12 +718,24 @@ static EM_BOOL WebAudioHostProcessingLoop( int numInputs, const AudioSampleFrame
 
 void WebAudioSuspendContextSync( EMSCRIPTEN_WEBAUDIO_T context )
 {
+#ifdef PA_WEBAUDIO_ASYNCIFY
     EM_ASM({
         const context = emscriptenGetAudioObject($0);
         Asyncify.handleAsync(async () => {
             await context.suspend();
         });
     }, context);
+#else
+    EM_ASM({
+        const context = emscriptenGetAudioObject($0);
+        context.suspend();
+    }, context);
+
+    while ( emscripten_audio_context_state( context ) != AUDIO_CONTEXT_STATE_SUSPENDED )
+    {
+        Pa_Sleep ( 100 );
+    }
+#endif
 }
 
 
@@ -772,7 +784,7 @@ static PaError StartStream( PaStream *s )
     while ( !IsStreamActive(stream) )
     {
         PA_DEBUG(("Audio context is not running yet, waiting for user interaction...\n"));
-        emscripten_sleep( 500 );
+        Pa_Sleep( 500 );
         emscripten_resume_audio_context_sync( stream->context );
     }
 
