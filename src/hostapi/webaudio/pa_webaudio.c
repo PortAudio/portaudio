@@ -731,9 +731,16 @@ void WebAudioSuspendContextSync( EMSCRIPTEN_WEBAUDIO_T context )
         context.suspend();
     }, context);
 
-    while ( emscripten_audio_context_state( context ) != AUDIO_CONTEXT_STATE_SUSPENDED )
+    if ( emscripten_is_main_browser_thread() )
     {
-        Pa_Sleep ( 100 );
+        PA_DEBUG(("Warning: Not waiting for the context to suspend since we're on the main browser thread, this may result in inconsistent behavior!"));
+    }
+    else
+    {
+        while ( emscripten_audio_context_state( context ) != AUDIO_CONTEXT_STATE_SUSPENDED )
+        {
+            Pa_Sleep ( 100 );
+        }
     }
 #endif
 }
@@ -781,12 +788,23 @@ static PaError StartStream( PaStream *s )
         TODO: Find a more elegant solution
     */
 
+#ifndef PA_WEBAUDIO_ASYNCIFY
+    if ( emscripten_is_main_browser_thread() )
+    {
+        PA_DEBUG(("Warning: Not waiting for the context to initialize in StartStream since we're on the main browser thread, this may result in inconsistent behavior!"));
+    }
+    else
+    {
+#endif
     while ( !IsStreamActive(stream) )
     {
         PA_DEBUG(("Audio context is not running yet, waiting for user interaction...\n"));
         Pa_Sleep( 500 );
         emscripten_resume_audio_context_sync( stream->context );
     }
+#ifndef PA_WEBAUDIO_ASYNCIFY
+    }
+#endif
 
     return result;
 }
