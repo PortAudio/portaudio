@@ -44,6 +44,7 @@
 
 
 #include <assert.h>
+#include <emscripten/threading.h>
 #include <emscripten/webaudio.h>
 #include <string.h> /* strlen() */
 #include <stdint.h>
