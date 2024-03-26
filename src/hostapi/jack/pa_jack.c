@@ -1390,6 +1390,26 @@ error:
 }
 
 /*
+ * Reset inputBase and outputBase when all streams have been closed. This makes port names stable for typical
+ * applications that open streams in the same order every time. Applications that open streams in a different order
+ * every time do not get stable port names. Stable port names allow JACK connection managers to save/load connections
+ * between ports, saving the user the trouble of manually connecting ports each time they use the application.
+ */
+static void CheckAndResetPortBase( PaJackHostApiRepresentation *jackApi )
+{
+    int noStreams;
+
+    ASSERT_CALL( pthread_mutex_lock( &jackApi->mtx ), 0 );
+    noStreams = jackApi->jackIsDown || jackApi->processQueue == NULL;
+    ASSERT_CALL( pthread_mutex_unlock( &jackApi->mtx ), 0 );
+
+    if ( noStreams ) {
+        jackApi->inputBase = 0;
+        jackApi->outputBase = 0;
+    }
+}
+
+/*
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
 */
@@ -1397,12 +1417,14 @@ static PaError CloseStream( PaStream* s )
 {
     PaError result = paNoError;
     PaJackStream *stream = (PaJackStream*)s;
+    PaJackHostApiRepresentation *hostApi = stream->hostApi;
 
     /* Remove this stream from the processing queue */
     ENSURE_PA( RemoveStream( stream ) );
 
 error:
     CleanUpStream( stream, 1, 1 );
+    CheckAndResetPortBase( hostApi );
     return result;
 }
 
