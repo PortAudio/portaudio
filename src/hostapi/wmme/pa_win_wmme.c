@@ -3702,7 +3702,9 @@ static PaError ReadStream( PaStream* s,
     unsigned long framesProcessed;
     signed int hostInputBufferIndex;
     DWORD waitResult;
-    DWORD timeoutMs = stream->allBuffersDurationMs / 2;
+    DWORD pollTimeoutMs = stream->allBuffersDurationMs / 2;
+    DWORD failTimeoutMs = stream->allBuffersDurationMs * 3;
+    DWORD accumulatedTimoutMs = 0;
     unsigned int channel, i;
 
     if( PA_IS_INPUT_STREAM_(stream) )
@@ -3727,6 +3729,8 @@ static PaError ReadStream( PaStream* s,
         do{
             if( CurrentInputBuffersAreDone( stream ) )
             {
+                accumulatedTimoutMs = 0; /* reset failure timer whenever we have a buffer */
+
                 if( NoBuffersAreQueued( &stream->input ) )
                 {
                     /** @todo REVIEW: consider what to do if the input overflows.
@@ -3772,7 +3776,7 @@ static PaError ReadStream( PaStream* s,
 
             }else{
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->input.bufferEvent, timeoutMs );
+                waitResult = WaitForSingleObject( stream->input.bufferEvent, pollTimeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     result = paUnanticipatedHostError;
@@ -3780,9 +3784,13 @@ static PaError ReadStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
-                    */
+                    /* if a timeout is encountered, continue to check for data. but give up eventually. */
+                    accumulatedTimoutMs += pollTimeoutMs;
+                    if( accumulatedTimoutMs >= failTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }
             }
         }while( framesRead < frames );
@@ -3807,7 +3815,9 @@ static PaError WriteStream( PaStream* s,
     unsigned long framesProcessed;
     signed int hostOutputBufferIndex;
     DWORD waitResult;
-    DWORD timeoutMs = stream->allBuffersDurationMs / 2;
+    DWORD pollTimeoutMs = stream->allBuffersDurationMs / 2;
+    DWORD failTimeoutMs = stream->allBuffersDurationMs * 3;
+    DWORD accumulatedTimoutMs = 0;
     unsigned int channel, i;
 
 
@@ -3833,6 +3843,8 @@ static PaError WriteStream( PaStream* s,
         do{
             if( CurrentOutputBuffersAreDone( stream ) )
             {
+                accumulatedTimoutMs = 0; /* reset failure timer whenever we have a buffer */
+
                 if( NoBuffersAreQueued( &stream->output ) )
                 {
                     /** @todo REVIEW: consider what to do if the output
@@ -3880,7 +3892,7 @@ static PaError WriteStream( PaStream* s,
             else
             {
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeoutMs );
+                waitResult = WaitForSingleObject( stream->output.bufferEvent, pollTimeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     result = paUnanticipatedHostError;
@@ -3888,9 +3900,13 @@ static PaError WriteStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
-                    */
+                    /* if a timeout is encountered, continue to try to output. but give up eventually. */
+                    accumulatedTimoutMs += pollTimeoutMs;
+                    if( accumulatedTimoutMs >= failTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }
             }
         }while( framesWritten < frames );
