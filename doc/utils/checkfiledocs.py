@@ -62,8 +62,8 @@ def printError( f, message ):
     global currentFile
     if f != currentFile:
         currentFile = f
-        print f, ":"
-    print "\t!", message
+        print(f, ":")
+    print("\t!", message)
 
 
 for f in sourceFiles:
@@ -83,5 +83,3 @@ for f in sourceFiles:
         
     if not '@ingroup' in s:
         printError( f, "no doxygen @ingroup tag" )
-        
-
