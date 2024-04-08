@@ -330,6 +330,23 @@ elseif(UNIX)
 
     set(PKGCONFIG_LDFLAGS_PRIVATE
       "${PKGCONFIG_LDFLAGS_PRIVATE} -framework CoreAudio -framework AudioToolbox -framework AudioUnit -framework CoreFoundation -framework CoreServices")
+    if(CMAKE_SYSTEM_VERSION VERSION_GREATER_EQUAL "13.0")
+      # Add the ScreenCaptureKit framework
+      find_library(SCREENCAPTUREKIT_FRAMEWORK ScreenCaptureKit)
+      if(SCREENCAPTUREKIT_FRAMEWORK)
+        target_sources(PortAudio PRIVATE
+          src/hostapi/screencapturekit/pa_mac_screencapturekit.m
+        )
+        target_link_libraries(PortAudio
+          PRIVATE
+            -Wl,-framework,ScreenCaptureKit
+            -Wl,-framework,CoreMedia
+        )
+        target_compile_definitions(PortAudio PUBLIC PA_USE_SCREENCAPTUREKIT=1)
+        set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_SCREENCAPTUREKIT=1")
+        set(PKGCONFIG_LDFLAGS_PRIVATE "${PKGCONFIG_LDFLAGS_PRIVATE} -framework ScreenCaptureKit -framework CoreMedia")
+      endif()
+    endif()
   else()
     # Some BSDs have a reimplementation of alsalib, so do not explicitly check for Linux.
     find_package(ALSA)
