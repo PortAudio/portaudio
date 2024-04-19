@@ -6,6 +6,8 @@ Run and graph the results of patest_suggested_vs_streaminfo_latency.c
 Requires matplotlib for plotting: http://matplotlib.sourceforge.net/
 
 """
+from __future__ import print_function
+
 import os
 from pylab import *
 import numpy
@@ -92,7 +94,7 @@ isFirst = True
 
 for framesPerBuffer in compositeTestFramesPerBufferValues:
     commandString = testExeName + " " + str(inputDeviceIndex) + " " + str(outputDeviceIndex) + " " + str(sampleRate) + " " + str(framesPerBuffer) + ' > ' + dataFileName
-    print commandString
+    print(commandString)
     os.system(commandString)
 
     d = loadCsvData(dataFileName)
