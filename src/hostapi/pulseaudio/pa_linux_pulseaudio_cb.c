@@ -478,7 +478,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     stream->pulseaudioIsStopped = 1;
 
     if( stream->outputStream != NULL
-        && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY )
+        && PA_STREAM_IS_GOOD( pa_stream_get_state( stream->outputStream ) ) )
     {
         PaPulseAudio_Lock(stream->mainloop);
         /* Pause stream so it stops faster */
@@ -510,7 +510,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     }
 
     if( stream->inputStream != NULL
-        && pa_stream_get_state( stream->inputStream ) == PA_STREAM_READY )
+        && PA_STREAM_IS_GOOD( pa_stream_get_state( stream->inputStream ) ) )
     {
         PaPulseAudio_Lock( stream->mainloop );
         /* Pause stream so it stops so it stops faster */
@@ -551,7 +551,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     {
         PaPulseAudio_Lock( stream->mainloop );
         if( stream->inputStream != NULL
-            && pa_stream_get_state( stream->inputStream ) == PA_STREAM_TERMINATED )
+            && !PA_STREAM_IS_GOOD( pa_stream_get_state( stream->inputStream ) ) )
         {
             pa_stream_unref( stream->inputStream );
             stream->inputStream = NULL;
@@ -560,7 +560,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 
         PaPulseAudio_Lock( stream->mainloop );
         if( stream->outputStream != NULL
-            && pa_stream_get_state(stream->outputStream) == PA_STREAM_TERMINATED )
+            && !PA_STREAM_IS_GOOD( pa_stream_get_state( stream->outputStream ) ) )
         {
             pa_stream_unref( stream->outputStream );
             stream->outputStream = NULL;
