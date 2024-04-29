@@ -1,0 +1,16 @@
+/** @page compile_wasm Building PortAudio for WebAssemblys
+@ingroup tutorial
+
+<b>NOTE:</b> These instructions best work under Linux. Other platforms haven't been tested and might not work.
+
+Building PortAudio for WebAssembly is support only through CMake. To build PortAudio for WebAssembly, you need to install Emscripten. Follow the instructions at https://emscripten.org/docs/getting_started/downloads.html to install and setup Emscripten. Make sure that you also install emcmake and emmake as well.
+
+Once you've installed Emscripten, run the following:
+
+@code
+mkdir build && cd build
+emcmake cmake -DWASM=1 <portaudio_root>
+emmake make
+@endcode
+
+*/
