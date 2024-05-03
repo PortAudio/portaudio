@@ -49,13 +49,13 @@ jobs:
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
           - name: macOS Clang
             os: macOS-latest
-            vcpkg_triplet: x64-osx
+            vcpkg_triplet: arm64-osx
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=OFF
           - name: macOS Clang framework
             os: macOS-latest
-            vcpkg_triplet: x64-osx
+            vcpkg_triplet: arm64-osx
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=ON
