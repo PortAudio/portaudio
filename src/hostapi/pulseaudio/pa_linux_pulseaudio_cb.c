@@ -469,6 +469,8 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = stream->hostapi;
     pa_operation *pulseaudioOperation = NULL;
     int waitLoop = 0;
+    int waitOutputClose = 0;
+    int waitInputClose = 0;
     int pulseaudioError = 0;
 
     /* Wait for stream to be stopped */
@@ -553,8 +555,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         if( stream->inputStream != NULL
             && !PA_STREAM_IS_GOOD( pa_stream_get_state( stream->inputStream ) ) )
         {
-            pa_stream_unref( stream->inputStream );
-            stream->inputStream = NULL;
+            waitInputClose = 1;
         }
         PaPulseAudio_UnLock( stream->mainloop );
 
@@ -562,27 +563,55 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         if( stream->outputStream != NULL
             && !PA_STREAM_IS_GOOD( pa_stream_get_state( stream->outputStream ) ) )
         {
-            pa_stream_unref( stream->outputStream );
-            stream->outputStream = NULL;
+            waitOutputClose = 1;
         }
         PaPulseAudio_UnLock( stream->mainloop );
 
-        if((stream->outputStream == NULL
-           && stream->inputStream == NULL)
-           || pulseaudioError >= 5000 )
+        if( ( ( stream->outputStream == NULL || waitOutputClose )
+           && ( stream->inputStream == NULL || waitInputClose ) )
+           || pulseaudioError >= 500 )
         {
             waitLoop = 1;
+
+            /* If we are here because of timeout
+               then we should return some error.
+
+               As it should be closed by now even
+               behind very slow TCP link we'll
+               just assume everything is ok and
+               bail out ourselves.
+               */
+            if( pulseaudioError >= 500 )
+            {
+                result = paInternalError;
+            }
         }
 
         pulseaudioError ++;
-        usleep(10000);
+        usleep(1000);
+    }
+
+    if( stream->inputStream != NULL )
+    {
+        pa_stream_unref( stream->inputStream );
+        stream->inputStream = NULL;
+    }
+
+    if( stream->outputStream != NULL )
+    {
+        pa_stream_unref( stream->outputStream );
+        stream->outputStream = NULL;
     }
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
 
     PaUtil_FreeMemory( stream->inputStreamName );
+    stream->inputStreamName = NULL;
+
     PaUtil_FreeMemory( stream->outputStreamName );
+    stream->outputStreamName = NULL;
+
     PaUtil_FreeMemory( stream );
 
     return result;
