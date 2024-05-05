@@ -79,11 +79,11 @@ extern "C"
 /* Just some value that Pulseaudio can handle */
 #define PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC 32
 
-/* Assuming of 2 seconds of 44100 Hz sample rate with FLOAT (4 bytes) and stereo channels (2 channels).
+/* Assuming of 4 seconds of 48000 Hz sample rate with FLOAT (4 bytes) and stereo channels (2 channels).
    You should have pretty good size buffer with this. If output/intput doesn't happens in 2 second we
    have more trouble than this buffer.
    @todo change this to something more sophisticated */
-#define PULSEAUDIO_BUFFER_SIZE (96100 * 4 * 2)
+#define PULSEAUDIO_BUFFER_SIZE ((48000 * 2) * 4 * 4)
 
 typedef struct
 {
@@ -170,6 +170,7 @@ typedef struct PaPulseAudio_Stream
     volatile sig_atomic_t isStopped;
     volatile sig_atomic_t pulseaudioIsActive;
     volatile sig_atomic_t pulseaudioIsStopped;
+    volatile sig_atomic_t isClosed;
 
 }
 PaPulseAudio_Stream;
@@ -195,10 +196,29 @@ PaPulseAudio_Stream;
                 return errorCode; \
             } \
     } \
-    if( !pastream->isActive || pastream->isStopped ) \
+    if( !(pastream)->isActive || (pastream)->isStopped ) \
     { \
-            return paStreamIsStopped; \
+        return paStreamIsStopped; \
     }
+
+#define PA_PULSEAUDIO_WAIT_FOR_OPERATION(pulseaudiostream, operation, waitOperation) \
+    waitOperation = 0; \
+    while( pa_operation_get_state( operation ) == PA_OPERATION_RUNNING ) \
+    { \
+        pa_threaded_mainloop_wait( pulseaudiostream->mainloop ); \
+        waitOperation ++; \
+        usleep(2000); \
+        if(waitOperation > 2000) \
+        { \
+            break; \
+        } \
+    } \
+    waitOperation = 0; \
+    PaPulseAudio_Lock(pulseaudiostream->mainloop); \
+    pa_operation_unref( operation ); \
+    operation = NULL; \
+    PaPulseAudio_UnLock(pulseaudiostream->mainloop); \
+
 
 void PaPulseAudio_Lock( pa_threaded_mainloop *mainloop );
 
