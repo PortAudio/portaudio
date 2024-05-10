@@ -155,7 +155,7 @@ for dir in dirs:
             # check and then normalize to \n line endings for the benefit of the rest of the program
             if b"\r" in data and b"\n" in data:
                 # CRLF (Windows) case: check for stray CR or LF, then convert CRLF to LF
-                assert not b"\f" in data  # we'll use \f as a sentinel during conversion
+                assert b"\f" not in data  # we'll use \f as a sentinel during conversion
                 d = data.replace(b"\r\n", b"\f")
                 if b"\r" in d:
                     status.incrementIssueCount("has-inconsistent-line-endings")
@@ -261,7 +261,7 @@ for dir in dirs:
             # 7. No "empty" (or whitespace) lines at end-of-file.
             # Cases:
             #   1. There is an EOL at EOF. Since the lines array is constructed by splitting on '\n',
-            #      the final element in the lines array will be an empty string. This is expeced and allowed.
+            #      the final element in the lines array will be an empty string. This is expected and allowed.
             #      Then continue to check for earlier empty lines.
             #   2. There is no EOF at EOL.
             #      Check for empty lines, including the final line.
