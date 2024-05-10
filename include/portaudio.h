@@ -1001,8 +1001,8 @@ PaError Pa_StartStream( PaStream *stream );
 PaError Pa_StopStream( PaStream *stream );
 
 
-/** Terminates audio processing immediately without waiting for pending
- buffers to complete.
+/** Terminates audio processing promptly without necessarily waiting for
+ pending buffers to complete.
 */
 PaError Pa_AbortStream( PaStream *stream );
 
