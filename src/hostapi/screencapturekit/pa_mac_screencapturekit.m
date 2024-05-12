@@ -39,6 +39,7 @@
 
 #include <CoreMedia/CoreMedia.h>
 #include <ScreenCaptureKit/ScreenCaptureKit.h>
+#include <pthread.h>
 #include <pa_debugprint.h>
 #include <pa_hostapi.h>
 #include <pa_ringbuffer.h>
@@ -54,6 +55,7 @@ typedef struct PaScreenCaptureKitHostApiRepresentation
 {
     PaUtilHostApiRepresentation inheritedHostApiRep;
     PaUtilStreamInterface blockingStreamInterface;
+    PaUtilStreamInterface callbackStreamInterface;
 } PaScreenCaptureKitHostApiRepresentation;
 
 typedef struct PaScreenCaptureKitStream
@@ -64,6 +66,10 @@ typedef struct PaScreenCaptureKitStream
     PaUtilRingBuffer ringBuffer;
     BOOL isStopped;
     int sampleRate;
+    PaStreamCallback *streamCallback;
+    void *userData;
+    unsigned long framesPerBuffer;
+    pthread_t callbackThreadId;
 } PaScreenCaptureKitStream;
 
 @implementation ScreenCaptureKitStreamOutput
@@ -137,6 +143,27 @@ typedef struct PaScreenCaptureKitStream
 }
 @end
 
+static PaError StopStreamInternal(PaStream *s)
+{
+    PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    __block PaError result = paNoError;
+    dispatch_group_t handlerGroup = dispatch_group_create();
+    dispatch_group_enter(handlerGroup);
+    // Stop the audio capture session
+    [stream->audioStream stopCaptureWithCompletionHandler:^(NSError *error) {
+      if (error)
+      {
+          PA_DEBUG(("Failed to stop audio capture: %s\n", [[error localizedDescription] UTF8String]));
+          result = paInternalError;
+          return;
+      }
+      dispatch_group_leave(handlerGroup);
+    }];
+    stream->isStopped = TRUE;
+    dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
+    return result;
+}
+
 // PortAudio host API stream read function
 static PaError ReadStream(PaStream *s, void *buffer, unsigned long frames)
 {
@@ -151,6 +178,35 @@ static PaError ReadStream(PaStream *s, void *buffer, unsigned long frames)
     ring_buffer_size_t read = PaUtil_ReadRingBuffer(&stream->ringBuffer, buffer, frames);
 
     return paNoError;
+}
+
+static void *StreamProcessingThread(void *userData)
+{
+    PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)userData;
+    while (!stream->isStopped)
+    {
+        // Wait until enough data is available in the ring buffer
+        if (PaUtil_GetRingBufferReadAvailable(&stream->ringBuffer) >= stream->framesPerBuffer)
+        {
+            float buffer[stream->framesPerBuffer];
+            // Copy the data to the buffer
+            ring_buffer_size_t read = PaUtil_ReadRingBuffer(&stream->ringBuffer, buffer, stream->framesPerBuffer);
+
+            const PaStreamCallbackTimeInfo timeInfo = {0, 0, 0}; // TODO : Fill the timestamps
+            PaStreamCallbackFlags statusFlags = 0; // TODO : Determine underflow/overflow flags as needed
+
+            // Call the user callback
+            PaStreamCallbackResult callbackResult = stream->streamCallback(buffer, NULL,
+                stream->framesPerBuffer, &timeInfo, statusFlags, stream->userData);
+
+            if (callbackResult != paContinue)
+            {
+                StopStreamInternal((PaStream *)stream);
+            }
+        }
+        usleep(1000);
+    }
+    return NULL;
 }
 
 // PortAudio host API is format supported function
@@ -200,8 +256,6 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
     PaError result = IsFormatSupported(hostApi, inputParameters, outputParameters, sampleRate);
     if (result != paFormatIsSupported)
         return result;
-    if (streamCallback != NULL)
-        return paCanNotWriteToACallbackStream;
     PaScreenCaptureKitHostApiRepresentation *paSck = (PaScreenCaptureKitHostApiRepresentation *)hostApi;
     PaScreenCaptureKitStream *stream = NULL;
     result = paNoError;
@@ -307,7 +361,19 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
         goto error;
     }
 
-    PaUtil_InitializeStreamRepresentation(&stream->streamRepresentation, &paSck->blockingStreamInterface, NULL, NULL);
+    if (streamCallback)
+    {
+        PaUtil_InitializeStreamRepresentation(&stream->streamRepresentation, &paSck->callbackStreamInterface,
+                                              streamCallback, userData);
+        stream->streamCallback = streamCallback;
+        stream->userData = userData;
+        stream->framesPerBuffer = framesPerBuffer;
+    }
+    else
+    {
+        PaUtil_InitializeStreamRepresentation(&stream->streamRepresentation, &paSck->blockingStreamInterface, NULL,
+                                              NULL);
+    }
     stream->isStopped = TRUE;
 
     // Around 1 second of ringbuffer (allocated to nearest power of 2)
@@ -335,15 +401,6 @@ error:
     return result;
 }
 
-// PortAudio host API stream close function
-static PaError CloseStream(PaStream *s)
-{
-    PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
-    PaUtil_FreeMemory(stream->ringBuffer.buffer);
-    PaUtil_FreeMemory(stream);
-    return paNoError;
-}
-
 static PaError IsStreamStopped(PaStream *s)
 {
     return ((PaScreenCaptureKitStream *)s)->isStopped;
@@ -360,6 +417,7 @@ static PaError StartStream(PaStream *s)
         return paStreamIsNotStopped;
     __block PaError result = paNoError;
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+
     dispatch_group_t handlerGroup = dispatch_group_create();
     dispatch_group_enter(handlerGroup);
 
@@ -377,6 +435,14 @@ static PaError StartStream(PaStream *s)
     {
         stream->isStopped = FALSE;
     }
+    if (stream->streamCallback != NULL)
+    {
+        int result = pthread_create(&stream->callbackThreadId, NULL, StreamProcessingThread, stream);
+        if (result != 0) {
+            PA_DEBUG(("Failed to create audio processing thread\n"));
+            return paUnanticipatedHostError;
+        }
+    }
 
     return result;
 }
@@ -386,22 +452,9 @@ static PaError StopStream(PaStream *s)
 {
     if (IsStreamStopped(s))
         return paStreamIsStopped;
-    __block PaError result = paNoError;
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
-    dispatch_group_t handlerGroup = dispatch_group_create();
-    dispatch_group_enter(handlerGroup);
-    // Stop the audio capture session
-    [stream->audioStream stopCaptureWithCompletionHandler:^(NSError *error) {
-      if (error)
-      {
-          PA_DEBUG(("Failed to stop audio capture: %s\n", [[error localizedDescription] UTF8String]));
-          result = paInternalError;
-          return;
-      }
-      dispatch_group_leave(handlerGroup);
-    }];
-    stream->isStopped = TRUE;
-    dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
+    PaError result = StopStreamInternal(s);
+    pthread_join(stream->callbackThreadId, NULL);
 
     return result;
 }
@@ -410,6 +463,16 @@ static PaError StopStream(PaStream *s)
 static PaError AbortStream(PaStream *s)
 {
     return StopStream(s);
+}
+
+// PortAudio host API stream close function
+static PaError CloseStream(PaStream *s)
+{
+    StopStream(s);
+    PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    PaUtil_FreeMemory(stream->ringBuffer.buffer);
+    PaUtil_FreeMemory(stream);
+    return paNoError;
 }
 
 static void Terminate(struct PaUtilHostApiRepresentation *hostApi)
@@ -484,6 +547,9 @@ PaError PaMacScreenCapture_Initialize(PaUtilHostApiRepresentation **hostApi, PaH
                                      IsStreamStopped, IsStreamActive, GetStreamTime, PaUtil_DummyGetCpuLoad, ReadStream,
                                      PaUtil_DummyWrite, PaUtil_DummyGetReadAvailable, PaUtil_DummyGetWriteAvailable);
 
+    PaUtil_InitializeStreamInterface(&paSck->callbackStreamInterface, CloseStream, StartStream, StopStream, AbortStream,
+                                     IsStreamStopped, IsStreamActive, GetStreamTime, PaUtil_DummyGetCpuLoad, PaUtil_DummyRead,
+                                     PaUtil_DummyWrite, PaUtil_DummyGetReadAvailable, PaUtil_DummyGetWriteAvailable);
     return result;
 
 error:
