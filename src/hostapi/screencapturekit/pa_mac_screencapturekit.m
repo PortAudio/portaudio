@@ -72,6 +72,8 @@ typedef struct PaScreenCaptureKitStream
     pthread_t callbackThreadId;
 } PaScreenCaptureKitStream;
 
+#define SAMPLE_RATE 48000
+
 @implementation ScreenCaptureKitStreamOutput
 
 - (void)stream:(SCStream *)stream didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(SCStreamOutputType)type
@@ -171,8 +173,8 @@ static PaError ReadStream(PaStream *s, void *buffer, unsigned long frames)
     // TODO : Need to implement exit on StopStream, Closestream or similar
     while (PaUtil_GetRingBufferReadAvailable(&stream->ringBuffer) < frames)
     {
-        // Sleep for 10ms
-        usleep(10000);
+        // Sleep for 1ms
+        usleep(1000);
     }
 
     ring_buffer_size_t read = PaUtil_ReadRingBuffer(&stream->ringBuffer, buffer, frames);
@@ -239,7 +241,7 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi, co
         return paInvalidDevice;
     }
 
-    if (sampleRate == 0)
+    if (sampleRate != SAMPLE_RATE)
     {
         return paInvalidSampleRate;
     }
@@ -376,8 +378,8 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
     }
     stream->isStopped = TRUE;
 
-    // Around 1 second of ringbuffer (allocated to nearest power of 2)
-    int audioBufferSize = 1 << (int)ceil(log2(sampleRate));
+    // Around 100 ms of ringbuffer (allocated to nearest power of 2)
+    int audioBufferSize = 1 << (int)ceil(log2(sampleRate / 10));
     void *data = PaUtil_AllocateZeroInitializedMemory(audioBufferSize * sizeof(float));
     if (!data)
     {
@@ -541,7 +543,7 @@ PaError PaMacScreenCapture_Initialize(PaUtilHostApiRepresentation **hostApi, PaH
     (*hostApi)->deviceInfos[0]->hostApi = hostApiIndex;
     (*hostApi)->deviceInfos[0]->name = "System Audio [Loopback]";
     (*hostApi)->deviceInfos[0]->maxInputChannels = 1;
-    (*hostApi)->deviceInfos[0]->defaultSampleRate = 44100;
+    (*hostApi)->deviceInfos[0]->defaultSampleRate = SAMPLE_RATE;
 
     PaUtil_InitializeStreamInterface(&paSck->blockingStreamInterface, CloseStream, StartStream, StopStream, AbortStream,
                                      IsStreamStopped, IsStreamActive, GetStreamTime, PaUtil_DummyGetCpuLoad, ReadStream,
