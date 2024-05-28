@@ -1756,7 +1756,7 @@ static PaError RealStop( PaJackStream *stream, int abort )
     int i;
 
     if( stream->isBlockingStream )
-        BlockingWaitEmpty ( stream );
+        BlockingWaitEmpty ( (PaStream*)stream );
 
     ASSERT_CALL( pthread_mutex_lock( &stream->hostApi->mtx ), 0 );
     if( abort )

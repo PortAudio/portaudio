@@ -881,7 +881,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( pulseaudioPlaybackStarted || pulseaudioRecordStarted )
     {
-        PaPulseAudio_AbortStreamCb( stream );
+        PaPulseAudio_AbortStreamCb( (PaStream*)stream );
     }
 
     stream->isActive = 0;

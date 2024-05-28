@@ -346,7 +346,7 @@ static void CloseOpenStreams( void )
         logic is used for automatically closed streams */
 
     while( firstOpenStream_ != NULL )
-        Pa_CloseStream( firstOpenStream_ );
+        Pa_CloseStream( (PaStream*)firstOpenStream_ );
 }
 
 
