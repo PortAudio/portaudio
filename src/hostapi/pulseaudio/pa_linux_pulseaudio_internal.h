@@ -125,6 +125,7 @@ typedef struct PaPulseAudio_Stream
     pa_stream *inputStream;
     pa_buffer_attr outputBufferAttr;
     pa_buffer_attr inputBufferAttr;
+    unsigned int suggestedLatencyUSecs;
     int outputUnderflows;
     int outputChannelCount;
     int inputChannelCount;

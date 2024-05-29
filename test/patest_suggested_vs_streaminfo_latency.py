@@ -6,8 +6,10 @@ Run and graph the results of patest_suggested_vs_streaminfo_latency.c
 Requires matplotlib for plotting: http://matplotlib.sourceforge.net/
 
 """
+from __future__ import print_function
+
 import os
-from pylab import *
+from pylab import figure, gcf, grid, legend, plot, title, xlabel, xlim, ylabel, ylim
 import numpy
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -27,7 +29,7 @@ def loadCsvData( dataFileName ):
     inputDevice = ""
     outputDevice = ""
 
-    startLines = file(dataFileName).readlines(1024)
+    startLines = open(dataFileName).readlines(1024)
     for line in startLines:
         if "output device" in line:
             outputDevice = line.strip(" \t\n\r#")
@@ -37,7 +39,9 @@ def loadCsvData( dataFileName ):
 
     data = numpy.loadtxt(dataFileName, delimiter=",", skiprows=4).transpose()
 
-    class R(object): pass
+    class R(object):
+        pass
+
     result = R()
     result.params = params
     for s in params.split(','):
@@ -51,7 +55,7 @@ def loadCsvData( dataFileName ):
     result.halfDuplexInputLatency = data[2]
     result.fullDuplexOutputLatency = data[3]
     result.fullDuplexInputLatency = data[4]
-    return result;
+    return result
 
 
 def setFigureTitleAndAxisLabels( framesPerBufferString ):
@@ -92,7 +96,7 @@ isFirst = True
 
 for framesPerBuffer in compositeTestFramesPerBufferValues:
     commandString = testExeName + " " + str(inputDeviceIndex) + " " + str(outputDeviceIndex) + " " + str(sampleRate) + " " + str(framesPerBuffer) + ' > ' + dataFileName
-    print commandString
+    print(commandString)
     os.system(commandString)
 
     d = loadCsvData(dataFileName)

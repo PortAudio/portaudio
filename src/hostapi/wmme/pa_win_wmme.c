@@ -2813,7 +2813,7 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
     int eventCount = 0;
     DWORD result = paNoError;
     DWORD waitResult;
-    DWORD timeout = (unsigned long)(stream->allBuffersDurationMs * 0.5);
+    DWORD timeoutMs = stream->allBuffersDurationMs / 2;
     int hostBuffersAvailable;
     signed int hostInputBufferIndex, hostOutputBufferIndex;
     PaStreamCallbackFlags statusFlags;
@@ -2845,7 +2845,7 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
           huge problem, it just means that we won't always be able to detect
           underflow/overflow.
         */
-        waitResult = WaitForMultipleObjects( eventCount, events, FALSE /* wait all = FALSE */, timeout );
+        waitResult = WaitForMultipleObjects( eventCount, events, FALSE /* wait all = FALSE */, timeoutMs );
         if( waitResult == WAIT_FAILED )
         {
             result = paUnanticipatedHostError;
@@ -3430,7 +3430,7 @@ static PaError StopStream( PaStream *s )
 {
     PaError result = paNoError;
     PaWinMmeStream *stream = (PaWinMmeStream*)s;
-    int timeout;
+    DWORD timeoutMs;
     DWORD waitResult;
     MMRESULT mmresult;
     signed int hostOutputBufferIndex;
@@ -3451,19 +3451,19 @@ static PaError StopStream( PaStream *s )
         stream->stopProcessing = 1;
 
         /* Calculate timeOut longer than longest time it could take to return all buffers. */
-        timeout = (int)(stream->allBuffersDurationMs * 1.5);
-        if( timeout < PA_MME_MIN_TIMEOUT_MSEC_ )
-            timeout = PA_MME_MIN_TIMEOUT_MSEC_;
+        timeoutMs = (DWORD)(stream->allBuffersDurationMs * 1.5);
+        if( timeoutMs < PA_MME_MIN_TIMEOUT_MSEC_ )
+            timeoutMs = PA_MME_MIN_TIMEOUT_MSEC_;
 
         PA_DEBUG(("WinMME StopStream: waiting for background thread.\n"));
 
-        waitResult = WaitForSingleObject( stream->processingThread, timeout );
+        waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
         if( waitResult == WAIT_TIMEOUT )
         {
             /* try to abort */
             stream->abortProcessing = 1;
             SetEvent( stream->abortEvent );
-            waitResult = WaitForSingleObject( stream->processingThread, timeout );
+            waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
             if( waitResult == WAIT_TIMEOUT )
             {
                 PA_DEBUG(("WinMME StopStream: timed out while waiting for background thread to finish.\n"));
@@ -3515,15 +3515,15 @@ static PaError StopStream( PaStream *s )
             }
 
 
-            timeout = (stream->allBuffersDurationMs / stream->output.bufferCount) + 1;
-            if( timeout < PA_MME_MIN_TIMEOUT_MSEC_ )
-                timeout = PA_MME_MIN_TIMEOUT_MSEC_;
+            timeoutMs = (stream->allBuffersDurationMs / stream->output.bufferCount) + 1;
+            if( timeoutMs < PA_MME_MIN_TIMEOUT_MSEC_ )
+                timeoutMs = PA_MME_MIN_TIMEOUT_MSEC_;
 
             waitCount = 0;
             while( !NoBuffersAreQueued( &stream->output ) && waitCount <= stream->output.bufferCount )
             {
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeout );
+                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     break;
@@ -3575,7 +3575,7 @@ static PaError AbortStream( PaStream *s )
 {
     PaError result = paNoError;
     PaWinMmeStream *stream = (PaWinMmeStream*)s;
-    int timeout;
+    DWORD timeoutMs;
     DWORD waitResult;
     MMRESULT mmresult;
     unsigned int i;
@@ -3631,11 +3631,11 @@ static PaError AbortStream( PaStream *s )
         PA_DEBUG(("WinMME AbortStream: waiting for background thread.\n"));
 
         /* Calculate timeOut longer than longest time it could take to return all buffers. */
-        timeout = (int)(stream->allBuffersDurationMs * 1.5);
-        if( timeout < PA_MME_MIN_TIMEOUT_MSEC_ )
-            timeout = PA_MME_MIN_TIMEOUT_MSEC_;
+        timeoutMs = (DWORD)(stream->allBuffersDurationMs * 1.5);
+        if( timeoutMs < PA_MME_MIN_TIMEOUT_MSEC_ )
+            timeoutMs = PA_MME_MIN_TIMEOUT_MSEC_;
 
-        waitResult = WaitForSingleObject( stream->processingThread, timeout );
+        waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
         if( waitResult == WAIT_TIMEOUT )
         {
             PA_DEBUG(("WinMME AbortStream: timed out while waiting for background thread to finish.\n"));
@@ -3702,7 +3702,9 @@ static PaError ReadStream( PaStream* s,
     unsigned long framesProcessed;
     signed int hostInputBufferIndex;
     DWORD waitResult;
-    DWORD timeout = (unsigned long)(stream->allBuffersDurationMs * 0.5);
+    DWORD pollTimeoutMs = stream->allBuffersDurationMs / 2;
+    DWORD failTimeoutMs = stream->allBuffersDurationMs * 3;
+    DWORD accumulatedTimoutMs = 0;
     unsigned int channel, i;
 
     if( PA_IS_INPUT_STREAM_(stream) )
@@ -3727,6 +3729,8 @@ static PaError ReadStream( PaStream* s,
         do{
             if( CurrentInputBuffersAreDone( stream ) )
             {
+                accumulatedTimoutMs = 0; /* reset failure timer whenever we have a buffer */
+
                 if( NoBuffersAreQueued( &stream->input ) )
                 {
                     /** @todo REVIEW: consider what to do if the input overflows.
@@ -3772,7 +3776,7 @@ static PaError ReadStream( PaStream* s,
 
             }else{
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->input.bufferEvent, timeout );
+                waitResult = WaitForSingleObject( stream->input.bufferEvent, pollTimeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     result = paUnanticipatedHostError;
@@ -3780,9 +3784,13 @@ static PaError ReadStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
-                    */
+                    /* if a timeout is encountered, continue to check for data. but give up eventually. */
+                    accumulatedTimoutMs += pollTimeoutMs;
+                    if( accumulatedTimoutMs >= failTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }
             }
         }while( framesRead < frames );
@@ -3807,7 +3815,9 @@ static PaError WriteStream( PaStream* s,
     unsigned long framesProcessed;
     signed int hostOutputBufferIndex;
     DWORD waitResult;
-    DWORD timeout = (unsigned long)(stream->allBuffersDurationMs * 0.5);
+    DWORD pollTimeoutMs = stream->allBuffersDurationMs / 2;
+    DWORD failTimeoutMs = stream->allBuffersDurationMs * 3;
+    DWORD accumulatedTimoutMs = 0;
     unsigned int channel, i;
 
 
@@ -3833,6 +3843,8 @@ static PaError WriteStream( PaStream* s,
         do{
             if( CurrentOutputBuffersAreDone( stream ) )
             {
+                accumulatedTimoutMs = 0; /* reset failure timer whenever we have a buffer */
+
                 if( NoBuffersAreQueued( &stream->output ) )
                 {
                     /** @todo REVIEW: consider what to do if the output
@@ -3880,7 +3892,7 @@ static PaError WriteStream( PaStream* s,
             else
             {
                 /* wait for MME to signal that a buffer is available */
-                waitResult = WaitForSingleObject( stream->output.bufferEvent, timeout );
+                waitResult = WaitForSingleObject( stream->output.bufferEvent, pollTimeoutMs );
                 if( waitResult == WAIT_FAILED )
                 {
                     result = paUnanticipatedHostError;
@@ -3888,9 +3900,13 @@ static PaError WriteStream( PaStream* s,
                 }
                 else if( waitResult == WAIT_TIMEOUT )
                 {
-                    /* if a timeout is encountered, continue,
-                        perhaps we should give up eventually
-                    */
+                    /* if a timeout is encountered, continue to try to output. but give up eventually. */
+                    accumulatedTimoutMs += pollTimeoutMs;
+                    if( accumulatedTimoutMs >= failTimeoutMs )
+                    {
+                        result = paTimedOut;
+                        break;
+                    }
                 }
             }
         }while( framesWritten < frames );

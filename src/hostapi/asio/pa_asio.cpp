@@ -1878,15 +1878,17 @@ static PaError ValidateAsioSpecificStreamInfo(
         }
 
         if( streamInfo->flags & paAsioUseChannelSelectors )
+        {
             *channelSelectors = streamInfo->channelSelectors;
 
-        if( !(*channelSelectors) )
-            return paIncompatibleHostApiSpecificStreamInfo;
+            if( !(*channelSelectors) )
+                return paIncompatibleHostApiSpecificStreamInfo;
 
-        for( int i=0; i < streamParameters->channelCount; ++i ){
-            if( (*channelSelectors)[i] < 0
+            for( int i=0; i < streamParameters->channelCount; ++i ){
+                if( (*channelSelectors)[i] < 0
                     || (*channelSelectors)[i] >= deviceChannelCount ){
-                return paInvalidChannelCount;
+                    return paInvalidChannelCount;
+                }
             }
         }
     }

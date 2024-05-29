@@ -1,6 +1,7 @@
+from __future__ import print_function
+
 import os
 import os.path
-import string
 
 paRootDirectory = '../../'
 paHtmlDocDirectory = os.path.join( paRootDirectory, "doc", "html" )
@@ -50,9 +51,9 @@ def doxygenHtmlDocFileName( sourceFile ):
     return sourceFile.replace( '_', '__' ).replace( '.', '_8' ) + '.html'
 
 
-sourceFiles = recursiveFindFiles( os.path.join(paRootDirectory,'src'), [ '.c', '.h', '.cpp' ], ['.svn', 'mingw-include'], True );
-sourceFiles += recursiveFindFiles( os.path.join(paRootDirectory,'include'), [ '.c', '.h', '.cpp' ], ['.svn'], True );
-docFiles = recursiveFindFiles( paHtmlDocDirectory, [ '.html' ], ['.svn'], False );
+sourceFiles = recursiveFindFiles( os.path.join(paRootDirectory,'src'), [ '.c', '.h', '.cpp' ], ['.svn', 'mingw-include'], True )
+sourceFiles += recursiveFindFiles( os.path.join(paRootDirectory,'include'), [ '.c', '.h', '.cpp' ], ['.svn'], True )
+docFiles = recursiveFindFiles( paHtmlDocDirectory, [ '.html' ], ['.svn'], False )
 
 
 
@@ -62,26 +63,24 @@ def printError( f, message ):
     global currentFile
     if f != currentFile:
         currentFile = f
-        print f, ":"
-    print "\t!", message
+        print(f, ":")
+    print("\t!", message)
 
 
 for f in sourceFiles:
-    if not doxygenHtmlDocFileName( os.path.basename(f) ) in docFiles:
+    if doxygenHtmlDocFileName( os.path.basename(f) ) not in docFiles:
         printError( f, "no doxygen generated doc page" )
 
-    s = file( f, 'rt' ).read()
+    s = open( f, 'rt' ).read()
 
-    if not '/**' in s:
+    if '/**' not in s:
         printError( f, "no doxygen /** block" )  
     
-    if not '@file' in s:
+    if '@file' not in s:
         printError( f, "no doxygen @file tag" )
 
-    if not '@brief' in s:
+    if '@brief' not in s:
         printError( f, "no doxygen @brief tag" )
         
-    if not '@ingroup' in s:
+    if '@ingroup' not in s:
         printError( f, "no doxygen @ingroup tag" )
-        
-

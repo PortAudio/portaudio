@@ -37,7 +37,7 @@ This DLL contains all 5 current Win32 PA APIS (MME/DS/ASIO/WASAPI/WDMKS)
      http://www.microsoft.com/msdownload/platformsdk/sdkupdate/psdk-full.htm
 	 (This will allow your code base to be x64 friendly, with correct defines 
 	 for LONG_PTR and such)
-	 NOTE A) Yes you have to use IE activex scripts to install that - wont work in Firefox, you 
+	 NOTE A) Yes you have to use IE activex scripts to install that - won't work in Firefox, you 
 	 may have to temporarily change tyour default browser(aint life unfair)
 	 NOTE B) Dont forget to hit "Register PSDK Directories with Visual Studio". 
 	 you can make sure its right in VC6 if you open tools/options/directories/include files and you see SDK 2003 as the FIRST entry

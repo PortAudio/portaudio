@@ -140,8 +140,13 @@ find_package(JACK)
 cmake_dependent_option(PA_USE_JACK "Enable support for JACK Audio Connection Kit" ON JACK_FOUND OFF)
 if(PA_USE_JACK)
   target_link_libraries(PortAudio PRIVATE JACK::jack)
-  target_sources(PortAudio PRIVATE src/hostapi/jack/pa_jack.c)
+  target_sources(PortAudio PRIVATE
+    src/hostapi/jack/pa_jack.c
+    src/os/unix/pa_pthread_util.c
+    src/os/unix/pa_pthread_util.h
+  )
   set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_jack.h)
+  target_include_directories(PortAudio PRIVATE src/os/unix) # for pa_pthread_util.h
   target_compile_definitions(PortAudio PUBLIC PA_USE_JACK=1)
   set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_JACK=1")
   set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} jack")
@@ -284,12 +289,14 @@ if(WIN32)
     target_sources(PortAudio PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/portaudio.def")
   endif()
 elseif(UNIX)
-  target_sources(PortAudio PUBLIC
+  target_sources(PortAudio PRIVATE
           ${CMAKE_CURRENT_SOURCE_DIR}/src/os/unix/pa_unix_hostapis.c
           ${CMAKE_CURRENT_SOURCE_DIR}/src/os/unix/pa_unix_util.c
           ${CMAKE_CURRENT_SOURCE_DIR}/src/os/unix/pa_unix_util.h
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/os/unix/pa_pthread_util.c
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/os/unix/pa_pthread_util.h
           )
-  target_include_directories(PortAudio PUBLIC src/os/unix)
+  target_include_directories(PortAudio PRIVATE src/os/unix)
   target_link_libraries(PortAudio PRIVATE m)
 
   IF(CMAKE_SYSTEM_NAME STREQUAL "Android")
@@ -360,7 +367,6 @@ elseif(UNIX)
     find_package(ALSA)
     cmake_dependent_option(PA_USE_ALSA "Enable support for ALSA" ON ALSA_FOUND OFF)
     if(PA_USE_ALSA)
-      target_link_libraries(PortAudio PRIVATE "${ALSA_LIBRARIES}")
       target_sources(PortAudio PRIVATE src/hostapi/alsa/pa_linux_alsa.c)
       set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_linux_alsa.h)
       target_compile_definitions(PortAudio PUBLIC PA_USE_ALSA=1)
@@ -372,6 +378,7 @@ elseif(UNIX)
         target_link_libraries(PortAudio PRIVATE "${CMAKE_DL_LIBS}")
         set(PKGCONFIG_LDFLAGS_PRIVATE "${PKGCONFIG_LDFLAGS_PRIVATE} -l${CMAKE_DL_LIBS}")
       else()
+        target_link_libraries(PortAudio PRIVATE "${ALSA_LIBRARIES}")
         set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} alsa")
       endif()
     endif()
@@ -415,7 +422,21 @@ elseif(UNIX)
       install(FILES cmake/modules/FindPulseAudio.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
     endif()
 
+    pkg_check_modules(SNDIO sndio)
+    cmake_dependent_option(PA_USE_SNDIO "Enable support for sndio" ON SNDIO_FOUND OFF)
+    if(PA_USE_SNDIO)
+      target_link_libraries(PortAudio PRIVATE "${SNDIO_LIBRARIES}")
+      target_sources(PortAudio PRIVATE src/hostapi/sndio/pa_sndio.c)
+      target_compile_definitions(PortAudio PUBLIC PA_USE_SNDIO=1)
+      set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_SNDIO=1")
+      set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} sndio")
+    endif()
   endif()
+endif()
+
+# Make sure PA_USE_ALSA is available as it is used for PortAudioConfig.cmake configuration
+if (NOT PA_USE_ALSA)
+    set(PA_USE_ALSA OFF)
 endif()
 
 # Add public headers to sources of PortAudio (used by some IDEs to list them in project tree)

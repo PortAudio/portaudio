@@ -63,6 +63,7 @@
 #include <jack/jack.h>
 
 #include "pa_util.h"
+#include "pa_pthread_util.h"
 #include "pa_hostapi.h"
 #include "pa_stream.h"
 #include "pa_process.h"
@@ -168,6 +169,7 @@ typedef struct
 
     pthread_mutex_t mtx;
     pthread_cond_t cond;
+    PaUtilClockId condClockId;
     unsigned long inputBase, outputBase;
 
     /* For dealing with the process thread */
@@ -449,6 +451,15 @@ BlockingWaitEmpty( PaStream *s )
 
 /* ---- jack driver ---- */
 
+/* like jack_port_get_latency_range() but only returns the minimum value */
+static jack_nframes_t port_get_min_latency( jack_port_t *port, jack_latency_callback_mode_t mode )
+{
+    jack_latency_range_t range;
+
+    jack_port_get_latency_range( port, mode, &range );
+    return range.min;
+}
+
 /* copy null terminated string source to destination, escaping regex characters with '\\' in the process */
 static void copy_string_and_escape_regex_chars( char *destination, const char *source, size_t destbuffersize )
 {
@@ -634,7 +645,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         {
             jack_port_t *p = jack_port_by_name( jackApi->jack_client, clientPorts[0] );
             curDevInfo->defaultLowInputLatency = curDevInfo->defaultHighInputLatency =
-                jack_port_get_latency( p ) / globalSampleRate;
+                port_get_min_latency( p, JackCaptureLatency ) / globalSampleRate;
 
             for( i = 0; clientPorts[i] != NULL; i++)
             {
@@ -655,7 +666,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         {
             jack_port_t *p = jack_port_by_name( jackApi->jack_client, clientPorts[0] );
             curDevInfo->defaultLowOutputLatency = curDevInfo->defaultHighOutputLatency =
-                jack_port_get_latency( p ) / globalSampleRate;
+                port_get_min_latency( p, JackPlaybackLatency ) / globalSampleRate;
 
             for( i = 0; clientPorts[i] != NULL; i++)
             {
@@ -758,6 +769,7 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
     int activated = 0;
     jack_status_t jackStatus = 0;
     *hostApi = NULL;    /* Initialize to NULL */
+    pthread_condattr_t cattr;
 
     UNLESS( jackHostApi = (PaJackHostApiRepresentation*)
         PaUtil_AllocateZeroInitializedMemory( sizeof(PaJackHostApiRepresentation) ), paInsufficientMemory );
@@ -765,7 +777,10 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
 
     mainThread_ = pthread_self();
     ASSERT_CALL( pthread_mutex_init( &jackHostApi->mtx, NULL ), 0 );
-    ASSERT_CALL( pthread_cond_init( &jackHostApi->cond, NULL ), 0 );
+
+    ASSERT_CALL( pthread_condattr_init( &cattr ), 0 );
+    jackHostApi->condClockId = PaPthreadUtil_NegotiateCondAttrClock( &cattr );
+    ASSERT_CALL( pthread_cond_init( &jackHostApi->cond, &cattr), 0 );
 
     /* Try to become a client of the JACK server.  If we cannot do
      * this, then this API cannot be used.
@@ -1049,13 +1064,20 @@ static PaError WaitCondition( PaJackHostApiRepresentation *hostApi )
 {
     PaError result = paNoError;
     int err = 0;
-    PaTime pt = PaUtil_GetTime();
     struct timespec ts;
 
-    ts.tv_sec = (time_t) floor( pt + 10 * 60 /* 10 minutes */ );
-    ts.tv_nsec = (long) ((pt - floor( pt )) * 1000000000);
-    /* XXX: Best enclose in loop, in case of spurious wakeups? */
-    err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
+    if( PaPthreadUtil_GetTime( hostApi->condClockId, &ts ) == 0 )
+    {
+        ts.tv_sec += 10 * 60; /* 10 minutes */
+
+        /* XXX: Best enclose in loop, in case of spurious wakeups? */
+        err = pthread_cond_timedwait( &hostApi->cond, &hostApi->mtx, &ts );
+    }
+    else
+    {
+        /* XXX: Best enclose in loop, in case of spurious wakeups? */
+        err = pthread_cond_wait( &hostApi->cond, &hostApi->mtx );
+    }
 
     /* Make sure we didn't time out */
     UNLESS( err != ETIMEDOUT, paTimedOut );
@@ -1351,12 +1373,12 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     bpInitialized = 1;
 
     if( stream->num_incoming_connections > 0 )
-        stream->streamRepresentation.streamInfo.inputLatency = (jack_port_get_latency( stream->remote_output_ports[0] )
-                - jack_get_buffer_size( jackHostApi->jack_client )  /* One buffer is not counted as latency */
+        stream->streamRepresentation.streamInfo.inputLatency =
+            (port_get_min_latency( stream->remote_output_ports[0], JackCaptureLatency )
             + PaUtil_GetBufferProcessorInputLatencyFrames( &stream->bufferProcessor )) / sampleRate;
     if( stream->num_outgoing_connections > 0 )
-        stream->streamRepresentation.streamInfo.outputLatency = (jack_port_get_latency( stream->remote_input_ports[0] )
-                - jack_get_buffer_size( jackHostApi->jack_client )  /* One buffer is not counted as latency */
+        stream->streamRepresentation.streamInfo.outputLatency =
+            (port_get_min_latency( stream->remote_input_ports[0], JackPlaybackLatency )
             + PaUtil_GetBufferProcessorOutputLatencyFrames( &stream->bufferProcessor )) / sampleRate;
 
     stream->streamRepresentation.streamInfo.sampleRate = jackSr;
@@ -1377,6 +1399,26 @@ error:
 }
 
 /*
+ * Reset inputBase and outputBase when all streams have been closed. This makes port names stable for typical
+ * applications that open streams in the same order every time. Applications that open streams in a different order
+ * every time do not get stable port names. Stable port names allow JACK connection managers to save/load connections
+ * between ports, saving the user the trouble of manually connecting ports each time they use the application.
+ */
+static void CheckAndResetPortBase( PaJackHostApiRepresentation *jackApi )
+{
+    int noStreams;
+
+    ASSERT_CALL( pthread_mutex_lock( &jackApi->mtx ), 0 );
+    noStreams = jackApi->jackIsDown || jackApi->processQueue == NULL;
+    ASSERT_CALL( pthread_mutex_unlock( &jackApi->mtx ), 0 );
+
+    if ( noStreams ) {
+        jackApi->inputBase = 0;
+        jackApi->outputBase = 0;
+    }
+}
+
+/*
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
 */
@@ -1384,12 +1426,14 @@ static PaError CloseStream( PaStream* s )
 {
     PaError result = paNoError;
     PaJackStream *stream = (PaJackStream*)s;
+    PaJackHostApiRepresentation *hostApi = stream->hostApi;
 
     /* Remove this stream from the processing queue */
     ENSURE_PA( RemoveStream( stream ) );
 
 error:
     CleanUpStream( stream, 1, 1 );
+    CheckAndResetPortBase( hostApi );
     return result;
 }
 
@@ -1417,11 +1461,11 @@ static PaError RealProcess( PaJackStream *stream, jack_nframes_t frames )
 
     timeInfo.currentTime = (jack_frame_time( stream->jack_client ) - stream->t0) / sr;
     if( stream->num_incoming_connections > 0 )
-        timeInfo.inputBufferAdcTime = timeInfo.currentTime - jack_port_get_latency( stream->remote_output_ports[0] )
-            / sr;
+        timeInfo.inputBufferAdcTime = timeInfo.currentTime -
+            port_get_min_latency( stream->remote_output_ports[0], JackCaptureLatency ) / sr;
     if( stream->num_outgoing_connections > 0 )
-        timeInfo.outputBufferDacTime = timeInfo.currentTime + jack_port_get_latency( stream->remote_input_ports[0] )
-            / sr;
+        timeInfo.outputBufferDacTime = timeInfo.currentTime +
+            port_get_min_latency( stream->remote_input_ports[0], JackPlaybackLatency ) / sr;
 
     PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 

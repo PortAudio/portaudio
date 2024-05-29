@@ -292,7 +292,8 @@ typedef enum PaHostApiTypeId
     paAudioScienceHPI=14,
     paAudioIO=15,
     paPulseAudio=16,
-    paOboe=17
+    paSndio=17
+    paOboe=18
 } PaHostApiTypeId;
 
 
@@ -1002,8 +1003,8 @@ PaError Pa_StartStream( PaStream *stream );
 PaError Pa_StopStream( PaStream *stream );
 
 
-/** Terminates audio processing immediately without waiting for pending
- buffers to complete.
+/** Terminates audio processing promptly without necessarily waiting for
+ pending buffers to complete.
 */
 PaError Pa_AbortStream( PaStream *stream );
 

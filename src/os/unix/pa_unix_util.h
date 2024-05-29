@@ -45,6 +45,7 @@
 #define PA_UNIX_UTIL_H
 
 #include "pa_util.h"
+#include "pa_pthread_util.h"
 #include "pa_cpuload.h"
 #include <assert.h>
 #include <pthread.h>
@@ -150,6 +151,7 @@ typedef struct
     int locked;
     PaUnixMutex mtx;
     pthread_cond_t cond;
+    PaUtilClockId condClockId;
     volatile sig_atomic_t stopRequest;
 } PaUnixThread;
 
