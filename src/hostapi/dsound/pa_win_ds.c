@@ -106,7 +106,7 @@
 
 #if !defined(__CYGWIN__) && !defined(UNDER_CE)
 #define CREATE_THREAD (HANDLE)_beginthreadex
-#undef CLOSE_THREAD_HANDLE /* as per documentation we don't call CloseHandle on a thread created with _beginthreadex */
+#define CLOSE_THREAD_HANDLE CloseHandle
 #define PA_THREAD_FUNC static unsigned WINAPI
 #define PA_THREAD_ID unsigned
 #else
@@ -3051,9 +3051,7 @@ error:
 #ifndef PA_WIN_DS_USE_WMME_TIMER
     if( stream->processingThread )
     {
-#ifdef CLOSE_THREAD_HANDLE
         CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
-#endif
         stream->processingThread = NULL;
     }
 #endif
@@ -3092,10 +3090,8 @@ static PaError StopStream( PaStream *s )
         if( WaitForSingleObject( stream->processingThreadCompleted, 30*100 ) == WAIT_TIMEOUT )
             return paUnanticipatedHostError;
 
-#ifdef CLOSE_THREAD_HANDLE
-        CloseHandle( stream->processingThread ); /* Delete thread. */
+        CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
         stream->processingThread = NULL;
-#endif
 
     }
 #endif
