@@ -3463,12 +3463,7 @@ static PaError StopStream( PaStream *s )
             /* try to abort */
             stream->abortProcessing = 1;
             SetEvent( stream->abortEvent );
-            waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
-            if( waitResult == WAIT_TIMEOUT )
-            {
-                PA_DEBUG(("WinMME StopStream: timed out while waiting for background thread to finish.\n"));
-                result = paTimedOut;
-            }
+            WaitForSingleObject( stream->processingThread, INFINITE );
         }
 
         CloseHandle( stream->processingThread );
@@ -3575,8 +3570,6 @@ static PaError AbortStream( PaStream *s )
 {
     PaError result = paNoError;
     PaWinMmeStream *stream = (PaWinMmeStream*)s;
-    DWORD timeoutMs;
-    DWORD waitResult;
     MMRESULT mmresult;
     unsigned int i;
 
@@ -3630,17 +3623,7 @@ static PaError AbortStream( PaStream *s )
 
         PA_DEBUG(("WinMME AbortStream: waiting for background thread.\n"));
 
-        /* Calculate timeOut longer than longest time it could take to return all buffers. */
-        timeoutMs = (DWORD)(stream->allBuffersDurationMs * 1.5);
-        if( timeoutMs < PA_MME_MIN_TIMEOUT_MSEC_ )
-            timeoutMs = PA_MME_MIN_TIMEOUT_MSEC_;
-
-        waitResult = WaitForSingleObject( stream->processingThread, timeoutMs );
-        if( waitResult == WAIT_TIMEOUT )
-        {
-            PA_DEBUG(("WinMME AbortStream: timed out while waiting for background thread to finish.\n"));
-            return paTimedOut;
-        }
+        WaitForSingleObject( stream->processingThread, INFINITE );
 
         CloseHandle( stream->processingThread );
         stream->processingThread = NULL;
