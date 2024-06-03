@@ -105,6 +105,34 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
     return 0;
 }
 
+/* Release pa_operation always same way */
+int PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
+                                  pa_operation **operation)
+{
+    unsigned int wait = 0;
+    pa_operation *localOperation = (*operation);
+
+    while( pa_operation_get_state( localOperation ) == PA_OPERATION_RUNNING )
+    {
+        pa_threaded_mainloop_wait( hostapi->mainloop );
+
+        wait ++;
+        usleep( 1000 );
+
+        if( wait > 2000 )
+        {
+            PA_DEBUG( ( "Portaudio %s: Operation still running %d!\n",
+            __FUNCTION__, pa_operation_get_state( localOperation ) ) );
+            break;
+        }
+    }
+
+    PaPulseAudio_Lock( hostapi->mainloop );
+    pa_operation_unref( localOperation );
+    operation = NULL;
+    PaPulseAudio_UnLock( hostapi->mainloop );
+}
+
 
 /* locks the Pulse Main loop when not called from it */
 void PaPulseAudio_Lock( pa_threaded_mainloop *mainloop )
@@ -488,22 +516,10 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
                                               stream );
         PaPulseAudio_UnLock( stream->mainloop );
 
-        while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
-        {
-            pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-            waitLoop ++;
-
-            if(waitLoop > 256)
-            {
-                break;
-            }
-        }
-
-        waitLoop = 0;
+        PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                       &pulseaudioOperation );
 
         PaPulseAudio_Lock(stream->mainloop);
-        pa_operation_unref( pulseaudioOperation );
-        pulseaudioOperation = NULL;
 
         pa_stream_disconnect( stream->outputStream );
         PaPulseAudio_UnLock( stream->mainloop );
@@ -520,22 +536,10 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
                                               stream );
         PaPulseAudio_UnLock( stream->mainloop );
 
-        while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
-        {
-            pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-            waitLoop ++;
-
-            if(waitLoop > 256)
-            {
-                break;
-            }
-        }
-
-        waitLoop = 0;
+        PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                       &pulseaudioOperation );
 
         PaPulseAudio_Lock( stream->mainloop );
-        pa_operation_unref( pulseaudioOperation );
-        pulseaudioOperation = NULL;
 
         /* Then we disconnect stream and wait for
          * Termination
@@ -641,7 +645,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = stream->hostapi;
     const char *pulseaudioName = NULL;
     pa_operation *pulseaudioOperation = NULL;
-    int waitLoop = 0;
     unsigned int pulseaudioReqFrameSize = stream->suggestedLatencyUSecs;
 
     stream->isActive = 0;
@@ -769,13 +772,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                             stream );
             PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
 
-            while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING)
-            {
-                pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-            }
-
-            pa_operation_unref( pulseaudioOperation );
-            pulseaudioOperation = NULL;
+            PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                           &pulseaudioOperation );
         }
         else
         {
@@ -897,6 +895,7 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
     PaError ret = paNoError;
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = stream->hostapi;
     pa_operation *pulseaudioOperation = NULL;
+    int waitLoop = 0;
 
     PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
 
@@ -919,14 +918,8 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
                                               PaPulseAudio_CorkSuccessCb,
                                               stream );
 
-        while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
-        {
-            pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-        }
-
-        pa_operation_unref( pulseaudioOperation );
-
-        pulseaudioOperation = NULL;
+        PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                       &pulseaudioOperation );
     }
 
     requeststop_error:
