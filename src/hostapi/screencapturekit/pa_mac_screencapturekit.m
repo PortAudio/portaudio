@@ -157,7 +157,6 @@ static PaError StopStreamInternal(PaStream *s)
       {
           PA_DEBUG(("Failed to stop audio capture: %s\n", [[error localizedDescription] UTF8String]));
           result = paInternalError;
-          return;
       }
       dispatch_group_leave(handlerGroup);
     }];
@@ -170,11 +169,22 @@ static PaError StopStreamInternal(PaStream *s)
 static PaError ReadStream(PaStream *s, void *buffer, unsigned long frames)
 {
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    // Sleep for 1ms
+    const int sleepDurationMs = 1;
+    // Set a timeout of 1 second + the time it takes to read the frames
+    const unsigned long timeoutMs = 1000 + ((frames * 1000) / stream->sampleRate);
+    const int maxIterations = timeoutMs / sleepDurationMs;
+    int numIterations = 0;
     // TODO : Need to implement exit on StopStream, Closestream or similar
-    while (PaUtil_GetRingBufferReadAvailable(&stream->ringBuffer) < frames)
+    while (PaUtil_GetRingBufferReadAvailable(&stream->ringBuffer) < frames &&
+        numIterations++ < maxIterations)
     {
-        // Sleep for 1ms
-        usleep(1000);
+        usleep(sleepDurationMs * 1000);
+    }
+
+    if (PaUtil_GetRingBufferReadAvailable(&stream->ringBuffer) < frames)
+    {
+        return paTimedOut;
     }
 
     ring_buffer_size_t read = PaUtil_ReadRingBuffer(&stream->ringBuffer, buffer, frames);
@@ -433,10 +443,10 @@ static PaError StartStream(PaStream *s)
       dispatch_group_leave(handlerGroup);
     }];
     dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
-    if (result == paNoError)
-    {
-        stream->isStopped = FALSE;
-    }
+    if (result != paNoError)
+        return result;
+
+    stream->isStopped = FALSE;
     if (stream->streamCallback != NULL)
     {
         int result = pthread_create(&stream->callbackThreadId, NULL, StreamProcessingThread, stream);
