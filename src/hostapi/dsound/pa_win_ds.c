@@ -106,7 +106,7 @@
 
 #if !defined(__CYGWIN__) && !defined(UNDER_CE)
 #define CREATE_THREAD (HANDLE)_beginthreadex
-#undef CLOSE_THREAD_HANDLE /* as per documentation we don't call CloseHandle on a thread created with _beginthreadex */
+#define CLOSE_THREAD_HANDLE CloseHandle
 #define PA_THREAD_FUNC static unsigned WINAPI
 #define PA_THREAD_ID unsigned
 #else
@@ -318,7 +318,6 @@ typedef struct PaWinDsStream
 #endif
     HANDLE           processingThread;
     PA_THREAD_ID     processingThreadId;
-    HANDLE           processingThreadCompleted;
 #endif
 
 } PaWinDsStream;
@@ -2092,16 +2091,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 #endif
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-        stream->processingThreadCompleted = CreateEvent( NULL, /* bManualReset = */ TRUE, /* bInitialState = */ FALSE, NULL );
-        if( stream->processingThreadCompleted == NULL )
-        {
-            result = paUnanticipatedHostError;
-            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
-            goto error;
-        }
-#endif
-
         /* set up i/o parameters */
 
         if( userRequestedHostInputBufferSizeFrames > 0 || userRequestedHostOutputBufferSizeFrames > 0 )
@@ -2292,11 +2281,6 @@ error:
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
         if( stream->waitableTimer != NULL )
             CloseHandle( stream->waitableTimer );
-#endif
-
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-        if( stream->processingThreadCompleted != NULL )
-            CloseHandle( stream->processingThreadCompleted );
 #endif
 
         if( stream->pDirectSoundOutputBuffer )
@@ -2785,8 +2769,6 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
     }
 #endif /* PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT */
 
-    SetEvent( stream->processingThreadCompleted );
-
     return 0;
 }
 
@@ -2806,10 +2788,6 @@ static PaError CloseStream( PaStream* s )
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
     if( stream->waitableTimer != NULL )
         CloseHandle( stream->waitableTimer );
-#endif
-
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-    CloseHandle( stream->processingThreadCompleted );
 #endif
 
     // Cleanup the sound buffers
@@ -2905,10 +2883,6 @@ static PaError StartStream( PaStream *s )
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
     ResetEvent( stream->processingCompleted );
-
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-    ResetEvent( stream->processingThreadCompleted );
-#endif
 
     if( stream->bufferProcessor.inputChannelCount > 0 )
     {
@@ -3051,9 +3025,7 @@ error:
 #ifndef PA_WIN_DS_USE_WMME_TIMER
     if( stream->processingThread )
     {
-#ifdef CLOSE_THREAD_HANDLE
         CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
-#endif
         stream->processingThread = NULL;
     }
 #endif
@@ -3089,13 +3061,11 @@ static PaError StopStream( PaStream *s )
 #else
     if( stream->processingThread )
     {
-        if( WaitForSingleObject( stream->processingThreadCompleted, 30*100 ) == WAIT_TIMEOUT )
+        if( WaitForSingleObject( stream->processingThread, 30*100 ) == WAIT_TIMEOUT )
             return paUnanticipatedHostError;
 
-#ifdef CLOSE_THREAD_HANDLE
-        CloseHandle( stream->processingThread ); /* Delete thread. */
+        CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
         stream->processingThread = NULL;
-#endif
 
     }
 #endif
