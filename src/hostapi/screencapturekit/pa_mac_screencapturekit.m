@@ -47,6 +47,13 @@
 #include <pa_util.h>
 #include <portaudio.h>
 
+typedef struct PaScreenCaptureKitStream PaScreenCaptureKitStream;
+static PaError StopStreamInternal(PaStream *s);
+
+@interface ScreenCaptureDelegate : NSObject <SCStreamDelegate>
+@property (nonatomic, assign) PaScreenCaptureKitStream *stream;
+@end
+
 @interface ScreenCaptureKitStreamOutput : NSObject <SCStreamOutput>
 @property(nonatomic, assign) PaUtilRingBuffer *ringBuffer;
 @end
@@ -63,6 +70,7 @@ typedef struct PaScreenCaptureKitStream
     PaUtilStreamRepresentation streamRepresentation;
     SCStream *audioStream;
     ScreenCaptureKitStreamOutput *streamOutput;
+    ScreenCaptureDelegate *delegate;
     PaUtilRingBuffer ringBuffer;
     BOOL isStopped;
     int sampleRate;
@@ -73,6 +81,23 @@ typedef struct PaScreenCaptureKitStream
 } PaScreenCaptureKitStream;
 
 #define SAMPLE_RATE 48000
+
+@implementation ScreenCaptureDelegate
+
+- (void)outputVideoEffectDidStartForStream:(SCStream *)stream {
+}
+
+- (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {
+    fprintf(stderr, "Stream encountered an error\n");
+    if (self.stream) {
+        StopStreamInternal((PaStream *)self.stream);
+    }
+}
+
+- (void)outputVideoEffectDidStopForStream:(SCStream *)stream {
+}
+
+@end
 
 @implementation ScreenCaptureKitStreamOutput
 
@@ -169,6 +194,8 @@ static PaError StopStreamInternal(PaStream *s)
 static PaError ReadStream(PaStream *s, void *buffer, unsigned long frames)
 {
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    if (stream->isStopped)
+        return paStreamIsStopped;
     // Sleep for 1ms
     const int sleepDurationMs = 1;
     // Set a timeout of 1 second + the time it takes to read the frames
@@ -333,8 +360,11 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
     streamConfig.sampleRate = stream->sampleRate = sampleRate;
     streamConfig.channelCount = inputParameters->channelCount;
 
+    stream->delegate = [[ScreenCaptureDelegate alloc] init]; // Create an instance of the delegate
+    stream->delegate.stream = stream;
+
     // Create an audio capture session
-    stream->audioStream = [[SCStream alloc] initWithFilter:contentFilter configuration:streamConfig delegate:nil];
+    stream->audioStream = [[SCStream alloc] initWithFilter:contentFilter configuration:streamConfig delegate:stream->delegate];
     if (!stream->audioStream)
     {
         PA_DEBUG(("Failed to create audio stream\n"));
@@ -401,13 +431,22 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
     stream->streamOutput.ringBuffer = &stream->ringBuffer;
 
     [displays release];
+    [contentFilter release];
     *s = (PaStream *)stream;
     return paNoError;
 error:
     if (stream)
     {
+        if (stream->audioStream)
+            [stream->audioStream release];
+        if (stream->streamOutput)
+            [stream->streamOutput release];
+        if (stream->delegate)
+            [stream->delegate release];
         PaUtil_FreeMemory(stream);
     }
+    if (contentFilter)
+        [contentFilter release];
     if (displays)
         [displays release];
     return result;
@@ -482,6 +521,9 @@ static PaError CloseStream(PaStream *s)
 {
     StopStream(s);
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    [stream->audioStream release];
+    [stream->streamOutput release];
+    [stream->delegate release];
     PaUtil_FreeMemory(stream->ringBuffer.buffer);
     PaUtil_FreeMemory(stream);
     return paNoError;
