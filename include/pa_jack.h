@@ -50,6 +50,19 @@
 extern "C" {
 #endif
 
+typedef struct PaJackStreamInfo
+{
+    unsigned long size;
+    PaHostApiTypeId hostApiType;
+    unsigned long version;
+
+    PaDeviceIndex device;
+}
+PaJackStreamInfo;
+
+/** Initialize host API specific structure, to ask for no device connection. */
+void PaJack_InitializeNoDeviceStreamInfo( PaJackStreamInfo *info );
+
 /** Set the JACK client name.
  *
  * During Pa_Initialize, When PA JACK connects as a client of the JACK server, it requests a certain
