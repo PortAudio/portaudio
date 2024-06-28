@@ -6651,7 +6651,7 @@ static PaError PaPinCaptureEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo,
     pos += pin->hwLatency;
     pos %= pCapture->hostBufferSize;
     /* Need to align position on frame boundary */
-    pos &= ~(pCapture->bytesPerFrame - 1);
+    pos = (pos / pCapture->bytesPerFrame) * pCapture->bytesPerFrame;
 
     /* Call barrier (or dummy) */
     pin->fnMemBarrier();
@@ -6703,7 +6703,7 @@ static PaError PaPinRenderEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, u
     /* Wrap it */
     pos %= pRender->hostBufferSize;
     /* And align it, not sure its really needed though */
-    pos &= ~(pRender->bytesPerFrame - 1);
+    pos = (pos / pRender->bytesPerFrame) * pRender->bytesPerFrame;
     /* Then realOutBuf will point to "other" half of double buffer */
     realOutBuf = pos < halfOutputBuffer ? 1U : 0U;
 
@@ -6740,7 +6740,7 @@ static PaError PaPinRenderEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo, 
     /* Wrap it */
     pos %= pRender->hostBufferSize;
     /* And align it, not sure its really needed though */
-    pos &= ~(pRender->bytesPerFrame - 1);
+    pos = (pos / pRender->bytesPerFrame) * pRender->bytesPerFrame;
 
     if (pInfo->priming)
     {
