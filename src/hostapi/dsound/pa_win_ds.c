@@ -41,12 +41,6 @@
  @ingroup hostapi_src
 */
 
-/* Until May 2011 PA/DS has used a multimedia timer to perform the callback.
-   We're replacing this with a new implementation using a thread and a different timer mechanism.
-   Defining PA_WIN_DS_USE_WMME_TIMER uses the old (pre-May 2011) behavior.
-*/
-//#define PA_WIN_DS_USE_WMME_TIMER
-
 #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0400)
     #undef _WIN32_WINNT
     #define _WIN32_WINNT 0x0400 /* required to get waitable timer APIs */
@@ -73,10 +67,8 @@
 #ifdef PAWIN_USE_WDMKS_DEVICE_INFO
 #include <dsconf.h>
 #endif /* PAWIN_USE_WDMKS_DEVICE_INFO */
-#ifndef PA_WIN_DS_USE_WMME_TIMER
 #ifndef UNDER_CE
 #include <process.h>
-#endif
 #endif
 
 #include "pa_util.h"
@@ -101,9 +93,6 @@
 #pragma comment( lib, "kernel32.lib" )
 #endif
 
-/* use CreateThread for CYGWIN, _beginthreadex for all others */
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-
 #if !defined(__CYGWIN__) && !defined(UNDER_CE)
 #define CREATE_THREAD (HANDLE)_beginthreadex
 #undef CLOSE_THREAD_HANDLE /* as per documentation we don't call CloseHandle on a thread created with _beginthreadex */
@@ -127,8 +116,6 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg );
 #if !defined(UNDER_CE)
 #define PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT /* use waitable timer where possible, otherwise we use a WaitForSingleObject timeout */
 #endif
-
-#endif /* !PA_WIN_DS_USE_WMME_TIMER */
 
 
 /*
@@ -309,17 +296,12 @@ typedef struct PaWinDsStream
 
     UINT             systemTimerResolutionPeriodMs; /* set to 0 if we were unable to set the timer period */
 
-#ifdef PA_WIN_DS_USE_WMME_TIMER
-    MMRESULT         timerID;
-#else
-
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
     HANDLE           waitableTimer;
 #endif
     HANDLE           processingThread;
     PA_THREAD_ID     processingThreadId;
     HANDLE           processingThreadCompleted;
-#endif
 
 } PaWinDsStream;
 
@@ -2078,10 +2060,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             goto error;
         }
 
-#ifdef PA_WIN_DS_USE_WMME_TIMER
-        stream->timerID = 0;
-#endif
-
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
         stream->waitableTimer = (HANDLE)CreateWaitableTimer( 0, FALSE, NULL );
         if( stream->waitableTimer == NULL )
@@ -2092,7 +2070,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 #endif
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
         stream->processingThreadCompleted = CreateEvent( NULL, /* bManualReset = */ TRUE, /* bInitialState = */ FALSE, NULL );
         if( stream->processingThreadCompleted == NULL )
         {
@@ -2100,7 +2077,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
             goto error;
         }
-#endif
 
         /* set up i/o parameters */
 
@@ -2294,10 +2270,8 @@ error:
             CloseHandle( stream->waitableTimer );
 #endif
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
         if( stream->processingThreadCompleted != NULL )
             CloseHandle( stream->processingThreadCompleted );
-#endif
 
         if( stream->pDirectSoundOutputBuffer )
         {
@@ -2726,8 +2700,6 @@ static void CALLBACK TimerCallback(UINT uID, UINT uMsg, DWORD_PTR dwUser, DWORD 
     }
 }
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
 
 static void CALLBACK WaitableTimerAPCProc(
@@ -2790,8 +2762,6 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
     return 0;
 }
 
-#endif /* !PA_WIN_DS_USE_WMME_TIMER */
-
 /***********************************************************************************
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
@@ -2808,9 +2778,7 @@ static PaError CloseStream( PaStream* s )
         CloseHandle( stream->waitableTimer );
 #endif
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
     CloseHandle( stream->processingThreadCompleted );
-#endif
 
     // Cleanup the sound buffers
     if( stream->pDirectSoundOutputBuffer )
@@ -2906,9 +2874,7 @@ static PaError StartStream( PaStream *s )
 
     ResetEvent( stream->processingCompleted );
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
     ResetEvent( stream->processingThreadCompleted );
-#endif
 
     if( stream->bufferProcessor.inputChannelCount > 0 )
     {
@@ -3000,23 +2966,6 @@ static PaError StartStream( PaStream *s )
         }
 
 
-#ifdef PA_WIN_DS_USE_WMME_TIMER
-        /* Create timer that will wake us up so we can fill the DSound buffer. */
-        /* We have deprecated timeSetEvent because all MM timer callbacks
-           are serialised onto a single thread. Which creates problems with multiple
-           PA streams, or when also using timers for other time critical tasks
-        */
-        stream->timerID = timeSetEvent( timerPeriodMs, stream->systemTimerResolutionPeriodMs, (LPTIMECALLBACK) TimerCallback,
-                                             (DWORD_PTR) stream, TIME_PERIODIC | TIME_KILL_SYNCHRONOUS );
-
-        if( stream->timerID == 0 )
-        {
-            stream->isActive = 0;
-            result = paUnanticipatedHostError;
-            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
-            goto error;
-        }
-#else
         /* Create processing thread which calls TimerCallback */
 
         stream->processingThread = CREATE_THREAD( 0, 0, ProcessingThreadProc, stream, 0, &stream->processingThreadId );
@@ -3033,7 +2982,6 @@ static PaError StartStream( PaStream *s )
             PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
             goto error;
         }
-#endif
     }
 
     stream->isActive = 1;
@@ -3048,7 +2996,6 @@ error:
         IDirectSoundBuffer_Stop( stream->pDirectSoundOutputBuffer );
     stream->outputIsRunning = FALSE;
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
     if( stream->processingThread )
     {
 #ifdef CLOSE_THREAD_HANDLE
@@ -3056,7 +3003,6 @@ error:
 #endif
         stream->processingThread = NULL;
     }
-#endif
 
     return result;
 }
@@ -3080,13 +3026,6 @@ static PaError StopStream( PaStream *s )
         WaitForSingleObject( stream->processingCompleted, timeoutMsec );
     }
 
-#ifdef PA_WIN_DS_USE_WMME_TIMER
-    if( stream->timerID != 0 )
-    {
-        timeKillEvent(stream->timerID);  /* Stop callback timer. */
-        stream->timerID = 0;
-    }
-#else
     if( stream->processingThread )
     {
         if( WaitForSingleObject( stream->processingThreadCompleted, 30*100 ) == WAIT_TIMEOUT )
@@ -3098,7 +3037,6 @@ static PaError StopStream( PaStream *s )
 #endif
 
     }
-#endif
 
     if( stream->systemTimerResolutionPeriodMs > 0 ){
         timeEndPeriod( stream->systemTimerResolutionPeriodMs );
