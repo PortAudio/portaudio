@@ -200,7 +200,7 @@ PaPulseAudio_Stream;
         return paStreamIsStopped; \
     }
 
-int PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
+void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
                                   pa_operation **pulseaudioOperation);
 
 void PaPulseAudio_Lock( pa_threaded_mainloop *mainloop );
