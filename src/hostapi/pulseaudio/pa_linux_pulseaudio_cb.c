@@ -109,22 +109,38 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
 void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
                                   pa_operation **operation)
 {
-    unsigned int wait = 0;
+    unsigned int waitOperation = 1000;
     pa_operation *localOperation = (*operation);
+    pa_operation_state_t localOperationState = PA_OPERATION_RUNNING;
 
-    while( pa_operation_get_state( localOperation ) == PA_OPERATION_RUNNING )
+    // As mainly operation is done when running locally
+    // done after 1-3 then 1000 is enough to wait if
+    // something goes wrong
+
+    while( waitOperation > 0 )
     {
+        PaPulseAudio_Lock( hostapi->mainloop );
         pa_threaded_mainloop_wait( hostapi->mainloop );
+        PaPulseAudio_UnLock( hostapi->mainloop );
 
-        wait ++;
-        usleep( 1000 );
+        localOperationState = pa_operation_get_state( localOperation );
 
-        if( wait > 2000 )
+        // No wait if operation have been DONE or CANCELLED
+        if( localOperationState != PA_OPERATION_RUNNING)
         {
-            PA_DEBUG( ( "Portaudio %s: Operation still running %d!\n",
-            __FUNCTION__, pa_operation_get_state( localOperation ) ) );
             break;
         }
+
+        waitOperation --;
+
+        usleep( 1000 );
+    }
+
+    // No wait if operation have been DONE or CANCELLED
+    if( localOperationState == PA_OPERATION_RUNNING)
+    {
+        PA_DEBUG( ( "Portaudio %s: Operation still running %d!\n",
+        __FUNCTION__, localOperationState ) );
     }
 
     PaPulseAudio_Lock( hostapi->mainloop );
@@ -895,7 +911,6 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
     PaError ret = paNoError;
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = stream->hostapi;
     pa_operation *pulseaudioOperation = NULL;
-    int waitLoop = 0;
 
     PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
 
@@ -918,8 +933,10 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
                                               PaPulseAudio_CorkSuccessCb,
                                               stream );
 
+        PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
         PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
                                        &pulseaudioOperation );
+        PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
     }
 
     requeststop_error:

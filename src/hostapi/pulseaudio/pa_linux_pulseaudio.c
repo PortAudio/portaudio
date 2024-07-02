@@ -649,8 +649,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                 PaPulseAudio_ServerInfoCb,
                                 pulseaudioHostApi );
 
+    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
+
     PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
                                    &pulseaudioOperation );
+
+    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
 
     /* Add the "Default" sink at index 0 */
     if( _PaPulseAudio_AddAudioDevice( pulseaudioHostApi,
@@ -696,8 +702,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                        PaPulseAudio_SinkListCb,
                                        pulseaudioHostApi );
 
+    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
+
     PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
                                    &pulseaudioOperation );
+
+    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
 
     /* List PulseAudio sources. If found callback: PaPulseAudio_SourceListCb */
     pulseaudioOperation =
@@ -705,8 +717,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                          PaPulseAudio_SourceListCb,
                                          pulseaudioHostApi );
 
+    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
+
     PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
                                    &pulseaudioOperation );
+
+    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
 
     (*hostApi)->info.deviceCount = pulseaudioHostApi->deviceCount;
 
