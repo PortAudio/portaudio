@@ -106,7 +106,7 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
 }
 
 /* Release pa_operation always same way */
-int PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
+void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
                                   pa_operation **operation)
 {
     unsigned int wait = 0;
