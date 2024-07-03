@@ -70,7 +70,7 @@ add_library(PortAudio::portaudiocpp ALIAS portaudiocpp) # For subdirectory build
 
 find_package(PortAudio MODULE REQUIRED)
 
-target_link_libraries(portaudiocpp PUBLIC PortAudio::portaudio)
+target_link_libraries(portaudiocpp PUBLIC PortAudio::PortAudio)
 target_include_directories(
   portaudiocpp PUBLIC $<INSTALL_INTERFACE:include>
                       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
