@@ -98,7 +98,7 @@ typedef struct PaVersionInfo {
      Encoded as UTF-8.
     */
     const char *versionControlRevision;
-    /** Version as a string, for example "PortAudio V19.5.0-devel, revision 1952M". Encoded as UTF-8.*/
+    /** Version as a string, for example "PortAudio V19.5.0-devel, revision 1952M". Encoded as UTF-8. */
     const char *versionText;
 } PaVersionInfo;
 
