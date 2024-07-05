@@ -95,9 +95,10 @@ typedef struct PaVersionInfo {
      This is currently the Git revision hash but may change in the future.
      The versionControlRevision is updated by running a script before compiling the library.
      If the update does not occur, this value may refer to an earlier revision.
+     Encoded as UTF-8.
     */
     const char *versionControlRevision;
-    /** Version as a string, for example "PortAudio V19.5.0-devel, revision 1952M" */
+    /** Version as a string, for example "PortAudio V19.5.0-devel, revision 1952M". Encoded as UTF-8. */
     const char *versionText;
 } PaVersionInfo;
 
@@ -157,7 +158,7 @@ typedef enum PaErrorCode
 
 
 /** Translate the supplied PortAudio error code into a human readable
- message.
+ message, encoded as UTF-8.
 */
 const char *Pa_GetErrorText( PaError errorCode );
 
@@ -303,7 +304,7 @@ typedef struct PaHostApiInfo
     int structVersion;
     /** The well known unique identifier of this host API @see PaHostApiTypeId */
     PaHostApiTypeId type;
-    /** A textual description of the host API for display on user interfaces. */
+    /** A textual description of the host API for display on user interfaces. Encoded as UTF-8. */
     const char *name;
 
     /**  The number of devices belonging to this host API. This field may be
@@ -393,7 +394,7 @@ PaDeviceIndex Pa_HostApiDeviceIndexToDeviceIndex( PaHostApiIndex hostApi,
 typedef struct PaHostErrorInfo{
     PaHostApiTypeId hostApiType;    /**< the host API which returned the error code */
     long errorCode;                 /**< the error code returned */
-    const char *errorText;          /**< a textual description of the error if available, otherwise a zero-length string */
+    const char *errorText;          /**< a textual description of the error if available (encoded as UTF-8), otherwise a zero-length C string */
 }PaHostErrorInfo;
 
 
@@ -503,9 +504,13 @@ typedef unsigned long PaSampleFormat;
 */
 typedef struct PaDeviceInfo
 {
-    int structVersion;  /* this is struct version 2 */
+    int structVersion;  /**< this is struct version 2 */
+
+    /** Human readable device name. Encoded as UTF-8. */
     const char *name;
-    PaHostApiIndex hostApi; /**< note this is a host API index, not a type id*/
+
+    /** Host API index in the range 0 to (Pa_GetHostApiCount()-1). Note: this is a host API index, not a type id. */
+    PaHostApiIndex hostApi;
 
     int maxInputChannels;
     int maxOutputChannels;
