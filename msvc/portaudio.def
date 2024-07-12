@@ -58,7 +58,7 @@ PaWasapiWinrt_SetDefaultDeviceId    @67
 PaWasapiWinrt_PopulateDeviceList    @69
 PaWasapi_GetIMMDevice               @70
 PaWasapi_IsLoopback                 @71
-PaWinMME_GetStreamInputHandleCount  @72
-PaWinMME_GetStreamInputHandle       @73
-PaWinMME_GetStreamOutputHandleCount @74
-PaWinMME_GetStreamOutputHandle      @75
+PaWinMME_GetStreamInputHandleCount  @100
+PaWinMME_GetStreamInputHandle       @101
+PaWinMME_GetStreamOutputHandleCount @102
+PaWinMME_GetStreamOutputHandle      @103
