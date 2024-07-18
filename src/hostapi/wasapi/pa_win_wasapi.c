@@ -2992,7 +2992,7 @@ static PaError GetClosestFormat(IAudioClient *client, const PaDeviceInfo *baseDe
             // Limit this workaround to Realtek devices only
             if (strstr(baseDeviceInfo->name, "Realtek") != NULL)
             {
-                // Force internal Mono to Stereo mixer
+                // Force our Mono to Stereo mixer mechanism
                 outWavex->Format.nChannels = 2;
                 UpdateWaveFormatBlockAlign((WAVEFORMATEX *)outWavex);
             }
