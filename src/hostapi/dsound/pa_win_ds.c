@@ -3089,9 +3089,7 @@ static PaError StopStream( PaStream *s )
 #else
     if( stream->processingThread )
     {
-        if( WaitForSingleObject( stream->processingThreadCompleted, 30*100 ) == WAIT_TIMEOUT )
-            return paUnanticipatedHostError;
-
+        WaitForSingleObject(stream->processingThreadCompleted, INFINITE );
 #ifdef CLOSE_THREAD_HANDLE
         CloseHandle( stream->processingThread ); /* Delete thread. */
         stream->processingThread = NULL;
