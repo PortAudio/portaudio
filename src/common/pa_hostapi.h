@@ -153,6 +153,13 @@ are defaulted to 1.
 #define PA_USE_COREAUDIO 1
 #endif
 
+#ifndef PA_USE_COREAUDIO_IOS
+#define PA_USE_COREAUDIO_IOS 0
+#elif (PA_USE_COREAUDIO_IOS != 0) && (PA_USE_COREAUDIO_IOS != 1)
+#undef PA_USE_COREAUDIO_IOS
+#define PA_USE_COREAUDIO_IOS 1
+#endif
+
 #ifndef PA_USE_ASIHPI
 #define PA_USE_ASIHPI 0
 #elif (PA_USE_ASIHPI != 0) && (PA_USE_ASIHPI != 1)
