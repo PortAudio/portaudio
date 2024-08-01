@@ -336,7 +336,7 @@ int main(void)
         fprintf(stderr,"Error: No default input device.\n");
         goto done;
     }
-    inputParameters.channelCount = 2;                    /* stereo input */
+    inputParameters.channelCount = NUM_CHANNELS;
     inputParameters.sampleFormat = PA_SAMPLE_TYPE;
     inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
     inputParameters.hostApiSpecificStreamInfo = NULL;
@@ -394,7 +394,7 @@ int main(void)
         fprintf(stderr,"Error: No default output device.\n");
         goto done;
     }
-    outputParameters.channelCount = 2;                     /* stereo output */
+    outputParameters.channelCount = NUM_CHANNELS;
     outputParameters.sampleFormat =  PA_SAMPLE_TYPE;
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = NULL;
