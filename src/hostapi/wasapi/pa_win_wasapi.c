@@ -4839,7 +4839,7 @@ static PaError ReadStream( PaStream* s, void *_buffer, unsigned long frames )
         if (isMonoStereoConverter)
         {
             // Expand buffer if necessary (normally shall not happen, buffer is preallocated by
-            // ActivateAudioClient(), this is to circumvent unexpeced buffer size provided by the driver)
+            // ActivateAudioClient(), this is to circumvent unexpected buffer size provided by the driver)
             if ((hr = ReallocateMonoMixerBuffer(&stream->in, available)) != S_OK)
             {
                 LogHostError(hr);
