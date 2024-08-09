@@ -50,7 +50,7 @@
 
 /*#define SAMPLE_RATE        (17932) // Test failure to open with this value. */
 #define SAMPLE_RATE        (44100)
-#define CHANNELS           (2)
+#define CHANNELS           (2) /* set to 0 to use all device channels */
 #define FRAMES_PER_BUFFER  (512)
 #define NUM_SECONDS        (10)
 /*#define DITHER_FLAG        (paDitherOff) */
