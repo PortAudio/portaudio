@@ -47,13 +47,14 @@
 #include <stdlib.h>
 #include "portaudio.h"
 
-/* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
-#define SAMPLE_RATE  (44100)
-#define FRAMES_PER_BUFFER (1024)
-#define NUM_SECONDS     (5)
-#define NUM_CHANNELS    (2)
-/* #define DITHER_FLAG     (paDitherOff)  */
-#define DITHER_FLAG     (0) /**/
+/* #define SAMPLE_RATE        (17932) // Test failure to open with this value. */
+#define SAMPLE_RATE        (44100)
+#define FRAMES_PER_BUFFER  (1024)
+#define NUM_SECONDS        (5)
+#define NUM_CHANNELS       (2)
+/* #define DITHER_FLAG        (paDitherOff)  */
+#define DITHER_FLAG        (0) /**/
+#define USE_LOOPBACK_INPUT (0)
 
 /* Select sample format. */
 #if 1
@@ -93,7 +94,6 @@ int main(void)
     int numBytes;
     SAMPLE max, average, val;
 
-
     printf("patest_read_record.c\n"); fflush(stdout);
 
     totalFrames = NUM_SECONDS * SAMPLE_RATE; /* Record for a few seconds. */
@@ -111,7 +111,24 @@ int main(void)
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
+#if USE_LOOPBACK_INPUT
+    inputParameters.device = paNoDevice;
+    for (i = Pa_GetDeviceCount() - 1; i >= 0; i--)
+    {
+        const PaDeviceInfo* device;
+        if ((device = Pa_GetDeviceInfo(i)) != NULL)
+        {
+            // Note: [Loopback] name postfix is provided by the WASAPI device only
+            if (strstr(device->name, "[Loopback]") != NULL)
+            {
+                inputParameters.device = i;
+                break;
+            }
+        }
+    }
+#else
     inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
+#endif
     if (inputParameters.device == paNoDevice) {
         fprintf(stderr,"Error: No default input device.\n");
         goto error;
