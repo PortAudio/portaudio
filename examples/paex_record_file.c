@@ -249,14 +249,13 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     paTestData *data = (paTestData*)userData;
     ring_buffer_size_t elementsWriteable = PaUtil_GetRingBufferWriteAvailable(&data->ringBuffer);
     ring_buffer_size_t elementsToWrite = rbs_min(elementsWriteable, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
-    const SAMPLE *rptr = (const SAMPLE*)inputBuffer;
 
     (void) outputBuffer; /* Prevent unused variable warnings. */
     (void) timeInfo;
     (void) statusFlags;
     (void) userData;
 
-    data->frameIndex += PaUtil_WriteRingBuffer(&data->ringBuffer, rptr, elementsToWrite);
+    data->frameIndex += PaUtil_WriteRingBuffer(&data->ringBuffer, inputBuffer, elementsToWrite);
 
     return paContinue;
 }
@@ -274,14 +273,13 @@ static int playCallback( const void *inputBuffer, void *outputBuffer,
     paTestData *data = (paTestData*)userData;
     ring_buffer_size_t elementsToPlay = PaUtil_GetRingBufferReadAvailable(&data->ringBuffer);
     ring_buffer_size_t elementsToRead = rbs_min(elementsToPlay, (ring_buffer_size_t)(framesPerBuffer * NUM_CHANNELS));
-    SAMPLE* wptr = (SAMPLE*)outputBuffer;
 
     (void) inputBuffer; /* Prevent unused variable warnings. */
     (void) timeInfo;
     (void) statusFlags;
     (void) userData;
 
-    data->frameIndex += PaUtil_ReadRingBuffer(&data->ringBuffer, wptr, elementsToRead);
+    data->frameIndex += PaUtil_ReadRingBuffer(&data->ringBuffer, outputBuffer, elementsToRead);
 
     return data->threadSyncFlag ? paComplete : paContinue;
 }
