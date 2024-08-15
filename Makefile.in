@@ -213,8 +213,12 @@ install: lib/$(PALIB) portaudio-2.0.pc
 
 uninstall:
 	$(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(libdir)/$(PALIB)
-	$(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(includedir)/portaudio.h
+	for include in $(INCLUDES); do \
+		$(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(includedir)/$$include; \
+	done
+	$(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(libdir)/pkgconfig/portaudio-2.0.pc
 	$(MAKE) uninstall-recursive
+
 
 clean:
 	$(LIBTOOL) --mode=clean rm -f $(LTOBJS) $(LOOPBACK_OBJS) $(ALL_TESTS) lib/$(PALIB)
