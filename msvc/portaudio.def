@@ -36,6 +36,7 @@ Pa_GetStreamWriteAvailable          @32
 Pa_GetSampleSize                    @33
 Pa_Sleep                            @34
 Pa_GetVersionInfo                   @35
+; add new portable public API functions here. DO NOT CHANGE EXISTING ORDINALS!
 PaAsio_GetAvailableBufferSizes      @50
 PaAsio_ShowControlPanel             @51
 PaUtil_InitializeX86PlainConverters @52
@@ -57,8 +58,9 @@ PaWasapi_SetStreamStateHandler      @68
 PaWasapiWinrt_SetDefaultDeviceId    @67
 PaWasapiWinrt_PopulateDeviceList    @69
 PaWasapi_GetIMMDevice               @70
-PaWasapi_IsLoopback                 @71
-PaWinMME_GetStreamInputHandleCount  @72
-PaWinMME_GetStreamInputHandle       @73
-PaWinMME_GetStreamOutputHandleCount @74
-PaWinMME_GetStreamOutputHandle      @75
+PaWinMME_GetStreamInputHandleCount  @71
+PaWinMME_GetStreamInputHandle       @72
+PaWinMME_GetStreamOutputHandleCount @73
+PaWinMME_GetStreamOutputHandle      @74
+PaWasapi_IsLoopback                 @75
+; add new host-API-specific public functions here. DO NOT CHANGE EXISTING ORDINALS!

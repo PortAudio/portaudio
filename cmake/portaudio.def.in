@@ -39,6 +39,7 @@ Pa_GetStreamWriteAvailable          @32
 Pa_GetSampleSize                    @33
 Pa_Sleep                            @34
 Pa_GetVersionInfo                   @35
+; add new portable public API functions here. DO NOT CHANGE EXISTING ORDINALS!
 @DEF_EXCLUDE_ASIO_SYMBOLS@PaAsio_GetAvailableBufferSizes      @50
 @DEF_EXCLUDE_ASIO_SYMBOLS@PaAsio_ShowControlPanel             @51
 @DEF_EXCLUDE_X86_PLAIN_CONVERTERS@PaUtil_InitializeX86PlainConverters @52
@@ -60,8 +61,9 @@ PaUtil_SetDebugPrintFunction        @55
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapiWinrt_SetDefaultDeviceId    @67
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapiWinrt_PopulateDeviceList    @69
 @DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapi_GetIMMDevice               @70
-@DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapi_IsLoopback                 @71
-@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamInputHandleCount    @72
-@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamInputHandle         @73
-@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamOutputHandleCount   @74
-@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamOutputHandle        @75
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamInputHandleCount    @71
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamInputHandle         @72
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamOutputHandleCount   @73
+@DEF_EXCLUDE_WMME_SYMBOLS@PaWinMME_GetStreamOutputHandle        @74
+@DEF_EXCLUDE_WASAPI_SYMBOLS@PaWasapi_IsLoopback                 @75
+; add new host-API-specific public functions here. DO NOT CHANGE EXISTING ORDINALS!
