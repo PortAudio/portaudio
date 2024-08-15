@@ -18,3 +18,7 @@ jobs:
       run: ./configure
     - name: make
       run: make
+    - name: install
+      run: make install
+    - name: uninstall
+      run: make uninstall
