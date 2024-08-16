@@ -44,11 +44,12 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
 #include "portaudio.h"
 
 #define NUM_SECONDS         (5)
 #define SAMPLE_RATE         (44100)
-#define CHANNELS            (2)
+#define CHANNELS            (2) /* Set to 1 or 2. */
 #define FRAMES_PER_BUFFER   (1024)
 
 #ifndef M_PI
@@ -72,6 +73,8 @@ int main(void)
     int right_inc = 3; /* higher pitch so we can distinguish left and right. */
     int i, j, k;
     int bufferCount;
+
+    assert(CHANNELS >= 1 && CHANNELS <= 2);
 
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
 
