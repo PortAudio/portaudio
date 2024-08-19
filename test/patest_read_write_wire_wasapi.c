@@ -48,12 +48,14 @@
 #include <string.h>
 #include "portaudio.h"
 
-/* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
-#define SAMPLE_RATE       (44100)
-#define FRAMES_PER_BUFFER   (512)
-#define NUM_SECONDS          (10)
-/* #define DITHER_FLAG     (paDitherOff)  */
-#define DITHER_FLAG           (0)
+/*#define SAMPLE_RATE        (17932) // Test failure to open with this value. */
+#define SAMPLE_RATE        (44100)
+#define CHANNELS           (2) /* set to 0 to use all device channels */
+#define FRAMES_PER_BUFFER  (512)
+#define NUM_SECONDS        (10)
+/*#define DITHER_FLAG        (paDitherOff) */
+#define DITHER_FLAG        (0)
+#define USE_LOOPBACK_INPUT (0)
 
 /* Select sample format. */
 #if 1
@@ -105,6 +107,30 @@ int main(void)
     if( err != paNoError ) goto error2;
 
     inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
+
+#if USE_LOOPBACK_INPUT
+    for (i = Pa_GetDeviceCount() - 1; i >= 0; i--)
+    {
+        const PaDeviceInfo* device;
+        if ((device = Pa_GetDeviceInfo(i)) != NULL)
+        {
+            // Note: [Loopback] name postfix is provided by the WASAPI device only
+            if (strstr(device->name, "[Loopback]") != NULL)
+            {
+                inputParameters.device = i;
+                inputInfo = device;
+                break;
+            }
+        }
+    }
+
+    if (inputInfo == NULL)
+    {
+        fprintf(stderr, "Error: Loopback device not found.\n");
+        return -1;
+    }
+#endif
+
     printf( "Input device # %d.\n", inputParameters.device );
     inputInfo = Pa_GetDeviceInfo( inputParameters.device );
     printf( "    Name: %s\n", inputInfo->name );
@@ -120,6 +146,7 @@ int main(void)
 
     numChannels = inputInfo->maxInputChannels < outputInfo->maxOutputChannels
             ? inputInfo->maxInputChannels : outputInfo->maxOutputChannels;
+    numChannels = (CHANNELS ? CHANNELS : numChannels);
     printf( "Num channels = %d.\n", numChannels );
 
     inputParameters.channelCount = numChannels;
