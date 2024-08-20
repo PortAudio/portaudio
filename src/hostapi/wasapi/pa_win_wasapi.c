@@ -5929,11 +5929,6 @@ PA_THREAD_FUNC ProcThreadEvent(void *param)
     if (!PrepareComPointers(stream, &threadComInitialized))
         return (UINT32)paUnanticipatedHostError;
 
-    // Request fine (1 ms) granularity of the system timer functions for precise operation of waitable timers
-    // Note: while granularity is already set by OpenStream() we still must be sure that user code did not
-    // change granularity between Pa_OpenStream() and Pa_StartStream()
-    SystemTimer_SetGranularity(&stream->timer, 1);
-
     // Waiting on all events in case of Full-Duplex/Exclusive mode.
     if ((stream->in.clientProc != NULL) && (stream->out.clientProc != NULL))
     {
@@ -6083,9 +6078,6 @@ thread_end:
     // Release unmarshaled COM pointers
     FinishComPointers(stream, threadComInitialized);
 
-    // Restore system timer granularity
-    SystemTimer_RestoreGranularity(&stream->timer);
-
     // Notify: stream inactive
     stream->isActive = FALSE;
 
@@ -6232,11 +6224,6 @@ PA_THREAD_FUNC ProcThreadPoll(void *param)
     // Prepare COM pointers
     if (!PrepareComPointers(stream, &threadComInitialized))
         return (UINT32)paUnanticipatedHostError;
-
-    // Request fine (1 ms) granularity of the system timer functions to guarantee correct logic around WaitForSingleObject
-    // Note: while granularity is already set by OpenStream() we still must be sure that user code did not
-    // change granularity between Pa_OpenStream() and Pa_StartStream()
-    SystemTimer_SetGranularity(&stream->timer, 1);
 
     // Calculate sleep time of the processing loop (inside WaitForSingleObject)
     sleepTime = ConfigureLoopSleepTimeAndScheduler(stream, &scheduler);
@@ -6567,9 +6554,6 @@ thread_end:
 
     // Release unmarshaled COM pointers
     FinishComPointers(stream, threadComInitialized);
-
-    // Restore system timer granularity
-    SystemTimer_RestoreGranularity(&stream->timer);
 
     // Notify: state inactive
     stream->isActive = FALSE;
