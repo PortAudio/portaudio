@@ -5,7 +5,7 @@
 
 CMake can be used to generate Visual Studio solutions on Windows, Makefiles (on Linux and OS X) and build metadata for other build systems for PortAudio. You should obtain a recent version of CMake from [http://www.cmake.org] if you do not have one already. If you are unfamiliar with CMake, this section will provide some information on using CMake to build PortAudio.
 
-Warning: PortAudio's CMake support has significantly changed since the PortAudio 19.7 release and is currently in flux. The documentation below is not up to date. Proceed with care. Known issues are marked with "FIXME" or "TODO", the list of open CMake related build issues is here: https://github.com/PortAudio/portaudio/issues?q=is%3Aissue+is%3Aopen+label%3Abuild-cmake
+Warning: PortAudio's CMake support has significantly changed since the PortAudio 19.7 release and is currently in flux. The documentation below is not up to date. Proceed with care. Known issues are marked with "FIXME" or "TODO", the list of open CMake related build issues is here: [https://github.com/PortAudio/portaudio/issues?q=is%3Aissue+is%3Aopen+label%3Abuild-cmake]
 
 FIXME: fix these docs and then remove the above warning.
 
