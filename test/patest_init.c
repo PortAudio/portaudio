@@ -64,7 +64,7 @@ int main(void)
         goto error;
     }
 
-    printf("Test completed without error.\n");
+    printf("Test completed successfully.\n");
     return err;
 
 error:
