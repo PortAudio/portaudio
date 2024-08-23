@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: configure
-      run: ./configure
+      run: ./configure --prefix=/home/runner/.local
     - name: make
       run: make
     - name: install
