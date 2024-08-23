@@ -8,7 +8,7 @@
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
- * Copyright (c) 1999-2000 Ross Bencina and Phil Burk
+ * Copyright (c) 1999-2024 Ross Bencina and Phil Burk
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
