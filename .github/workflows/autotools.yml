@@ -6,6 +6,21 @@ on:
   pull_request:
     branches: [ master ]
 
+env:
+  # GitHub CI Actions-specific environment variables:
+
+  # Location for user-local `make install`
+  PORTAUDIO_INSTALL_DIR: /home/runner/.local
+
+  # Environment variables for compiling and running the test program.
+  # Usually none of this is needed as `make install` would install to system locations
+  # where include and library search paths are already set up to just work.
+  # gcc environment variables. see https://gcc.gnu.org/onlinedocs/gcc/Environment-Variables.html
+  C_INCLUDE_PATH: /home/runner/.local/include
+  LIBRARY_PATH: /home/runner/.local/lib
+  # runtime dynamically linked library search path. see https://stackoverflow.com/questions/480764
+  LD_LIBRARY_PATH: /home/runner/.local/lib
+
 jobs:
   build-autotools:
 
@@ -14,7 +29,24 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    # test configure and build
     - name: configure
-      run: ./configure
+      run: ./configure --prefix=$PORTAUDIO_INSTALL_DIR
     - name: make
       run: make
+    # test make install
+    - name: install
+      run: make install
+    - name: list install dirs (post-install)
+      run: ls $PORTAUDIO_INSTALL_DIR $PORTAUDIO_INSTALL_DIR/include $PORTAUDIO_INSTALL_DIR/lib
+    - name: build patest_init.c (test just calls Pa_Initialize();Pa_Terminate();)
+      run: gcc -o patest_init ./test/patest_init.c -lportaudio
+    - name: run patest_init
+      run: ./patest_init
+      # test make uninstall
+    - name: uninstall
+      run: make uninstall
+    - name: list install dirs (post-uninstall)
+      run: ls $PORTAUDIO_INSTALL_DIR $PORTAUDIO_INSTALL_DIR/include $PORTAUDIO_INSTALL_DIR/lib
+    - name: build patest_init.c to check uninstall (expect failure)
+      run: if gcc -o patest_init ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
