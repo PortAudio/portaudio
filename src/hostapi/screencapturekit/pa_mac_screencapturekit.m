@@ -78,6 +78,7 @@ typedef struct PaScreenCaptureKitStream
     void *userData;
     unsigned long framesPerBuffer;
     pthread_t callbackThreadId;
+    pthread_mutex_t stopMutex;
 } PaScreenCaptureKitStream;
 
 #define SAMPLE_RATE 48000
@@ -173,6 +174,13 @@ typedef struct PaScreenCaptureKitStream
 static PaError StopStreamInternal(PaStream *s)
 {
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    pthread_mutex_lock(&stream->stopMutex);
+
+    if (stream->isStopped) {
+        pthread_mutex_unlock(&stream->stopMutex);
+        return paNoError;
+    }
+
     __block PaError result = paNoError;
     dispatch_group_t handlerGroup = dispatch_group_create();
     dispatch_group_enter(handlerGroup);
@@ -187,6 +195,7 @@ static PaError StopStreamInternal(PaStream *s)
     }];
     stream->isStopped = TRUE;
     dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
+    pthread_mutex_unlock(&stream->stopMutex);
     return result;
 }
 
@@ -297,6 +306,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
         return result;
     PaScreenCaptureKitHostApiRepresentation *paSck = (PaScreenCaptureKitHostApiRepresentation *)hostApi;
     PaScreenCaptureKitStream *stream = NULL;
+    bool mutexCreated = false;
     result = paNoError;
     __block NSArray<SCDisplay *> *displays = nil;
     if ((stream = (PaScreenCaptureKitStream *)PaUtil_AllocateZeroInitializedMemory(sizeof(PaScreenCaptureKitStream))) ==
@@ -362,6 +372,14 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
 
     stream->delegate = [[ScreenCaptureDelegate alloc] init]; // Create an instance of the delegate
     stream->delegate.stream = stream;
+
+    if (pthread_mutex_init(&stream->stopMutex, NULL) != 0)
+    {
+        PA_DEBUG(("Failed to initialize stop mutex\n"));
+        result = paInternalError;
+        goto error;
+    }
+    mutexCreated = true;
 
     // Create an audio capture session
     stream->audioStream = [[SCStream alloc] initWithFilter:contentFilter configuration:streamConfig delegate:stream->delegate];
@@ -437,6 +455,8 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
 error:
     if (stream)
     {
+        if (mutexCreated)
+            pthread_mutex_destroy(&stream->stopMutex);
         if (stream->audioStream)
             [stream->audioStream release];
         if (stream->streamOutput)
@@ -521,6 +541,7 @@ static PaError CloseStream(PaStream *s)
 {
     StopStream(s);
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
+    pthread_mutex_destroy(&stream->stopMutex);
     [stream->audioStream release];
     [stream->streamOutput release];
     [stream->delegate release];
