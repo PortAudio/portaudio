@@ -89,9 +89,16 @@ typedef struct PaScreenCaptureKitStream
 }
 
 - (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {
-    fprintf(stderr, "Stream encountered an error\n");
+    fprintf(stderr, "Stream encountered an error: %s\n", [[error localizedDescription] UTF8String]);
+
     if (self.stream) {
-        StopStreamInternal((PaStream *)self.stream);
+        // Mark the stream as having encountered an error to avoid re-entrance issues
+        self.stream->isStopped = TRUE;
+
+        // Dispatch a block to perform the stop operation after returning from this delegate method
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            StopStreamInternal((PaStream *)self.stream);
+        });
     }
 }
 
@@ -184,20 +191,27 @@ static PaError StopStreamInternal(PaStream *s)
     __block PaError result = paNoError;
     dispatch_group_t handlerGroup = dispatch_group_create();
     dispatch_group_enter(handlerGroup);
+
     // Stop the audio capture session
     [stream->audioStream stopCaptureWithCompletionHandler:^(NSError *error) {
-      if (error)
-      {
-          PA_DEBUG(("Failed to stop audio capture: %s\n", [[error localizedDescription] UTF8String]));
-          result = paInternalError;
-      }
-      dispatch_group_leave(handlerGroup);
+        if (error) {
+            PA_DEBUG(("Failed to stop audio capture: %s\n", [[error localizedDescription] UTF8String]));
+            result = paInternalError;
+        }
+        dispatch_group_leave(handlerGroup);
     }];
+
     stream->isStopped = TRUE;
-    dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
+
+    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
+        PA_DEBUG(("Timeout occurred while waiting for audio capture to stop.\n"));
+        result = paInternalError;
+    }
+
     pthread_mutex_unlock(&stream->stopMutex);
     return result;
 }
+
 
 // PortAudio host API stream read function
 static PaError ReadStream(PaStream *s, void *buffer, unsigned long frames)
