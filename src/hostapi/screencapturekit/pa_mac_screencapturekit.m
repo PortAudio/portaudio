@@ -72,7 +72,7 @@ typedef struct PaScreenCaptureKitStream
     ScreenCaptureKitStreamOutput *streamOutput;
     ScreenCaptureDelegate *delegate;
     PaUtilRingBuffer ringBuffer;
-    BOOL isStopped;
+    BOOL volatile isStopped;
     int sampleRate;
     PaStreamCallback *streamCallback;
     void *userData;
@@ -92,13 +92,10 @@ typedef struct PaScreenCaptureKitStream
     fprintf(stderr, "Stream encountered an error: %s\n", [[error localizedDescription] UTF8String]);
 
     if (self.stream) {
+        pthread_mutex_lock(&self.stream->stopMutex);
         // Mark the stream as having encountered an error to avoid re-entrance issues
         self.stream->isStopped = TRUE;
-
-        // Dispatch a block to perform the stop operation after returning from this delegate method
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            StopStreamInternal((PaStream *)self.stream);
-        });
+        pthread_mutex_unlock(&self.stream->stopMutex);
     }
 }
 
