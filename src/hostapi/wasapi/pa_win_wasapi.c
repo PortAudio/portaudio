@@ -1429,6 +1429,7 @@ static HRESULT ReallocateMonoMixerBuffer(PaWasapiSubStream *subStream, UINT32 fr
         frames = subStream->bufferSize;
 
     assert(frames != 0);
+    assert(subStream->wavexu.ext.Format.nBlockAlign != 0);
 
     // Expand buffer if necessary
     UINT32 monoBufferSize = frames * subStream->wavexu.ext.Format.nBlockAlign;
@@ -1443,8 +1444,6 @@ static HRESULT ReallocateMonoMixerBuffer(PaWasapiSubStream *subStream, UINT32 fr
 
         subStream->monoBufferSize = monoBufferSize;
     }
-
-    assert(subStream->monoBuffer != NULL);
 
     return S_OK;
 }
