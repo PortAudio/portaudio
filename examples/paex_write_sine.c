@@ -44,10 +44,12 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
 #include "portaudio.h"
 
 #define NUM_SECONDS         (5)
 #define SAMPLE_RATE         (44100)
+#define CHANNELS            (2) /* Set to 1 or 2. */
 #define FRAMES_PER_BUFFER   (1024)
 
 #ifndef M_PI
@@ -63,7 +65,7 @@ int main(void)
     PaStreamParameters outputParameters;
     PaStream *stream;
     PaError err;
-    float buffer[FRAMES_PER_BUFFER][2]; /* stereo output buffer */
+    float buffer[FRAMES_PER_BUFFER][CHANNELS]; /* stereo output buffer */
     float sine[TABLE_SIZE]; /* sine wavetable */
     int left_phase = 0;
     int right_phase = 0;
@@ -71,6 +73,8 @@ int main(void)
     int right_inc = 3; /* higher pitch so we can distinguish left and right. */
     int i, j, k;
     int bufferCount;
+
+    assert(CHANNELS >= 1 && CHANNELS <= 2);
 
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
 
@@ -89,7 +93,7 @@ int main(void)
         fprintf(stderr,"Error: No default output device.\n");
         goto error;
     }
-    outputParameters.channelCount = 2;       /* stereo output */
+    outputParameters.channelCount = CHANNELS;
     outputParameters.sampleFormat = paFloat32; /* 32 bit floating point output */
     outputParameters.suggestedLatency = 0.050; // Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = NULL;
@@ -122,11 +126,15 @@ int main(void)
             for( j=0; j < FRAMES_PER_BUFFER; j++ )
             {
                 buffer[j][0] = sine[left_phase];  /* left */
-                buffer[j][1] = sine[right_phase];  /* right */
                 left_phase += left_inc;
                 if( left_phase >= TABLE_SIZE ) left_phase -= TABLE_SIZE;
-                right_phase += right_inc;
-                if( right_phase >= TABLE_SIZE ) right_phase -= TABLE_SIZE;
+
+                if (CHANNELS == 2)
+                {
+                    buffer[j][1] = sine[right_phase];  /* right */
+                    right_phase += right_inc;
+                    if( right_phase >= TABLE_SIZE ) right_phase -= TABLE_SIZE;
+                }
             }
 
             err = Pa_WriteStream( stream, buffer, FRAMES_PER_BUFFER );
@@ -137,7 +145,8 @@ int main(void)
         if( err != paNoError ) goto error;
 
         ++left_inc;
-        ++right_inc;
+        if (CHANNELS == 2)
+            ++right_inc;
 
         Pa_Sleep( 1000 );
     }
