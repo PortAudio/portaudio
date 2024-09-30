@@ -13,7 +13,7 @@ add_executable(paloopback
     src/write_wav.h
 )
 target_include_directories(paloopback PRIVATE ..)
-target_link_libraries(paloopback PortAudio)
+target_link_libraries(paloopback portaudio)
 if(UNIX)
   target_link_libraries(paloopback m)
 endif()
