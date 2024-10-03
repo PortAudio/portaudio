@@ -106,7 +106,7 @@
 
 #if !defined(__CYGWIN__) && !defined(UNDER_CE)
 #define CREATE_THREAD (HANDLE)_beginthreadex
-#define CLOSE_THREAD_HANDLE CloseHandle
+#define CLOSE_THREAD_HANDLE CloseHandle /* NOTE: _beginthreadex requires handle to be closed with CloseHandle */
 #define PA_THREAD_FUNC static unsigned WINAPI
 #define PA_THREAD_ID unsigned
 #else
