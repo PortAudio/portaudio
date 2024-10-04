@@ -2,7 +2,7 @@
 
 macro(add_example appl_name)
   add_executable(${appl_name} "${appl_name}.c")
-  target_link_libraries(${appl_name} PortAudio)
+  target_link_libraries(${appl_name} portaudio)
   if(UNIX)
     target_link_libraries(${appl_name} m)
   endif()
@@ -14,7 +14,7 @@ endmacro()
 
 macro(add_example_cpp appl_name)
   add_executable(${appl_name} "${appl_name}.cpp")
-  target_link_libraries(${appl_name} PortAudio)
+  target_link_libraries(${appl_name} portaudio)
   set_target_properties(${appl_name} PROPERTIES FOLDER "Examples C++")
   if(WIN32)
     set_property(TARGET ${appl_name} APPEND_STRING PROPERTY COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)

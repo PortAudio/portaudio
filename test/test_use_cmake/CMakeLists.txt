@@ -24,7 +24,7 @@ add_library(test_use_static STATIC "${CMAKE_CURRENT_BINARY_DIR}/main.cpp")
 add_library(test_use_shared SHARED "${CMAKE_CURRENT_BINARY_DIR}/main.cpp")
 add_executable(test_use_exe "${CMAKE_CURRENT_BINARY_DIR}/main.cpp")
 
-target_link_libraries(test_use_static PRIVATE PortAudio::PortAudio)
-target_link_libraries(test_use_shared PRIVATE PortAudio::PortAudio)
-target_link_libraries(test_use_exe PRIVATE PortAudio::PortAudio)
+target_link_libraries(test_use_static PRIVATE portaudio)
+target_link_libraries(test_use_shared PRIVATE portaudio)
+target_link_libraries(test_use_exe PRIVATE portaudio)
 
