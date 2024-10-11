@@ -200,9 +200,9 @@ static PaError StopStreamInternal(PaStream *s)
 
     stream->isStopped = TRUE;
 
-    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
+    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0) {
         PA_DEBUG(("Timeout occurred while waiting for audio capture to stop.\n"));
-        result = paInternalError;
+        result = paTimedOut;
     }
 
     pthread_mutex_unlock(&stream->stopMutex);
@@ -348,7 +348,11 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
           dispatch_group_leave(handlerGroup);
         }];
 
-    dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
+    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0) {
+        PA_DEBUG(("Timeout occurred while waiting for async operation.\n"));
+        result = paTimedOut;
+        goto error;
+    }
 
     // Check the size of displays array
     if (!displays || displays.count < 1)
@@ -512,7 +516,12 @@ static PaError StartStream(PaStream *s)
       }
       dispatch_group_leave(handlerGroup);
     }];
-    dispatch_group_wait(handlerGroup, DISPATCH_TIME_FOREVER);
+
+    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0) {
+        PA_DEBUG(("Timeout occurred while waiting for async operation.\n"));
+        return paTimedOut;
+    }
+
     if (result != paNoError)
         return result;
 
