@@ -341,10 +341,11 @@ elseif(UNIX)
           PRIVATE
             -Wl,-framework,ScreenCaptureKit
             -Wl,-framework,CoreMedia
+            -Wl,-framework,Foundation
         )
         target_compile_definitions(PortAudio PUBLIC PA_USE_SCREENCAPTUREKIT=1)
         set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_SCREENCAPTUREKIT=1")
-        set(PKGCONFIG_LDFLAGS_PRIVATE "${PKGCONFIG_LDFLAGS_PRIVATE} -framework ScreenCaptureKit -framework CoreMedia")
+        set(PKGCONFIG_LDFLAGS_PRIVATE "${PKGCONFIG_LDFLAGS_PRIVATE} -framework ScreenCaptureKit -framework CoreMedia -framework Foundation")
       endif()
     endif()
   else()

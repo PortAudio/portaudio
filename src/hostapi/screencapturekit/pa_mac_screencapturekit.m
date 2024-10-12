@@ -185,28 +185,17 @@ static PaError StopStreamInternal(PaStream *s)
         return paNoError;
     }
 
-    __block PaError result = paNoError;
-    dispatch_group_t handlerGroup = dispatch_group_create();
-    dispatch_group_enter(handlerGroup);
-
-    // Stop the audio capture session
     [stream->audioStream stopCaptureWithCompletionHandler:^(NSError *error) {
         if (error) {
+            // This error can be ignored. It usually means that the stream has already been stopped.
             PA_DEBUG(("Failed to stop audio capture: %s\n", [[error localizedDescription] UTF8String]));
-            result = paInternalError;
         }
-        dispatch_group_leave(handlerGroup);
     }];
 
     stream->isStopped = TRUE;
 
-    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0) {
-        PA_DEBUG(("Timeout occurred while waiting for audio capture to stop.\n"));
-        result = paTimedOut;
-    }
-
     pthread_mutex_unlock(&stream->stopMutex);
-    return result;
+    return paNoError;
 }
 
 
@@ -320,16 +309,13 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
     bool mutexCreated = false;
     result = paNoError;
     __block NSArray<SCDisplay *> *displays = nil;
+    __block bool gotShareableContent = false;
     if ((stream = (PaScreenCaptureKitStream *)PaUtil_AllocateZeroInitializedMemory(sizeof(PaScreenCaptureKitStream))) ==
         NULL)
     {
         result = paInsufficientMemory;
         goto error;
     }
-
-    dispatch_group_t handlerGroup = dispatch_group_create();
-
-    dispatch_group_enter(handlerGroup);
 
     [SCShareableContent
         getShareableContentWithCompletionHandler:^(SCShareableContent *shareableContent, NSError *error) {
@@ -344,12 +330,23 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi, PaStream 
               displays = [shareableContent.displays retain];
           }
 
-          // Leave the dispatch group
-          dispatch_group_leave(handlerGroup);
+          gotShareableContent = true;
         }];
 
-    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0) {
-        PA_DEBUG(("Timeout occurred while waiting for async operation.\n"));
+    // Yield to the run loop until the async operation completes or times out
+    CFTimeInterval timeout = 10.0;  // Timeout in seconds
+    CFAbsoluteTime startTime = CFAbsoluteTimeGetCurrent();
+    while (!gotShareableContent && (CFAbsoluteTimeGetCurrent() - startTime) < timeout) {
+        if ([NSThread isMainThread]) {
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
+        } else {
+            usleep(100 * 1000);
+        }
+    }
+
+    if (!gotShareableContent)
+    {
+        PA_DEBUG(("Timeout occurred while waiting for displays\n"));
         result = paTimedOut;
         goto error;
     }
@@ -502,28 +499,37 @@ static PaError StartStream(PaStream *s)
     if (IsStreamActive(s))
         return paStreamIsNotStopped;
     __block PaError result = paNoError;
+    __block bool isCaptureStarted = false;
     PaScreenCaptureKitStream *stream = (PaScreenCaptureKitStream *)s;
 
-    dispatch_group_t handlerGroup = dispatch_group_create();
-    dispatch_group_enter(handlerGroup);
-
-    // Start the audio capture session
     [stream->audioStream startCaptureWithCompletionHandler:^(NSError *error) {
-      if (error)
-      {
-          PA_DEBUG(("Failed to start audio capture: %s\n", [[error localizedDescription] UTF8String]));
-          result = paInternalError;
-      }
-      dispatch_group_leave(handlerGroup);
+        if (error)
+        {
+            PA_DEBUG(("Failed to start audio capture: %s\n", [[error localizedDescription] UTF8String]));
+            result = paInternalError;
+        }
+        isCaptureStarted = true;
     }];
 
-    if (dispatch_group_wait(handlerGroup, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)) != 0) {
-        PA_DEBUG(("Timeout occurred while waiting for async operation.\n"));
-        return paTimedOut;
+    // Yield to the run loop until the async operation completes or times out
+    CFTimeInterval timeout = 10.0;  // Timeout in seconds
+    CFAbsoluteTime startTime = CFAbsoluteTimeGetCurrent();
+    while (!isCaptureStarted && (CFAbsoluteTimeGetCurrent() - startTime) < timeout) {
+        if ([NSThread isMainThread]) {
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
+        } else {
+            usleep(100 * 1000);
+        }
     }
 
     if (result != paNoError)
         return result;
+
+    if (!isCaptureStarted)
+    {
+        PA_DEBUG(("Timeout occurred while waiting for capture to start\n"));
+        return paTimedOut;
+    }
 
     stream->isStopped = FALSE;
     if (stream->streamCallback != NULL)
