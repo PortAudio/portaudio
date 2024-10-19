@@ -119,21 +119,23 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
 
     while( waitOperation > 0 )
     {
-        PaPulseAudio_Lock( hostapi->mainloop );
-        pa_threaded_mainloop_wait( hostapi->mainloop );
-        PaPulseAudio_UnLock( hostapi->mainloop );
 
+        PaPulseAudio_Lock( hostapi->mainloop );
         localOperationState = pa_operation_get_state( localOperation );
 
-        // No wait if operation have been DONE or CANCELLED
-        if( localOperationState != PA_OPERATION_RUNNING)
+        if( localOperationState == PA_OPERATION_RUNNING )
         {
+            pa_threaded_mainloop_wait( hostapi->mainloop );
+        }
+        else
+        {
+            // Result is DONE or CANCEL
+            PaPulseAudio_UnLock( hostapi->mainloop );
             break;
         }
+        PaPulseAudio_UnLock( hostapi->mainloop );
 
         waitOperation --;
-
-        usleep( 1000 );
     }
 
     // No wait if operation have been DONE or CANCELLED
