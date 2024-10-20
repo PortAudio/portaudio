@@ -78,6 +78,18 @@ PaError PaAsio_GetAvailableBufferSizes( PaDeviceIndex device,
 #define PaAsio_GetAvailableLatencyValues PaAsio_GetAvailableBufferSizes
 
 
+/** Get the current sample rate of the specified device (at the time of PortAudio initialization).
+
+ @param device The global index of the device about which the query is being made.
+ @param sampleRate A pointer to the location which will receive the current sample rate.
+
+ If the current sample rate is unknown, sampleRate will be set to 0.
+
+ @see ASIOGetSampleRate in the ASIO SDK.
+*/
+PaError PaAsio_GetSampleRate( PaDeviceIndex device, double* sampleRate );
+
+
 /** Display the ASIO control panel for the specified device.
 
   @param device The global index of the device whose control panel is to be displayed.
