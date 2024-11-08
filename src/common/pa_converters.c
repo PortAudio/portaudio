@@ -330,7 +330,7 @@ static const double const_1_div_2147483648_ = 1.0 / 2147483648.0; /* 32 bit mult
 
 /* -------------------------------------------------------------------------- */
 
-static int SetRoundingMode()
+static int SetRoundingModeToNearest()
 {
     int prev = fegetround();
 
@@ -357,7 +357,7 @@ static void Float32_To_Int32(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest =  (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -383,7 +383,7 @@ static void Float32_To_Int32_Dither(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest =  (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -409,7 +409,7 @@ static void Float32_To_Int32_Clip(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest =  (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -436,7 +436,7 @@ static void Float32_To_Int32_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest = (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -463,7 +463,7 @@ static void Float32_To_Int24(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
     (void)ditherGenerator; /* unused parameter */
@@ -500,7 +500,7 @@ static void Float32_To_Int24_Dither(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
     while( count-- )
@@ -539,7 +539,7 @@ static void Float32_To_Int24_Clip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
     (void)ditherGenerator; /* unused parameter */
@@ -577,7 +577,7 @@ static void Float32_To_Int24_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
     while( count-- )
@@ -617,7 +617,7 @@ static void Float32_To_Int16(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -642,7 +642,7 @@ static void Float32_To_Int16_Dither(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest = (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -669,7 +669,7 @@ static void Float32_To_Int16_Clip(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -695,7 +695,7 @@ static void Float32_To_Int16_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -725,7 +725,7 @@ static void Float32_To_Int8(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -750,7 +750,7 @@ static void Float32_To_Int8_Dither(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -775,7 +775,7 @@ static void Float32_To_Int8_Clip(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -802,7 +802,7 @@ static void Float32_To_Int8_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -831,7 +831,7 @@ static void Float32_To_UInt8(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -856,7 +856,7 @@ static void Float32_To_UInt8_Dither(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -882,7 +882,7 @@ static void Float32_To_UInt8_Clip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
@@ -908,7 +908,7 @@ static void Float32_To_UInt8_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingMode();
+    int prevMode = SetRoundingModeToNearest();
 
     (void)ditherGenerator; /* unused parameter */
 
