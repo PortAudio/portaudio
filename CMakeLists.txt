@@ -303,14 +303,25 @@ elseif(UNIX)
 
   if(APPLE)
     set(CMAKE_MACOSX_RPATH 1)
-    target_sources(PortAudio PRIVATE
-      src/hostapi/coreaudio/pa_mac_core.c
-      src/hostapi/coreaudio/pa_mac_core_blocking.c
-      src/hostapi/coreaudio/pa_mac_core_blocking.h
-      src/hostapi/coreaudio/pa_mac_core_internal.h
-      src/hostapi/coreaudio/pa_mac_core_utilities.c
-      src/hostapi/coreaudio/pa_mac_core_utilities.h
-    )
+    if(IOS)
+      target_sources(PortAudio PRIVATE
+        src/hostapi/coreaudio_ios/pa_ios_core.c
+        src/hostapi/coreaudio_ios/pa_ios_core_blocking.c
+        src/hostapi/coreaudio_ios/pa_ios_core_blocking.h
+        src/hostapi/coreaudio_ios/pa_ios_core_internal.h
+        src/hostapi/coreaudio_ios/pa_ios_core_utilities.c
+        src/hostapi/coreaudio_ios/pa_ios_core_utilities.h
+      )
+    else()
+      target_sources(PortAudio PRIVATE
+        src/hostapi/coreaudio/pa_mac_core.c
+        src/hostapi/coreaudio/pa_mac_core_blocking.c
+        src/hostapi/coreaudio/pa_mac_core_blocking.h
+        src/hostapi/coreaudio/pa_mac_core_internal.h
+        src/hostapi/coreaudio/pa_mac_core_utilities.c
+        src/hostapi/coreaudio/pa_mac_core_utilities.h
+      )
+    endif()
     target_include_directories(PortAudio PRIVATE src/hostapi/coreaudio)
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_mac_core.h)
 
@@ -322,8 +333,12 @@ elseif(UNIX)
         -Wl,-framework,CoreFoundation
         -Wl,-framework,CoreServices
     )
-    target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
-    set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
+    if(IOS)
+      target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO_IOS=1)
+    else()
+      target_compile_definitions(PortAudio PUBLIC PA_USE_COREAUDIO=1)
+      set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_COREAUDIO=1")
+    endif()
 
     # Use C11 so that we can make use of atomic library and avoid deprecation errors.
     set_property(TARGET PortAudio PROPERTY C_STANDARD 11)
