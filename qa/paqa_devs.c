@@ -140,6 +140,7 @@ static int QaCallback( const void *inputBuffer, void *outputBuffer,
                        const PaStreamCallbackTimeInfo* timeInfo,
                        PaStreamCallbackFlags statusFlags,
                        void *userData );
+static void RunQuickTest( void );
 
 static void PaQaSetupData(PaQaData *myData,
                           const PaQaTestParameters *parameters)
@@ -515,7 +516,7 @@ error:
 }
 
 
-static void RunQuickTest()
+static void RunQuickTest( void )
 {
     PaQaTestParameters parameters = kDefaultTestParameters;
 
