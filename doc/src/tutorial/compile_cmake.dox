@@ -37,6 +37,40 @@ If you want ASIO support you need to obtain the ASIO2 SDK from Steinberg and pla
 
 <b>Note</b>: If you are using CMake 3.18 or later, PortAudio can automatically download and extract the ASIO2 SDK for you.
 
+@section cmake_build_options CMake Build Options
+
+PortAudio's CMake build system contains the following build options categorized below.
+
+Backend options (all default to `ON` if available except for the OSS, ASIO, and skeleton backends):
+
+- **`-DPA_USE_ALSA=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the ASLA host API. Requires ALSA.
+    - **`-DPA_ALSA_DYNAMIC=ON|OFF`**: Dynamically load libasound with dlopen using PaAlsa_SetLibraryPathName.
+- **`-DPA_USE_ASIO=ON|OFF`**: (Windows Only). Use the ASIO host API. Requires the ASIO SDK[2].
+- **`-DPA_USE_AUDIOIO=ON|OFF`**: (Solaris Only). Use the audioio host API.
+- **`-DPA_USE_DS=ON|OFF`**: (Windows Only). Use the DirectSound host API.
+- **`-DPA_USE_JACK=ON|OFF`**: Use the JACK host API. Requires JACK.
+- **`-DPA_USE_SKELETON=ON|OFF`**: Use the skeleton host API (no audio output).
+- **`-DPA_USE_OSS=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the OSS host API[1]. Requires OSS.
+- **`-DPA_USE_PULSEAUDIO=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the PulseAudio host API. Requires PulseAudio to be present.
+- **`-DPA_USE_SNDIO=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the sndio host API.
+- **`-DPA_USE_WASAPI=ON|OFF`**: (Windows Only). Use the WASAPI host API.
+- **`-DPA_USE_WDMKS=ON|OFF`**: (Windows Only). Use the WDMKS host API.
+    - **`-DPA_USE_WDMKS_DEVICE_INFO=ON|OFF`**: Use the WDMKS API for device info.
+- **`-DPA_USE_WMME=ON|OFF`**: (Windows Only). Use the MME host API.
+
+[1] The ASIO SDK is only available under a proprietary license. This license imposes many requirements including conditions and limitations on distributing binaries that you build. Be sure to read this page from Steinberg: https://www.steinberg.net/developers. Also be advised that enabling ASIO can cause an impact on initialization performance and reliability, so exercise caution when enabling this backend. See https://github.com/PortAudio/portaudio/issues/696 for more information.
+
+[2] To avoid confusing end-users, the OSS backend is intentionally off by default because there are no devices on modern Linux systems.
+
+Miscellaneous build options:
+
+- **`-DPA_BUILD_SHARED_LIBS=ON|OFF`**: Builds PortAudio as a shared library instead of a static one. Default: `OFF`
+- **`-DPA_BUILD_TESTS=ON|OFF`**: Builds all tests. Default: `OFF`
+- **`-DPA_BUILD_EXAMPLES=ON|OFF`**: Builds all examples. Default: `OFF`
+- **`-DPA_WARNINGS_ARE_ERRORS=ON|OFF`**: Treats all warnings as errors. Mostly of interest to developers. Default: `OFF`
+- **`-DPA_ENABLE_DEBUG_OUTPUT=ON|OFF`**: Enables debugging output. Default: `OFF`
+- **`-DPA_DLL_LINK_WITH_STATIC_RUNTIME`**: (Windows Only). Links PortAudio with static runtime dependencies.
+
 @section cmake_using Using PortAudio in your CMake project
 
 PortAudio defines the "portaudio" target, which includes both dynamic and static builds. Previous versions (i.e., <= 19.7) had an additional "portaudio_static" target for static builds.
