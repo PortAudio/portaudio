@@ -37,6 +37,20 @@ If you want ASIO support you need to obtain the ASIO2 SDK from Steinberg and pla
 
 <b>Note</b>: If you are using CMake 3.18 or later, PortAudio can automatically download and extract the ASIO2 SDK for you.
 
+@section Building Tests
+
+Unlike some of our other build systems (e.g., autotools), tests are not built automatically. In that case, you can add
+
+    -DPA_BUILD_TESTS=ON
+
+to your CMake build options. For example:
+
+    build_path> cmake -G <Your Generator> -DPA_BUILD_TESTS=ON [other CMake options...] [/path/to/portaudio/source]
+
+Then follow the rest of the normal build process. After the build finishes, you will notice a `test/` folder where you can run any test to ensure PortAudio is working correctly.
+
+<b>Note</b>: PortAudio _does not_ support CTest at the moment. Contributions are welcome.
+
 @section cmake_build_options CMake Build Options
 
 PortAudio's CMake build system contains the following build options categorized below.
