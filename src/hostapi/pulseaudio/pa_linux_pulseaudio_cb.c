@@ -158,6 +158,12 @@ void PaPulseAudio_Lock( pa_threaded_mainloop *mainloop )
     if( !pa_threaded_mainloop_in_thread( mainloop ) ) {
         pa_threaded_mainloop_lock( mainloop );
     }
+    else
+    {
+        PA_DEBUG( ("Portaudio %s: Called from event loop thread as value is: %d (not locked)\n",
+            __FUNCTION__,
+            pa_threaded_mainloop_in_thread( mainloop )) );
+    }
 }
 
 /* unlocks the Pulse Main loop when not called from it */
@@ -165,6 +171,12 @@ void PaPulseAudio_UnLock( pa_threaded_mainloop *mainloop )
 {
     if( !pa_threaded_mainloop_in_thread( mainloop ) ) {
         pa_threaded_mainloop_unlock( mainloop );
+    }
+    else
+    {
+        PA_DEBUG( ("Portaudio %s: Called from event loop thread as value is: %d (not unlocked)\n",
+            __FUNCTION__,
+            pa_threaded_mainloop_in_thread( mainloop )) );
     }
 }
 
