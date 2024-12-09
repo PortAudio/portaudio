@@ -55,6 +55,11 @@
 
 #else
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#endif
+
 #include <ks.h>
 #include <ksmedia.h>
 
@@ -307,3 +312,7 @@ int PaWin_WDMKS_QueryFilterMaximumChannelCount( void *wcharDevicePath, int isInp
     CloseHandle( deviceHandle );
     return result;
 }
+
+#if !defined(__GNUC__) && defined(__clang__)
+#pragma clang diagnostic pop
+#endif
