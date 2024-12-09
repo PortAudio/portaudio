@@ -1647,6 +1647,8 @@ static HRESULT ActivateAudioInterface(const PaWasapiDeviceInfo *deviceInfo, cons
         audioProps.eCategory  = (AUDIO_STREAM_CATEGORY)streamInfo->streamCategory;
         switch (streamInfo->streamOption)
         {
+        case eStreamOptionNone:
+            break;
         case eStreamOptionRaw:
             if (PaWinUtil_GetOsVersion() >= paOsVersionWindows8_1Server2012R2)
                 audioProps.Options = pa_AUDCLNT_STREAMOPTIONS_RAW;
