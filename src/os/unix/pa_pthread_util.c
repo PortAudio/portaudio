@@ -37,14 +37,14 @@
  * license above.
  */
 
+#include "pa_pthread_util.h"
+#include "pa_debugprint.h"
+
 #if !PAUTIL_USE_POSIX_ADVANCED_REALTIME && (defined(WIN32) || defined(_WIN32))
 #include <windows.h>
 #else
 #include <errno.h>
 #endif
-
-#include "pa_pthread_util.h"
-#include "pa_debugprint.h"
 
 PaUtilClockId PaPthreadUtil_NegotiateCondAttrClock( pthread_condattr_t *cattr )
 {
