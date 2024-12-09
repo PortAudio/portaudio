@@ -658,7 +658,7 @@ static PaError InitializeDeviceInfo( PaMacAUHAL *auhalHostApi,
     CFStringRef nameRef;
     UInt32 propSize;
 
-    VVDBUG(("InitializeDeviceInfo(): macCoreDeviceId=%ld\n", macCoreDeviceId));
+    VVDBUG(("InitializeDeviceInfo(): macCoreDeviceId=%ld\n", (long)macCoreDeviceId));
 
     memset(deviceInfo, 0, sizeof(PaDeviceInfo));
 
@@ -1195,7 +1195,7 @@ static PaError OpenAndSetupOneAudioUnit(
             inStreamParams  ? inStreamParams->sampleFormat  : -1,
             outStreamParams ? outStreamParams->channelCount : -1,
             outStreamParams ? outStreamParams->sampleFormat : -1,
-            requestedFramesPerBuffer ));
+            (long)requestedFramesPerBuffer ));
 
     /* -- handle the degenerate case  -- */
     if( !inStreamParams && !outStreamParams ) {
