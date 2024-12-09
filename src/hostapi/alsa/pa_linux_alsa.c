@@ -2892,6 +2892,12 @@ error:
         PaAlsaStream_Terminate( stream );
     }
 
+    if( result == paNoError )
+    {
+        fprintf(stderr, "pa_linux_alsa.c: error occurred, but result was paNoError: returning paUnanticipatedHostError instead\n");
+        result = paUnanticipatedHostError;
+    }
+
     return result;
 }
 
