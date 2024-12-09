@@ -61,14 +61,8 @@
 */
 
 #include "pa_mac_core_blocking.h"
-#include "pa_mac_core_internal.h"
+#include "pa_mac_core_atomic.h"
 #include <assert.h>
-#ifdef MOSX_USE_NON_ATOMIC_FLAG_BITS
-# define OSAtomicOr32( a, b ) ( (*(b)) |= (a) )
-# define OSAtomicAnd32( a, b ) ( (*(b)) &= (a) )
-#else
-# include <libkern/OSAtomic.h>
-#endif
 
 /*
  * This function determines the size of a particular sample format.

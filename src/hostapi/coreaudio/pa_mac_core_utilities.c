@@ -57,8 +57,7 @@
 */
 
 #include "pa_mac_core_utilities.h"
-#include "pa_mac_core_internal.h"
-#include <libkern/OSAtomic.h>
+#include "pa_mac_core_atomic.h"
 #include <strings.h>
 #include <pthread.h>
 #include <sys/time.h>
