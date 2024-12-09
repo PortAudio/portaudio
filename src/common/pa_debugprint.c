@@ -74,7 +74,7 @@ void PaUtil_SetDebugPrintFunction(PaUtilLogCallback cb)
  If your platform doesn't have vsnprintf, you are stuck with a
  VERY dangerous alternative, vsprintf (with no n)
 */
-#if _MSC_VER
+#if defined(_MSC_VER)
     /* Some Windows Mobile SDKs don't define vsnprintf but all define _vsnprintf (hopefully).
        According to MSDN "vsnprintf is identical to _vsnprintf". So we use _vsnprintf with MSC.
     */

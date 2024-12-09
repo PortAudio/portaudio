@@ -125,6 +125,13 @@ are defaulted to 1.
 #define PA_USE_ALSA 1
 #endif
 
+#ifndef PA_USE_AUDIOIO
+#define PA_USE_AUDIOIO 0
+#elif (PA_USE_AUDIOIO != 0) && (PA_USE_AUDIOIO != 1)
+#undef PA_USE_AUDIOIO
+#define PA_USE_AUDIOIO 1
+#endif
+
 #ifndef PA_USE_JACK
 #define PA_USE_JACK 0
 #elif (PA_USE_JACK != 0) && (PA_USE_JACK != 1)
