@@ -2472,6 +2472,7 @@ static PaWasapiHostApiRepresentation *_GetHostApi(PaError *ret)
     return (PaWasapiHostApiRepresentation *)pApi;
 }
 
+#if defined(PA_WASAPI_MAX_CONST_DEVICE_COUNT) && (PA_WASAPI_MAX_CONST_DEVICE_COUNT > 0)
 // ------------------------------------------------------------------------------------------
 static PaError UpdateDeviceList()
 {
@@ -2515,6 +2516,7 @@ static PaError UpdateDeviceList()
 
     return paNoError;
 }
+#endif
 
 // ------------------------------------------------------------------------------------------
 PaError PaWasapi_UpdateDeviceList()

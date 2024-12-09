@@ -199,6 +199,7 @@ Default is to use the pin category.
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
 #include <mmreg.h>
@@ -1143,6 +1144,7 @@ static ULONG GetConnectedPin(ULONG startPin, BOOL forward, PaWinWdmFilter* filte
     return KSFILTER_NODE;
 }
 
+#ifdef PA_ENABLE_DEBUG_OUTPUT
 static void DumpConnectionsAndNodes(PaWinWdmFilter* filter)
 {
     unsigned i;
@@ -1175,8 +1177,8 @@ static void DumpConnectionsAndNodes(PaWinWdmFilter* filter)
         ));
     }
     PA_LOGL_;
-
 }
+#endif
 
 typedef struct __PaUsbTerminalGUIDToName
 {
@@ -2750,8 +2752,9 @@ static PaWinWdmFilter* FilterNew( PaWDMKSType type, DWORD devNode, const wchar_t
         goto error;
     }
 
-    /* For debugging purposes */
+    #if PA_ENABLE_DEBUG_OUTPUT
     DumpConnectionsAndNodes(filter);
+    #endif
 
     /* Get product GUID (it might not be supported) */
     {
