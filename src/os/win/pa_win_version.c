@@ -92,6 +92,9 @@ static PaOsVersion GetOsVersion()
 
 #ifndef PA_WINRT
     DWORD dwMajorVersion = 0xFFFFFFFFU, dwMinorVersion = 0, dwPlatformId = 0, dwBuild = 0;
+    #ifndef PA_ENABLE_DEBUG_OUTPUT
+    (void)dwBuild;
+    #endif
 
     // Can be missing in some MinGW distributions
 #ifndef NT_SUCCESS

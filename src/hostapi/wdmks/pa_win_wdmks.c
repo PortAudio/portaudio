@@ -1121,7 +1121,7 @@ static ULONG GetConnectedPin(ULONG startPin, BOOL forward, PaWinWdmFilter* filte
                 const GUID* nodes = (const GUID*)(filter->nodes + 1);
                 if (IsEqualGUID(&nodes[conn->FromNode], &KSNODETYPE_MUX))
                 {
-                    ULONG nConn = GetNumberOfConnectionsTo(conn, filter);
+                    GetNumberOfConnectionsTo(conn, filter);
                     conn = fnGetConnection(conn, filter, muxPosition);
                     if (conn == NULL)
                     {
@@ -6531,6 +6531,10 @@ static PaError PaPinCaptureEventHandler_WaveCyclic(PaProcessThreadInfo* pInfo, u
 
         frameCount = PaUtil_WriteRingBuffer(&pInfo->stream->ringBuffer, packet->Header.Data, pInfo->stream->capture.framesPerBuffer);
 
+        #if !PA_TRACE_REALTIME_EVENTS
+        (void)frameCount;
+        #endif
+
         PA_HP_TRACE((pInfo->stream->hLog, ">>> Capture event: idx=%u (frames=%u)", eventIndex, frameCount));
         ++pInfo->captureHead;
     }
@@ -6594,7 +6598,6 @@ static PaError PaPinCaptureEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, 
     unsigned frameCount = 0;
     unsigned bytesToRead;
     PaWinWdmIOInfo* pCapture = &pInfo->stream->capture;
-    const unsigned halfInputBuffer = pCapture->hostBufferSize >> 1;
     PaWinWdmPin* pin = pCapture->pPin;
 
     /* Get hold of current ADC position */
@@ -6632,6 +6635,10 @@ static PaError PaPinCaptureEventHandler_WaveRTEvent(PaProcessThreadInfo* pInfo, 
         }
     }
 
+    #if !PA_TRACE_REALTIME_EVENTS
+    (void)frameCount;
+    #endif
+
     PA_HP_TRACE((pInfo->stream->hLog, "Capture event (WaveRT): idx=%u head=%u (pos = %4.1lf%%, frames=%u)", realInBuf, pInfo->captureHead, (pos * 100.0 / pCapture->hostBufferSize), frameCount));
 
     ++pInfo->captureHead;
@@ -6645,7 +6652,6 @@ static PaError PaPinCaptureEventHandler_WaveRTPolled(PaProcessThreadInfo* pInfo,
     unsigned long pos;
     unsigned bytesToRead;
     PaWinWdmIOInfo* pCapture = &pInfo->stream->capture;
-    const unsigned halfInputBuffer = pCapture->hostBufferSize >> 1;
     PaWinWdmPin* pin = pInfo->stream->capture.pPin;
 
     /* Get hold of current ADC position */

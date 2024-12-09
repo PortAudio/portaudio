@@ -5216,12 +5216,13 @@ static PaError MMCSS_activate(PaWasapiThreadPriority nPriorityClass, HANDLE *ret
         PRINT(("WASAPI: AvSetMmThreadPriority failed!\n"));
     }*/
 
-    // debug
+    #ifdef PA_ENABLE_DEBUG_OUTPUT
     {
         int    cur_priority          = GetThreadPriority(GetCurrentThread());
         DWORD  cur_priority_class = GetPriorityClass(GetCurrentProcess());
         PRINT(("WASAPI: thread[ priority-0x%X class-0x%X ]\n", cur_priority, cur_priority_class));
     }
+    #endif
 
     (*ret) = hTask;
     return paNoError;

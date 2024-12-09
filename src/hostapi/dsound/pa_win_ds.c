@@ -328,7 +328,7 @@ typedef struct PaWinDsStream
  */
 static double PaWinDS_GetMinSystemLatencySeconds( void )
 {
-    double minLatencySeconds;
+    double minLatencySeconds = 0.;
     /* Set minimal latency based on whether NT or other OS.
      * NT has higher latency.
      */
@@ -1472,6 +1472,8 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
                 we have the capability to convert from outputSampleFormat to
                 a native format
     */
+    (void)inputSampleFormat;
+    (void)outputSampleFormat;
 
     return paFormatIsSupported;
 }
@@ -2546,6 +2548,7 @@ static int TimeSlice( PaWinDsStream *stream )
             We don't currently add outputLatency here because it appears to produce worse
             results than not adding it. Need to do more testing to verify this.
             */
+            (void)outputLatency;
             /* timeInfo.outputBufferDacTime = timeInfo.currentTime + outputLatency; */
             timeInfo.outputBufferDacTime = timeInfo.currentTime;
 
@@ -2841,7 +2844,6 @@ static PaError CloseStream( PaStream* s )
 /***********************************************************************************/
 static HRESULT ClearOutputBuffer( PaWinDsStream *stream )
 {
-    PaError          result = paNoError;
     unsigned char*   pDSBuffData;
     DWORD            dwDataLen;
     HRESULT          hr;
@@ -2877,7 +2879,7 @@ static PaError StartStream( PaStream *s )
 {
     PaError          result = paNoError;
     PaWinDsStream   *stream = (PaWinDsStream*)s;
-    HRESULT          hr;
+    HRESULT          hr = DSERR_GENERIC;
 
     stream->callbackResult = paContinue;
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
@@ -3037,9 +3039,8 @@ error:
 /***********************************************************************************/
 static PaError StopStream( PaStream *s )
 {
-    PaError result = paNoError;
     PaWinDsStream *stream = (PaWinDsStream*)s;
-    HRESULT          hr;
+    HRESULT          hr = DS_OK;
     int timeoutMsec;
 
     if( stream->streamRepresentation.streamCallback )
@@ -3101,7 +3102,8 @@ static PaError StopStream( PaStream *s )
 
     stream->isStarted = 0;
 
-    return result;
+    (void)hr; //FIXME: What should happen if this result is not DS_OK?
+    return paNoError;
 }
 
 
