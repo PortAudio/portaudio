@@ -215,11 +215,6 @@ if(WIN32)
     endif()
   endif()
   if(PA_USE_ASIO AND TARGET ASIO::host)
-    #patch asiolist.cpp
-    file(READ "${ASIO_ROOT}/host/pc/asiolist.cpp" FILE_CONTENTS)
-    string(REPLACE "delete lpdrv" "delete[] lpdrv" FILE_CONTENTS "${FILE_CONTENTS}")
-    file(WRITE "${ASIO_ROOT}/host/pc/asiolist.cpp" "${FILE_CONTENTS}")
-
     target_link_libraries(portaudio PRIVATE "$<BUILD_INTERFACE:ASIO::host>")
     set(PORTAUDIO_PUBLIC_HEADERS "${PORTAUDIO_PUBLIC_HEADERS}" include/pa_asio.h)
     target_compile_definitions(portaudio PUBLIC PA_USE_ASIO=1)
