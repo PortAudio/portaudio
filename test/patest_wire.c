@@ -186,7 +186,9 @@ int main(void)
     PaError err = paNoError;
     WireConfig_t CONFIG;
     WireConfig_t *config = &CONFIG;
-    int configIndex = 0;;
+    int configIndex = 0;
+    int maxInputChannels = 1;
+    int maxOutputChannels = 1;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -196,6 +198,16 @@ int main(void)
     printf("output format = %lu\n", OUTPUT_FORMAT );
     printf("input device ID  = %d\n", INPUT_DEVICE );
     printf("output device ID = %d\n", OUTPUT_DEVICE );
+
+    /* Determine the maximum number of channels supported by each device. */
+    if (INPUT_DEVICE != paNoDevice) {
+        maxInputChannels = Pa_GetDeviceInfo(INPUT_DEVICE)->maxInputChannels;
+    }
+    printf("maxInputChannels = %d\n", maxInputChannels );
+    if (OUTPUT_DEVICE != paNoDevice) {
+        maxOutputChannels = Pa_GetDeviceInfo(OUTPUT_DEVICE)->maxOutputChannels;
+    }
+    printf("maxOutputChannels = %d\n", maxOutputChannels );
 
     if( INPUT_FORMAT == OUTPUT_FORMAT )
     {
@@ -214,9 +226,13 @@ int main(void)
     {
         for( config->isOutputInterleaved = 0; config->isOutputInterleaved < 2; config->isOutputInterleaved++ )
         {
-            for( config->numInputChannels = 1; config->numInputChannels < 3; config->numInputChannels++ )
+            for( config->numInputChannels = 1;
+                 config->numInputChannels <= maxInputChannels;
+                 config->numInputChannels++ )
             {
-                for( config->numOutputChannels = 1; config->numOutputChannels < 3; config->numOutputChannels++ )
+                for( config->numOutputChannels = 1;
+                     config->numOutputChannels <= maxInputChannels;
+                     config->numOutputChannels++ )
                 {
                            /* If framesPerCallback = 0, assertion fails in file pa_common/pa_process.c, line 1413: EX. */
                     for( config->framesPerCallback = 64; config->framesPerCallback < 129; config->framesPerCallback += 64 )
