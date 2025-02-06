@@ -61,11 +61,18 @@ if(ASIO_ROOT)
   message(STATUS "Found ASIO SDK: ${ASIO_ROOT}")
 
   if(ASIO_FOUND AND NOT TARGET ASIO::host)
+    #patch asiolist.cpp
+    if(NOT EXISTS "${ASIO_ROOT}/host/pc/patched_asiolist.cpp")
+      file(READ "${ASIO_ROOT}/host/pc/asiolist.cpp" FILE_CONTENTS)
+      string(REPLACE "delete lpdrv" "delete[] lpdrv" FILE_CONTENTS "${FILE_CONTENTS}")
+      file(WRITE "${ASIO_ROOT}/host/pc/patched_asiolist.cpp" "${FILE_CONTENTS}")
+      message(STATUS "Done patching asiolist.cpp into patched_asiolist.cpp")
+    endif()
     add_library(ASIO::host INTERFACE IMPORTED)
     target_sources(ASIO::host INTERFACE
       "${ASIO_ROOT}/common/asio.cpp"
       "${ASIO_ROOT}/host/asiodrivers.cpp"
-      "${ASIO_ROOT}/host/pc/asiolist.cpp"
+      "${ASIO_ROOT}/host/pc/patched_asiolist.cpp"
     )
     target_include_directories(ASIO::host INTERFACE
       "${ASIO_ROOT}/common"
