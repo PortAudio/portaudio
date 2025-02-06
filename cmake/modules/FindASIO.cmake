@@ -66,7 +66,7 @@ if(ASIO_ROOT)
       file(READ "${ASIO_ROOT}/host/pc/asiolist.cpp" FILE_CONTENTS)
       string(REPLACE "delete lpdrv" "delete[] lpdrv" FILE_CONTENTS "${FILE_CONTENTS}")
       file(WRITE "${ASIO_ROOT}/host/pc/patched_asiolist.cpp" "${FILE_CONTENTS}")
-      message(STATUS "Done patching asiolist.cpp")
+      message(STATUS "Done patching asiolist.cpp into patched_asiolist.cpp")
     endif()
     add_library(ASIO::host INTERFACE IMPORTED)
     target_sources(ASIO::host INTERFACE
