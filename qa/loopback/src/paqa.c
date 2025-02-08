@@ -849,7 +849,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
         {
             double latencyMSec;
 
-            printf( "%4lu-%4lu | ",
+            printf( "%4lu,%4lu | ",
                    loopbackContext.minFramesPerBuffer,
                    loopbackContext.maxFramesPerBuffer
                    );

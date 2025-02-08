@@ -227,15 +227,17 @@ int main(void)
         for( config->isOutputInterleaved = 0; config->isOutputInterleaved < 2; config->isOutputInterleaved++ )
         {
             for( config->numInputChannels = 1;
-                 config->numInputChannels <= maxInputChannels;
-                 config->numInputChannels++ )
+                    config->numInputChannels <= maxInputChannels;
+                    config->numInputChannels++ )
             {
                 for( config->numOutputChannels = 1;
-                     config->numOutputChannels <= maxInputChannels;
-                     config->numOutputChannels++ )
+                        config->numOutputChannels <= maxOutputChannels;
+                        config->numOutputChannels++ )
                 {
                            /* If framesPerCallback = 0, assertion fails in file pa_common/pa_process.c, line 1413: EX. */
-                    for( config->framesPerCallback = 64; config->framesPerCallback < 129; config->framesPerCallback += 64 )
+                    for( config->framesPerCallback = 64;
+                            config->framesPerCallback < 129;
+                            config->framesPerCallback += 64 )
                     {
                         printf("-----------------------------------------------\n" );
                         printf("Configuration #%d\n", configIndex++ );
