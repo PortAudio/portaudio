@@ -309,8 +309,20 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     if( !stream->isActive && stream->pulseaudioIsActive && stream->outputStream)
     {
-        bufferData = pulseaudioSampleBuffer;
-        memset( bufferData, 0x00, length);
+        size_t tmpSize = length;
+
+        /* Allocate memory to make it faster to output stuff */
+        pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
+
+        /* If bufferData is NULL then output is not ready
+         * and we have to wait for it
+         */
+        if(!bufferData)
+        {
+            return paNotInitialized;
+        }
+
+        memset( bufferData, 0x00, tmpSize);
 
         pa_stream_write( stream->outputStream,
                          bufferData,
@@ -325,6 +337,14 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     while(1)
     {
+        /* Make sure that bufferData is NULL that marks there
+         * is nothing to output
+         */
+        if( isOutputCb )
+        {
+            bufferData = NULL;
+        }
+
         /*
          * If everything fail like stream vanish or mainloop
          * is in error state try to handle error
@@ -420,6 +440,26 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
             PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
                                         hostFramesPerBuffer );
 
+        }
+
+        hostFrameCount =
+            PaUtil_EndBufferProcessing( &stream->bufferProcessor,
+                                        &ret );
+
+        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
+                                      hostFrameCount );
+
+        /*
+         * Idea behind this is that is there is output we have
+         * allocated buffer for with pa_stream_begin_write
+         * and then if PaUtil_EndBufferProcessing returns
+         * paContinue well write data to buffer and if
+         * there is no coming anymore output (ret is something
+         * else than paContinue) then we have to cancel
+         * write with pa_stream_cancel_write
+         */
+        if( ret == paContinue && isOutputCb && bufferData )
+        {
             if( pa_stream_write( stream->outputStream,
                                  bufferData,
                                  pulseaudioOutputBytes,
@@ -433,14 +473,19 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
             pulseaudioOutputWritten += pulseaudioOutputBytes;
         }
+        else if( ret != paContinue && isOutputCb && bufferData )
+        {
+            pa_stream_cancel_write( stream->outputStream );
+            bufferData = NULL;
+        }
 
-        hostFrameCount =
-            PaUtil_EndBufferProcessing( &stream->bufferProcessor,
-                                        &ret );
-
-        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
-                                      hostFrameCount );
+        if( ret != paContinue )
+        {
+            break;
+        }
     }
+
+
 
     return ret;
 }
