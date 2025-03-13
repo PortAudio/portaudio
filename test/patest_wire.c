@@ -58,6 +58,8 @@
 
 typedef struct WireConfig_s
 {
+    PaDeviceIndex inputDevice;
+    PaDeviceIndex outputDevice;
     int isInputInterleaved;
     int isOutputInterleaved;
     int numInputChannels;
@@ -193,20 +195,30 @@ int main(void)
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
 
+    /* NOTE: INPUT/OUTPUT_DEVICE macros may use PaGetDefault...Device(), so call after Pa_Initialze() */
+    config->inputDevice = INPUT_DEVICE;
+    if (config->inputDevice == paNoDevice) {
+        fprintf(stderr,"Error: No default input device.\n");
+        goto done;
+    }
+
+    config->outputDevice = OUTPUT_DEVICE;
+    if (config->outputDevice == paNoDevice) {
+        fprintf(stderr,"Error: No default output device.\n");
+        goto done;
+    }
+
     printf("Please connect audio signal to input and listen for it on output!\n");
     printf("input format = %lu\n", INPUT_FORMAT );
     printf("output format = %lu\n", OUTPUT_FORMAT );
-    printf("input device ID  = %d\n", INPUT_DEVICE );
-    printf("output device ID = %d\n", OUTPUT_DEVICE );
+    printf("input device ID  = %d\n", config->inputDevice );
+    printf("output device ID = %d\n", config->outputDevice );
 
     /* Determine the maximum number of channels supported by each device. */
-    if (INPUT_DEVICE != paNoDevice) {
-        maxInputChannels = Pa_GetDeviceInfo(INPUT_DEVICE)->maxInputChannels;
-    }
+    maxInputChannels = Pa_GetDeviceInfo(config->inputDevice)->maxInputChannels;
     printf("maxInputChannels = %d\n", maxInputChannels );
-    if (OUTPUT_DEVICE != paNoDevice) {
-        maxOutputChannels = Pa_GetDeviceInfo(OUTPUT_DEVICE)->maxOutputChannels;
-    }
+
+    maxOutputChannels = Pa_GetDeviceInfo(config->outputDevice)->maxOutputChannels;
     printf("maxOutputChannels = %d\n", maxOutputChannels );
 
     if( INPUT_FORMAT == OUTPUT_FORMAT )
@@ -285,21 +297,13 @@ static PaError TestConfiguration( WireConfig_t *config )
     printf("output channels = %d\n", config->numOutputChannels );
     printf("framesPerCallback = %d\n", config->framesPerCallback );
 
-    inputParameters.device = INPUT_DEVICE;              /* default input device */
-    if (inputParameters.device == paNoDevice) {
-        fprintf(stderr,"Error: No default input device.\n");
-        goto error;
-    }
+    inputParameters.device = config->inputDevice;
     inputParameters.channelCount = config->numInputChannels;
     inputParameters.sampleFormat = INPUT_FORMAT | (config->isInputInterleaved ? 0 : paNonInterleaved);
     inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
     inputParameters.hostApiSpecificStreamInfo = NULL;
 
-    outputParameters.device = OUTPUT_DEVICE;            /* default output device */
-    if (outputParameters.device == paNoDevice) {
-        fprintf(stderr,"Error: No default output device.\n");
-        goto error;
-    }
+    outputParameters.device = config->outputDevice;
     outputParameters.channelCount = config->numOutputChannels;
     outputParameters.sampleFormat = OUTPUT_FORMAT | (config->isOutputInterleaved ? 0 : paNonInterleaved);
     outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
