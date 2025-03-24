@@ -189,8 +189,8 @@ int main(void)
     WireConfig_t CONFIG;
     WireConfig_t *config = &CONFIG;
     int configIndex = 0;
-    int maxInputChannels = 1;
-    int maxOutputChannels = 1;
+    int maxInputChannels = 0;
+    int maxOutputChannels = 0;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -220,6 +220,16 @@ int main(void)
 
     maxOutputChannels = Pa_GetDeviceInfo(config->outputDevice)->maxOutputChannels;
     printf("maxOutputChannels = %d\n", maxOutputChannels );
+
+    if (maxInputChannels < 1) {
+        fprintf(stderr,"Error: device has no input channels. At least one channel required for full-duplex test.\n");
+        goto done;
+    }
+
+    if (maxOutputChannels < 1) {
+        fprintf(stderr,"Error: device has no output channels. At least one channel required for full-duplex test.\n");
+        goto done;
+    }
 
     if( INPUT_FORMAT == OUTPUT_FORMAT )
     {
