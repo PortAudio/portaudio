@@ -892,13 +892,30 @@ static void Int32_To_Int24_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    (void) destinationBuffer; /* unused parameters */
-    (void) destinationStride; /* unused parameters */
-    (void) sourceBuffer; /* unused parameters */
-    (void) sourceStride; /* unused parameters */
-    (void) count; /* unused parameters */
-    (void) ditherGenerator; /* unused parameters */
-    /* IMPLEMENT ME */
+
+    PaInt32 *src = (PaInt32*)sourceBuffer;
+    unsigned char *dest = (unsigned char*)destinationBuffer;
+    PaInt32 *scaledDitherResult = (PaInt32*)destinationBuffer;
+    PaInt32 dither;
+
+    while ( count-- )
+    {
+        /* REVIEW */
+        dither = PaUtil_Generate16BitTriangularDither(ditherGenerator);
+        *scaledDitherResult = (PaInt32) ((((*src) >> 1) + dither) >> 7);
+
+#if defined(PA_LITTLE_ENDIAN)
+        dest[0] = (unsigned char)(*scaledDitherResult);
+        dest[1] = (unsigned char)(*scaledDitherResult >> 8);
+        dest[2] = (unsigned char)(*scaledDitherResult >> 16);
+#elif defined(PA_BIG_ENDIAN)
+        dest[0] = (unsigned char)(*scaledDitherResult >> 16);
+        dest[1] = (unsigned char)(*scaledDitherResult >> 8);
+        dest[2] = (unsigned char)(*scaledDitherResult);
+#endif
+        src += sourceStride;
+        dest += destinationStride * 3;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1012,16 +1029,19 @@ static void Int32_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt32 *src = (PaInt32*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt32 *src = (PaInt32*)sourceBuffer;
+    unsigned char *dest =  (unsigned char*)destinationBuffer;
+    PaInt32 dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        /* REVIEW */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        *dest = (unsigned char)((((*src) >> 1) + dither) >> 23);
+
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
