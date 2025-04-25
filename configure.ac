@@ -4,8 +4,8 @@ dnl
 dnl Dominic Mazzoni, Arve Knudsen, Stelios Bounanos
 dnl
 
-dnl Require autoconf >= 2.13
-AC_PREREQ(2.13)
+dnl Require autoconf >= 2.69
+AC_PREREQ([2.69])
 
 dnl Init autoconf and make sure configure is being called
 dnl from the right directory
