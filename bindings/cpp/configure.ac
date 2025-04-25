@@ -5,8 +5,8 @@
 # Customized for automake by Mikael Magnusson
 #
 
-# Require autoconf >= 2.13
-AC_PREREQ(2.13)
+# Require autoconf >= 2.69
+AC_PREREQ([2.69])
 
 m4_define([lt_current], [0])
 m4_define([lt_revision], [12])

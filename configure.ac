@@ -4,8 +4,8 @@ dnl
 dnl Dominic Mazzoni, Arve Knudsen, Stelios Bounanos
 dnl
 
-dnl Require autoconf >= 2.13
-AC_PREREQ(2.13)
+dnl Require autoconf >= 2.69
+AC_PREREQ([2.69])
 
 dnl cause a reasonable diagnostic if AX_CHECK_COMPILE_FLAG is not available
 m4_pattern_forbid([AX_CHECK_COMPILE_FLAG])
