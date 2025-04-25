@@ -34,8 +34,12 @@ LT_VERSION_INFO="lt_current:lt_revision:lt_age"
 
 AC_PROG_CC
 AC_PROG_CXX
-AC_LIBTOOL_WIN32_DLL
-AC_PROG_LIBTOOL
+AC_REQUIRE(AC_CANONICAL_HOST)_LT_SET_OPTION([LT_INIT],[win32-dll])
+m4_warn([obsolete],[AC_LIBTOOL_WIN32_DLL: Remove this warning and the call to _LT_SET_OPTION when you
+put the 'win32-dll' option into LT_INIT's first parameter.])
+
+
+LT_INIT
 
 # Transfer these variables to the Makefile
 AC_SUBST(DEFAULT_INCLUDES)
