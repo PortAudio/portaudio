@@ -123,11 +123,8 @@ dnl ASIO and CXX bindings need a C++ compiler
 if [[ "$with_asio" = "yes" ] || [ "$enable_cxx" = "yes" ]] ; then
        AC_PROG_CXX
 fi
-AC_REQUIRE(AC_CANONICAL_HOST)_LT_SET_OPTION([LT_INIT],[win32-dll])
-m4_warn([obsolete],[AC_LIBTOOL_WIN32_DLL: Remove this warning and the call to _LT_SET_OPTION when you
-put the 'win32-dll' option into LT_INIT's first parameter.])
 
-LT_INIT
+LT_INIT(win32-dll)
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PATH_PROG(AR, ar, no)
