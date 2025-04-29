@@ -82,7 +82,7 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
     for( frameIndex=0; frameIndex<(int)framesPerBuffer; frameIndex++ )
     {
         /* Generate sine wave. */
-        float value = (float) 0.3 * sin(data->phase);
+        float value = 0.3f * sinf(data->phase);
         /* Stereo - two channels. */
         *out++ = value;
         *out++ = value;
