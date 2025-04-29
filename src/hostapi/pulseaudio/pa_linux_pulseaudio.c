@@ -563,7 +563,6 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 {
     PaError result = paNoError;
     int i;
-    int deviceCount;
     int ret = 0;
     int lockTaken = 0;
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = NULL;
