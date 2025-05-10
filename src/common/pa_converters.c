@@ -1012,16 +1012,20 @@ static void Int32_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt32 *src = (PaInt32*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer; */
+    PaInt32 *src = (PaInt32*)sourceBuffer;
+    unsigned char *dest =  (unsigned char*)destinationBuffer; 
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+       
+        PaInt32 dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        PaInt32 result = ((*src >> 1)  + (dither << 8));
+        result = (result >> 23) + 128;
+        *dest = (unsigned char)result;
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        src += sourceStride;
+        dest += destinationStride; 
     }
 }
 
