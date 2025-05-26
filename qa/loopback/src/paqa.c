@@ -1348,7 +1348,7 @@ int TestSampleFormatConversion( void )
     int i;
     const float floatInput[] = { 1.0, 0.5, -0.5, -1.0 };
 
-    const char charInput[] = { 127, 64, -64, -128 };
+    const signed char charInput[] = { 127, 64, -64, -128 };
     const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
     const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
     const int int_minus_2147483648 = (-2147483647 - 1); /*"-2147483648" as a signed integer. See PR #814*/
@@ -1358,7 +1358,7 @@ int TestSampleFormatConversion( void )
     short shortOutput[4];
     int intOutput[4];
     unsigned char ucharOutput[4];
-    char charOutput[4];
+    signed char charOutput[4];
 
     QA_ASSERT_EQUALS("int must be 32-bit", 4, (int) sizeof(int) );
     QA_ASSERT_EQUALS("short must be 16-bit", 2, (int) sizeof(short) );
