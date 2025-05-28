@@ -856,7 +856,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     double * defaultLowLatency, * defaultHighLatency;
     double defaultSr = devInfo->baseDeviceInfo.defaultSampleRate;
     unsigned int uintSampleRate = 0;
-    
+
     assert( pcm );
 
     PA_DEBUG(( "%s: collecting info ..\n", __FUNCTION__ ));
@@ -2762,7 +2762,7 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
     {
         assert( self->capture.framesPerPeriod != 0 );
         PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->capture, hwParamsCapture, inParams, self->primeBuffers, realSr,
-                    inputLatency ) );        
+                    inputLatency ) );
         /* Now that we have finalized the hwParams, we can get a more accurate sample rate. */
         ENSURE_( GetExactSampleRate( hwParamsCapture, &realSr ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: Capture period size: %lu, latency: %f\n", __FUNCTION__, self->capture.framesPerPeriod, *inputLatency ));
