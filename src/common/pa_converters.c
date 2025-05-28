@@ -59,8 +59,6 @@
 */
 
 
-#include <fenv.h> /* fegetround() / fesetround() */
-
 #include "pa_converters.h"
 #include "pa_dither.h"
 #include "pa_endianness.h"
@@ -322,31 +320,12 @@ PaUtilConverterTable paConverters = {
 #define PA_CLIP_( val, min, max )\
     { val = ((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)); }
 
+
 static const float const_1_div_128_ = 1.0f / 128.0f;  /* 8 bit multiplier */
 
 static const float const_1_div_32768_ = 1.0f / 32768.f; /* 16 bit multiplier */
 
 static const double const_1_div_2147483648_ = 1.0 / 2147483648.0; /* 32 bit multiplier */
-
-/* -------------------------------------------------------------------------- */
-
-static int SetRoundingModeToNearest()
-{
-    int prev = fegetround();
-
-    if (fesetround(FE_TONEAREST) != 0)
-        prev = -1;
-
-    return prev;
-}
-
-/* -------------------------------------------------------------------------- */
-
-static void ResetRoundingMode(int prev)
-{
-    if (prev != -1)
-        fesetround(prev);
-}
 
 /* -------------------------------------------------------------------------- */
 
@@ -357,21 +336,17 @@ static void Float32_To_Int32(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest =  (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* REVIEW */
         double scaled = *src * 0x7FFFFFFF;
-        *dest = (PaInt32)scaled;
+        *dest = (PaInt32) scaled;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -383,7 +358,6 @@ static void Float32_To_Int32_Dither(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest =  (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -391,13 +365,11 @@ static void Float32_To_Int32_Dither(
         double dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
-        *dest = (PaInt32)dithered;
+        *dest = (PaInt32) dithered;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -409,22 +381,18 @@ static void Float32_To_Int32_Clip(
 {
     float *src = (float*)sourceBuffer;
     PaInt32 *dest =  (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
-    (void)ditherGenerator; /* unused parameter */
+    (void) ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* REVIEW */
         double scaled = *src * 0x7FFFFFFF;
         PA_CLIP_( scaled, -2147483648., 2147483647.  );
-        *dest = (PaInt32)scaled;
+        *dest = (PaInt32) scaled;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -435,23 +403,20 @@ static void Float32_To_Int32_DitherClip(
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
     float *src = (float*)sourceBuffer;
-    PaInt32 *dest = (PaInt32*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
+    PaInt32 *dest =  (PaInt32*)destinationBuffer;
 
     while( count-- )
     {
         /* REVIEW */
-        double dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        double dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
         PA_CLIP_( dithered, -2147483648., 2147483647.  );
-        *dest = (PaInt32)dithered;
+        *dest = (PaInt32) dithered;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -463,16 +428,15 @@ static void Float32_To_Int24(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
-    (void)ditherGenerator; /* unused parameter */
+    (void) ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* convert to 32 bit and drop the low 8 bits */
         double scaled = (double)(*src) * 2147483647.0;
-        temp = (PaInt32)scaled;
+        temp = (PaInt32) scaled;
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -487,8 +451,6 @@ static void Float32_To_Int24(
         src += sourceStride;
         dest += destinationStride * 3;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -500,18 +462,17 @@ static void Float32_To_Int24_Dither(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
     while( count-- )
     {
         /* convert to 32 bit and drop the low 8 bits */
 
-        double dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        double dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
 
-        temp = (PaInt32)dithered;
+        temp = (PaInt32) dithered;
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -526,8 +487,6 @@ static void Float32_To_Int24_Dither(
         src += sourceStride;
         dest += destinationStride * 3;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -539,17 +498,16 @@ static void Float32_To_Int24_Clip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
-    (void)ditherGenerator; /* unused parameter */
+    (void) ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         /* convert to 32 bit and drop the low 8 bits */
         double scaled = *src * 0x7FFFFFFF;
         PA_CLIP_( scaled, -2147483648., 2147483647.  );
-        temp = (PaInt32)scaled;
+        temp = (PaInt32) scaled;
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -564,8 +522,6 @@ static void Float32_To_Int24_Clip(
         src += sourceStride;
         dest += destinationStride * 3;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -577,7 +533,6 @@ static void Float32_To_Int24_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest = (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
     PaInt32 temp;
 
     while( count-- )
@@ -589,7 +544,7 @@ static void Float32_To_Int24_DitherClip(
         double dithered = ((double)*src * (2147483646.0)) + dither;
         PA_CLIP_( dithered, -2147483648., 2147483647.  );
 
-        temp = (PaInt32)dithered;
+        temp = (PaInt32) dithered;
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -604,8 +559,6 @@ static void Float32_To_Int24_DitherClip(
         src += sourceStride;
         dest += destinationStride * 3;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -617,20 +570,16 @@ static void Float32_To_Int16(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
-        float scaled = *src * (32767.0f);
-        *dest = (PaInt16)scaled;
+        short samp = (short) (*src * (32767.0f));
+        *dest = samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -642,7 +591,6 @@ static void Float32_To_Int16_Dither(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest = (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
@@ -651,13 +599,11 @@ static void Float32_To_Int16_Dither(
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (32766.0f)) + dither;
 
-        *dest = (PaInt16)dithered;
+        *dest = (PaInt16) dithered;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -669,21 +615,18 @@ static void Float32_To_Int16_Clip(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
-        float scaled = *src * (32767.0f);
-        PA_CLIP_( scaled, -0x8000, 0x7FFF );
-        *dest = (PaInt16)scaled;
+        long samp = (PaInt32) (*src * (32767.0f));
+
+        PA_CLIP_( samp, -0x8000, 0x7FFF );
+        *dest = (PaInt16) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -695,25 +638,21 @@ static void Float32_To_Int16_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
 
-        float dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (32766.0f)) + dither;
-        PaInt32 samp = (PaInt32)dithered;
+        PaInt32 samp = (PaInt32) dithered;
         PA_CLIP_( samp, -0x8000, 0x7FFF );
         *dest = (PaInt16) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -725,20 +664,16 @@ static void Float32_To_Int8(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
-        float scaled = *src * (127.0f);
-        *dest = (signed char)scaled;
+        signed char samp = (signed char) (*src * (127.0f));
+        *dest = samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -750,20 +685,18 @@ static void Float32_To_Int8_Dither(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
         float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
-        *dest = (signed char)dithered;
+        PaInt32 samp = (PaInt32) dithered;
+        *dest = (signed char) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -775,22 +708,17 @@ static void Float32_To_Int8_Clip(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
-        float scaled = *src * (127.0f);
-        PaInt32 samp = (PaInt32)scaled;
+        PaInt32 samp = (PaInt32)(*src * (127.0f));
         PA_CLIP_( samp, -0x80, 0x7F );
         *dest = (signed char) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -802,8 +730,6 @@ static void Float32_To_Int8_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     signed char *dest =  (signed char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
@@ -811,15 +737,13 @@ static void Float32_To_Int8_DitherClip(
         float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
-        PaInt32 samp = (PaInt32)dithered;
+        PaInt32 samp = (PaInt32) dithered;
         PA_CLIP_( samp, -0x80, 0x7F );
         *dest = (signed char) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -831,20 +755,16 @@ static void Float32_To_UInt8(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
-        unsigned char samp = (unsigned char)(128 + ((unsigned char)(PaInt32)(*src * (127.0f))));
+        unsigned char samp = (unsigned char)(128 + ((unsigned char) (*src * (127.0f))));
         *dest = samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -856,21 +776,18 @@ static void Float32_To_UInt8_Dither(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
 
     while( count-- )
     {
-        float dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
-        PaInt32 samp = (PaInt32)dithered;
+        PaInt32 samp = (PaInt32) dithered;
         *dest = (unsigned char) (128 + samp);
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -882,21 +799,17 @@ static void Float32_To_UInt8_Clip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
         PaInt32 samp = 128 + (PaInt32)(*src * (127.0f));
-        PA_CLIP_( samp, 0x00, 0xFF );
+        PA_CLIP_( samp, 0x0000, 0x00FF );
         *dest = (unsigned char) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -908,8 +821,6 @@ static void Float32_To_UInt8_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     unsigned char *dest =  (unsigned char*)destinationBuffer;
-    int prevMode = SetRoundingModeToNearest();
-
     (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
@@ -917,15 +828,13 @@ static void Float32_To_UInt8_DitherClip(
         float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
-        PaInt32 samp = 128 + (PaInt32)dithered;
-        PA_CLIP_( samp, 0x00, 0xFF );
+        PaInt32 samp = 128 + (PaInt32) dithered;
+        PA_CLIP_( samp, 0x0000, 0x00FF );
         *dest = (unsigned char) samp;
 
         src += sourceStride;
         dest += destinationStride;
     }
-
-    ResetRoundingMode(prevMode);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1103,16 +1012,18 @@ static void Int32_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt32 *src = (PaInt32*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt32 *src = (PaInt32*)sourceBuffer;
+    unsigned char *dest = (unsigned char*)destinationBuffer;
+
+    PaInt32 dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (unsigned char) ((((src[0] >> 1) + dither) >> 23) + 128);
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
@@ -1351,13 +1262,30 @@ static void Int24_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    (void) destinationBuffer; /* unused parameters */
-    (void) destinationStride; /* unused parameters */
-    (void) sourceBuffer; /* unused parameters */
-    (void) sourceStride; /* unused parameters */
-    (void) count; /* unused parameters */
-    (void) ditherGenerator; /* unused parameters */
-    /* IMPLEMENT ME */
+    unsigned char *src = (unsigned char*)sourceBuffer;
+    unsigned char  *dest = (unsigned char*)destinationBuffer;
+
+    PaInt32 temp, dither;
+
+    while( count-- )
+    {
+
+#if defined(PA_LITTLE_ENDIAN)
+        temp = (((PaInt32)src[0]) << 8);
+        temp = temp | (((PaInt32)src[1]) << 16);
+        temp = temp | (((PaInt32)src[2]) << 24);
+#elif defined(PA_BIG_ENDIAN)
+        temp = (((PaInt32)src[0]) << 24);
+        temp = temp | (((PaInt32)src[1]) << 16);
+        temp = temp | (((PaInt32)src[2]) << 8);
+#endif
+
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
+
+        src += sourceStride * 3;
+        dest += destinationStride;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1464,16 +1392,20 @@ static void Int16_To_Int8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt16 *src = (PaInt16*)sourceBuffer;
-    signed char *dest =  (signed char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt16 *src = (PaInt16*)sourceBuffer;
+    signed char *dest = (signed char*)destinationBuffer;
+
+    PaInt32 temp, dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        temp = ((PaInt32)src[0]) << 16;
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (signed char) (((temp >> 1) + dither) >> 23);
+
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
@@ -1504,16 +1436,20 @@ static void Int16_To_UInt8_Dither(
     void *sourceBuffer, signed int sourceStride,
     unsigned int count, struct PaUtilTriangularDitherGenerator *ditherGenerator )
 {
-    /* PaInt16 *src = (PaInt16*)sourceBuffer;
-    unsigned char *dest =  (unsigned char*)destinationBuffer; */
-    (void)ditherGenerator; /* unused parameter */
+    PaInt16 *src = (PaInt16*)sourceBuffer;
+    unsigned char *dest = (unsigned char*)destinationBuffer;
+
+    PaInt32 temp, dither;
 
     while( count-- )
     {
-        /* IMPLEMENT ME */
+        temp = ((PaInt32)src[0]) << 16;
 
-        /* src += sourceStride;
-        dest += destinationStride; */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
+
+        src += sourceStride;
+        dest += destinationStride;
     }
 }
 
