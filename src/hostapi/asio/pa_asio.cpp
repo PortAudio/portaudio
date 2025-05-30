@@ -266,6 +266,7 @@ typedef struct PaAsioDriverInfo
     ASIODriverInfo asioDriverInfo;
     long inputChannelCount, outputChannelCount;
     long bufferMinSize, bufferMaxSize, bufferPreferredSize, bufferGranularity;
+    ASIOSampleRate sampleRate;
     bool postOutput;
 }
 PaAsioDriverInfo;
@@ -894,6 +895,7 @@ typedef struct PaAsioDeviceInfo
     long maxBufferSize;
     long preferredBufferSize;
     long bufferGranularity;
+    ASIOSampleRate sampleRate;
 
     ASIOChannelInfo *asioChannelInfos;
 }
@@ -927,6 +929,32 @@ PaError PaAsio_GetAvailableBufferSizes( PaDeviceIndex device,
 
     return result;
 }
+
+
+PaError PaAsio_GetSampleRate( PaDeviceIndex device, double* sampleRate )
+{
+    PaError result;
+    PaUtilHostApiRepresentation *hostApi;
+    PaDeviceIndex hostApiDevice;
+
+    result = PaUtil_GetHostApiRepresentation( &hostApi, paASIO );
+
+    if( result == paNoError )
+    {
+        result = PaUtil_DeviceIndexToHostApiDeviceIndex( &hostApiDevice, device, hostApi );
+
+        if( result == paNoError )
+        {
+            PaAsioDeviceInfo *asioDeviceInfo =
+                    (PaAsioDeviceInfo*)hostApi->deviceInfos[hostApiDevice];
+
+            *sampleRate = asioDeviceInfo->sampleRate;
+        }
+    }
+
+    return result;
+}
+
 
 /* Unload whatever we loaded in LoadAsioDriver().
 */
@@ -986,6 +1014,17 @@ static PaError LoadAsioDriver( PaAsioHostApiRepresentation *asioHostApi, const c
         goto error;
     }
 
+    if( (asioError = ASIOGetSampleRate(&driverInfo->sampleRate)) != ASE_OK )
+    {
+    #if 1
+        driverInfo->sampleRate = 0;
+    #else
+        result = paUnanticipatedHostError;
+        PA_ASIO_SET_LAST_ASIO_ERROR( asioError );
+        goto error;
+    #endif
+    }
+
     if( ASIOOutputReady() == ASE_OK )
         driverInfo->postOutput = true;
     else
@@ -1034,9 +1073,11 @@ static PaError InitPaDeviceInfoFromAsioDriver( PaAsioHostApiRepresentation *asio
         PA_DEBUG(("PaAsio_Initialize: drv:%d bufferMaxSize       = %d\n", driverIndex, paAsioDriver.info.bufferMaxSize));
         PA_DEBUG(("PaAsio_Initialize: drv:%d bufferPreferredSize = %d\n", driverIndex, paAsioDriver.info.bufferPreferredSize));
         PA_DEBUG(("PaAsio_Initialize: drv:%d bufferGranularity   = %d\n", driverIndex, paAsioDriver.info.bufferGranularity));
+        PA_DEBUG(("PaAsio_Initialize: drv:%d sampleRate          = %d\n", driverIndex, paAsioDriver.info.sampleRate));
 
         deviceInfo->maxInputChannels  = paAsioDriver.info.inputChannelCount;
         deviceInfo->maxOutputChannels = paAsioDriver.info.outputChannelCount;
+
 
         deviceInfo->defaultSampleRate = 0.;
         bool foundDefaultSampleRate = false;
@@ -1095,7 +1136,7 @@ static PaError InitPaDeviceInfoFromAsioDriver( PaAsioHostApiRepresentation *asio
         asioDeviceInfo->maxBufferSize = paAsioDriver.info.bufferMaxSize;
         asioDeviceInfo->preferredBufferSize = paAsioDriver.info.bufferPreferredSize;
         asioDeviceInfo->bufferGranularity = paAsioDriver.info.bufferGranularity;
-
+        asioDeviceInfo->sampleRate = paAsioDriver.info.sampleRate;
 
         asioDeviceInfo->asioChannelInfos = (ASIOChannelInfo*)PaUtil_GroupAllocateZeroInitializedMemory(
                 asioHostApi->allocations,
