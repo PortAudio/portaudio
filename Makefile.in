@@ -67,6 +67,11 @@ LOOPBACK_OBJS = \
 	qa/loopback/src/write_wav.o \
 	qa/loopback/src/paqa.o
 
+PATEST_CONVERTER_OBJS = \
+	src/common/pa_converters.o \
+	src/common/pa_dither.o \
+	test/patest_converters.o
+
 EXAMPLES = \
 	bin/pa_devs \
 	bin/pa_fuzz \
@@ -88,6 +93,7 @@ TESTS = \
 	bin/patest_buffer \
 	bin/patest_callbackstop \
 	bin/patest_clip \
+	bin/patest_converters \
 	bin/patest_dither \
 	bin/patest_hang \
 	bin/patest_in_overflow \
@@ -189,6 +195,10 @@ $(SELFTESTS): bin/%: lib/$(PALIB) $(MAKEFILE) $(PAINC) qa/%.c
 bin/paloopback: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(LOOPBACK_OBJS)
 	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(LOOPBACK_OBJS) lib/$(PALIB) $(LIBS)
 	@WITH_ASIO_TRUE@ $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS)  $(LOOPBACK_OBJS) lib/$(PALIB) $(LIBS)
+
+bin/patest_converters: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(PATEST_CONVERTER_OBJS)
+	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(PATEST_CONVERTER_OBJS) lib/$(PALIB) $(LIBS)
+	@WITH_ASIO_TRUE@ $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS)  $(PATEST_CONVERTER_OBJS) lib/$(PALIB) $(LIBS)
 
 install: lib/$(PALIB) portaudio-2.0.pc
 	$(INSTALL) -d $(DESTDIR)$(libdir)
