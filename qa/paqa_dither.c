@@ -118,7 +118,7 @@ static char * MyPa_GetFormatName( PaSampleFormat format )
             result = "paUint8";
             break;
         case paInt8:
-            result = "paint8";
+            result = "paInt8";
             break;
         case paInt16:
             result = "paInt16";
@@ -317,47 +317,115 @@ int TestAllDitherScaling( void )
     return 0;
 }
 
+/**
+ * Check to see whether the dithering causes a numeric wraparound.
+ */
+static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
+                                    PaSampleFormat destinationFormat,
+                                    double sourceValue) {
+
+    const int kNumSamples = 1024;
+    char source[kNumSamples * sizeof(PaInt32)];
+    char destination[kNumSamples * sizeof(PaInt32)];
+    PaUtilTriangularDitherGenerator ditherState;
+    PaUtilConverter *converter;
+    char supported = 0;
+
+    PaUtil_InitializeTriangularDitherState( &ditherState );
+    switch( sourceFormat ) {
+        case paFloat32:
+            for ( int i = 0; i < kNumSamples; i++ ) ((float *)source)[i] = (float)sourceValue;
+            break;
+        case paInt32:
+            for ( int i = 0; i < kNumSamples; i++ ) ((PaInt32 *)source)[i] = (PaInt32)sourceValue;
+            break;
+        case paInt16:
+            for ( int i = 0; i < kNumSamples; i++ ) ((PaInt16 *)source)[i] = (PaInt16)sourceValue;
+            break;
+    }
+    memset(destination, 0, sizeof(destination));
+
+    converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, paNoFlag );
+    (*converter)( destination, 1, source, 1, kNumSamples, &ditherState );
+    /* Try to detect wrapping, which causes a huge delta. */
+    int previousValue = 0;
+    int maxDelta = 0;
+    switch( destinationFormat ) {
+        case paInt16:
+            previousValue = ((PaInt16 *)destination)[0];
+            for ( int i = 1; i < kNumSamples; i++ ) {
+                int value = (int) ((PaInt16 *)destination)[i];
+                int delta = abs(value - previousValue);
+                if (delta > maxDelta) {
+                    maxDelta = delta;
+                }
+                if (value != 0) {
+                    supported = 1;
+                }
+            }
+            break;
+        case paInt8:
+            previousValue = ((signed char *)destination)[0];
+            for ( int i = 1; i < kNumSamples; i++ ) {
+                int value = (int) ((signed char *)destination)[i];
+                int delta = abs(value - previousValue);
+                if (delta > maxDelta) {
+                    maxDelta = delta;
+                }
+                if (value != 0) {
+                    supported = 1;
+                }
+            }
+            break;
+        case paUInt8:
+            previousValue = ((unsigned char *)destination)[0];
+            for ( int i = 1; i < kNumSamples; i++ ) {
+                int value = (int) ((unsigned char *)destination)[i];
+                int delta = abs(value - previousValue);
+                if (delta > maxDelta) {
+                    maxDelta = delta;
+                }
+                if (value != 128) {
+                    supported = 1;
+                }
+            }
+            break;
+    }
+
+    ASSERT_TRUE(supported);
+    ASSERT_LT(maxDelta, 2);
+error:
+    return maxDelta;
+}
+
+
 static int TestDitherClipping(PaSampleFormat sourceFormat, PaSampleFormat destinationFormat) {
     int result = 0;
-    double minValue = -2.0;
-    double maxValue = 2.0;
-    const int kNumSteps = 41;
-    double averages[kNumSteps] = {-999.0};
-    double expected[kNumSteps] = {-999.0};
-    double stride = (maxValue - minValue) / (kNumSteps - 1);
-    char supported = 0;
-    double slope = 0.0;
-    double bias = 0.0;
-    double rSquared;
 
-    printf(" ============= %s => %s ============== Linearity\n",
+    printf(" ============= %s => %s ============== Clipping\n",
            MyPa_GetFormatName(sourceFormat), MyPa_GetFormatName(destinationFormat));
-
-    for (int i = 0; i < kNumSteps; i++) {
-        double destinationValue = minValue + (i * stride);
-        expected[i] = destinationValue;
-        averages[i] = MeasureAverageConversion(sourceFormat, destinationFormat, destinationValue);
-        if (averages[i] != 0.0) {
-            supported = 1;
-        }
+    double minSourceValue;
+    double maxSourceValue;
+    switch (sourceFormat) {
+        case paFloat32:
+            maxSourceValue = 0.999999;
+            minSourceValue = -1.0;
+            break;
+        case paInt32:
+            maxSourceValue = (double)((1 << 31) - 1);
+            minSourceValue = -(double)(1 << 31);
+            break;
+        case paInt16:
+            maxSourceValue = (double)((1 << 15) - 1);
+            minSourceValue = -(double)(1 << 15);
+            break;
+        default:
+            maxSourceValue = 0.0;
+            minSourceValue = 0.0;
+            break;
     }
-    ASSERT_TRUE(supported);
-
-    linearRegression(expected, averages, kNumSteps, &slope, &bias);
-    rSquared = CalculateRSquared(expected, averages, kNumSteps);
-    printf("slope = %f, bias = %f, rSquared = %f\n", slope, bias, rSquared);
-    EXPECT_TRUE((slope < 1.1));
-    EXPECT_TRUE((slope > 0.9));
-    EXPECT_TRUE((bias > -0.1));
-    EXPECT_TRUE((bias < 0.1));
-    EXPECT_TRUE((rSquared < 0.2));
-
-    for (int i = 0; i < kNumSteps; i++) {
-        printf("%8.5f => %8.5f: ", expected[i], averages[i]);
-        int numStars = 2 * (int)((averages[i] - minValue) / stride);
-        printStars(numStars);
-    }
-error:
+    TestDitherClippingSingle(sourceFormat, destinationFormat, minSourceValue);
+    TestDitherClippingSingle(sourceFormat, destinationFormat, maxSourceValue);
     return result;
 }
 
@@ -370,6 +438,7 @@ int TestAllDitherClipping( void )
     TestDitherClipping(paInt32, paInt16);
     TestDitherClipping(paInt32, paInt8);
     TestDitherClipping(paInt16, paInt8);
+    TestDitherClipping(paInt16, paUInt8);
     return 0;
 }
 
