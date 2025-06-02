@@ -150,7 +150,7 @@ int ShowDitherDistribution( void )
     const int kNumSamples = 24 * 1024;
     PaInt32 minDither = 0x01000000;
     PaInt32 maxDither = -0x01000000;
-    int histogram[kNumBins] = {0};
+    int histogram[kNumBins] = {};
     int maxCount = 0;
 
     for (int i = 0; i < kNumSamples; i++) {
@@ -240,7 +240,7 @@ double CalculateRSquared(double *xa, double *ya, int numPoints) {
     }
 
     if (sum_squares_total == 0) {
-         return 1.0; // if total sum of squares is zero, the model explains all the variance
+        return 1.0; // if total sum of squares is zero, the model explains all the variance
     }
 
     return 1.0 - (sum_squares_residual / sum_squares_total);
@@ -266,8 +266,8 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     double minValue = -2.0;
     double maxValue = 2.0;
     const int kNumSteps = 41;
-    double averages[kNumSteps] = {-999.0};
-    double expected[kNumSteps] = {-999.0};
+    double averages[kNumSteps] = {};
+    double expected[kNumSteps] = {};
     double stride = (maxValue - minValue) / (kNumSteps - 1);
     char supported = 0;
     double slope = 0.0;
@@ -412,7 +412,7 @@ static int TestDitherClipping(PaSampleFormat sourceFormat, PaSampleFormat destin
             minSourceValue = -1.0;
             break;
         case paInt32:
-            maxSourceValue = (double)((1 << 31) - 1);
+            maxSourceValue = (double)(0x7FFFFFFF);
             minSourceValue = -(double)(1 << 31);
             break;
         case paInt16:
