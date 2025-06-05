@@ -434,9 +434,10 @@ int TestAllDitherClipping( void )
 {
     TestDitherClipping(paFloat32, paInt16);
     TestDitherClipping(paFloat32, paInt8);
-    TestDitherClipping(paFloat32, paInt8);
+    TestDitherClipping(paFloat32, paUInt8);
     TestDitherClipping(paInt32, paInt16);
     TestDitherClipping(paInt32, paInt8);
+    TestDitherClipping(paInt32, paUInt8);
     TestDitherClipping(paInt16, paInt8);
     TestDitherClipping(paInt16, paUInt8);
     return 0;

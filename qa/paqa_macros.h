@@ -28,7 +28,7 @@ extern int paQaNumFailed;
     } while(0)
 
 #define ASSERT_TRUE(_exp) CHECK_TRUE(_exp, goto error)
-#define EXPECT_TRUE(_exp) CHECK_TRUE(_exp, )
+#define EXPECT_TRUE(_exp) CHECK_TRUE(_exp, (void)0)
 
 #define CHECK_AB(_a, _b, _op, _opn, _on_error) \
     do \
@@ -54,7 +54,7 @@ extern int paQaNumFailed;
 #define ASSERT_LT(_a, _b) ASSERT_AB(_a, _b, <, >=)
 #define ASSERT_LE(_a, _b) ASSERT_AB(_a, _b, <=, >)
 
-#define EXPECT_AB(_a, _b, _op, _opn) CHECK_AB(_a, _b, _op, _opn, )
+#define EXPECT_AB(_a, _b, _op, _opn) CHECK_AB(_a, _b, _op, _opn, (void)0)
 #define EXPECT_EQ(_a, _b) EXPECT_AB(_a, _b, ==, !=)
 #define EXPECT_NE(_a, _b) EXPECT_AB(_a, _b, !=, ==)
 #define EXPECT_GT(_a, _b) EXPECT_AB(_a, _b, >, <=)
