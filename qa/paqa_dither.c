@@ -56,6 +56,8 @@
 
 PAQA_INSTANTIATE_GLOBALS
 
+#define PAQA_SHOW_CHARTS 0
+
 /**
  * Overrange values will be marked with "[" or "]".
  * @param numStars value between 0 to 100
@@ -153,6 +155,7 @@ int ShowDitherDistribution( void )
     int histogram[kNumBins] = {};
     int maxCount = 0;
 
+    printf("======= 16-bit dither distribution ===================\n");
     for (int i = 0; i < kNumSamples; i++) {
         PaInt32 dither = PaUtil_Generate16BitTriangularDither( &ditherGenerator );
         int binIndex = (dither * kNumBins >> 16) + (kNumBins / 2);
@@ -173,7 +176,7 @@ int ShowDitherDistribution( void )
         int numStars = histogram[i] * 100 / maxCount;
         printStars(numStars);
     }
-    printf("minDither = %d, maxDither = %d\n", minDither, maxDither);
+    printf("minDither = %d, maxDither = %d\n\n", minDither, maxDither);
     return 0;
 }
 
@@ -209,7 +212,7 @@ static double MeasureAverageConversion(PaSampleFormat sourceFormat,
     }
     memset(destination, 0, sizeof(destination));
 
-    converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, paNoFlag );
+    converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, paClipOff ); // paClipOff or paNoFlag
     (*converter)( destination, 1, source, 1, kNumSamples, &ditherState );
     double sum = 0.0f;
     switch( destinationFormat ) {
@@ -224,6 +227,10 @@ static double MeasureAverageConversion(PaSampleFormat sourceFormat,
     return sum / kNumSamples;
 }
 
+/**
+ * Calculate the Coefficient of Determination, "R-squared".
+ * You want a value as close to 1.0 as possible.
+ */
 double CalculateRSquared(double *xa, double *ya, int numPoints) {
     double sum_squares_residual = 0;
     double sum_squares_total = 0;
@@ -274,7 +281,7 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     double bias = 0.0;
     double rSquared;
 
-    printf(" ============= %s => %s ============== Linearity\n",
+    printf(" ============= Linearity: %9s => %7s ============== \n",
            MyPa_GetFormatName(sourceFormat), MyPa_GetFormatName(destinationFormat));
 
     for (int i = 0; i < kNumSteps; i++) {
@@ -290,17 +297,20 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     linearRegression(expected, averages, kNumSteps, &slope, &bias);
     rSquared = CalculateRSquared(expected, averages, kNumSteps);
     printf("slope = %f, bias = %f, rSquared = %f\n", slope, bias, rSquared);
-    EXPECT_TRUE((slope < 1.1));
-    EXPECT_TRUE((slope > 0.9));
-    EXPECT_TRUE((bias > -0.1));
-    EXPECT_TRUE((bias < 0.1));
-    EXPECT_TRUE((rSquared < 0.2));
+    EXPECT_TRUE((slope < 1.02));
+    EXPECT_TRUE((slope > 0.98));
+    EXPECT_TRUE((bias > -0.01));
+    EXPECT_TRUE((bias < 0.01));
+    EXPECT_TRUE((rSquared > 0.99));
 
+#if PAQA_SHOW_CHARTS
     for (int i = 0; i < kNumSteps; i++) {
         printf("%8.5f => %8.5f: ", expected[i], averages[i]);
         int numStars = 2 * (int)((averages[i] - minValue) / stride);
         printStars(numStars);
     }
+#endif
+
 error:
     return result;
 }
@@ -322,7 +332,8 @@ int TestAllDitherScaling( void )
  */
 static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
                                     PaSampleFormat destinationFormat,
-                                    double sourceValue) {
+                                    double sourceValue,
+                                    PaStreamFlags streamFlags) {
 
     const int kNumSamples = 1024;
     char source[kNumSamples * sizeof(PaInt32)];
@@ -345,7 +356,7 @@ static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
     }
     memset(destination, 0, sizeof(destination));
 
-    converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, paNoFlag );
+    converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, streamFlags );
     (*converter)( destination, 1, source, 1, kNumSamples, &ditherState );
     /* Try to detect wrapping, which causes a huge delta. */
     int previousValue = 0;
@@ -402,7 +413,7 @@ error:
 static int TestDitherClipping(PaSampleFormat sourceFormat, PaSampleFormat destinationFormat) {
     int result = 0;
 
-    printf(" ============= %s => %s ============== Clipping\n",
+    printf(" ============= Clipping: %9s => %7s ============== \n",
            MyPa_GetFormatName(sourceFormat), MyPa_GetFormatName(destinationFormat));
     double minSourceValue;
     double maxSourceValue;
@@ -413,7 +424,7 @@ static int TestDitherClipping(PaSampleFormat sourceFormat, PaSampleFormat destin
             break;
         case paInt32:
             maxSourceValue = (double)(0x7FFFFFFF);
-            minSourceValue = -(double)(1 << 31);
+            minSourceValue = -(double)(0x80000000);
             break;
         case paInt16:
             maxSourceValue = (double)((1 << 15) - 1);
@@ -424,8 +435,10 @@ static int TestDitherClipping(PaSampleFormat sourceFormat, PaSampleFormat destin
             minSourceValue = 0.0;
             break;
     }
-    TestDitherClippingSingle(sourceFormat, destinationFormat, minSourceValue);
-    TestDitherClippingSingle(sourceFormat, destinationFormat, maxSourceValue);
+    TestDitherClippingSingle(sourceFormat, destinationFormat, minSourceValue, paNoFlag);
+    TestDitherClippingSingle(sourceFormat, destinationFormat, maxSourceValue, paNoFlag);
+    TestDitherClippingSingle(sourceFormat, destinationFormat, minSourceValue, paClipOff);
+    TestDitherClippingSingle(sourceFormat, destinationFormat, maxSourceValue, paClipOff);
     return result;
 }
 
@@ -435,6 +448,7 @@ int TestAllDitherClipping( void )
     TestDitherClipping(paFloat32, paInt16);
     TestDitherClipping(paFloat32, paInt8);
     TestDitherClipping(paFloat32, paUInt8);
+    // TODO support 24-bit
     TestDitherClipping(paInt32, paInt16);
     TestDitherClipping(paInt32, paInt8);
     TestDitherClipping(paInt32, paUInt8);
