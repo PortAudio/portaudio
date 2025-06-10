@@ -584,10 +584,10 @@ static void PaAlsa_CloseLibrary()
     } while (0)
 
 /* Do NOT call this after an "error:" label. */
-#define ENSURE_(expr, code, goto error)
+#define ENSURE_(expr, code) ENSURE_ON_ERROR_(expr, code, goto error)
 
 /* Print warning but do not goto error. */
-#define ENSURE_SAFE_(expr, code, (void)0)
+#define ENSURE_SAFE_(expr, code) ENSURE_ON_ERROR_(expr, code, (void)0)
 
 #define ASSERT_CALL_(expr, success) \
     do {\
