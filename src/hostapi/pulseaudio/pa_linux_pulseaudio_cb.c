@@ -309,8 +309,20 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     if( !stream->isActive && stream->pulseaudioIsActive && stream->outputStream)
     {
-        bufferData = pulseaudioSampleBuffer;
-        memset( bufferData, 0x00, length);
+        size_t tmpSize = length;
+
+        /* Allocate memory to make it faster to output stuff */
+        pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
+
+        /* If bufferData is NULL then output is not ready
+         * and we have to wait for it
+         */
+        if(!bufferData)
+        {
+            return paNotInitialized;
+        }
+
+        memset( bufferData, 0x00, tmpSize);
 
         pa_stream_write( stream->outputStream,
                          bufferData,
@@ -323,8 +335,16 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     }
 
 
-    while(1)
+    do
     {
+        /* Make sure that bufferData is NULL that marks there
+         * is nothing to output
+         */
+        if( isOutputCb )
+        {
+            bufferData = NULL;
+        }
+
         /*
          * If everything fail like stream vanish or mainloop
          * is in error state try to handle error
@@ -396,6 +416,9 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
                                        hostFramesPerBuffer );
         }
 
+        /* Is output is enable and buffer data is not NULL
+         * then crap pointer to output ringbuffer
+         */
         if( isOutputCb )
         {
 
@@ -403,14 +426,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
             /* Allocate memory to make it faster to output stuff */
             pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
-
-            /* If bufferData is NULL then output is not ready
-             * and we have to wait for it
-             */
-            if(!bufferData)
-            {
-                return paNotInitialized;
-            }
 
             PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
                                                  0,
@@ -420,6 +435,31 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
             PaUtil_SetOutputFrameCount( &stream->bufferProcessor,
                                         hostFramesPerBuffer );
 
+        }
+
+        hostFrameCount =
+                PaUtil_EndBufferProcessing( &stream->bufferProcessor,
+                                            &ret );
+
+        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
+                                      hostFrameCount );
+
+        /*
+         * pa_stream_begin_write gives pointer to ring
+         * buffer in Pulseaudio. WhenPaUtil_EndBufferProcessing
+         * returns paContinue then is ok to write output.
+         *
+         * When it's something else than paContinue
+         * then we have to cancel writing with
+         * with pa_stream_cancel_write.
+         *
+         * If there is no space in output ringbuffer or for
+         * example USB device has dissapiered and pointer
+         * is NULL then we just get out of loop as there is not much
+         * we can't do
+         */
+        if( ret == paContinue && isOutputCb && bufferData )
+        {
             if( pa_stream_write( stream->outputStream,
                                  bufferData,
                                  pulseaudioOutputBytes,
@@ -433,14 +473,19 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
             pulseaudioOutputWritten += pulseaudioOutputBytes;
         }
-
-        hostFrameCount =
-            PaUtil_EndBufferProcessing( &stream->bufferProcessor,
-                                        &ret );
-
-        PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
-                                      hostFrameCount );
+        else if( ret != paContinue && isOutputCb && bufferData )
+        {
+            pa_stream_cancel_write( stream->outputStream );
+            bufferData = NULL;
+        }
+        else if( isOutputCb && !bufferData )
+        {
+            ret = -1;
+        }
     }
+    while( ret == paContinue );
+
+
 
     return ret;
 }
