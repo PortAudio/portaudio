@@ -438,8 +438,8 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
 
         hostFrameCount =
-            PaUtil_EndBufferProcessing( &stream->bufferProcessor,
-                                        &ret );
+                PaUtil_EndBufferProcessing( &stream->bufferProcessor,
+                                            &ret );
 
         PaUtil_EndCpuLoadMeasurement( &stream->cpuLoadMeasurer,
                                       hostFrameCount );
