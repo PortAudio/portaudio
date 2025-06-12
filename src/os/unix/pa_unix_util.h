@@ -80,7 +80,7 @@ extern "C"
 #define PA_UNLESS(expr, code) PA_UNLESS_ON_ERROR(expr, code, goto error)
 
 /* This is safe to call after an "error:" label. */
-#define PA_UNLESS_SAFE(expr, code) PA_UNLESS_ON_ERROR(expr, code, (void)0)
+#define PA_UNLESS_NO_GOTO(expr, code) PA_UNLESS_ON_ERROR(expr, code, (void)0)
 
 static PaError paUtilErr_;          /* Used with PA_ENSURE */
 
@@ -99,7 +99,7 @@ static PaError paUtilErr_;          /* Used with PA_ENSURE */
 #define PA_ENSURE(expr) PA_ENSURE_ON_ERROR(expr, goto error)
 
 /* This is safe to call after an "error:" label. */
-#define PA_ENSURE_SAFE(expr) PA_ENSURE_ON_ERROR(expr, (void)0)
+#define PA_ENSURE_NO_GOTO(expr) PA_ENSURE_ON_ERROR(expr, (void)0)
 
 #define PA_ASSERT_CALL(expr, success) \
     paUtilErr_ = (expr); \

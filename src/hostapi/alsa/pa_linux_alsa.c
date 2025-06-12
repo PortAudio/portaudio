@@ -587,7 +587,7 @@ static void PaAlsa_CloseLibrary()
 #define ENSURE_(expr, code) ENSURE_ON_ERROR_(expr, code, goto error)
 
 /* Print warning but do not goto error. */
-#define ENSURE_SAFE_(expr, code) ENSURE_ON_ERROR_(expr, code, (void)0)
+#define ENSURE_NO_GOTO_(expr, code) ENSURE_ON_ERROR_(expr, code, (void)0)
 
 #define ASSERT_CALL_(expr, success) \
     do {\
@@ -3261,9 +3261,9 @@ error:
     {
         unsigned int _min = 0, _max = 0;
         int _dir = 0;
-        ENSURE_SAFE_( alsa_snd_pcm_hw_params_get_rate_min( hwParams, &_min, &_dir ), paUnanticipatedHostError );
+        ENSURE_NO_GOTO_( alsa_snd_pcm_hw_params_get_rate_min( hwParams, &_min, &_dir ), paUnanticipatedHostError );
         _dir = 0;
-        ENSURE_SAFE_( alsa_snd_pcm_hw_params_get_rate_max( hwParams, &_max, &_dir ), paUnanticipatedHostError );
+        ENSURE_NO_GOTO_( alsa_snd_pcm_hw_params_get_rate_max( hwParams, &_max, &_dir ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: SR min = %u, max = %u, req = %u\n", __FUNCTION__, _min, _max, reqRate ));
     }
     goto end;
@@ -3297,7 +3297,7 @@ static PaError AlsaRestart( PaAlsaStream *stream )
     PA_DEBUG(( "%s: Restarted audio\n", __FUNCTION__ ));
 
 error:
-    PA_ENSURE_SAFE( PaUnixMutex_Unlock( &stream->stateMtx ) );
+    PA_ENSURE_NO_GOTO( PaUnixMutex_Unlock( &stream->stateMtx ) );
 
     return result;
 }
@@ -3994,7 +3994,7 @@ error:
     if( xrun )
     {
         /* Recover from the xrun state */
-        PA_ENSURE_SAFE( PaAlsaStream_HandleXrun( self ) );
+        PA_ENSURE_NO_GOTO( PaAlsaStream_HandleXrun( self ) );
         *framesAvail = 0;
     }
     else
@@ -4002,7 +4002,7 @@ error:
         if( 0 != *framesAvail )
         {
             /* If we're reporting frames eligible for processing, one of the handles better be ready */
-            PA_UNLESS_SAFE( self->capture.ready || self->playback.ready, paInternalError );
+            PA_UNLESS_NO_GOTO( self->capture.ready || self->playback.ready, paInternalError );
         }
     }
     *xrunOccurred = xrun;
@@ -4235,7 +4235,7 @@ end:
 error:
     if( xrun )
     {
-        PA_ENSURE_SAFE( PaAlsaStream_HandleXrun( self ) );
+        PA_ENSURE_NO_GOTO( PaAlsaStream_HandleXrun( self ) );
         *numFrames = 0;
     }
     *xrunOccurred = xrun;
