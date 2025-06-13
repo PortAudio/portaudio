@@ -66,28 +66,40 @@ extern "C"
 #define UNLIKELY(expr) (expr)
 #endif
 
-#define PA_UNLESS(expr, code) \
+#define PA_UNLESS_ON_ERROR(expr, code, _on_error) \
     do { \
         if( UNLIKELY( (expr) == 0 ) ) \
         { \
             PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = (code); \
-            goto error; \
+            _on_error; \
         } \
     } while (0);
+
+/* Do not call this after an "error:" label because it will loop forever! */
+#define PA_UNLESS(expr, code) PA_UNLESS_ON_ERROR(expr, code, goto error)
+
+/* This is safe to call after an "error:" label. */
+#define PA_UNLESS_NO_GOTO(expr, code) PA_UNLESS_ON_ERROR(expr, code, (void)0)
 
 static PaError paUtilErr_;          /* Used with PA_ENSURE */
 
 /* Check PaError */
-#define PA_ENSURE(expr) \
+#define PA_ENSURE_ON_ERROR(expr, _on_error) \
     do { \
         if( UNLIKELY( (paUtilErr_ = (expr)) < paNoError ) ) \
         { \
             PaUtil_DebugPrint(( "Expression '" #expr "' failed in '" __FILE__ "', line: " PA_STRINGIZE( __LINE__ ) "\n" )); \
             result = paUtilErr_; \
-            goto error; \
+            _on_error; \
         } \
     } while (0);
+
+/* Do not call this after an "error:" label because it will loop forever! */
+#define PA_ENSURE(expr) PA_ENSURE_ON_ERROR(expr, goto error)
+
+/* This is safe to call after an "error:" label. */
+#define PA_ENSURE_NO_GOTO(expr) PA_ENSURE_ON_ERROR(expr, (void)0)
 
 #define PA_ASSERT_CALL(expr, success) \
     paUtilErr_ = (expr); \
