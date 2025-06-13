@@ -2742,7 +2742,10 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
         PaUtilHostBufferSizeMode* hostBufferSizeMode )
 {
     PaError result = paNoError;
-    double realSr = sampleRate;
+    double approximateSampleRate = sampleRate;
+    double exactSampleRate = sampleRate;
+    double exactCaptureSampleRate = sampleRate;
+    double exactPlaybackSampleRate = sampleRate;
     snd_pcm_hw_params_t* hwParamsCapture, * hwParamsPlayback;
 
     alsa_snd_pcm_hw_params_alloca( &hwParamsCapture );
@@ -2750,34 +2753,48 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
 
     if( self->capture.pcm )
         PA_ENSURE( PaAlsaStreamComponent_InitialConfigure( &self->capture, inParams, self->primeBuffers, hwParamsCapture,
-                    &realSr ) );
+                    &approximateSampleRate ) );
     if( self->playback.pcm )
         PA_ENSURE( PaAlsaStreamComponent_InitialConfigure( &self->playback, outParams, self->primeBuffers, hwParamsPlayback,
-                    &realSr ) );
+                    &approximateSampleRate ) );
 
-    PA_ENSURE( PaAlsaStream_DetermineFramesPerBuffer( self, realSr, inParams, outParams, framesPerUserBuffer,
+    PA_ENSURE( PaAlsaStream_DetermineFramesPerBuffer( self, approximateSampleRate, inParams, outParams, framesPerUserBuffer,
                 hwParamsCapture, hwParamsPlayback, hostBufferSizeMode ) );
 
     if( self->capture.pcm )
     {
         assert( self->capture.framesPerPeriod != 0 );
-        PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->capture, hwParamsCapture, inParams, self->primeBuffers, realSr,
+        PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->capture, hwParamsCapture, inParams, self->primeBuffers, approximateSampleRate,
                     inputLatency ) );
         /* Now that we have finalized the hwParams, we can get a more accurate sample rate. */
-        ENSURE_( GetExactSampleRate( hwParamsCapture, &realSr ), paUnanticipatedHostError );
+        exactCaptureSampleRate = approximateSampleRate;
+        ENSURE_( GetExactSampleRate( hwParamsCapture, &exactCaptureSampleRate ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: Capture period size: %lu, latency: %f\n", __FUNCTION__, self->capture.framesPerPeriod, *inputLatency ));
+        exactSampleRate = exactCaptureSampleRate;
     }
     if( self->playback.pcm )
     {
         assert( self->playback.framesPerPeriod != 0 );
-        PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->playback, hwParamsPlayback, outParams, self->primeBuffers, realSr,
+        PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->playback, hwParamsPlayback, outParams, self->primeBuffers, approximateSampleRate,
                     outputLatency ) );
         /* Now that we have finalized the hwParams, we can get a more accurate sample rate. */
-        ENSURE_( GetExactSampleRate( hwParamsPlayback, &realSr ), paUnanticipatedHostError );
+        exactPlaybackSampleRate = approximateSampleRate;
+        ENSURE_( GetExactSampleRate( hwParamsPlayback, &exactPlaybackSampleRate ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: Playback period size: %lu, latency: %f\n", __FUNCTION__, self->playback.framesPerPeriod, *outputLatency ));
+        exactSampleRate = exactPlaybackSampleRate;
     }
 
-    self->streamRepresentation.streamInfo.sampleRate = realSr;
+    /* Warn if the input and output rates are very different. */
+    if( self->capture.pcm && self->playback.pcm )
+    {
+        if (fabs(exactCaptureSampleRate - exactPlaybackSampleRate) >= 1.0)
+        {
+            PA_DEBUG(( "%s: Warning: input and output sample rates differ, %f != %f\n"
+                    __FUNCTION__, exactCaptureSampleRate, exactPlaybackSampleRate ));
+        }
+    }
+
+    self->streamRepresentation.streamInfo.sampleRate = exactSampleRate;
 
     /* this will cause the two streams to automatically start/stop/prepare in sync.
      * We only need to execute these operations on one of the pair.
