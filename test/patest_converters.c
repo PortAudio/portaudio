@@ -334,8 +334,8 @@ int main( int argc, const char **argv )
         printf( "}}}\n" ); // trac preformated text tag
 
         printf( "\n" );
-        printf( "=== Combined dynamic range (src->dest->float32) ===\n" );
-        printf( "Key: Noise amplitude in dBfs, X - fail (either above failed or dest->float32 failed)\n" );
+        printf( "=== Maximum absolute difference src -> dest -> float32 (non-exhaustive) ===\n" );
+        printf( "Key: Worst error amplitude in dBfs, X - fail (either above failed or dest->float32 failed)\n" );
         printf( "{{{\n" ); // trac preformated text tag
         printf( "in|  out:    " );
         for( destinationFormatIndex = 0; destinationFormatIndex < SAMPLE_FORMAT_COUNT; ++destinationFormatIndex ){
