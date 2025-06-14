@@ -1,57 +1,157 @@
-/** @page compile_cmake PortAudio on Windows, OS X or Linux via. CMake
+/** @page compile_cmake Building PortAudio with CMake
 @ingroup tutorial
 
-@section cmake_building Building PortAudio stand-alone on Windows, OS X or Linux
+@section cmake_building Building PortAudio Stand-Alone on Windows, OS X or Linux
 
-CMake can be used to generate Visual Studio solutions on Windows, Makefiles (on Linux and OS X) and build metadata for other build systems for PortAudio. You should obtain a recent version of CMake from [http://www.cmake.org] if you do not have one already. If you are unfamiliar with CMake, this section will provide some information on using CMake to build PortAudio.
+As an alternative to autotools, PortAudio offers a way of building via CMake. CMake can generate files for other build systems, including Visual Studio solutions and Makefiles among others.
 
-On Linux, CMake serves a very similar purpose to an autotools "configure" script - except it can generate build metadata apart from Makefiles. The equivalent of the following on POSIX'y systems:
+If you are familiar with building CMake projects, PortAudio follows the standard steps of building a CMake project. Otherwise, continue reading on.
 
-    build_path> {portaudio path}/configure --prefix=/install_location
-    build_path> make
-    build_path> make install
+@subsection compile_cmake_general General Steps
 
-Would be:
+On **all platforms**, after cloning the source tree and opening a command prompt/terminal, the **general** process is as follows:
 
-    build_path> cmake {portaudio path} -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/install_location
-    build_path> make
-    build_path> make install
+1. Create a build directory and change directory into it.
+2. Run `cmake /path/to/portaudio/source/dir`
+3. Run `cmake --build .`
 
-The "-G" option specifies the type of build metadata which will be generated. You can obtain a list of supported build metadata formats by invoking (on any platform):
+PortAudio's CMake build system also features several options. For a list of those, see @ref compile_cmake_options. Add them to the second command in the format `-DOPTION_NAME=VALUE`, with `VALUE` usually being either `ON` or `OFF`. For example, `cmake /path/to/portaudio/source/dir -DPA_BUILD_TESTS=ON`. Note that you do not need to restart with a clean build directory each time you change a config option. If you encounter problems, however, then start with a clean build directory and try again.
 
-    cmake -G
+If you want to use a different generator, add `-G "Generator Name"` to the second command, with "Generator Name"` being the generator you want to use (e.g., "Ninja"). We will not cover generators other than the default ones (Visual Studio projects and Unix Makefiles) here, but if you are experienced with them, you are free to use them.
 
-"make install" should install the same set of files that are installed using the usual configure script included with PortAudio along with a few extra files (similar to pkg-config metadata files) which make it easier for other CMake projects to use the installed libraries.
+For examples on specific platforms, see the following sections below. Note that the following examples assume you have created a build directory outside the source tree called `pabuild`.
 
-On Windows, you can use CMake to generate Visual Studio project files which can be used to create the PortAudio libraries. The following serves as an example (and should be done from a directory outside the PortAudio tree) which will create Visual Studio 2015 project files targeting a 64-bit build:
+@subsection compile_cmake_win Windows
 
-    C:\PABUILD> cmake {portaudio path} -G "Visual Studio 14 2015 Win64"
+On Windows, CMake will generate Visual Studio projects by default, so you will need to install Visual Studio first. Then, for a 64-bit build, open a command prompt (or PowerShell, the commands are the same) and run the following command:
 
-After executing the above, you can either open the generated solution with Visual Studio or use CMake to invoke the build process. The following shows an example of how to build a release configuration (assuming the above command was executed previously in the same directory):
+    C:\pabuild> cmake C:\path\to\portaudio\source
 
-    C:\PABUILD> cmake --build . --config Release
+Once configuration is successful, you can then start the build by running the following command:
 
-If you want ASIO support you need to obtain the ASIO2 SDK from Steinberg and place it according to \ref compile_windows_asio_msvc. Both ASIO and the DirectX SDK are automatically searched for by the CMake script - if they are found, they will be enabled by default.
+    C:\pabuild> cmake --build .
 
-@section cmake_using Using PortAudio in your CMake project
+This builds a _debug_ config of PortAudio. If you need a release config of PortAudio, add `--config Release` to the above command. For more CMake options, see @ref compile_cmake_options_general.
 
-PortAudio defines the following CMake targets:
+Alternatively, you can open the resulting `portaudio.sln` file in Visual Studio and build PortAudio that way.
 
- - "portaudio_static" for a static library and
- - "portaudio" for a dynamic library
+@subsection compile_cmake_others Linux, OS X, and Others
 
-If you installed PortAudio as described above in \ref cmake_building and the install prefix you used (CMAKE_INSTALL_PREFIX) is in your system PATH or CMAKE_MODULE_PATH CMake variable, you should be able to use:
+The configuration process for Linux is the same on OS X, so these two platforms are grouped into one. They are also not specific to just these two platforms either; FreeBSD users, for example, can follow this section.
+
+Before proceeding with this section, if on Linux or similar, first install the appropriate audio backend developer packages as listed in @ref compile_cmake_audio_backends. Then, come back to this section and proceed with the rest of the steps below.
+
+First, open a terminal at your build directory. Then, run the following command:
+
+    $ cmake -G "Unix Makefiles" /path/to/portaudio/source
+
+(The `-G "Unix Makefiles"` is used to ensure Unix Makefiles are generated).
+
+Once configuration is done, run the following command:
+
+    $ make
+
+Optionally add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based off your number of CPU threads).
+
+Alternatively, you can run `cmake --build .` as it's the same thing. You can also add `-j <num>` in the same manner as described above.
+
+Using an alternative perspective, if you are familiar with autotools, you'll realize that CMake servers a similar purpose to a `configure` script. Both generate makefiles for the project you're currently building. Therefore, the CMake equivalent of the following commands:
+
+    $ /path/to/portaudio/source/configure --prefix=/install_location # Assume we're in the build directory 'pabuild'
+    $ make
+    $ make install
+
+would be the following:
+
+    $ cmake /path/to/portaudio/source -DCMAKE_INSTALL_PREFIX=/install_location # Assume we're in the build directory 'pabuild'
+    $ make
+    $ make install
+
+@subsubsection compile_cmake_audio_backends Audio Backend Developer Packages
+
+Note that on Linux, you will need to install additional developer packages if CMake reports that no usable backends. On Debian, Ubuntu, and their derivatives, you can install one of the following developer packages to get a usable backend:
+
+- `libasound2-dev` for ALSA
+- `libjack-dev` for JACK
+
+TODO: Add PulseAudio developer packages.
+
+Notice how OSS is excluded here. Audio devices will not show up under OSS on most modern Linux distributions, which can confuse end-users.
+
+If you already compiled PortAudio at this point, delete your build folder and follow the above steps again.
+
+@subsection compile_cmake_tests Building Tests
+
+@note
+    - These instructions applies to **ALL** platforms.
+    - PortAudio does **NOT** support CTest. Contributions are accepted adding support for it.
+
+Unlike in other build systems, building PortAudio with CMake does not automatically build tests. To build tests, simply add `-DPA_BUILD_TESTS=ON` to your configuration command. See the above sections for more information about adding build options.
+
+@subsection compile_cmake_options CMake Build Options
+
+This section contains options that configure your build. Some are specific to PortAudio while others are general CMake options. They are divided into two sections below
+
+@subsubsection compile_cmake_options_general General CMake Options
+
+- `--configure <buildtype>`: Changes the build type. This can be `Release` for a release build, `Debug` for a debug build, `RelWithDebInfo` for a release build but with debugging symbols, `MinSizeRel` for the smallest build possible, and `None` for no build type.
+
+- `-DCMAKE_INSTALL_PREFIX=/install_prefix`: When running `make install` or similar, install to `/install_prefix` instead of CMake's default of `/usr`.
+
+@subsubsection compile_cmake_options_pa PortAudio Specific Options
+
+@note Backend options all default to `ON` if available except for the OSS, ASIO, and skeleton backends.
+
+- **`-DPA_USE_ALSA=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the ASLA host API. Requires ALSA.
+    - **`-DPA_ALSA_DYNAMIC=ON|OFF`**: Dynamically load libasound with dlopen using @ref PaAlsa_SetLibraryPathName.
+- **`-DPA_USE_ASIO=ON|OFF`**: (Windows Only). Use the ASIO host API. Requires the ASIO SDK[1].
+- **`-DPA_USE_AUDIOIO=ON|OFF`**: (Solaris Only). Use the audioio host API.
+- **`-DPA_USE_DS=ON|OFF`**: (Windows Only). Use the DirectSound host API.
+- **`-DPA_USE_JACK=ON|OFF`**: Use the JACK host API. Requires JACK.
+- **`-DPA_USE_OSS=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the OSS host API[2]. Requires OSS.
+- **`-DPA_USE_PULSEAUDIO=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the PulseAudio host API. Requires PulseAudio to be present.
+- **`-DPA_USE_SKELETON=ON|OFF`**: Use the skeleton host API (no audio output).
+- **`-DPA_USE_SNDIO=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the sndio host API.
+- **`-DPA_USE_WASAPI=ON|OFF`**: (Windows Only). Use the WASAPI host API.
+- **`-DPA_USE_WDMKS=ON|OFF`**: (Windows Only). Use the WDMKS host API.
+    - **`-DPA_USE_WDMKS_DEVICE_INFO=ON|OFF`**: Use the WDMKS API for device info.
+- **`-DPA_USE_WMME=ON|OFF`**: (Windows Only). Use the MME host API.
+
+[1] The ASIO SDK is only available under a proprietary license. This license imposes many requirements including conditions and limitations on distributing binaries that you build. Be sure to read this page from Steinberg: https://www.steinberg.net/developers. Also be advised that enabling ASIO can cause an impact on initialization performance and reliability, so exercise caution when enabling this backend. See https://github.com/PortAudio/portaudio/issues/696 for more information.
+
+[2] To avoid confusing end-users, the OSS backend is intentionally off by default because there are no devices on modern Linux systems.
+
+Miscellaneous build options:
+
+- **`-DPA_BUILD_SHARED_LIBS=ON|OFF`**: Builds PortAudio as a shared library instead of a static one. Default: `OFF`
+- **`-DPA_BUILD_TESTS=ON|OFF`**: Builds all tests. Default: `OFF`
+- **`-DPA_BUILD_EXAMPLES=ON|OFF`**: Builds all examples. Default: `OFF`
+- **`-DPA_WARNINGS_ARE_ERRORS=ON|OFF`**: Treats all warnings as errors. Mostly of interest to developers. Default: `OFF`
+- **`-DPA_ENABLE_DEBUG_OUTPUT=ON|OFF`**: Enables debugging output. Default: `OFF`
+- **`-DPA_DLL_LINK_WITH_STATIC_RUNTIME`**: (Windows Only). Links PortAudio with static runtime dependencies.
+
+@section cmake_using Using PortAudio in Your CMake Project
+
+PortAudio defines two CMake targets: `portaudio`, for a dynamic library, and `portaudio_static`, for a static library.
+
+To use these targets, there are two ways: using `find_package()` or `add_subdirectory()`.
+
+@subsection cmake_using_find_package Using the `find_package()` CMake Command
+
+The easiest way is to use the aforementioned targets is to have PortAudio installed and use the `find_package()` CMake command. Use the command as follows:
 
     find_package(portaudio)
 
-To define the "portaudio_static" and "portaudio" targets in your CMake project.
+Optionally add `REQUIRED` after `portaudio` to make it a required dependency:
 
-If you do not want to install portaudio into your system but would rather just have it get built as part of your own project (which may be particularly convenient on Windows), you may also use:
+    find_package(portaudio REQUIRED)
 
-    add_subdirectory("path to PortAudio location" "some binary directory" EXCLUDE_FROM_ALL)
+@subsection cmake_using_add_subdirectory Using the `add_subdirectory()` CMake Command
 
-EXCLUDE_FROM_ALL is not strictly necessary, but will ensure that targets which you don't use in your project won't get built.
+If you do not want to install PortAudio on your system, you may also include PortAudio in your project's source tree (e.g., as a Git submodule) or similar. In that case, use the `add_subdirectory()` CMake command as follows:
 
-Back to \ref tutorial_start
+    add_subdirectory("/path/to/portaudio/source")
+
+Optionally, you may add an extra parameter for the build directory and/or `EXCLUDE_FROM_ALL`. If you add `EXCLUDE_FROM_ALL`, this excludes PortAudio from a default build.
 
 */
