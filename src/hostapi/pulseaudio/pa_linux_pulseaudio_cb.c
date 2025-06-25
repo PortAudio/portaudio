@@ -283,18 +283,19 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     size_t pulseaudioOutputWritten = 0;
     size_t pulseaudioLength = length;
 
-    /* If there is no specified per host buffer then
-     * just generate one or but correct one in place
+    /* If a per-host buffer is not specified, a new buffer should
+     * be generated or the existing one should be corrected in place.
      */
     if( hostFramesPerBuffer == paFramesPerBufferUnspecified )
     {
         if( !stream->framesPerHostCallback )
         {
-            /* This just good enough and most
-             * Pulseaudio server and ALSA can handle it
+            /*
+             * This configuration is deemed sufficient, as it is
+             * compatible with most PulseAudio servers and ALSA.
              *
-             * We should never get here but this is ultimate
-             * backup.
+             * Although reaching this point is not expected, it serves
+             * as a final backup measure.
              */
             hostFramesPerBuffer = PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC;
 
@@ -308,7 +309,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     if( stream->outputStream )
     {
-        /* Calculate how many bytes goes to one frame */
+        /* The number of bytes allocated to a single frame should be calculated. */
         pulseaudioInputBytes = pulseaudioOutputBytes = (hostFramesPerBuffer * stream->outputFrameSize);
 
         if( stream->bufferProcessor.streamCallback )
@@ -317,8 +318,8 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
     }
 
-    /* If we just want to have input but not output (Not Duplex)
-     * Use this calculation
+    /* If input is desired without output (non-duplex operation),
+     * the following calculation should be utilized.
      */
     if( stream->inputStream )
     {
@@ -330,10 +331,10 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
     }
 
-    /* If we have input which is mono and
-     * output which is stereo. We have to copy
-     * mono to monomono which is stereo.
-     * Then just read half and copy
+    /* In the case where the input is mono and the output is stereo,
+     * the mono input must be copied to a mono-mono format, which
+     * corresponds to stereo. Subsequently, only half of the data
+     * should be read and copied.
      */
     if( isOutputCb &&
         stream->outputSampleSpec.channels == 2 &&
@@ -351,8 +352,8 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     do
     {
-        /* Make sure that bufferData is NULL that marks there
-         * is nothing to output
+        /* It must be ensured that bufferData is NULL, indicating that
+         * there is no data available for output.
          */
         if( isOutputCb )
         {
@@ -360,8 +361,9 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
 
         /*
-         * If everything fail like stream vanish or mainloop
-         * is in error state try to handle error
+         * In the event of failures, such as the stream becoming
+         * unavailable or the main loop entering an error state,
+         * an attempt should be made to handle the error.
          */
         PA_PULSEAUDIO_IS_ERROR( stream, paStreamIsStopped )
 
@@ -381,11 +383,14 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
         PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 
-        /* When doing Portaudio Duplex one has to write and read same amount of data
-         * if not done that way Portaudio will go boo boo and nothing works.
-         * This is why this is done as it's done
+        /* In the context of PortAudio duplex operation, it is required
+         * that the same amount of data be written and read. Failure to
+         * adhere to this requirement may result in malfunctioning
+         * behavior of PortAudio.
          *
-         * Pulseaudio does not care and this is something that needs small adjusting
+         * This necessity dictates the implementation approach.
+         * PulseAudio operates independently of this constraint,
+         * necessitating minor adjustments.
          */
         PaUtil_BeginBufferProcessing( &stream->bufferProcessor,
                                       &timeInfo,
@@ -407,8 +412,8 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
                                        hostFramesPerBuffer );
         }
 
-        /* Is output is enable and buffer data is not NULL
-         * then crap pointer to output ringbuffer
+        /* If output is enabled and the buffer data is not NULL,
+         *  a pointer to the output ring buffer is assigned.
          */
         if( isOutputCb )
         {
@@ -441,18 +446,20 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
                                       hostFrameCount );
 
         /*
-         * pa_stream_begin_write gives pointer to ring
-         * buffer in Pulseaudio. WhenPaUtil_EndBufferProcessing
-         * returns paContinue then is ok to write output.
+         * A pointer to the ring buffer in PulseAudio is provided by
+         * the function pa_stream_begin_write.
+         * When PaUtil_EndBufferProcessing yields a return value of
+         * paContinue, it is indicated that writing output is
+         * permissible.
          *
-         * When it's something else than paContinue
-         * then we have to cancel writing with
-         * with pa_stream_cancel_write.
+         * In instances where a return value other than paContinue is
+         * received, the writing process must be terminated using
+         * pa_stream_cancel_write.
          *
-         * If there is no space in output ringbuffer or for
-         * example USB device has dissapiered and pointer
-         * is NULL then we just get out of loop as there is not much
-         * we can't do
+         * If insufficient space is detected in the output ring buffer,
+         * or if the USB device is no longer present and the pointer is
+         * NULL, the loop is exited, as further actions are rendered
+         * ineffective.
          */
         if( ret == paContinue && isOutputCb && bufferData )
         {
