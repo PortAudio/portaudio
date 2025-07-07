@@ -130,7 +130,7 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
         }
         else
         {
-            // Result is DONE or CANCEL
+            /* Result is DONE or CANCEL */
             PaPulseAudio_UnLock( hostapi->mainloop );
             break;
         }
@@ -140,7 +140,7 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
         usleep(sleep_us);
     }
 
-    // No wait if operation have been DONE or CANCELLED
+    /* Do not wait if operation is DONE or CANCELLED */
     if( localOperationState == PA_OPERATION_RUNNING)
     {
         PA_DEBUG( ( "Portaudio %s: Operation still running %d!\n",
@@ -215,9 +215,8 @@ void _PaPulseAudio_Read( PaPulseAudio_Stream *stream,
     const void *pulseaudioData = NULL;
 
     /*
-     * The concept underlying this implementation is to populate the
-     * ring buffer with data obtained from the input device. Once the
-     * data is available, it will be utilized for either callback
+     * Populate the ring buffer with data obtained from the input device.
+     * Once the data is available, it will be utilized for either callback
      * processing or blocking reads.
      */
     if( pa_stream_peek( stream->inputStream,
@@ -285,7 +284,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     size_t pulseaudioOutputWritten = 0;
     size_t pulseaudioLength = length;
 
-    /* If a per-host buffer is not specified, a new buffer should
+    /* If a per-host buffer is not present, a new buffer should
      * be generated or the existing one should be corrected in place.
      */
     if( hostFramesPerBuffer == paFramesPerBufferUnspecified )
@@ -398,7 +397,9 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
                                       &timeInfo,
                                       0 );
 
-        /* Read of ther is something to read */
+        /* Read from input buffer if there is enough bytes or add
+         * zero if there is not
+         */
         if( isInputCb )
         {
             PaUtil_ReadRingBuffer( &stream->inputRing,
@@ -459,7 +460,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
          * pa_stream_cancel_write.
          *
          * If insufficient space is detected in the output ring buffer,
-         * or if the USB device is no longer present and the pointer is
+         * or if the USB audio device is no longer present and the pointer is
          * NULL, the loop is exited, as further actions are rendered
          * ineffective.
          */
@@ -568,9 +569,6 @@ void PaPulseAudio_StreamStartedCb( pa_stream * stream,
                                  0 );
 }
 
-/* When CloseStream() is invoked, the multi-API layer verifies that
- * the stream has already been stopped or aborted.
- */
 PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 {
     PaError result = paNoError;
@@ -588,9 +586,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && PA_STREAM_IS_GOOD( pa_stream_get_state( stream->outputStream ) ) )
     {
         PaPulseAudio_Lock(stream->mainloop);
-        /* The stream should be paused to facilitate a quicker cessation
-         * of operation.
-         */
+        /* Corking stream pauses stream and causes it to terminate more quickly */
         pulseaudioOperation = pa_stream_cork( stream->outputStream,
                                               1,
                                               PaPulseAudio_CorkSuccessCb,
@@ -609,9 +605,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
         && PA_STREAM_IS_GOOD( pa_stream_get_state( stream->inputStream ) ) )
     {
         PaPulseAudio_Lock( stream->mainloop );
-        /* The stream should be paused to facilitate a quicker cessation
-         * of operation.
-         */
+        /* Corking stream pauses stream and causes it to terminate more quickly */
         pulseaudioOperation = pa_stream_cork( stream->inputStream,
                                               1,
                                               PaPulseAudio_CorkSuccessCb,
@@ -623,9 +617,7 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 
         PaPulseAudio_Lock( stream->mainloop );
 
-        /* Subsequently, the stream should be disconnected,
-         * and termination should be awaited.
-         */
+        /* Disconnect stream and await for termination */
         pa_stream_disconnect( stream->inputStream );
 
         PaPulseAudio_UnLock( stream->mainloop );
@@ -719,7 +711,7 @@ PaError _PaPulseAudio_WaitStreamState( pa_threaded_mainloop *mainloop, pa_stream
                 break;
         }
 
-        /* Creating can take some time */
+        /* Stream creation take some time */
         if( state != PA_STREAM_CREATING )
         {
             wait ++;
@@ -750,7 +742,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
     PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
-    /* Adjust latencies if that is wanted
+    /* Adjust latencies
      * https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/Developer/Clients/LatencyControl/
      *
      * tlength is for Playback
@@ -783,10 +775,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->inputStream )
     {
-        /* The default input reads 65,535 bytes, setting the fragsize to
-         * request smaller data chunks. This approach facilitates the
-         * generation of more precise timestamps within the current
-         * callback system.
+        /* The default input settings is to read 65,535 bytes per request,
+         * setting the fragsize to request smaller data chunks.
+         * This leads more precise timestamps.
          */
         stream->inputBufferAttr.fragsize = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->inputSampleSpec );
@@ -807,7 +798,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         /* NULL means default device */
         pulseaudioName = NULL;
 
-        /* If default device is not requested then change to wanted device */
+        /* If default device is not requested then change to requested device */
         if( result == paNoError && stream->inputDevice != defaultInputDevice )
         {
             pulseaudioName = pulseaudioHostApi->
@@ -855,7 +846,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         stream->outputBufferAttr.tlength = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->outputSampleSpec );
 
-        /* Just keep on trucking if we are just corked */
+        /* If stream is just corked then uncork it otherwise
+         * create new stream
+         */
         if( pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY
             && pa_stream_is_corked( stream->outputStream ) )
         {
@@ -888,9 +881,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             /* NULL means default device */
             pulseaudioName = NULL;
 
-            /* If the default device is not requested, the configuration
-             * should be updated to use the desired device.
-             */
+            /* If default device is not requested then change to requested device */
             if( result == paNoError && stream->outputDevice != defaultOutputDevice )
             {
                 pulseaudioName = pulseaudioHostApi->
