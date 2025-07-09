@@ -5,7 +5,12 @@
   "homepage": "http://portaudio.com/",
   "license": "MIT",
   "supports": "!uwp",
-  "default-features": [ "jack" ],
+  "default-features": [
+    {
+      "name": "jack",
+      "platform": "!emscripten"
+    }
+  ],
   "features": {
     "jack": {
       "description": "Build with support for the JACK Audio Connection Kit host API.",
