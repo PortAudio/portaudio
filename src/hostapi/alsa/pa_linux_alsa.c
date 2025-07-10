@@ -855,7 +855,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     int* minChannels, * maxChannels;
     double * defaultLowLatency, * defaultHighLatency;
     double defaultSr = devInfo->baseDeviceInfo.defaultSampleRate;
-    unsigned int uintSampleRate = 0;
+    unsigned int approximateSampleRate = 0;
 
     assert( pcm );
 
@@ -885,8 +885,8 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     {
         /* Could be that the device opened in one mode supports samplerates that the other mode wont have,
          * so try again .. */
-        uintSampleRate = (unsigned int) defaultSr;
-        if( SetApproximateSampleRate( pcm, hwParams, &uintSampleRate ) < 0 )
+        approximateSampleRate = (unsigned int) defaultSr;
+        if( SetApproximateSampleRate( pcm, hwParams, &approximateSampleRate ) < 0 )
         {
             defaultSr = -1.0;
             alsa_snd_pcm_hw_params_any( pcm, hwParams ); /* Clear any params (rate) that might have been set */
@@ -896,18 +896,18 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
 
     if( defaultSr < 0.0 )           /* Default sample rate not set */
     {
-        uintSampleRate = 44100;  /* Will contain approximate rate returned by alsa-lib */
+        approximateSampleRate = 44100;  /* Will contain approximate rate returned by alsa-lib */
 
         /* Don't allow rate resampling when probing for the default rate (but ignore if this call fails) */
         alsa_snd_pcm_hw_params_set_rate_resample( pcm, hwParams, 0 );
-        if( alsa_snd_pcm_hw_params_set_rate_near( pcm, hwParams, &uintSampleRate, NULL ) < 0 )
+        if( alsa_snd_pcm_hw_params_set_rate_near( pcm, hwParams, &approximateSampleRate, NULL ) < 0 )
         {
             PaUtil_DebugPrint( "%s: alsa_snd_pcm_hw_params_set_rate_near failed! got %d\n",
-                    __FUNCTION__, uintSampleRate );
+                    __FUNCTION__, approximateSampleRate );
             result = paUnanticipatedHostError;
             goto error;
         }
-        defaultSr = (double) uintSampleRate;
+        defaultSr = (double) approximateSampleRate;
     }
 
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_min( hwParams, &minChans ), paUnanticipatedHostError );
@@ -957,8 +957,8 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     alsaPeriodFrames = 512;
     /* Have to reset hwParams, to set new buffer size; need to also set sample rate again */
     ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
-    ENSURE_( SetApproximateSampleRate( pcm, hwParams, &uintSampleRate ), paUnanticipatedHostError );
-    defaultSr = (double) uintSampleRate;
+    ENSURE_( SetApproximateSampleRate( pcm, hwParams, &approximateSampleRate ), paUnanticipatedHostError );
+    defaultSr = (double) approximateSampleRate;
     ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, NULL ), paUnanticipatedHostError );
     *defaultHighLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
@@ -1989,7 +1989,7 @@ static int nearbyint_(float value) {
  *
  */
 static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *self, const PaStreamParameters *params,
-        int primeBuffers, snd_pcm_hw_params_t *hwParams, double *sampleRate )
+        int primeBuffers, snd_pcm_hw_params_t *hwParams, unsigned int *sampleRatePtr )
 {
     /* Configuration consists of setting all of ALSA's parameters.
      * These parameters come in two flavors: hardware parameters
@@ -2003,7 +2003,6 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
     int dir = 0;
     snd_pcm_t *pcm = self->pcm;
     unsigned int minPeriods = 2;
-    unsigned int uintSampleRate = (unsigned int) *sampleRate;
 
     /* self->framesPerPeriod = framesPerHostBuffer; */
 
@@ -2072,12 +2071,12 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
     /* Some specific hardware (reported: Audio8 DJ) can fail with assertion during this step. */
     ENSURE_( alsa_snd_pcm_hw_params_set_format( pcm, hwParams, self->nativeFormat ), paUnanticipatedHostError );
 
-    if( ( result = SetApproximateSampleRate( pcm, hwParams, &uintSampleRate )) != paUnanticipatedHostError )
+    if( ( result = SetApproximateSampleRate( pcm, hwParams, sampleRatePtr )) != paUnanticipatedHostError )
     {
         if( result == paInvalidSampleRate ) /* From the SetApproximateSampleRate() call above */
         { /* The sample rate was returned as 'out of tolerance' of the one requested */
             PA_DEBUG(( "%s: Wanted %.3f, closest sample rate was %u\n",
-                    __FUNCTION__, sampleRate, uintSampleRate ));
+                    __FUNCTION__, sampleRate, *sampleRatePtr ));
             PA_ENSURE( paInvalidSampleRate );
         }
     }
@@ -2087,8 +2086,6 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
     }
 
     ENSURE_( alsa_snd_pcm_hw_params_set_channels( pcm, hwParams, self->numHostChannels ), paInvalidChannelCount );
-
-    *sampleRate = (double) uintSampleRate;
 
 end:
     return result;
@@ -2104,7 +2101,7 @@ error:
  * @param latency: The latency for this component.
  */
 static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *self, snd_pcm_hw_params_t* hwParams,
-        const PaStreamParameters *params, int primeBuffers, double sampleRate, PaTime* latency )
+        const PaStreamParameters *params, int primeBuffers, unsigned int sampleRate, PaTime* latency )
 {
     PaError result = paNoError;
     snd_pcm_sw_params_t* swParams;
@@ -2139,7 +2136,7 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
     }
 
     /* Latency in seconds */
-    *latency = (self->alsaBufferSize - self->framesPerPeriod) / sampleRate;
+    *latency = (self->alsaBufferSize - self->framesPerPeriod) / (double)sampleRate;
 
     /* Now software parameters... */
     ENSURE_( alsa_snd_pcm_sw_params_current( self->pcm, swParams ), paUnanticipatedHostError );
@@ -2742,10 +2739,10 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
         PaUtilHostBufferSizeMode* hostBufferSizeMode )
 {
     PaError result = paNoError;
-    double approximateSampleRate = sampleRate;
-    double exactSampleRate = sampleRate;
-    double exactCaptureSampleRate = sampleRate;
-    double exactPlaybackSampleRate = sampleRate;
+    unsigned int approximateSampleRate = (unsigned int)(sampleRate + 0.5);
+    double preciseSampleRate = sampleRate;
+    double preciseCaptureSampleRate = 0;
+    double precisePlaybackSampleRate = 0;
     snd_pcm_hw_params_t* hwParamsCapture, * hwParamsPlayback;
 
     alsa_snd_pcm_hw_params_alloca( &hwParamsCapture );
@@ -2767,10 +2764,9 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
         PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->capture, hwParamsCapture, inParams, self->primeBuffers, approximateSampleRate,
                     inputLatency ) );
         /* Now that we have finalized the hwParams, we can get a more accurate sample rate. */
-        exactCaptureSampleRate = approximateSampleRate;
-        ENSURE_( GetExactSampleRate( hwParamsCapture, &exactCaptureSampleRate ), paUnanticipatedHostError );
+        ENSURE_( GetExactSampleRate( hwParamsCapture, &preciseCaptureSampleRate ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: Capture period size: %lu, latency: %f\n", __FUNCTION__, self->capture.framesPerPeriod, *inputLatency ));
-        exactSampleRate = exactCaptureSampleRate;
+        preciseSampleRate = preciseCaptureSampleRate;
     }
     if( self->playback.pcm )
     {
@@ -2778,23 +2774,22 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
         PA_ENSURE( PaAlsaStreamComponent_FinishConfigure( &self->playback, hwParamsPlayback, outParams, self->primeBuffers, approximateSampleRate,
                     outputLatency ) );
         /* Now that we have finalized the hwParams, we can get a more accurate sample rate. */
-        exactPlaybackSampleRate = approximateSampleRate;
-        ENSURE_( GetExactSampleRate( hwParamsPlayback, &exactPlaybackSampleRate ), paUnanticipatedHostError );
+        ENSURE_( GetExactSampleRate( hwParamsPlayback, &precisePlaybackSampleRate ), paUnanticipatedHostError );
         PA_DEBUG(( "%s: Playback period size: %lu, latency: %f\n", __FUNCTION__, self->playback.framesPerPeriod, *outputLatency ));
-        exactSampleRate = exactPlaybackSampleRate;
+        preciseSampleRate = precisePlaybackSampleRate;
     }
 
     /* Warn if the input and output rates are very different. */
     if( self->capture.pcm && self->playback.pcm )
     {
-        if (fabs(exactCaptureSampleRate - exactPlaybackSampleRate) >= 1.0)
+        if (fabs(preciseCaptureSampleRate - precisePlaybackSampleRate) >= 1.0)
         {
             PA_DEBUG(( "%s: Warning: input and output sample rates differ, %f != %f\n"
-                    __FUNCTION__, exactCaptureSampleRate, exactPlaybackSampleRate ));
+                    __FUNCTION__, preciseCaptureSampleRate, precisePlaybackSampleRate ));
         }
     }
 
-    self->streamRepresentation.streamInfo.sampleRate = exactSampleRate;
+    self->streamRepresentation.streamInfo.sampleRate = preciseSampleRate;
 
     /* this will cause the two streams to automatically start/stop/prepare in sync.
      * We only need to execute these operations on one of the pair.
