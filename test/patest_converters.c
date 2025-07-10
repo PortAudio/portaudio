@@ -361,6 +361,8 @@ int main( int argc, const char **argv )
     free( destinationBuffer );
     free( sourceBuffer );
     free( referenceBuffer );
+
+    return 0;
 }
 
 // copied here for now otherwise we need to include the world just for this function.

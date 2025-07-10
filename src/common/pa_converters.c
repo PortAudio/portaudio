@@ -936,7 +936,15 @@ static void Int32_To_Int16_Dither(
     {
         /* REVIEW */
         dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+#if 1
         *dest = (PaInt16) ((((*src)>>1) + dither) >> 15);
+#else
+        // Clip the intermediate value because adding the dither could cause
+        // a numeric wraparound when shifting.
+        PaInt32 temp = (((*src)>>1) + dither);
+        PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
+        *dest = (PaInt16) (temp >> 15);
+#endif
 
         src += sourceStride;
         dest += destinationStride;
