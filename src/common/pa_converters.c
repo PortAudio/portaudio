@@ -939,8 +939,10 @@ static void Int32_To_Int16_Dither(
 #if 1
         *dest = (PaInt16) ((((*src)>>1) + dither) >> 15);
 #else
-        // Clip the intermediate value because adding the dither could cause
-        // a numeric wraparound when shifting.
+        /* EXPERIMENTAL force clip after dither. see ticket #112
+           Clip the intermediate value because adding the dither could cause
+           a numeric wraparound when shifting.
+        */
         PaInt32 temp = (((*src)>>1) + dither);
         PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
         *dest = (PaInt16) (temp >> 15);
