@@ -72,6 +72,11 @@ PATEST_CONVERTER_OBJS = \
 	src/common/pa_dither.o \
 	test/patest_converters.o
 
+PAQA_DITHER_OBJS = \
+	src/common/pa_converters.o \
+	src/common/pa_dither.o \
+	qa/paqa_dither.o
+
 EXAMPLES = \
 	bin/pa_devs \
 	bin/pa_fuzz \
@@ -85,6 +90,7 @@ EXAMPLES = \
 
 SELFTESTS = \
 	bin/paqa_devs \
+	bin/paqa_dither \
 	bin/paqa_errs \
 	bin/paqa_latency
 
@@ -199,6 +205,10 @@ bin/paloopback: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(LOOPBACK_OBJS)
 bin/patest_converters: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(PATEST_CONVERTER_OBJS)
 	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(PATEST_CONVERTER_OBJS) lib/$(PALIB) $(LIBS)
 	@WITH_ASIO_TRUE@ $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS)  $(PATEST_CONVERTER_OBJS) lib/$(PALIB) $(LIBS)
+
+bin/paqa_dither: lib/$(PALIB) $(MAKEFILE) $(PAINC) $(PAQA_DITHER_OBJS)
+	@WITH_ASIO_FALSE@ $(LIBTOOL) --mode=link $(CC) -o $@ $(CFLAGS) $(PAQA_DITHER_OBJS) lib/$(PALIB) $(LIBS)
+	@WITH_ASIO_TRUE@ $(LIBTOOL) --mode=link --tag=CXX $(CXX) -o $@ $(CXXFLAGS)  $(PAQA_DITHER_OBJS) lib/$(PALIB) $(LIBS)
 
 install: lib/$(PALIB) portaudio-2.0.pc
 	$(INSTALL) -d $(DESTDIR)$(libdir)
