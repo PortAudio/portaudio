@@ -22,13 +22,44 @@ env:
   LD_LIBRARY_PATH: /home/runner/.local/lib
 
 jobs:
-  build-autotools:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu GCC
+            os: ubuntu-latest
+          - name: Ubuntu MinGW
+            os: ubuntu-latest
+            asio_sdk_cache_path: asiosdk.zip
+            dependencies_extras: mingw-w64
+            vcpkg_triplet: x64-mingw-static
+          - name: Windows MinGW
+            os: windows-latest
+            vcpkg_triplet: x64-mingw-static
+          - name: macOS Clang
+            os: macOS-latest
+            vcpkg_triplet: arm64-osx
 
-    runs-on: ubuntu-latest
-    name: Ubuntu
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
 
     steps:
-    - uses: actions/checkout@v2
+    - name: checkout PortAudio git repo
+      uses: actions/checkout@v2
+
+    - name: setup vcpkg
+      uses: lukka/run-vcpkg@v7
+      if: ${{ matrix.vcpkg_triplet }} != null
+      with:
+        vcpkgDirectory: ${{ github.workspace }}/../vcpkg
+        vcpkgTriplet: ${{ matrix.vcpkg_triplet }}
+        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
+        additionalCachedPaths: build/vcpkg_installed
+        # vcpkg commit: [libxml2] Fix ICU support option, hash: ca9ac0b, date: Dec 1, 2023, https://github.com/microsoft/vcpkg/commits
+        vcpkgGitCommitId: ca9ac0ba65965937fb66783c4f726c2c755ad9d9
+        # Required when using vcpkg.json manifest in repository
+        setupOnly: true
     # test configure and build
     - name: configure
       run: ./configure --prefix=$PORTAUDIO_INSTALL_DIR
