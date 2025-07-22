@@ -47,6 +47,8 @@
 
 #include <AudioUnit/AudioUnit.h>
 #include <AudioToolbox/AudioToolbox.h>
+#include <os/workgroup.h>
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -135,6 +137,17 @@ const char *PaMacCore_GetChannelName( int device, int channelIndex, bool input )
  */
 PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
                                        long *minBufferSizeFrames, long *maxBufferSizeFrames );
+
+
+/**
+ * Retrieve the audio workgroup of the specified device.
+ *
+ * @param device The global index of the PortAudio device about which the query is being made.
+ * @param workgroup A pointer to the location which will receive the workgroup value.
+ *
+ * @see kAudioDevicePropertyIOThreadOSWorkgroup in the CoreAudio SDK.
+ */
+ PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgroup );
 
 
 /**

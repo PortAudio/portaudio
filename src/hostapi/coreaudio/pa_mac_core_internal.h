@@ -76,6 +76,7 @@
 #include "pa_ringbuffer.h"
 
 #include "pa_mac_core_blocking.h"
+#include "pa_mac_core_utilities.h"
 
 /* function prototypes */
 
@@ -96,6 +97,7 @@ PaError ReadStream( PaStream* stream, void *buffer, unsigned long frames );
 PaError WriteStream( PaStream* stream, const void *buffer, unsigned long frames );
 signed long GetStreamReadAvailable( PaStream* stream );
 signed long GetStreamWriteAvailable( PaStream* stream );
+
 /* PaMacAUHAL - host api datastructure specific to this implementation */
 typedef struct
 {

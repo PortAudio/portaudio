@@ -233,6 +233,34 @@ PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
 }
 
 
+PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgroup )
+{
+    PaError result;
+    PaUtilHostApiRepresentation *hostApi;
+
+    result = PaUtil_GetHostApiRepresentation( &hostApi, paCoreAudio );
+
+    if( result == paNoError )
+    {
+        PaDeviceIndex hostApiDeviceIndex;
+        result = PaUtil_DeviceIndexToHostApiDeviceIndex( &hostApiDeviceIndex, device, hostApi );
+        if( result == paNoError )
+        {
+            PaMacAUHAL *macCoreHostApi = (PaMacAUHAL*)hostApi;
+            AudioDeviceID macCoreDeviceId = macCoreHostApi->devIds[hostApiDeviceIndex];
+            UInt32 propSize = sizeof( os_workgroup_t );
+
+            // return the size range for the output scope unless we only have inputs
+            Boolean isInput = 0;
+
+            result = WARNING(PaMacCore_AudioDeviceGetProperty( macCoreDeviceId, 0, isInput, kAudioDevicePropertyIOThreadOSWorkgroup, &propSize, workgroup ) );
+        }
+    }
+
+    return result;
+}
+
+
 AudioDeviceID PaMacCore_GetStreamInputDevice( PaStream* s )
 {
     PaMacCoreStream *stream = (PaMacCoreStream*)s;
