@@ -10,16 +10,16 @@ env:
   # GitHub CI Actions-specific environment variables:
 
   # Location for user-local `make install`
-  PORTAUDIO_INSTALL_DIR: /home/runner/.local
+  PORTAUDIO_INSTALL_DIR: ${HOME}/.local
 
   # Environment variables for compiling and running the test program.
   # Usually none of this is needed as `make install` would install to system locations
   # where include and library search paths are already set up to just work.
   # gcc environment variables. see https://gcc.gnu.org/onlinedocs/gcc/Environment-Variables.html
-  C_INCLUDE_PATH: /home/runner/.local/include
-  LIBRARY_PATH: /home/runner/.local/lib
+  C_INCLUDE_PATH: ${HOME}/.local/include
+  LIBRARY_PATH: ${HOME}/.local/lib
   # runtime dynamically linked library search path. see https://stackoverflow.com/questions/480764
-  LD_LIBRARY_PATH: /home/runner/.local/lib
+  LD_LIBRARY_PATH: ${HOME}/.local/lib
 
 jobs:
   build:
