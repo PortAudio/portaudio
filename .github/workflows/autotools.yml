@@ -69,7 +69,7 @@ jobs:
     - name: install
       run: make install
     - name: list install dirs (post-install)
-      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.PORTAUDIO_INSTALL_DIR }}/include ${{ env.PORTAUDIO_INSTALL_DIR }}/lib
+      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }} ${{ env.LD_LIBRARY_PATH }}
     - name: build patest_init.c (test just calls Pa_Initialize();Pa_Terminate();)
       run: gcc -o patest_init ./test/patest_init.c -lportaudio
     - name: run patest_init
@@ -78,6 +78,6 @@ jobs:
     - name: uninstall
       run: make uninstall
     - name: list install dirs (post-uninstall)
-      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.PORTAUDIO_INSTALL_DIR }}/include ${{ env.PORTAUDIO_INSTALL_DIR }}/lib
+      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }} ${{ env.LD_LIBRARY_PATH }}
     - name: build patest_init.c to check uninstall (expect failure)
       run: if gcc -o patest_init ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
