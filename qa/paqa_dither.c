@@ -152,8 +152,11 @@ int ShowDitherDistribution( void )
     const int kNumSamples = 24 * 1024;
     PaInt32 minDither = 0x01000000;
     PaInt32 maxDither = -0x01000000;
-    int histogram[kNumBins] = {};
+    int histogram[kNumBins];
     int maxCount = 0;
+
+    for (int i = 0; i < kNumBins; i++)
+        histogram[i] = 0;
 
     printf("======= 16-bit dither distribution ===================\n");
     for (int i = 0; i < kNumSamples; i++) {
@@ -273,8 +276,8 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     double minValue = -2.0;
     double maxValue = 2.0;
     const int kNumSteps = 41;
-    double averages[kNumSteps] = {};
-    double expected[kNumSteps] = {};
+    double averages[kNumSteps];
+    double expected[kNumSteps];
     double stride = (maxValue - minValue) / (kNumSteps - 1);
     char supported = 0;
     double slope = 0.0;
