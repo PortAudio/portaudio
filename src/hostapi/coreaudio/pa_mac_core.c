@@ -232,7 +232,7 @@ PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
     return result;
 }
 
-
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
 PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgroup )
 {
     PaError result;
@@ -261,7 +261,7 @@ PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgrou
 
     return result;
 }
-
+#endif
 
 AudioDeviceID PaMacCore_GetStreamInputDevice( PaStream* s )
 {
