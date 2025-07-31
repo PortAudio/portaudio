@@ -76,7 +76,6 @@
 #include "pa_ringbuffer.h"
 
 #include "pa_mac_core_blocking.h"
-#include "pa_mac_core_utilities.h"
 
 /* function prototypes */
 
