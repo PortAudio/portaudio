@@ -250,12 +250,13 @@ PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgrou
             AudioDeviceID macCoreDeviceId = macCoreHostApi->devIds[hostApiDeviceIndex];
             UInt32 propSize = sizeof( os_workgroup_t );
 
-            // Determine if this is an inputs only device
-            Boolean isInputsOnly = 0;
+            // return the workgroup for the output scope unless the device only has inputs,
+            // in which case return the workgroup for the input scope
+            Boolean isInputOnly = 0;
             if( macCoreHostApi->inheritedHostApiRep.deviceInfos[hostApiDeviceIndex]->maxOutputChannels == 0 )
-                isInputsOnly = 1;
+                isInputOnly = 1;
 
-            result = WARNING(PaMacCore_AudioDeviceGetProperty( macCoreDeviceId, 0, isInputsOnly, kAudioDevicePropertyIOThreadOSWorkgroup, &propSize, workgroup ) );
+            result = WARNING(PaMacCore_AudioDeviceGetProperty( macCoreDeviceId, 0, isInputOnly, kAudioDevicePropertyIOThreadOSWorkgroup, &propSize, workgroup ) );
         }
     }
 
