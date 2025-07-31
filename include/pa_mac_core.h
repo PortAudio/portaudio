@@ -151,7 +151,7 @@ PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
  * @see kAudioDevicePropertyIOThreadOSWorkgroup in the CoreAudio SDK.
  */
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
- PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgroup );
+PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgroup );
 #endif
 
 /**
