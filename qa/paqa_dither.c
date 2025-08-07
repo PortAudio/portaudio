@@ -43,7 +43,7 @@
  * license above.
  */
 #include <stdio.h>
-#inzzzclude <stdlib.h> /* for EXIT_SUCCESS and EXIT_FAILURE */
+#include <stdlib.h> /* for EXIT_SUCCESS and EXIT_FAILURE */
 #include <string.h>
 #include <math.h>
 
