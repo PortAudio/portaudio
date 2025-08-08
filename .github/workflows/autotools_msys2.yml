@@ -37,11 +37,13 @@ jobs:
         msystem: UCRT64
         update: true
         install: git mingw-w64-ucrt-x86_64-gcc
-    # HACK: see whether running autoreconf fixes things on mingw:
-    - name: autoreconf
+    # regenerate configure script due to MSYS2 "Known Issues" see: https://www.msys2.org/docs/autotools/
+    - name: setup autotools for autoreconf
       run: |
         pacman --noconfirm -S "${MINGW_PACKAGE_PREFIX}-autotools"
         pacman --noconfirm -S "autoconf-archive"
+    - name: autoreconf
+      run: |
         autoreconf -fvi
     # test configure and build
     - name: configure
@@ -52,7 +54,7 @@ jobs:
     - name: install
       run: make install
     - name: list install dirs (post-install)
-      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }} ${{ env.LD_LIBRARY_PATH }} ${{ env.BIN_PATH }}
+      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.BIN_PATH }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }} ${{ env.LD_LIBRARY_PATH }}
     - name: build patest_init.c (test just calls Pa_Initialize();Pa_Terminate();)
       run: |
         C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
@@ -61,16 +63,15 @@ jobs:
         ls
     - name: run patest_init.exe
       run: |
-        LD_LIBRARY_PATH=${{ env.LD_LIBRARY_PATH }}
         export PATH=${{ env.BIN_PATH }}:$PATH
         ./patest_init.exe
       # test make uninstall
     - name: uninstall
       run: make uninstall
     - name: list install dirs (post-uninstall)
-      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }} ${{ env.LD_LIBRARY_PATH }}
+      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.BIN_PATH }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }} ${{ env.LD_LIBRARY_PATH }}
     - name: build patest_init.c to check uninstall (expect failure)
       run: |
         C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
         LIBRARY_PATH=${{ env.LIBRARY_PATH }}
-        if gcc -o patest_init ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
+        if gcc -o patest_init.exe ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi
