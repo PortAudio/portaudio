@@ -39,7 +39,7 @@ jobs:
     # HACK: see whether running autoreconf fixes things on mingw:
     - name: autoreconf
       run: |
-        pacman -S "${MINGW_PACKAGE_PREFIX}-autotools"
+        pacman --noconfirm -S "${MINGW_PACKAGE_PREFIX}-autotools"
         autoreconf -fvi
     # test configure and build
     - name: configure
