@@ -40,6 +40,7 @@ jobs:
     - name: autoreconf
       run: |
         pacman --noconfirm -S "${MINGW_PACKAGE_PREFIX}-autotools"
+        pacman --noconfirm -S "autoconf-archive"
         autoreconf -fvi
     # test configure and build
     - name: configure
