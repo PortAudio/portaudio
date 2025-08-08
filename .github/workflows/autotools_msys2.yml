@@ -61,6 +61,7 @@ jobs:
     - name: run patest_init.exe
       run: |
         LD_LIBRARY_PATH=${{ env.LD_LIBRARY_PATH }}
+        export PATH=${{ env.LD_LIBRARY_PATH }}:$PATH
         ./patest_init.exe
       # test make uninstall
     - name: uninstall
