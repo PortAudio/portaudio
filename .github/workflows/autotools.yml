@@ -62,6 +62,11 @@ jobs:
         vcpkgGitCommitId: ca9ac0ba65965937fb66783c4f726c2c755ad9d9
         # Required when using vcpkg.json manifest in repository
         setupOnly: true
+    # HACK: see whether autoreconf fixes things on mingw:
+    - name: autoreconf
+      run: |
+        pacman -S "${MINGW_PACKAGE_PREFIX}-autotools"
+        autoreconf -fvi
     # test configure and build
     - name: configure
       run: ./configure --prefix=${{ env.PORTAUDIO_INSTALL_DIR }}
