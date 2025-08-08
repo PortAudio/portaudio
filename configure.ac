@@ -77,7 +77,7 @@ case "$target_os" in *mingw* | *cygwin*)
                  eval with_$api=yes
                  ;;
              *)
-                 AC_MSG_ERROR([unknown Windows API \"$api\" (do you need --help?)])
+                 AC_MSG_ERROR([unknown Windows API "$api" (do you need --help?)])
                  ;;
          esac
      done
