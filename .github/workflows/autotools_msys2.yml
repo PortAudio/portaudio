@@ -56,11 +56,12 @@ jobs:
       run: |
         C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
         LIBRARY_PATH=${{ env.LIBRARY_PATH }}
-        gcc -o patest_init ./test/patest_init.c -lportaudio
-    - name: run patest_init
+        gcc -o patest_init.exe ./test/patest_init.c -lportaudio
+        ls
+    - name: run patest_init.exe
       run: |
         LD_LIBRARY_PATH=${{ env.LD_LIBRARY_PATH }}
-        ./patest_init
+        ./patest_init.exe
       # test make uninstall
     - name: uninstall
       run: make uninstall
