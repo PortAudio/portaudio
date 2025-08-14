@@ -141,6 +141,7 @@ static char * MyPa_GetFormatName( PaSampleFormat format )
     return result;
 }
 
+#define NUM_BINS 32
 /**
  * Show a histogram of the dither values.
  */
@@ -148,21 +149,21 @@ int ShowDitherDistribution( void )
 {
     PaUtilTriangularDitherGenerator ditherGenerator;
     PaUtil_InitializeTriangularDitherState( &ditherGenerator );
-    const int kNumBins = 32;
     const int kNumSamples = 24 * 1024;
     PaInt32 minDither = 0x01000000;
     PaInt32 maxDither = -0x01000000;
-    int histogram[kNumBins];
+    int histogram[NUM_BINS];
     int maxCount = 0;
 
-    for (int i = 0; i < kNumBins; i++)
+    for (int i = 0; i < NUM_BINS; i++) {
         histogram[i] = 0;
+    }
 
     printf("======= 16-bit dither distribution ===================\n");
     for (int i = 0; i < kNumSamples; i++) {
         PaInt32 dither = PaUtil_Generate16BitTriangularDither( &ditherGenerator );
-        int binIndex = (dither * kNumBins >> 16) + (kNumBins / 2);
-        if (binIndex < 0 || binIndex > (kNumBins - 1)) {
+        int binIndex = (dither * NUM_BINS >> 16) + (NUM_BINS / 2);
+        if (binIndex < 0 || binIndex > (NUM_BINS - 1)) {
             printf("ERROR binIndex = %d, dither = %d\n", binIndex, dither);
         } else {
             histogram[binIndex]++;
@@ -170,11 +171,11 @@ int ShowDitherDistribution( void )
         minDither = (dither < minDither) ? dither : minDither;
         maxDither = (dither > maxDither) ? dither : maxDither;
     }
-    for (int i = 0; i < kNumBins; i++) {
+    for (int i = 0; i < NUM_BINS; i++) {
         maxCount = (histogram[i] > maxCount) ? histogram[i] : maxCount;
     }
-    for (int i = 0; i < kNumBins; i++) {
-        PaInt32 dither = ((i - (kNumBins / 2)) << 16) / kNumBins;
+    for (int i = 0; i < NUM_BINS; i++) {
+        PaInt32 dither = ((i - (NUM_BINS / 2)) << 16) / NUM_BINS;
         printf("%6d, %4d, ", dither, histogram[i]);
         int numStars = histogram[i] * 100 / maxCount;
         printStars(numStars);
@@ -183,13 +184,13 @@ int ShowDitherDistribution( void )
     return 0;
 }
 
+#define NUM_SAMPLES 1024
 static double MeasureAverageConversion(PaSampleFormat sourceFormat,
                                        PaSampleFormat destinationFormat,
                                        double targetValue
                               ) {
-    const int kNumSamples = 1024;
-    char source[kNumSamples * sizeof(PaInt32)];
-    char destination[kNumSamples * sizeof(PaInt32)];
+    char source[NUM_SAMPLES * sizeof(PaInt32)];
+    char destination[NUM_SAMPLES * sizeof(PaInt32)];
     PaUtilTriangularDitherGenerator ditherState;
     PaUtilConverter *converter;
     double sourceValue;
@@ -204,30 +205,30 @@ static double MeasureAverageConversion(PaSampleFormat sourceFormat,
 
     switch( sourceFormat ) {
         case paFloat32:
-            for ( int i = 0; i < kNumSamples; i++ ) ((float *)source)[i] = (float)sourceValue;
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) ((float *)source)[i] = (float)sourceValue;
             break;
         case paInt32:
-            for ( int i = 0; i < kNumSamples; i++ ) ((PaInt32 *)source)[i] = (PaInt32)sourceValue;
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) ((PaInt32 *)source)[i] = (PaInt32)sourceValue;
             break;
         case paInt16:
-            for ( int i = 0; i < kNumSamples; i++ ) ((PaInt16 *)source)[i] = (PaInt16)sourceValue;
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) ((PaInt16 *)source)[i] = (PaInt16)sourceValue;
             break;
     }
     memset(destination, 0, sizeof(destination));
 
     converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, paClipOff ); // paClipOff or paNoFlag
-    (*converter)( destination, 1, source, 1, kNumSamples, &ditherState );
+    (*converter)( destination, 1, source, 1, NUM_SAMPLES, &ditherState );
     double sum = 0.0f;
     switch( destinationFormat ) {
         case paInt16:
-            for ( int i = 0; i < kNumSamples; i++ ) sum += (double) ((PaInt16 *)destination)[i];
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) sum += (double) ((PaInt16 *)destination)[i];
             break;
         case paInt8:
-            for ( int i = 0; i < kNumSamples; i++ ) sum += (double) ((signed char *)destination)[i];
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) sum += (double) ((signed char *)destination)[i];
             break;
     }
 
-    return sum / kNumSamples;
+    return sum / NUM_SAMPLES;
 }
 
 /**
@@ -271,14 +272,14 @@ void linearRegression(double *xa, double *ya, int numPoints, double *a, double *
     *b = (sumY - (*a) * sumX) / numPoints;
 }
 
+#define LINEARITY_NUM_STEPS 41
 static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat destinationFormat) {
     int result = 0;
     double minValue = -2.0;
     double maxValue = 2.0;
-    const int kNumSteps = 41;
-    double averages[kNumSteps];
-    double expected[kNumSteps];
-    double stride = (maxValue - minValue) / (kNumSteps - 1);
+    double averages[LINEARITY_NUM_STEPS];
+    double expected[LINEARITY_NUM_STEPS];
+    double stride = (maxValue - minValue) / (LINEARITY_NUM_STEPS - 1);
     char supported = 0;
     double slope = 0.0;
     double bias = 0.0;
@@ -287,7 +288,7 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     printf(" ============= Linearity: %9s => %7s ============== \n",
            MyPa_GetFormatName(sourceFormat), MyPa_GetFormatName(destinationFormat));
 
-    for (int i = 0; i < kNumSteps; i++) {
+    for (int i = 0; i < LINEARITY_NUM_STEPS; i++) {
         double destinationValue = minValue + (i * stride);
         expected[i] = destinationValue;
         averages[i] = MeasureAverageConversion(sourceFormat, destinationFormat, destinationValue);
@@ -297,8 +298,8 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     }
     ASSERT_TRUE(supported);
 
-    linearRegression(expected, averages, kNumSteps, &slope, &bias);
-    rSquared = CalculateRSquared(expected, averages, kNumSteps);
+    linearRegression(expected, averages, LINEARITY_NUM_STEPS, &slope, &bias);
+    rSquared = CalculateRSquared(expected, averages, LINEARITY_NUM_STEPS);
     printf("slope = %f, bias = %f, rSquared = %f\n", slope, bias, rSquared);
     EXPECT_TRUE((slope < 1.02));
     EXPECT_TRUE((slope > 0.98));
@@ -307,7 +308,7 @@ static int TestDitherLinearity(PaSampleFormat sourceFormat, PaSampleFormat desti
     EXPECT_TRUE((rSquared > 0.99));
 
 #if PAQA_SHOW_CHARTS
-    for (int i = 0; i < kNumSteps; i++) {
+    for (int i = 0; i < LINEARITY_NUM_STEPS; i++) {
         printf("%8.5f => %8.5f: ", expected[i], averages[i]);
         int numStars = 2 * (int)((averages[i] - minValue) / stride);
         printStars(numStars);
@@ -337,10 +338,8 @@ static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
                                     PaSampleFormat destinationFormat,
                                     double sourceValue,
                                     PaStreamFlags streamFlags) {
-
-    const int kNumSamples = 1024;
-    char source[kNumSamples * sizeof(PaInt32)];
-    char destination[kNumSamples * sizeof(PaInt32)];
+    char source[NUM_SAMPLES * sizeof(PaInt32)];
+    char destination[NUM_SAMPLES * sizeof(PaInt32)];
     PaUtilTriangularDitherGenerator ditherState;
     PaUtilConverter *converter;
     char supported = 0;
@@ -348,26 +347,26 @@ static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
     PaUtil_InitializeTriangularDitherState( &ditherState );
     switch( sourceFormat ) {
         case paFloat32:
-            for ( int i = 0; i < kNumSamples; i++ ) ((float *)source)[i] = (float)sourceValue;
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) ((float *)source)[i] = (float)sourceValue;
             break;
         case paInt32:
-            for ( int i = 0; i < kNumSamples; i++ ) ((PaInt32 *)source)[i] = (PaInt32)sourceValue;
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) ((PaInt32 *)source)[i] = (PaInt32)sourceValue;
             break;
         case paInt16:
-            for ( int i = 0; i < kNumSamples; i++ ) ((PaInt16 *)source)[i] = (PaInt16)sourceValue;
+            for ( int i = 0; i < NUM_SAMPLES; i++ ) ((PaInt16 *)source)[i] = (PaInt16)sourceValue;
             break;
     }
     memset(destination, 0, sizeof(destination));
 
     converter = PaUtil_SelectConverter( sourceFormat, destinationFormat, streamFlags );
-    (*converter)( destination, 1, source, 1, kNumSamples, &ditherState );
+    (*converter)( destination, 1, source, 1, NUM_SAMPLES, &ditherState );
     /* Try to detect wrapping, which causes a huge delta. */
     int previousValue = 0;
     int maxDelta = 0;
     switch( destinationFormat ) {
         case paInt16:
             previousValue = ((PaInt16 *)destination)[0];
-            for ( int i = 1; i < kNumSamples; i++ ) {
+            for ( int i = 1; i < NUM_SAMPLES; i++ ) {
                 int value = (int) ((PaInt16 *)destination)[i];
                 int delta = abs(value - previousValue);
                 if (delta > maxDelta) {
@@ -380,7 +379,7 @@ static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
             break;
         case paInt8:
             previousValue = ((signed char *)destination)[0];
-            for ( int i = 1; i < kNumSamples; i++ ) {
+            for ( int i = 1; i < NUM_SAMPLES; i++ ) {
                 int value = (int) ((signed char *)destination)[i];
                 int delta = abs(value - previousValue);
                 if (delta > maxDelta) {
@@ -393,7 +392,7 @@ static int TestDitherClippingSingle(PaSampleFormat sourceFormat,
             break;
         case paUInt8:
             previousValue = ((unsigned char *)destination)[0];
-            for ( int i = 1; i < kNumSamples; i++ ) {
+            for ( int i = 1; i < NUM_SAMPLES; i++ ) {
                 int value = (int) ((unsigned char *)destination)[i];
                 int delta = abs(value - previousValue);
                 if (delta > maxDelta) {
