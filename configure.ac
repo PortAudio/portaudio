@@ -4,15 +4,16 @@ dnl
 dnl Dominic Mazzoni, Arve Knudsen, Stelios Bounanos
 dnl
 
-dnl Require autoconf >= 2.13
-AC_PREREQ(2.13)
+dnl Require autoconf >= 2.69
+AC_PREREQ([2.69])
 
 dnl cause a reasonable diagnostic if AX_CHECK_COMPILE_FLAG is not available
 m4_pattern_forbid([AX_CHECK_COMPILE_FLAG])
 
 dnl Init autoconf and make sure configure is being called
 dnl from the right directory
-AC_INIT([include/portaudio.h])
+AC_INIT
+AC_CONFIG_SRCDIR([include/portaudio.h])
 
 dnl This is is for testing compilation on Mac OS
 PAMAC_TEST_PROGRAM="
@@ -76,7 +77,7 @@ case "$target_os" in *mingw* | *cygwin*)
                  eval with_$api=yes
                  ;;
              *)
-                 AC_MSG_ERROR([unknown Windows API \"$api\" (do you need --help?)])
+                 AC_MSG_ERROR([unknown Windows API "$api" (do you need --help?)])
                  ;;
          esac
      done
@@ -125,8 +126,8 @@ dnl ASIO and CXX bindings need a C++ compiler
 if [[ "$with_asio" = "yes" ] || [ "$enable_cxx" = "yes" ]] ; then
        AC_PROG_CXX
 fi
-AC_LIBTOOL_WIN32_DLL
-AC_PROG_LIBTOOL
+
+LT_INIT(win32-dll)
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PATH_PROG(AR, ar, no)
@@ -494,7 +495,8 @@ fi
 AC_SUBST(WITH_ASIO_TRUE)
 AC_SUBST(WITH_ASIO_FALSE)
 
-AC_OUTPUT([Makefile portaudio-2.0.pc])
+AC_CONFIG_FILES([Makefile portaudio-2.0.pc])
+AC_OUTPUT
 
 AC_MSG_RESULT([
 Configuration summary:

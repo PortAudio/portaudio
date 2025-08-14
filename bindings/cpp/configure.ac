@@ -5,8 +5,8 @@
 # Customized for automake by Mikael Magnusson
 #
 
-# Require autoconf >= 2.13
-AC_PREREQ(2.13)
+# Require autoconf >= 2.69
+AC_PREREQ([2.69])
 
 m4_define([lt_current], [0])
 m4_define([lt_revision], [12])
@@ -14,7 +14,7 @@ m4_define([lt_age], [0])
 
 AC_INIT([PortAudioCpp], [12])
 AC_CONFIG_SRCDIR([include/portaudiocpp/PortAudioCpp.hxx])
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE(subdir-objects)
 AM_MAINTAINER_MODE
 
 ###### Top-level directory of pacpp
@@ -34,8 +34,8 @@ LT_VERSION_INFO="lt_current:lt_revision:lt_age"
 
 AC_PROG_CC
 AC_PROG_CXX
-AC_LIBTOOL_WIN32_DLL
-AC_PROG_LIBTOOL
+
+LT_INIT(win32-dll)
 
 # Transfer these variables to the Makefile
 AC_SUBST(DEFAULT_INCLUDES)
