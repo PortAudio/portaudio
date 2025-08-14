@@ -7,6 +7,9 @@ dnl
 dnl Require autoconf >= 2.13
 AC_PREREQ(2.13)
 
+dnl cause a reasonable diagnostic if AX_CHECK_COMPILE_FLAG is not available
+m4_pattern_forbid([AX_CHECK_COMPILE_FLAG])
+
 dnl Init autoconf and make sure configure is being called
 dnl from the right directory
 AC_INIT([include/portaudio.h])
