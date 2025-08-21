@@ -35,7 +35,7 @@ jobs:
             dependencies_extras: mingw-w64
             vcpkg_triplet: x64-mingw-static
           # Use autotools_msys2.yml for Windows MinGW due to siginificant differences
-           - name: Windows MinGW
+          - name: Windows MinGW
             os: windows-latest
             vcpkg_triplet: x64-mingw-static
           - name: macOS Clang
