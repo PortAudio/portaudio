@@ -60,7 +60,7 @@ jobs:
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: build/vcpkg_installed
         # vcpkg commit: [libxml2] Fix ICU support option, hash: ca9ac0b, date: Dec 1, 2023, https://github.com/microsoft/vcpkg/commits
-        #vcpkgGitCommitId: ca9ac0ba65965937fb66783c4f726c2c755ad9d9
+        vcpkgGitCommitId: ca9ac0ba65965937fb66783c4f726c2c755ad9d9
         # Required when using vcpkg.json manifest in repository
         setupOnly: true
     # test configure and build
