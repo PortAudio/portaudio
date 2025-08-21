@@ -4458,17 +4458,17 @@ static void *CallbackThreadFunc( void *userData )
         }
     }
 
-end:
-    ; /* Hack to fix "label at end of compound statement" error caused by pthread_cleanup_pop(1) macro. */
-    /* Match pthread_cleanup_push */
-    pthread_cleanup_pop( 1 );
-
-    PA_DEBUG(( "%s: Thread %d exiting\n ", __FUNCTION__, pthread_self() ));
-    PaUnixThreading_EXIT( result );
-
+    /* Note that we will not fall into this error label from above.
+     * It is a while(1) loop that only exits using a goto.
+     */
 error:
     PA_DEBUG(( "%s: Thread %d is canceled due to error %d\n ", __FUNCTION__, pthread_self(), result ));
-    goto end;
+
+end:
+    PA_DEBUG(( "%s: Thread %d exiting\n ", __FUNCTION__, pthread_self() ));
+    /* Match pthread_cleanup_push */
+    pthread_cleanup_pop( 1 );
+    PaUnixThreading_EXIT( result );
 }
 
 /* Blocking interface */
