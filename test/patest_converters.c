@@ -44,6 +44,8 @@
  * requested that these non-binding requests be included along with the
  * license above.
  */
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -366,7 +368,7 @@ int main( int argc, const char **argv )
 }
 
 // copied here for now otherwise we need to include the world just for this function.
-PaError My_Pa_GetSampleSize( PaSampleFormat format )
+int My_Pa_GetSampleSize( PaSampleFormat format )
 {
     int result;
 
@@ -392,9 +394,10 @@ PaError My_Pa_GetSampleSize( PaSampleFormat format )
         break;
 
     default:
-        result = paSampleFormatNotSupported;
+        assert(0); /* Catch this early. */
+        result = 4;
         break;
     }
 
-    return (PaError) result;
+    return result;
 }
