@@ -394,7 +394,7 @@ int My_Pa_GetSampleSize( PaSampleFormat format )
         break;
 
     default:
-        assert(0); /* Catch this early. */
+        assert(0); /* The above cases must cover all format data types. */
         result = 4;
         break;
     }
