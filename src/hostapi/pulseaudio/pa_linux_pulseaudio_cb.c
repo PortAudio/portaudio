@@ -109,15 +109,15 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
 void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
                                   pa_operation **operation)
 {
-    unsigned int waitOperation = 1000;
+    unsigned int wait = 1000;
     pa_operation *localOperation = (*operation);
     pa_operation_state_t localOperationState = PA_OPERATION_RUNNING;
 
     /* Since the primary operations are conducted locally, a wait time
      * of 1 to 3 seconds, followed by an additional 1000 milliseconds,
-     * is deemed sufficient in the event of an error.
+     * is deemed sufficient to to detect successful completion or to detect an error.
      */
-    while( waitOperation > 0 )
+    while( wait > 0 )
     {
 
         PaPulseAudio_Lock( hostapi->mainloop );
@@ -125,6 +125,9 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
 
         if( localOperationState == PA_OPERATION_RUNNING )
         {
+            /* Wait for an event to be signalled by the event loop thread.
+             * pa_threaded_mainloop_wait() may cause spurious wakeups.
+             */
             pa_threaded_mainloop_wait( hostapi->mainloop );
         }
         else
@@ -135,7 +138,7 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
         }
         PaPulseAudio_UnLock( hostapi->mainloop );
 
-        waitOperation --;
+        wait --;
     }
 
     /* Do not wait if operation is DONE or CANCELLED */
@@ -185,7 +188,7 @@ void _PaPulseAudio_WriteRingBuffer( PaUtilRingBuffer *ringbuffer,
                                     size_t length )
 {
     /*
-     * If insufficient space is available, data should be read from
+     * If insufficient space is available, read data from
      * the ring buffer to ensure that it is not full and to prevent
      * audio underrun.
      *
@@ -213,7 +216,7 @@ void _PaPulseAudio_Read( PaPulseAudio_Stream *stream,
     const void *pulseaudioData = NULL;
 
     /*
-     * Populate the ring buffer with data obtained from the input device.
+     * Copy data from the input device into the ring buffer.
      * Once the data is available, it will be utilized for either callback
      * processing or blocking reads.
      */
@@ -250,19 +253,17 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
     void *bufferData = NULL;
     size_t pulseaudioOutputWritten = 0;
 
-    /* If a per-host buffer is not present, a new buffer should
-     * be generated or the existing one should be corrected in place.
-     */
+    /* Determine host frames per buffer */
     if( hostFramesPerBuffer == paFramesPerBufferUnspecified )
     {
         if( !stream->framesPerHostCallback )
         {
             /*
-             * This configuration is deemed sufficient, as it is
-             * compatible with most PulseAudio servers and ALSA.
+             * Reaching this point is not expected, it serves
+             * only as a backup measure.
              *
-             * Although reaching this point is not expected, it serves
-             * as a final backup measure.
+             * PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC should be good enough
+             * for ALSA and most PulseAudio servers.
              */
             hostFramesPerBuffer = PAPULSEAUDIO_FRAMESPERBUFFERUNSPEC;
 
@@ -276,7 +277,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     if( stream->outputStream )
     {
-        /* The number of bytes allocated to a single frame should be calculated. */
+        /* Calculate how many bytes go into to one frame */
         pulseaudioInputBytes = pulseaudioOutputBytes = (hostFramesPerBuffer * stream->outputFrameSize);
 
         if( stream->bufferProcessor.streamCallback )
@@ -340,18 +341,14 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     do
     {
-        /* It must be ensured that bufferData is NULL, indicating that
-         * there is no data available for output.
-         */
+        /* Set bufferData to NULL to indicate that there is no data available for output. */
         if( isOutputCb )
         {
             bufferData = NULL;
         }
 
-        /*
-         * In the event of failures, such as the stream becoming
-         * unavailable or the main loop entering an error state,
-         * an attempt should be made to handle the error.
+        /* Handle failures, such as the stream becoming unavailable or the main loop
+         * entering an error state.
          */
         PA_PULSEAUDIO_IS_ERROR( stream, paStreamIsStopped )
 
@@ -585,12 +582,13 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
     int waitLoop = 0;
     int pulseaudioError = 0;
 
-    /* Await the cessation of the stream. */
+    /* Disconnect the stream(s) then wait for them to stop. */
     stream->isActive = 0;
     stream->isStopped = 1;
     stream->pulseaudioIsActive = 0;
     stream->pulseaudioIsStopped = 1;
 
+    /* Disconnect the output stream */
     if( stream->outputStream != NULL
         && PA_STREAM_IS_GOOD( pa_stream_get_state( stream->outputStream ) ) )
     {
@@ -607,11 +605,11 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 
         PaPulseAudio_Lock(stream->mainloop);
 
-        /* Disconnect stream and await for termination */
         pa_stream_disconnect( stream->outputStream );
         PaPulseAudio_UnLock( stream->mainloop );
     }
 
+    /* Disconnect the input stream */
     if( stream->inputStream != NULL
         && PA_STREAM_IS_GOOD( pa_stream_get_state( stream->inputStream ) ) )
     {
@@ -628,14 +626,12 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 
         PaPulseAudio_Lock( stream->mainloop );
 
-        /* Disconnect stream and await for termination */
         pa_stream_disconnect( stream->inputStream );
 
         PaPulseAudio_UnLock( stream->mainloop );
-
     }
 
-    /* Await termination for both processes. */
+    /* Wait for termination of both the input stream and the output stream. */
     while(!waitLoop)
     {
         PaPulseAudio_Lock( stream->mainloop );
@@ -719,7 +715,7 @@ PaError _PaPulseAudio_WaitStreamState( pa_threaded_mainloop *mainloop, pa_stream
                 break;
         }
 
-        /* Stream creation take some time */
+        /* Stream creation can take some time */
         if( state != PA_STREAM_CREATING )
         {
             wait ++;
@@ -784,9 +780,9 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
 
     if( stream->inputStream )
     {
-        /* The default input settings is to read 65,535 bytes per request,
-         * setting the fragsize to request smaller data chunks.
-         * This leads more precise timestamps.
+        /* The default input setting is to read 65,535 bytes per request.
+         * Setting the fragsize to request smaller data chunks leads
+         * to more precise timestamps.
          */
         stream->inputBufferAttr.fragsize = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->inputSampleSpec );
@@ -807,7 +803,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         /* NULL means default device */
         pulseaudioName = NULL;
 
-        /* If default device is not requested then change to requested device */
+        /* If default device is not requested then select the requested device */
         if( result == paNoError && stream->inputDevice != defaultInputDevice )
         {
             pulseaudioName = pulseaudioHostApi->
@@ -890,7 +886,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             /* NULL means default device */
             pulseaudioName = NULL;
 
-            /* If default device is not requested then change to requested device */
+            /* If default device is not requested then select the requested device */
             if( result == paNoError && stream->outputDevice != defaultOutputDevice )
             {
                 pulseaudioName = pulseaudioHostApi->
@@ -901,8 +897,8 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             {
                 PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
 
-                /* This is only necessary for non-duplex operations, as
-                 * in duplex mode, the input is expected to feed the
+                /* This is only necessary for non-full-duplex operations, as
+                 * in full-duplex mode, the input callback is expected to feed the
                  * output, eliminating the need for a playback callback.
                  */
                 if( !stream->inputStream )
@@ -956,9 +952,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     stream->isActive = 1;
     stream->isStopped = 0;
 
-    /* The callback should be initiated at this point, once it has been
-     * confirmed that all conditions are correct.
-     */
+    /* Now that everything is set up, start the callback */
     if( stream->inputStream )
     {
         pa_stream_set_read_callback( stream->inputStream,
@@ -1004,7 +998,7 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
 
     stream->missedBytes = 0;
 
-    /* It should be verified whether there is any data available for playback. */
+    /* Check whether there is any data available for playback. */
     if( stream->outputStream
         && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY
         && !pa_stream_is_corked( stream->outputStream )
