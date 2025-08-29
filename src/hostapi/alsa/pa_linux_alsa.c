@@ -135,7 +135,7 @@ _PA_DEFINE_FUNC(snd_pcm_hw_params_set_channels);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_rate_near); //!!!
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_rate);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_rate_resample);
-//_PA_DEFINE_FUNC(snd_pcm_hw_params_set_buffer_time_near);
+_PA_DEFINE_FUNC(snd_pcm_hw_params_set_buffer_time_near);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_buffer_size);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_buffer_size_near); //!!!
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_buffer_size_min);
@@ -420,7 +420,7 @@ static int PaAlsa_LoadLibrary()
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_rate_near);
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_rate);
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_rate_resample);
-//    _PA_LOAD_FUNC(snd_pcm_hw_params_set_buffer_time_near);
+    _PA_LOAD_FUNC(snd_pcm_hw_params_set_buffer_time_near);
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_buffer_size);
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_buffer_size_near);
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_buffer_size_min);
@@ -1824,6 +1824,18 @@ static PaError TestParameters( const PaUtilHostApiRepresentation *hostApi, const
 
     /* Some specific hardware (reported: Audio8 DJ) can fail with assertion during this step. */
     ENSURE_( alsa_snd_pcm_hw_params_set_format( pcm, hwParams, Pa2AlsaFormat( hostFormat ) ), paUnanticipatedHostError );
+
+    /*
+     * Intel HDA driver doesn't set PCM rule to limit maximum size of buffer.
+     * This can result in a request for too large a buffer size.
+     * That can cause memory allocation error in ALSA PCM core, at least Linux kernel 5.8.
+     * As a workaround, limit buffer size to a reasonable value.
+     */
+    {
+        unsigned int bufferTimeMicros = 50 * 1000;
+        int direction = 0;
+        ENSURE_( alsa_snd_pcm_hw_params_set_buffer_time_near( pcm, hwParams, &bufferTimeMicros, &direction ), paBufferTooBig );
+    }
 
     {
         /* It happens that this call fails because the device is busy */
