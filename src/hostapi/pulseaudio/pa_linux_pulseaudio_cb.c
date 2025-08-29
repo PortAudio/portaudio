@@ -301,7 +301,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     /* In the case where the input is mono and the output is stereo,
      * the mono input must be copied to a mono-mono format, which
-     * corresponds to stereo. Subsequently, only half of the data
+     * corresponds to stereo. Subsequently, only half as much data
      * should be read and copied.
      */
     if( isOutputCb &&
@@ -319,7 +319,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
 
         /* If bufferData is NULL, it indicates that the output is
-         * not ready, necessitating a wait for its availability.
+         * not ready -- we have to wait for it to become available.
          */
         if(!bufferData)
         {
@@ -407,8 +407,8 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
                                       &timeInfo,
                                       0 );
 
-        /* Read from input buffer if there is enough bytes or add
-         * zero if there is not
+        /* Read from input buffer if there are enough bytes or add
+         * zero if there are not
          */
         if( isInputCb )
         {
@@ -433,7 +433,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
             size_t tmpSize = pulseaudioOutputBytes;
 
-            /* Pre allocate memory from output buffer which will make output faster */
+            /* Pre allocate memory from output buffer to make output faster */
             pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize );
 
             PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
