@@ -1834,7 +1834,8 @@ static PaError TestParameters( const PaUtilHostApiRepresentation *hostApi, const
     {
         unsigned int bufferTimeMicros = 50 * 1000;
         int direction = 0;
-        ENSURE_( alsa_snd_pcm_hw_params_set_buffer_time_near( pcm, hwParams, &bufferTimeMicros, &direction ), paBufferTooBig );
+        ENSURE_( alsa_snd_pcm_hw_params_set_buffer_time_near( pcm, hwParams,
+                &bufferTimeMicros, &direction ), paBufferTooBig );
     }
 
     {
