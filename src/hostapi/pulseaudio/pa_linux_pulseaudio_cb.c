@@ -998,7 +998,7 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
 
     stream->missedBytes = 0;
 
-    /* Check whether there is any data available for playback. */
+    /* Check whether there is any data to play */
     if( stream->outputStream
         && pa_stream_get_state( stream->outputStream ) == PA_STREAM_READY
         && !pa_stream_is_corked( stream->outputStream )
