@@ -1,17 +1,17 @@
 /** @page compile_cmake Building PortAudio with CMake
 @ingroup tutorial
 
-As an alternative to autotools, PortAudio offers a way of building via CMake. CMake can generate files for other build systems, including Visual Studio solutions and Makefiles among others.
+As an alternative to autotools, PortAudio offers a way of building via CMake. CMake works by generating files for other build systems, including Visual Studio solutions, Makefiles, and many others others.
 
 If you are familiar with building CMake projects, PortAudio follows the standard steps of building a CMake project. Otherwise, continue reading on.
 
 @section compile_cmake_general General Steps
 
-The build process for a CMake project is pretty much the same across all other platforms. Here, we have a general section that gets you up and going as quick as possible and explains how to build PortAudio _on all platforms_. If you need further assistence, we also explain how to build for your specific platform in the following sections below. (See @ref compile_cmake_win for Windows and @ref compile_cmake_others for macOS, Linux, and others, respectively).
+The build process for a CMake project is pretty much the same across all platforms. To get you up and running as quickly as possible, we'll begin with general instructions that explain how to build PortAudio _on all platforms_. If you need further assistance, later sections explain how to build for your specific platform. (See @ref compile_cmake_win for Windows and @ref compile_cmake_others for macOS, Linux, and others, respectively).
 
-@subsection compile_cmake_general_clone Step 1: Clone the Source Code
+@subsection compile_cmake_general_clone Step 1: Get the PortAudio Source Code
 
-Before you proceed with building PortAudio, you must ensure that you have the PortAudio source code. If you don't, you will need to clone it from PortAudio's GitHub repository first using Git. If you do not have Git installed, install it either by downloading an installer from https://git-scm.org (Windows and macOS) or using your system's package manager (Linux, FreeBSD, etc). Then, open a terminal, command prompt window, or PowerShell window in a suitable directory (e.g., your documents folder) and run the following command:
+Before you proceed with building PortAudio, you must ensure that you have the PortAudio source code. If you don't, you will first need to clone it from PortAudio's GitHub repository using Git. If you do not have Git installed, install it either by downloading an installer from https://git-scm.org (Windows and macOS) or using your system's package manager (Linux, FreeBSD, etc). Then, open a terminal, command prompt window, or PowerShell window, in a suitable directory (e.g., your documents folder) and run the following command:
 
     git clone https://github.com/portaudio/portaudio
 
@@ -25,13 +25,13 @@ In the same window opened in Step 1, run the following commands to prepare for t
     cd build
     cmake ../portaudio
 
-At this point, the build files for PortAudio have been generated. Now you are ready to begin the actual build.
+At this point, the build files for PortAudio have been generated and placed in the `build` directory. Now you are ready to begin the actual build.
 
 @subsubsection compile_cmake_general_configure_tests_examples Building Tests and Examples
 
-Tests and examples are controlled by PortAudio's `-DPA_BUILD_TESTS` and `-DPA_BUILD_EXAMPLES` options, respectively. Add either or both to the last command in the series above. It does not matter if you ran the first command or not.
+Tests and examples are controlled by PortAudio's `-DPA_BUILD_TESTS` and `-DPA_BUILD_EXAMPLES` options, respectively. Add either or both to the (`cmake`) command in the series above. It does not matter whether you already ran the command.
 
-All tests will be under the `test` folder in the build directory while all examples will be under the `examples` directory, also in the build folder.
+All tests will be under the `test` folder in the build directory, while all examples will be under the `examples` directory, also in the build folder.
 
 To build _only_ tests alongside a normal PortAudio build, run the following command:
 
@@ -45,7 +45,7 @@ To build _both_ examples _and_ tests alongside a normal PortAudio build, run the
 
     cmake -DPA_BUILD_TESTS=ON -DPA_BUILD_EXAMPLES=ON ../portaudio
 
-More about PortAudio's build options is explained in @ref compile_cmake_general_options. For more about running PortAudio tests and examples, see @ref compile_cmake_general_running_tests_examples.
+PortAudio's build options are explained further in @ref compile_cmake_general_options. For more about running PortAudio tests and examples, see @ref compile_cmake_general_running_tests_examples.
 
 @subsection compile_cmake_general_build Step 3: Build PortAudio
 
@@ -53,40 +53,40 @@ To begin the actual build, run one last command, also in the same window opened 
 
     cmake --build .
 
-Alternatively, you can use the build tool of your choice that CMake has generated files for. For example, if CMake has generated Makefiles (usually the default on macOS, Linux, and similar OSes), then you could simply run `make` instead. If CMake has generated a Visual Studio project (usually the default on Windows), you could open that project in Visual Studio and build PortAudio that way (or alternatively use `nmake` if that's your preference).
+Alternatively, you can directly invoke the build tool that CMake has generated build files for. For example, if CMake has generated Makefiles (usually the default on macOS, Linux, and similar OSes), then you could simply run `make`. If CMake has generated a Visual Studio project (`.sln`, `.vcproj`) (usually the default on Windows), you could open the generated Visual Studio project and build PortAudio from within Visual Studio (or alternatively run `nmake` or `jom` if that's your preference).
 
-To explain all the steps above:
+To summarize all of the steps above:
 
-1. Before getting started, we clone the PortAudio source code from GitHub using Git. You can't do anything else without source code.
-2. Then, to get started, we create a new build folder. Ideally, this is where the PortAudio source tree is (and it is recommended to be there too), but it can technically be anywhere you want.
-3. Next, we `cd` into the build directory so we can work inside that folder now.
-4. After, we invoke CMake to configure PortAudio. In other words, we invoke CMake to generate the build files for PortAudio. We call the command to do this the _configure command_.
-5. Finally, we then invoke CMake one last time to actually build PortAudio.
+1. Before getting started, clone the PortAudio source code from GitHub using Git. You can't do anything else without source code.
+2. Then, to get started, create a new build folder. Typically this is along side the PortAudio source tree  (this is the recommended location), but technically it can be anywhere you want.
+3. Next, `cd` into the build directory so we can work inside that folder.
+4. After that, invoke CMake to configure PortAudio. In other words, we invoke CMake to generate the build files for PortAudio. We call the command to do this the _configure command_.
+5. Finally, invoke CMake one last time to actually build PortAudio.
 
-@subsection compile_cmake_general_running_tests_examples
+@subsection compile_cmake_general_running_tests_examples Running Tests and Examples
 
-As stated earlier, tests and examples are both within the `test` and `exmamples` folders, respectively. To list tests, run the following command in the same terminal or command prompt window as earlier:
+As stated earlier, tests and examples are located within the `test` and `examples` folders, respectively. To list tests, run the following command in the same terminal or command prompt window used earlier (substitute `dir` at the Windows command prompt):
 
     ls test/
 
-Alternatively, substitute `test/` with `examples/` for examples instead. To actually run a test, run the following:
+Alternatively, substitute `test/` with `examples/` for examples instead. To actually run a test, run the following command:
 
     test/patest_sometest
 
-Replace `patest_sometest` with the name of the test you want.
+Replace `patest_sometest` with the name of the test you want to run.
 
-The same can be said about examples:
+The same applies to examples:
 
     ls examples/ # List all known examples
     examples/paex_sine # Execute an example
 
 @subsection compile_cmake_general_options Build Options
 
-PortAudio's CMake build system also features several options. For a list of those, see @ref compile_cmake_options. Append them to your configure command in the format `-DOPTION_NAME=VALUE`, with `VALUE` usually being either `ON` or `OFF`. For example, `cmake /path/to/portaudio -DPA_BUILD_TESTS=ON`. Note that you do not need to restart with a clean build directory each time you change a config option, but if you encounter problems, then you should start with a clean build directory and try again.
+PortAudio's CMake build system also features several configuration options. For a list of options, see @ref compile_cmake_options. Append them to your configure command in the format `-DOPTION_NAME=VALUE`, with `VALUE` usually being either `ON` or `OFF`. For example, `cmake /path/to/portaudio -DPA_BUILD_TESTS=ON`. Note that you should not need to restart with a fresh, empty build directory each time you change a config option, but if you encounter problems, then you should start with a fresh build directory and try again.
 
-If you want to use a different generator, add `-G "Generator Name"` to the second command, with "Generator Name"` being the generator you want to use (e.g., "Ninja"). We will not cover generators other than the default ones (Visual Studio projects and Unix Makefiles), but if you are experienced with them, you are free to use them.
+If you want to use a different build file generator, add `-G "Generator Name"` to the initial configuration `cmake` command, where "Generator Name"` names the generator that you want to use, for example "Ninja". We will only cover the default generators (Visual Studio projects and Unix Makefiles) here, but if you are experienced with other generators, you are free to use them. The command `cmake --help` lists all available build file generators.
 
-For examples on specific platforms, see the following sections below. Note that the following examples assume you have created a build directory outside the source tree called `pabuild`.
+The following sections give platform-specific examples. Note that these examples assume that you have created a build directory outside the source tree named `pabuild`.
 
 @section compile_cmake_win Windows
 
@@ -111,13 +111,13 @@ Alternatively, you can open the resulting `portaudio.sln` file in Visual Studio 
 
 @subsection compile_cmake_win_asio Compiling With ASIO Support
 
-If you want to build PortAudio with ASIO support, you must first download the ASIO SDK from https://www.steinberg.net/developers and place it according to @ref compile_windows_asio_msvc. CMake will automatically search for the SDK and enable it by default.
+If you want to build PortAudio with ASIO support, you must first download the ASIO SDK from https://www.steinberg.net/developers and place it according to @ref compile_windows_asio_msvc. CMake will automatically search for the ASIO SDK and enable ASIO support within PortAudio by default.
 
 Alternatively, if you are using CMake 3.18 or higher, CMake will automatically download and extract the SDK for you. Be sure to add `-DPA_USE_ASIO=ON` to your configure command.
 
 @section compile_cmake_others Linux, OS X, and Others
 
-The configuration process for Linux is the same on OS X, so these two platforms are grouped into one. They are also not specific to just these two platforms either; FreeBSD users, for example, can follow this section.
+The configuration process for Linux and Mac OS X is the same, so these two platforms are grouped in this section. In fact, the instructions in this section apply to most Unix-like platforms; FreeBSD users, for example, can follow this section.
 
 Before proceeding with this section, if on Linux or similar, first install the appropriate audio backend developer packages as listed in @ref compile_cmake_audio_backends. Then, come back to this section and proceed with the rest of the steps below.
 
@@ -135,17 +135,17 @@ Once configuration is done, run the following command to build PortAudio:
 
     $ make
 
-Optionally add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based off your number of CPU threads).
+Optionally add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based on the number CPU threads on your computer).
 
-Alternatively, you can run `cmake --build .` as it's the same thing. You can also add `-j <num>` in the same manner as described above.
+Alternatively, you can run `cmake --build .` this does the same thing. You can also add `-j <num>` in the same manner as described above.
 
-Using an alternative perspective, if you are familiar with autotools, you'll realize that CMake servers a similar purpose to a `configure` script. Both generate makefiles for the project you're currently building. Therefore, the CMake equivalent of the following commands:
+From an alternative perspective, if you are familiar with autotools, you'll realize that CMake serves a similar purpose to a `./configure` script. Both generate makefiles for the project you're currently building. Therefore, the CMake equivalent of the following commands:
 
     $ /path/to/portaudio/source/configure --prefix=/install_location # Assume we're in the build directory 'pabuild'
     $ make
     $ make install
 
-would be the following:
+would be:
 
     $ cmake -DCMAKE_INSTALL_PREFIX=/install_location /path/to/portaudio/source # Assume we're in the build directory 'pabuild'
     $ make
@@ -153,16 +153,16 @@ would be the following:
 
 @subsection compile_cmake_audio_backends Audio Backend Developer Packages
 
-Note that on Linux, you will need to install additional developer packages if CMake reports that no usable backends. On Debian, Ubuntu, and their derivatives, you can install one of the following developer packages to get a usable backend:
+Note that on Linux, you will need to install additional audio developer packages, otherwise CMake will report no usable backends. On Debian, Ubuntu, and their derivatives, you can install one or more of the following developer packages using `apt` to get a usable audio backend:
 
 - `libasound2-dev` for ALSA
 - `libjack-dev` for JACK
 
 TODO: Add PulseAudio developer packages.
 
-Notice how OSS is excluded here. Audio devices will not show up under OSS on most modern Linux distributions, which can confuse end-users.
+Notice that OSS is excluded here. Audio devices will not show up under OSS on most modern Linux distributions, which can confuse end-users.
 
-If you already compiled PortAudio at this point, delete your build folder and follow the above steps again.
+If you get to this point and you have already compiled PortAudio, delete your build folder and start the PortAudio build instructions again once you've installed the developer packages.
 
 @section compile_cmake_examples Building Examples
 
@@ -176,11 +176,11 @@ To build examples, simply add `-DPA_BUILD_EXAMPLES=ON` to your configure command
     - These instructions apply to **ALL** platforms.
     - PortAudio does **NOT** support CTest. Contributions are accepted adding support for it.
 
-Unlike in other build systems, building PortAudio with CMake does not automatically build tests. To build tests, simply add `-DPA_BUILD_TESTS=ON` to your configuration command and rebuild PortAudio as needed. See @ref compile_cmake_general for more information about build options. Tests will be located in your build folder in the `test/` directory.
+Building PortAudio with CMake does not automatically build tests. To build tests, simply add `-DPA_BUILD_TESTS=ON` to your configuration command and rebuild PortAudio as needed. See @ref compile_cmake_general for more information about build options. Tests will be located in your build folder in the `test/` directory.
 
 @section compile_cmake_options CMake Build Options
 
-This section contains options that configure your build. Some are specific to PortAudio while others are general CMake options. They are divided into two sections below
+This section contains options that configure your build. Some options are specific to PortAudio while others are general CMake options.
 
 @subsection compile_cmake_options_general General CMake Options
 
@@ -211,7 +211,7 @@ This section contains options that configure your build. Some are specific to Po
 
 [1] The ASIO SDK is only available under a proprietary license. This license imposes many requirements including conditions and limitations on distributing binaries that you build. Be sure to read this page from Steinberg: https://www.steinberg.net/developers. Also be advised that enabling ASIO can cause an impact on initialization performance and reliability, so exercise caution when enabling this backend. See https://github.com/PortAudio/portaudio/issues/696 for more information.
 
-[2] To avoid confusing end-users, the OSS backend is intentionally off by default because there are no devices on modern Linux systems.
+[2] To avoid confusing end-users, the OSS backend is intentionally off by default because there are no OSS devices on modern Linux systems.
 
 @subsubsection compile_cmake_options_pa_misc Miscellaneous Build Options
 
