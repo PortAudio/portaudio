@@ -47,6 +47,12 @@ To build _both_ examples _and_ tests alongside a normal PortAudio build, run the
 
 PortAudio's build options are explained further in @ref compile_cmake_general_options. For more about running PortAudio tests and examples, see @ref compile_cmake_general_running_tests_examples.
 
+@subsubsection compile_cmake_general_configure_installation Configuring the Install Directory
+
+If you plan to install your build of PortAudio later, you may want to adjust the default installation directory. On Linux, this is /usr/local by default. To do this, add `-DCMAKE_INSTALL_PREFIX=/path/to/new/install/location` after the `cmake` command. For example, if you want to have your PortAudio build install to `/opt`, run the following command to configure CMake:
+
+    cmake -DCMAKE_INSTALL_PREFIX=ON ../portaudio
+
 @subsection compile_cmake_general_build Step 3: Build PortAudio
 
 To begin the actual build, run one last command, also in the same window opened in Step 1:
@@ -62,6 +68,14 @@ To summarize all of the steps above:
 3. Next, `cd` into the build directory so we can work inside that folder.
 4. After that, invoke CMake to configure PortAudio. In other words, we invoke CMake to generate the build files for PortAudio. We call the command to do this the _configure command_.
 5. Finally, invoke CMake one last time to actually build PortAudio.
+
+@subsection compile_cmake_general_install Optional: Install PortAudio
+
+Optionally, if you want to install your newly built PortAudio build, you can do so by running the following command:
+
+    cmake --build . -t install
+
+As usual, you can alternatively invoke the build tool CMake has generated build files for itself. Be sure to build the `install` target. Note that this will install PortAudio into your system directories, so be careful
 
 @subsection compile_cmake_general_running_tests_examples Running Tests and Examples
 
@@ -232,13 +246,15 @@ To use these targets, there are two ways: using `find_package()` or `add_subdire
 
 @subsection cmake_using_find_package Using the `find_package()` CMake Command
 
-The easiest way is to use the aforementioned targets is to have PortAudio installed and use the `find_package()` CMake command. Use the command as follows:
+The easiest way is to use the aforementioned targets is to have PortAudio installed via a package manager (your distribution's package manager, vcpkg, etc) and use the `find_package()` CMake command. Use the command as follows:
 
     find_package(portaudio)
 
 Optionally add `REQUIRED` after `portaudio` to make it a required dependency:
 
     find_package(portaudio REQUIRED)
+
+This also works if you installed PortAudio as described above in @ref compile_cmake_general_build and the install prefix (specified by `CMAKE_INSTALL_PREFIXED`) used is in either your system `PATH` or `CMAKE_MODULE_PATH`.
 
 @subsection cmake_using_add_subdirectory Using the `add_subdirectory()` CMake Command
 
