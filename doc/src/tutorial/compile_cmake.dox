@@ -113,7 +113,9 @@ Alternatively, you can open the resulting `portaudio.sln` file in Visual Studio 
 
 If you want to build PortAudio with ASIO support, you must first download the ASIO SDK from https://www.steinberg.net/developers and place it according to @ref compile_windows_asio_msvc. CMake will automatically search for the ASIO SDK and enable ASIO support within PortAudio by default.
 
-Alternatively, if you are using CMake 3.18 or higher, CMake will automatically download and extract the SDK for you. Be sure to add `-DPA_USE_ASIO=ON` to your configure command.
+Alternatively, if you are using CMake 3.18 or higher, CMake will automatically download and extract the ASIO SDK for you when you add `-DPA_USE_ASIO=ON` to your configure command.
+
+IMPORTANT WARNING: The ASIO SDK is only available under a proprietary license. This license imposes many requirements including conditions and limitations on distributing binaries that you build. Be sure to read this page from Steinberg: https://www.steinberg.net/developers. Also be advised that enabling ASIO can cause an impact on initialization performance and reliability, so exercise caution when enabling this backend. See https://github.com/PortAudio/portaudio/issues/696 for more information.
 
 @section compile_cmake_others Linux, OS X, and Others
 
@@ -209,7 +211,7 @@ This section contains options that configure your build. Some options are specif
     - **`-DPA_USE_WDMKS_DEVICE_INFO=ON|OFF`**: Use the WDMKS API for device info.
 - **`-DPA_USE_WMME=ON|OFF`**: (Windows Only). Use the MME host API.
 
-[1] The ASIO SDK is only available under a proprietary license. This license imposes many requirements including conditions and limitations on distributing binaries that you build. Be sure to read this page from Steinberg: https://www.steinberg.net/developers. Also be advised that enabling ASIO can cause an impact on initialization performance and reliability, so exercise caution when enabling this backend. See https://github.com/PortAudio/portaudio/issues/696 for more information.
+[1] Before compiling PortAudio with ASIO, please read IMPORTANT WARNING in @ref compile_cmake_win_asio above.
 
 [2] To avoid confusing end-users, the OSS backend is intentionally off by default because there are no OSS devices on modern Linux systems.
 
