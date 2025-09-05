@@ -75,7 +75,7 @@ To begin the actual build, run one last command, also in the same window opened 
 
     cmake --build .
 
-Alternatively, you can directly invoke the build tool that CMake has generated build files for. For example, if CMake has generated Makefiles (usually the default on macOS, Linux, and similar OSes), then you could simply run `make`. If CMake has generated a Visual Studio project (`.sln`, `.vcproj`) (usually the default on Windows), you could open the generated Visual Studio project and build PortAudio from within Visual Studio (or alternatively run `nmake` or `jom` if that's your preference).
+Alternatively, you can directly invoke the build tool that CMake has generated build files for. For example, if CMake has generated Makefiles (usually the default on macOS, Linux, and similar OSes), then you could simply run `make`. If CMake has generated a Visual Studio project (`.sln`, `.vcproj`) (usually the default on Windows), you could open the generated Visual Studio project and build PortAudio from within Visual Studio (or alternatively run `msbuild` if that's your preference).
 
 To summarize all of the steps above:
 
