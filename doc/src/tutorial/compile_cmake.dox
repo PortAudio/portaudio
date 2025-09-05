@@ -9,9 +9,25 @@ If you are familiar with building CMake projects, PortAudio follows the standard
 
 The build process for a CMake project is pretty much the same across all platforms. To get you up and running as quickly as possible, we'll begin with general instructions that explain how to build PortAudio _on all platforms_. If you need further assistance, later sections explain how to build for your specific platform. (See @ref compile_cmake_win for Windows and @ref compile_cmake_others for macOS, Linux, and others, respectively).
 
+@subsection compile_cmake_general_prerequisites Prerequisites
+
+Before doing _anything_, you need to have the appropriate software installed. These instructions assume you have the following installed:
+
+- A C compiler, such as GCC, Clang, or MSVC, installed.
+- [Git](https://git-scm.org)
+- [CMake](https://cmake.org)
+
+Often do Git and CMake come bundled with developer tools. For example, when installing Visual Studio on Windows, you can have the Visual Studio Installer install CMake for you. Otherwise, you will need to download them separately from their respective websites. On Linux and similar systems, use your system's package manager to install them. Consult your distribution's documentation and/or your favorite search engine for more information on how to do this if you don't know already.
+
+On Windows and macOS, PortAudio does not need any additional dependencies. On other systems, including Linux, you will need to install additional development packages for the necessary audio backends you plan to enable in PortAudio. To do this, see the @ref compile_cmake_audio_backends section.
+
 @subsection compile_cmake_general_clone Step 1: Get the PortAudio Source Code
 
-Before you proceed with building PortAudio, you must ensure that you have the PortAudio source code. If you don't, you will first need to clone it from PortAudio's GitHub repository using Git. If you do not have Git installed, install it either by downloading an installer from https://git-scm.org (Windows and macOS) or using your system's package manager (Linux, FreeBSD, etc). Then, open a terminal, command prompt window, or PowerShell window, in a suitable directory (e.g., your documents folder) and run the following command:
+Before you proceed with building PortAudio, you must ensure that you have the PortAudio source code. If you already have the source code, you may skip to the next section.
+
+There are two ways of getting the PortAudio source code: either through cloning PortAudio's GitHub repository, https://github.com/portaudio/portaudio, or by using your favorite download tool, such as `wget`, to download a source archive listed over at https://files.portaudio.com/download.html. Don't forget about having `tar` and `gzip` installed to extract the archive if you choose the latter way of obtaining the source code. For this tutorial, however, we will be using Git since you don't need to do any extraction first.
+
+To clone PortAudio's GitHub repository using Git, first open a terminal, command prompt window, or even a PowerShell Window in a suitable directory such as your documents folder. Then, in that newly opened window, run the following command:
 
     git clone https://github.com/portaudio/portaudio
 
