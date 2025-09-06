@@ -41,7 +41,19 @@ In the same window opened in Step 1, run the following commands to prepare for t
     cd build
     cmake ../portaudio
 
-At this point, the build files for PortAudio have been generated and placed in the `build` directory. Now you are ready to begin the actual build.
+With the last command, by default, a static library will be built. If you want a shared library (i.e., `.dll`, `.dylib`, or `.so`), you will want to add `-DPA_BUILD_SHARED_LIBS=ON` to the last command above like so:
+
+    cmake -DPA_BUILD_SHARED_LIBS=ON ../portaudio
+
+Also, by default, CMake will build a debug version of PortAudio. If you want a release version, add `--config Release` to the last command as seen in the three commands above:
+
+    cmake --config Release ../portaudio
+
+You can also mix and match `--config` and -DPA_BUILD_SHARED_LIBS` like so if desired:
+
+    cmake -DPA_BUILD_SHARED_LIBS=ON --config Release ../portaudio
+
+At this point, the build files for PortAudio have been generated and placed in the `build` directory. For Windows, the library files will be in a folder named after your configuration (e.g., `Debug/`, `Release/`, `RelWithDebInfo/`, etc.). For other systems, they will simply be in the root of your build directory. Now you are ready to begin the actual build.
 
 @subsubsection compile_cmake_general_configure_tests_examples Building Tests and Examples
 
@@ -60,6 +72,8 @@ To build _only_ examples alongside a normal PortAudio build, run the following c
 To build _both_ examples _and_ tests alongside a normal PortAudio build, run the following command:
 
     cmake -DPA_BUILD_TESTS=ON -DPA_BUILD_EXAMPLES=ON ../portaudio
+
+Once build the tests, they will be under the `tests/` directory in your build folder. For examples, they will be under `examples/`. On Windows, both tests and example will be under an additional folder named after the configuration you built in their respective folders. By default, this will be `Debug`, but it could also be under `Release/` if you built the `Release` configuration.
 
 PortAudio's build options are explained further in @ref compile_cmake_general_options. For more about running PortAudio tests and examples, see @ref compile_cmake_general_running_tests_examples.
 
@@ -135,9 +149,15 @@ Once configuration is successful, you can then start the build by running the fo
 
     C:\pabuild> cmake --build .
 
-This builds a _debug_ config of PortAudio. If you need a release config of PortAudio, add `--config Release` to the above command. For more CMake options, see @ref compile_cmake_options_general.
+This builds a _debug_ config of PortAudio. If you need a release config of PortAudio, add `--config Release` to the above command like so:
+
+    C:\pabuild> cmake --config Release --build .
 
 Alternatively, you can open the resulting `portaudio.sln` file in Visual Studio and build PortAudio that way.
+
+The actual PortAudio library itself will be output to a directory named after the configuration you just built. For example, if you built the `Debug` configuration, your files will be under `Debug/` in your build folder. If you built the `Release` configuration, your files will be under `Release/` in your build folder. This is due to CMake's Visual Studio Generator being a multi-config generator (meaning you can build multiple configurations without having to regenerate the build system). If you were building CMake on Linux using the Ninja Multi-Config generator, you will notice similar behavior.
+
+For more CMake options, see @ref compile_cmake_options_general.
 
 @subsection compile_cmake_win_asio Compiling With ASIO Support
 
@@ -157,19 +177,23 @@ First, create a build folder and change into it:
 
     $ mkdir build && cd build
 
-Then, run the configure command to configure the build:
+Then, run the configure command to configure the build for a **static library**:
 
     $ cmake -G "Unix Makefiles" /path/to/portaudio/source
 
-(The `-G "Unix Makefiles"` is used to ensure Unix Makefiles are generated).
+If you want a **shared library** configuration, add `-DPA_BUILD_SHARED_LIBS=ON` after `-G "Unix Makefiles"` like so:
+
+    $ cmake -G "Unix Makefiles" -DPA_BUILD_SHARED_LIBS=ON /path/to/portaudio/source
+
+(In both cases, the `-G "Unix Makefiles"` is used to ensure Unix Makefiles are generated).
 
 Once configuration is done, run the following command to build PortAudio:
 
     $ make
 
-Optionally add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based on the number CPU threads on your computer).
+Alternatively, you can run `cmake --build .` this does the same thing. For either command you use, add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based on the number CPU threads on your computer).
 
-Alternatively, you can run `cmake --build .` this does the same thing. You can also add `-j <num>` in the same manner as described above.
+Unlike on Windows, the actual library files will be in the root of build directory regardless of configuration.
 
 From an alternative perspective, if you are familiar with autotools, you'll realize that CMake serves a similar purpose to a `./configure` script. Both generate makefiles for the project you're currently building. Therefore, the CMake equivalent of the following commands:
 
@@ -216,7 +240,7 @@ This section contains options that configure your build. Some options are specif
 
 @subsection compile_cmake_options_general General CMake Options
 
-- `--configure <buildtype>`: Changes the build type. This can be `Release` for a release build, `Debug` for a debug build, `RelWithDebInfo` for a release build but with debugging symbols, `MinSizeRel` for the smallest build possible, and `None` for no build type.
+- `--config <buildtype>`: Changes the build type. This can be `Release` for a release build, `Debug` for a debug build, `RelWithDebInfo` for a release build but with debugging symbols, `MinSizeRel` for the smallest build possible, and `None` for no build type.
 
 - `-DCMAKE_INSTALL_PREFIX=/install_prefix`: When running `make install` or similar, install to `/install_prefix` instead of CMake's default of `/usr`.
 
