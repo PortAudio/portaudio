@@ -294,7 +294,7 @@ Optionally add `REQUIRED` after `portaudio` to make it a required dependency:
 
     find_package(portaudio REQUIRED)
 
-This also works if you installed PortAudio as described above in @ref compile_cmake_general_build and the install prefix (specified by `CMAKE_INSTALL_PREFIXED`) used is in either your system `PATH` or `CMAKE_MODULE_PATH`.
+This also works if you installed PortAudio as described above in @ref compile_cmake_general_build and the install prefix (specified by `CMAKE_INSTALL_PREFIX`) used is in either your system `PATH` or `CMAKE_MODULE_PATH`.
 
 @subsection cmake_using_add_subdirectory Using the `add_subdirectory()` CMake Command
 
