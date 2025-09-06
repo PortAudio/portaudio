@@ -240,8 +240,6 @@ This section contains options that configure your build. Some options are specif
 
 @subsection compile_cmake_options_general General CMake Options
 
-- `--config <buildtype>`: Changes the build type. This can be `Release` for a release build, `Debug` for a debug build, `RelWithDebInfo` for a release build but with debugging symbols, `MinSizeRel` for the smallest build possible, and `None` for no build type. On Windows or with multi-config generators, this allows you to select the build configuration after configuring the build system. On macOS, Linux, and similar systems or with non-multi-config generators, this allows you to select the build configuration the generated build system will build for. In that case, you must use this parameter while generating the build system.
-
 - `--config <buildtype`: Changes the configuration the build system will build. Possible configurations are `Release` for release builds, `Debug` for debug builds, `RelWithDebInfo` for debuggable release builds, `MinSizeRel` for the smallest possible build, and `None` for no configuration. If using with a multi-config generator, such as with Visual Studio, this applies _after_ generating the build system (multi-config generators can build multiple configurations without needing a reconfigure). If using a non-multi-config generator, such as with Unix Makeiles, this applies _when_ generating the build system (non-multi-config generators can only build one configuration at a time).
 
 - `-DCMAKE_INSTALL_PREFIX=/install_prefix`: When running `make install` or similar, install to `/install_prefix` instead of CMake's default of `/usr`.
