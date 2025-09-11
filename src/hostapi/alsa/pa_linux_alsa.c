@@ -1828,7 +1828,7 @@ static PaError TestParameters( const PaUtilHostApiRepresentation *hostApi, const
     /*
      * Intel HDA driver doesn't set PCM rule to limit maximum size of buffer.
      * This can result in a request for too large a buffer size.
-     * That can cause memory allocation error in ALSA PCM core, at least Linux kernel 5.8.
+     * That can cause a memory allocation error in ALSA PCM core, at least it does in Linux kernel 5.8.
      * As a workaround, limit buffer size to a reasonable value.
      */
     {
