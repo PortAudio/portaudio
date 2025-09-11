@@ -90,7 +90,6 @@ EXAMPLES = \
 
 SELFTESTS = \
 	bin/paqa_devs \
-	bin/paqa_dither \
 	bin/paqa_errs \
 	bin/paqa_latency
 
@@ -99,7 +98,6 @@ TESTS = \
 	bin/patest_buffer \
 	bin/patest_callbackstop \
 	bin/patest_clip \
-	bin/patest_converters \
 	bin/patest_dither \
 	bin/patest_hang \
 	bin/patest_in_overflow \
@@ -171,7 +169,7 @@ SRC_DIRS = \
 SUBDIRS =
 @ENABLE_CXX_TRUE@SUBDIRS += bindings/cpp
 
-all: lib/$(PALIB) all-recursive tests examples selftests
+all: lib/$(PALIB) all-recursive tests examples selftests bin/paqa_dither bin/patest_converters
 
 tests: bin-stamp $(TESTS)
 
