@@ -914,7 +914,7 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_max( hwParams, &maxChans ), paUnanticipatedHostError );
     /* ALSA may set maxChans to UINT_MAX if something is wrong.
      * Our understanding is that if a plugin does not set maxChans then ALSA sets it to 10000,
-       in which case we will clip to a lower value.
+     * in which case we will clip to a lower value.
      */
     const unsigned int kBadMaxChannels = 20000;
     const unsigned int kReasonableMaxChannels = 1024;
