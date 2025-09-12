@@ -940,6 +940,13 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
         goto error;
     }
 
+    /* XXX: Limit to sensible number (ALSA plugins accept a crazy amount of channels)? */
+    if( isPlug && maxChans > 128 )
+    {
+        maxChans = 128;
+        PA_DEBUG(( "%s: Limiting number of plugin channels to %u\n", __FUNCTION__, maxChans ));
+    }
+
     /* TWEAKME:
      * Giving values for default min and max latency is not straightforward.
      *  * for low latency, we want to give the lowest value that will work reliably.
