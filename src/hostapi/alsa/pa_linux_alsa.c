@@ -912,12 +912,23 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
 
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_min( hwParams, &minChans ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_hw_params_get_channels_max( hwParams, &maxChans ), paUnanticipatedHostError );
+    /* ALSA may set maxChans to UINT_MAX if something is wrong.
+     * Our understanding is that if a plugin does not set maxChans then ALSA sets it to 10000,
+     * in which case we will clip to a lower value.
+     */
+    const unsigned int kBadMaxChannels = 20000;
     const unsigned int kReasonableMaxChannels = 1024;
-    if( maxChans > kReasonableMaxChannels )
+    if( maxChans > kBadMaxChannels )
     {
-        PA_DEBUG(( "%s: maxChans = %u, which is unreasonably high\n", __FUNCTION__, maxChans ));
+        PA_DEBUG(( "%s: maxChans = %u, which indicates an ERROR\n", __FUNCTION__, maxChans ));
         result = paUnanticipatedHostError;
         goto error;
+    }
+    else if( maxChans > kReasonableMaxChannels )
+    {
+        PA_DEBUG(( "%s: maxChans = %u, which is unreasonably high, force to %u\n",
+                __FUNCTION__, maxChans, kReasonableMaxChannels ));
+        maxChans = kReasonableMaxChannels;
     }
     else if( maxChans == 0 )
     {
@@ -2016,6 +2027,7 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
     int dir = 0;
     snd_pcm_t *pcm = self->pcm;
     unsigned int minPeriods = 2;
+    unsigned int requestedRate = *sampleRatePtr;
 
     /* self->framesPerPeriod = framesPerHostBuffer; */
 
@@ -2089,7 +2101,7 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
         if( result == paInvalidSampleRate ) /* From the SetApproximateSampleRate() call above */
         { /* The sample rate was returned as 'out of tolerance' of the one requested */
             PA_DEBUG(( "%s: Wanted %.3f, closest sample rate was %u\n",
-                    __FUNCTION__, sampleRate, *sampleRatePtr ));
+                    __FUNCTION__, requestedRate, *sampleRatePtr ));
             PA_ENSURE( paInvalidSampleRate );
         }
     }
@@ -2797,7 +2809,7 @@ static PaError PaAlsaStream_Configure( PaAlsaStream *self, const PaStreamParamet
     {
         if (fabs(preciseCaptureSampleRate - precisePlaybackSampleRate) >= 1.0)
         {
-            PA_DEBUG(( "%s: Warning: input and output sample rates differ, %f != %f\n"
+            PA_DEBUG(( "%s: Warning: input and output sample rates differ, %f != %f\n",
                     __FUNCTION__, preciseCaptureSampleRate, precisePlaybackSampleRate ));
         }
     }
