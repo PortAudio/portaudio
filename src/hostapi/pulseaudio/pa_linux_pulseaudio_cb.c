@@ -666,12 +666,6 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
          * so no other thread should be accessing the ring buffer. */
         free( stream->inputRing.buffer );
         stream->inputRing.buffer = NULL;
-        stream->inputRing.bufferSize = 0;
-        stream->inputRing.bigMask = 0;
-        stream->inputRing.smallMask = 0;
-        stream->inputRing.elementSizeBytes = 0;
-        stream->inputRing.readIndex = 0;
-        stream->inputRing.writeIndex = 0;
     }
 
 
