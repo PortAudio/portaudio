@@ -659,6 +659,21 @@ PaError PaPulseAudio_CloseStreamCb( PaStream * s )
 
     PaUtil_TerminateBufferProcessor( &stream->bufferProcessor );
     PaUtil_TerminateStreamRepresentation( &stream->streamRepresentation );
+    /* Free any memory allocated for the blocking input ring buffer. */
+    if( stream->inputRing.buffer )
+    {
+        /* At this point input/output streams have been disconnected and unref\'d,
+         * so no other thread should be accessing the ring buffer. */
+        free( stream->inputRing.buffer );
+        stream->inputRing.buffer = NULL;
+        stream->inputRing.bufferSize = 0;
+        stream->inputRing.bigMask = 0;
+        stream->inputRing.smallMask = 0;
+        stream->inputRing.elementSizeBytes = 0;
+        stream->inputRing.readIndex = 0;
+        stream->inputRing.writeIndex = 0;
+    }
+
 
     PaUtil_FreeMemory( stream->inputStreamName );
     PaUtil_FreeMemory( stream->outputStreamName );
