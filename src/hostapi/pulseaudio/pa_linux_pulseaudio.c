@@ -1367,6 +1367,13 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( stream )
     {
+        /* If the blocking input ring buffer was allocated, release it. */
+        if( stream->inputRing.buffer )
+        {
+            free( stream->inputRing.buffer );
+            stream->inputRing.buffer = NULL;
+        }
+
         PaUtil_FreeMemory( stream->inputStreamName );
         PaUtil_FreeMemory( stream->outputStreamName );
         PaUtil_FreeMemory( stream );
