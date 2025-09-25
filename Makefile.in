@@ -104,6 +104,7 @@ TESTS = \
 	bin/patest_latency \
 	bin/patest_leftright \
 	bin/patest_longsine \
+	bin/patest_long_record \
 	bin/patest_many \
 	bin/patest_maxsines \
 	bin/patest_mono \
