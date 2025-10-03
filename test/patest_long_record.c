@@ -52,18 +52,30 @@
 
 static int64_t sCallbackCount = 0;
 // This callback will never be called again after a certain period of time
-static int listening ( const void*, void*, unsigned long,
-          const PaStreamCallbackTimeInfo*, PaStreamCallbackFlags, void* ) {
+
+static int listening( const void *inputBuffer, void *outputBuffer,
+                      unsigned long framesPerBuffer,
+                      const PaStreamCallbackTimeInfo* timeInfo,
+                      PaStreamCallbackFlags statusFlags,
+                      void *userData ) {
+    (void) inputBuffer;
+    (void) outputBuffer;
+    (void) framesPerBuffer;
+    (void) timeInfo;
+    (void) statusFlags;
+    (void) userData;
     sCallbackCount++;
     return paContinue;
 }
 
-int main ( int, char** ) {
+int main ( int argc, char** argv ) {
     PaStream* stream = NULL;
     PaStreamParameters inputParameters;
     PaError err = 0;
     int loopCount = 0;
     int64_t previousCallbackCount = sCallbackCount;
+    (void) argc;
+    (void) argv;
 
     Pa_Initialize ();
 
