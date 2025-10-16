@@ -130,7 +130,7 @@ typedef struct PaQaData
     unsigned long    maxFramesPerBuffer;
     unsigned long    framesDuration;
     PaSineOscillator sineOscillators[MAX_TEST_CHANNELS];
-    /* For interleaved buffers, audioBuffers points to a single
+    /* For interleaved buffers, audioBuffer points to a single
      * block of samples.
      * For non-interleaved data, it points to an array of pointers,
      * which point to each channel's block of samples.
