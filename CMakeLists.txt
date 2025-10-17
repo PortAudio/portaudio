@@ -5,14 +5,23 @@ project(PortAudio VERSION 19.8)
 # General PortAudio stuff
 #
 
-option(PA_BUILD_SHARED_LIBS "Build dynamic library" ${BUILD_SHARED_LIBS})
+if (NOT DEFINED PA_BUILD_SHARED_LIBS)
+    if (DEFINED BUILD_SHARED_LIBS)
+        set(PA_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    else()
+        option(PA_BUILD_SHARED_LIBS "Build shared library" ON)
+    endif()
+endif()
+
 option(PA_BUILD_TESTS "Include test projects" OFF)
 option(PA_BUILD_EXAMPLES "Include example projects" OFF)
 
 if(PA_BUILD_SHARED_LIBS)
   set(LIBRARY_BUILD_TYPE SHARED)
+  message(STATUS "Build using a Portaudio SHARED (dynamic) libary.")
 else()
   set(LIBRARY_BUILD_TYPE STATIC)
+  message(STATUS "Build using a Portaudio STATIC libary.")
 endif()
 
 option(PA_WARNINGS_ARE_ERRORS "Turn compiler warnings into errors" OFF)
