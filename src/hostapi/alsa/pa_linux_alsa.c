@@ -1271,7 +1271,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
 {
     PaUtilHostApiRepresentation *baseApi = &alsaApi->baseHostApiRep;
     PaAlsaDeviceInfo *deviceInfoArray;
-    int cardIdx = -1, devIdx = 0;
+    int cardIdx = -1;
     snd_ctl_card_info_t *cardInfo;
     PaError result = paNoError;
     size_t numDeviceNames = 0, maxDeviceNames = 1;
@@ -1484,7 +1484,8 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
      * for this.
      */
     PA_DEBUG(( "%s: Filling device info for %d devices\n", __FUNCTION__, numDeviceNames ));
-    for( size_t i = 0, devIdx = 0; i < numDeviceNames; ++i )
+    int devIdx = 0;
+    for( size_t i = 0; i < numDeviceNames; ++i )
     {
         PaAlsaDeviceInfo* devInfo = &deviceInfoArray[i];
         HwDevInfo* hwInfo = &hwDevInfos[i];
