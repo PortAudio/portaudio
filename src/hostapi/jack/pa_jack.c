@@ -568,7 +568,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         tmp_client_name[match_info.rm_eo - match_info.rm_so] = '\0';
 
         /* do we know about this port's client yet? */
-        for( int i = 0; i < numClients; i++ )
+        for( unsigned int i = 0; i < numClients; i++ )
         {
             if( strcmp( tmp_client_name, client_names[i] ) == 0 )
                 client_seen = TRUE;
