@@ -73,14 +73,13 @@ static unsigned long LCM( unsigned long a, unsigned long b )
 static unsigned long CalculateFrameShift( unsigned long M, unsigned long N )
 {
     unsigned long result = 0;
-    unsigned long i;
     unsigned long lcm;
 
     assert( M > 0 );
     assert( N > 0 );
 
     lcm = LCM( M, N );
-    for( i = M; i < lcm; i += M )
+    for( unsigned long i = M; i < lcm; i += M )
         result = PA_MAX_( result, i % N );
 
     return result;
@@ -477,7 +476,6 @@ void PaUtil_SetInputChannel( PaUtilBufferProcessor* bp,
 void PaUtil_SetInterleavedInputChannels( PaUtilBufferProcessor* bp,
         unsigned int firstChannel, void *data, unsigned int channelCount )
 {
-    unsigned int i;
     unsigned int channel = firstChannel;
     unsigned char *p = (unsigned char*)data;
 
@@ -488,7 +486,7 @@ void PaUtil_SetInterleavedInputChannels( PaUtilBufferProcessor* bp,
     assert( firstChannel + channelCount <= bp->inputChannelCount );
     assert( bp->hostInputIsInterleaved );
 
-    for( i=0; i< channelCount; ++i )
+    for( unsigned int i=0; i< channelCount; ++i )
     {
         bp->hostInputChannels[0][channel+i].data = p;
         p += bp->bytesPerHostInputSample;
@@ -528,7 +526,6 @@ void PaUtil_Set2ndInputChannel( PaUtilBufferProcessor* bp,
 void PaUtil_Set2ndInterleavedInputChannels( PaUtilBufferProcessor* bp,
         unsigned int firstChannel, void *data, unsigned int channelCount )
 {
-    unsigned int i;
     unsigned int channel = firstChannel;
     unsigned char *p = (unsigned char*)data;
 
@@ -539,7 +536,7 @@ void PaUtil_Set2ndInterleavedInputChannels( PaUtilBufferProcessor* bp,
     assert( firstChannel + channelCount <= bp->inputChannelCount );
     assert( bp->hostInputIsInterleaved );
 
-    for( i=0; i< channelCount; ++i )
+    for( unsigned int i=0; i< channelCount; ++i )
     {
         bp->hostInputChannels[1][channel+i].data = p;
         p += bp->bytesPerHostInputSample;
@@ -593,7 +590,6 @@ void PaUtil_SetOutputChannel( PaUtilBufferProcessor* bp,
 void PaUtil_SetInterleavedOutputChannels( PaUtilBufferProcessor* bp,
         unsigned int firstChannel, void *data, unsigned int channelCount )
 {
-    unsigned int i;
     unsigned int channel = firstChannel;
     unsigned char *p = (unsigned char*)data;
 
@@ -604,7 +600,7 @@ void PaUtil_SetInterleavedOutputChannels( PaUtilBufferProcessor* bp,
     assert( firstChannel + channelCount <= bp->outputChannelCount );
     assert( bp->hostOutputIsInterleaved );
 
-    for( i=0; i< channelCount; ++i )
+    for( unsigned int i=0; i< channelCount; ++i )
     {
         PaUtil_SetOutputChannel( bp, channel + i, p, channelCount );
         p += bp->bytesPerHostOutputSample;
@@ -643,7 +639,6 @@ void PaUtil_Set2ndOutputChannel( PaUtilBufferProcessor* bp,
 void PaUtil_Set2ndInterleavedOutputChannels( PaUtilBufferProcessor* bp,
         unsigned int firstChannel, void *data, unsigned int channelCount )
 {
-    unsigned int i;
     unsigned int channel = firstChannel;
     unsigned char *p = (unsigned char*)data;
 
@@ -654,7 +649,7 @@ void PaUtil_Set2ndInterleavedOutputChannels( PaUtilBufferProcessor* bp,
     assert( firstChannel + channelCount <= bp->outputChannelCount );
     assert( bp->hostOutputIsInterleaved );
 
-    for( i=0; i< channelCount; ++i )
+    for( unsigned int i=0; i< channelCount; ++i )
     {
         PaUtil_Set2ndOutputChannel( bp, channel + i, p, channelCount );
         p += bp->bytesPerHostOutputSample;
@@ -719,7 +714,6 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
     unsigned int srcChannelStrideBytes; /* stride from one channel to the next, in bytes */
     unsigned int destSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int destChannelStrideBytes; /* stride from one channel to the next, in bytes */
-    unsigned int i;
     unsigned long frameCount;
     unsigned long framesToGo = framesToProcess;
     unsigned long framesProcessed = 0;
@@ -771,7 +765,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     /* setup non-interleaved ptrs */
                     if( bp->userInputSampleFormatIsEqualToHost && !bp->hostInputIsInterleaved && bp->hostInputChannels[0][0].data )
                     {
-                        for( i=0; i<bp->inputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
                         {
                             bp->tempInputBufferPtrs[i] = hostInputChannels[i].data;
                         }
@@ -779,7 +773,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     }
                     else
                     {
-                        for( i=0; i<bp->inputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
                         {
                             bp->tempInputBufferPtrs[i] = ((unsigned char*)bp->tempInputBuffer) +
                                 i * bp->bytesPerUserInputSample * frameCount;
@@ -794,7 +788,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     /* no input was supplied (see PaUtil_SetNoInput), so
                         zero the input buffer */
 
-                    for( i=0; i<bp->inputChannelCount; ++i )
+                    for( unsigned int i=0; i<bp->inputChannelCount; ++i )
                     {
                         bp->inputZeroer( destBytePtr, destSampleStrideSamples, frameCount );
                         destBytePtr += destChannelStrideBytes;  /* skip to next destination channel */
@@ -804,7 +798,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                 {
                     if( skipInputConvert )
                     {
-                        for( i=0; i<bp->inputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
                         {
                             /* advance src ptr for next iteration */
                             hostInputChannels[i].data = ((unsigned char*)hostInputChannels[i].data) +
@@ -813,7 +807,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     }
                     else
                     {
-                        for( i=0; i<bp->inputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
                         {
                             bp->inputConverter( destBytePtr, destSampleStrideSamples,
                                                     hostInputChannels[i].data,
@@ -857,7 +851,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                 {
                     if( bp->userOutputSampleFormatIsEqualToHost && !bp->hostOutputIsInterleaved )
                     {
-                        for( i=0; i<bp->outputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
                         {
                             bp->tempOutputBufferPtrs[i] = hostOutputChannels[i].data;
                         }
@@ -865,7 +859,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                     }
                     else
                     {
-                        for( i=0; i<bp->outputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
                         {
                             bp->tempOutputBufferPtrs[i] = ((unsigned char*)bp->tempOutputBuffer) +
                                 i * bp->bytesPerUserOutputSample * frameCount;
@@ -895,7 +889,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                 {
                     if( skipOutputConvert )
                     {
-                        for( i=0; i<bp->outputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
                         {
                             /* advance dest ptr for next iteration */
                             hostOutputChannels[i].data = ((unsigned char*)hostOutputChannels[i].data) +
@@ -918,7 +912,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                             srcChannelStrideBytes = frameCount * bp->bytesPerUserOutputSample;
                         }
 
-                        for( i=0; i<bp->outputChannelCount; ++i )
+                        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
                         {
                             bp->outputConverter(    hostOutputChannels[i].data,
                                                     hostOutputChannels[i].stride,
@@ -951,7 +945,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
 
         if( bp->outputChannelCount != 0 && bp->hostOutputChannels[0][0].data )
         {
-            for( i=0; i<bp->outputChannelCount; ++i )
+            for( unsigned int i=0; i<bp->outputChannelCount; ++i )
             {
                 bp->outputZeroer(   hostOutputChannels[i].data,
                                     hostOutputChannels[i].stride,
@@ -984,7 +978,6 @@ static unsigned long AdaptingInputOnlyProcess( PaUtilBufferProcessor *bp,
     unsigned char *destBytePtr;
     unsigned int destSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int destChannelStrideBytes; /* stride from one channel to the next, in bytes */
-    unsigned int i;
     unsigned long frameCount;
     unsigned long framesToGo = framesToProcess;
     unsigned long framesProcessed = 0;
@@ -1019,7 +1012,7 @@ static unsigned long AdaptingInputOnlyProcess( PaUtilBufferProcessor *bp,
             destChannelStrideBytes = bp->framesPerUserBuffer * bp->bytesPerUserInputSample;
 
             /* setup non-interleaved ptrs */
-            for( i=0; i<bp->inputChannelCount; ++i )
+            for( unsigned int i=0; i<bp->inputChannelCount; ++i )
             {
                 bp->tempInputBufferPtrs[i] = ((unsigned char*)bp->tempInputBuffer) +
                     i * bp->bytesPerUserInputSample * bp->framesPerUserBuffer;
@@ -1028,7 +1021,7 @@ static unsigned long AdaptingInputOnlyProcess( PaUtilBufferProcessor *bp,
             userInput = bp->tempInputBufferPtrs;
         }
 
-        for( i=0; i<bp->inputChannelCount; ++i )
+        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
         {
             bp->inputConverter( destBytePtr, destSampleStrideSamples,
                                     hostInputChannels[i].data,
@@ -1091,7 +1084,6 @@ static unsigned long AdaptingOutputOnlyProcess( PaUtilBufferProcessor *bp,
     unsigned char *srcBytePtr;
     unsigned int srcSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int srcChannelStrideBytes;  /* stride from one channel to the next, in bytes */
-    unsigned int i;
     unsigned long frameCount;
     unsigned long framesToGo = framesToProcess;
     unsigned long framesProcessed = 0;
@@ -1109,7 +1101,7 @@ static unsigned long AdaptingOutputOnlyProcess( PaUtilBufferProcessor *bp,
             }
             else /* user output is not interleaved */
             {
-                for( i = 0; i < bp->outputChannelCount; ++i )
+                for( unsigned int i = 0; i < bp->outputChannelCount; ++i )
                 {
                     bp->tempOutputBufferPtrs[i] = ((unsigned char*)bp->tempOutputBuffer) +
                             i * bp->framesPerUserBuffer * bp->bytesPerUserOutputSample;
@@ -1161,7 +1153,7 @@ static unsigned long AdaptingOutputOnlyProcess( PaUtilBufferProcessor *bp,
                 srcChannelStrideBytes = bp->framesPerUserBuffer * bp->bytesPerUserOutputSample;
             }
 
-            for( i=0; i<bp->outputChannelCount; ++i )
+            for( unsigned int i=0; i<bp->outputChannelCount; ++i )
             {
                 bp->outputConverter(    hostOutputChannels[i].data,
                                         hostOutputChannels[i].stride,
@@ -1186,7 +1178,7 @@ static unsigned long AdaptingOutputOnlyProcess( PaUtilBufferProcessor *bp,
 
             frameCount = framesToGo;
 
-            for( i=0; i<bp->outputChannelCount; ++i )
+            for( unsigned int i=0; i<bp->outputChannelCount; ++i )
             {
                 bp->outputZeroer(   hostOutputChannels[i].data,
                                     hostOutputChannels[i].stride,
@@ -1219,7 +1211,6 @@ static void CopyTempOutputBuffersToHostOutputBuffers( PaUtilBufferProcessor *bp)
     unsigned char *srcBytePtr;
     unsigned int srcSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int srcChannelStrideBytes; /* stride from one channel to the next, in bytes */
-    unsigned int i;
 
     /* copy frames from user to host output buffers */
     while( bp->framesInTempOutputBuffer > 0 &&
@@ -1258,7 +1249,7 @@ static void CopyTempOutputBuffersToHostOutputBuffers( PaUtilBufferProcessor *bp)
             srcChannelStrideBytes = bp->framesPerUserBuffer * bp->bytesPerUserOutputSample;
         }
 
-        for( i=0; i<bp->outputChannelCount; ++i )
+        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
         {
             assert( hostOutputChannels[i].data != NULL );
             bp->outputConverter(    hostOutputChannels[i].data,
@@ -1305,7 +1296,6 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
     unsigned char *destBytePtr;
     unsigned int destSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int destChannelStrideBytes; /* stride from one channel to the next, in bytes */
-    unsigned int i, j;
 
 
     framesAvailable = bp->hostInputFrameCount[0] + bp->hostInputFrameCount[1];/* this is assumed to be the same as the output buffer's frame count */
@@ -1326,14 +1316,14 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
             /* the callback will not be called any more, so zero what remains
                 of the host output buffers */
 
-            for( i=0; i<2; ++i )
+            for( unsigned int i=0; i<2; ++i )
             {
                 frameCount = bp->hostOutputFrameCount[i];
                 if( frameCount > 0 )
                 {
                     hostOutputChannels = bp->hostOutputChannels[i];
 
-                    for( j=0; j<bp->outputChannelCount; ++j )
+                    for( unsigned int j=0; j<bp->outputChannelCount; ++j )
                     {
                         bp->outputZeroer(   hostOutputChannels[j].data,
                                             hostOutputChannels[j].stride,
@@ -1386,7 +1376,7 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
                 destChannelStrideBytes = bp->framesPerUserBuffer * bp->bytesPerUserInputSample;
             }
 
-            for( i=0; i<bp->inputChannelCount; ++i )
+            for( unsigned int i=0; i<bp->inputChannelCount; ++i )
             {
                 bp->inputConverter( destBytePtr, destSampleStrideSamples,
                                         hostInputChannels[i].data,
@@ -1427,7 +1417,7 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
                 }
                 else /* user input is not interleaved */
                 {
-                    for( i = 0; i < bp->inputChannelCount; ++i )
+                    for( unsigned int i = 0; i < bp->inputChannelCount; ++i )
                     {
                         bp->tempInputBufferPtrs[i] = ((unsigned char*)bp->tempInputBuffer) +
                                 i * bp->framesPerUserBuffer * bp->bytesPerUserInputSample;
@@ -1443,7 +1433,7 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
                 }
                 else /* user output is not interleaved */
                 {
-                    for( i = 0; i < bp->outputChannelCount; ++i )
+                    for( unsigned int i = 0; i < bp->outputChannelCount; ++i )
                     {
                         bp->tempOutputBufferPtrs[i] = ((unsigned char*)bp->tempOutputBuffer) +
                                 i * bp->framesPerUserBuffer * bp->bytesPerUserOutputSample;
@@ -1674,7 +1664,6 @@ unsigned long PaUtil_CopyInput( PaUtilBufferProcessor* bp,
     void **nonInterleavedDestPtrs;
     unsigned int destSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int destChannelStrideBytes; /* stride from one channel to the next, in bytes */
-    unsigned int i;
 
     hostInputChannels = bp->hostInputChannels[0];
     framesToCopy = PA_MIN_( bp->hostInputFrameCount[0], frameCount );
@@ -1686,7 +1675,7 @@ unsigned long PaUtil_CopyInput( PaUtilBufferProcessor* bp,
         destSampleStrideSamples = bp->inputChannelCount;
         destChannelStrideBytes = bp->bytesPerUserInputSample;
 
-        for( i=0; i<bp->inputChannelCount; ++i )
+        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
         {
             bp->inputConverter( destBytePtr, destSampleStrideSamples,
                                 hostInputChannels[i].data,
@@ -1712,7 +1701,7 @@ unsigned long PaUtil_CopyInput( PaUtilBufferProcessor* bp,
 
         destSampleStrideSamples = 1;
 
-        for( i=0; i<bp->inputChannelCount; ++i )
+        for( unsigned int i=0; i<bp->inputChannelCount; ++i )
         {
             destBytePtr = (unsigned char*)nonInterleavedDestPtrs[i];
 
@@ -1745,7 +1734,6 @@ unsigned long PaUtil_CopyOutput( PaUtilBufferProcessor* bp,
     void **nonInterleavedSrcPtrs;
     unsigned int srcSampleStrideSamples; /* stride from one sample to the next within a channel, in samples */
     unsigned int srcChannelStrideBytes; /* stride from one channel to the next, in bytes */
-    unsigned int i;
 
     hostOutputChannels = bp->hostOutputChannels[0];
     framesToCopy = PA_MIN_( bp->hostOutputFrameCount[0], frameCount );
@@ -1757,7 +1745,7 @@ unsigned long PaUtil_CopyOutput( PaUtilBufferProcessor* bp,
         srcSampleStrideSamples = bp->outputChannelCount;
         srcChannelStrideBytes = bp->bytesPerUserOutputSample;
 
-        for( i=0; i<bp->outputChannelCount; ++i )
+        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
         {
             bp->outputConverter(    hostOutputChannels[i].data,
                                     hostOutputChannels[i].stride,
@@ -1784,7 +1772,7 @@ unsigned long PaUtil_CopyOutput( PaUtilBufferProcessor* bp,
 
         srcSampleStrideSamples = 1;
 
-        for( i=0; i<bp->outputChannelCount; ++i )
+        for( unsigned int i=0; i<bp->outputChannelCount; ++i )
         {
             srcBytePtr = (unsigned char*)nonInterleavedSrcPtrs[i];
 
@@ -1814,12 +1802,11 @@ unsigned long PaUtil_ZeroOutput( PaUtilBufferProcessor* bp, unsigned long frameC
 {
     PaUtilChannelDescriptor *hostOutputChannels;
     unsigned int framesToZero;
-    unsigned int i;
 
     hostOutputChannels = bp->hostOutputChannels[0];
     framesToZero = PA_MIN_( bp->hostOutputFrameCount[0], frameCount );
 
-    for( i=0; i<bp->outputChannelCount; ++i )
+    for( unsigned int i=0; i<bp->outputChannelCount; ++i )
     {
         bp->outputZeroer(   hostOutputChannels[i].data,
                             hostOutputChannels[i].stride,
