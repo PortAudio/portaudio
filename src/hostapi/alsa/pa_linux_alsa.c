@@ -1070,9 +1070,7 @@ HwDevInfo predefinedNames[] = {
 
 static const HwDevInfo *FindDeviceName( const char *name )
 {
-    int i;
-
-    for( i = 0; predefinedNames[i].alsaName; i++ )
+    for( int i = 0; predefinedNames[i].alsaName; i++ )
     {
         if( strcmp( name, predefinedNames[i].alsaName ) == 0 )
         {
@@ -1276,7 +1274,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
     int cardIdx = -1, devIdx = 0;
     snd_ctl_card_info_t *cardInfo;
     PaError result = paNoError;
-    size_t numDeviceNames = 0, maxDeviceNames = 1, i;
+    size_t numDeviceNames = 0, maxDeviceNames = 1;
     HwDevInfo *hwDevInfos = NULL;
     snd_config_t *topNode = NULL;
     snd_pcm_info_t *pcmInfo;
@@ -1486,7 +1484,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
      * for this.
      */
     PA_DEBUG(( "%s: Filling device info for %d devices\n", __FUNCTION__, numDeviceNames ));
-    for( i = 0, devIdx = 0; i < numDeviceNames; ++i )
+    for( size_t i = 0, devIdx = 0; i < numDeviceNames; ++i )
     {
         PaAlsaDeviceInfo* devInfo = &deviceInfoArray[i];
         HwDevInfo* hwInfo = &hwDevInfos[i];
@@ -1499,7 +1497,7 @@ static PaError BuildDeviceList( PaAlsaHostApiRepresentation *alsaApi )
     }
     assert( devIdx <= numDeviceNames );
     /* Now inspect 'dmix' and 'default' plugins */
-    for( i = 0; i < numDeviceNames; ++i )
+    for( size_t i = 0; i < numDeviceNames; ++i )
     {
         PaAlsaDeviceInfo* devInfo = &deviceInfoArray[i];
         HwDevInfo* hwInfo = &hwDevInfos[i];
@@ -3571,8 +3569,7 @@ static PaError PaAlsaStreamComponent_EndProcessing( PaAlsaStreamComponent *self,
             void *bufs[self->numHostChannels];
             int bufsize = alsa_snd_pcm_format_size( self->nativeFormat, self->framesPerPeriod + 1 );
             unsigned char *buffer = self->nonMmapBuffer;
-            int i;
-            for( i = 0; i < self->numHostChannels; ++i )
+            for( int i = 0; i < self->numHostChannels; ++i )
             {
                 bufs[i] = buffer;
                 buffer += bufsize;
@@ -3621,7 +3618,6 @@ static PaError PaAlsaStreamComponent_DoChannelAdaption( PaAlsaStreamComponent *s
 {
     PaError result = paNoError;
     unsigned char *p;
-    int i;
     int unusedChans = self->numHostChannels - self->numUserChannels;
     unsigned char *src, *dst;
     int convertMono = ( self->numHostChannels % 2 ) == 0 && ( self->numUserChannels % 2 ) != 0;
@@ -3640,7 +3636,7 @@ static PaError PaAlsaStreamComponent_DoChannelAdaption( PaAlsaStreamComponent *s
         {
             /* Convert the last user channel into stereo pair */
             src = buffer + ( self->numUserChannels - 1 ) * swidth;
-            for( i = 0; i < numFrames; ++i )
+            for( int i = 0; i < numFrames; ++i )
             {
                 dst = src + swidth;
                 memcpy( dst, src, swidth );
@@ -3655,7 +3651,7 @@ static PaError PaAlsaStreamComponent_DoChannelAdaption( PaAlsaStreamComponent *s
         if( unusedChans > 0 )
         {
             /* Silence unused output channels */
-            for( i = 0; i < numFrames; ++i )
+            for( int i = 0; i < numFrames; ++i )
             {
                 memset( p, 0, swidth * unusedChans );
                 p += self->numHostChannels * swidth;
@@ -4077,7 +4073,6 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
     void (*setChannel)(PaUtilBufferProcessor *, unsigned int, void *, unsigned int) =
         StreamDirection_In == self->streamDir ? PaUtil_SetInputChannel : PaUtil_SetOutputChannel;
     unsigned char *buffer, *p;
-    int i;
     unsigned long framesAvail;
 
     /* This _must_ be called before mmap_begin */
@@ -4113,7 +4108,7 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
         int swidth = alsa_snd_pcm_format_size( self->nativeFormat, 1 );
 
         p = buffer = self->canMmap ? ExtractAddress( areas, self->offset ) : self->nonMmapBuffer;
-        for( i = 0; i < self->numUserChannels; ++i )
+        for( int i = 0; i < self->numUserChannels; ++i )
         {
             /* We're setting the channels up to userChannels, but the stride will be hostChannels samples */
             setChannel( bp, i, p, self->numHostChannels );
@@ -4124,7 +4119,7 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
     {
         if( self->canMmap )
         {
-            for( i = 0; i < self->numUserChannels; ++i )
+            for( int i = 0; i < self->numUserChannels; ++i )
             {
                 area = areas + i;
                 buffer = ExtractAddress( area, self->offset );
@@ -4135,7 +4130,7 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
         {
             unsigned int buf_per_ch_size = self->nonMmapBufferSize / self->numHostChannels;
             buffer = self->nonMmapBuffer;
-            for( i = 0; i < self->numUserChannels; ++i )
+            for( int i = 0; i < self->numUserChannels; ++i )
             {
                 setChannel( bp, i, buffer, 1 );
                 buffer += buf_per_ch_size;
@@ -4154,8 +4149,7 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
             void *bufs[self->numHostChannels];
             unsigned int buf_per_ch_size = self->nonMmapBufferSize / self->numHostChannels;
             unsigned char *buffer = self->nonMmapBuffer;
-            int i;
-            for( i = 0; i < self->numHostChannels; ++i )
+            for( int i = 0; i < self->numHostChannels; ++i )
             {
                 bufs[i] = buffer;
                 buffer += buf_per_ch_size;
