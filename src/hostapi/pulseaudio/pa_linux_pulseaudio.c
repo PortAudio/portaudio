@@ -1270,11 +1270,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             goto openstream_error;
         }
 
-        if( result != paNoError )
-        {
-            goto openstream_error;
-        }
-
         stream->outputDevice = outputParameters->device;
 
         /* Convert positive suggestedLatency from seconds to microseconds, otherwise default to zero. */
