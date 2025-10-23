@@ -130,6 +130,11 @@ typedef struct PaQaData
     unsigned long    maxFramesPerBuffer;
     unsigned long    framesDuration;
     PaSineOscillator sineOscillators[MAX_TEST_CHANNELS];
+    /* For interleaved buffers, audioBuffer points to a single
+     * block of samples.
+     * For non-interleaved data, it points to an array of pointers,
+     * which point to each channel's block of samples.
+     */
     void            *audioBuffer;
 } PaQaData;
 
@@ -181,15 +186,38 @@ static void PaQaSetupData(PaQaData *myData,
         int numChannels = (parameters->mode == MODE_OUTPUT)
                 ? parameters->numOutputChannels
                 : parameters->numInputChannels;
-        myData->audioBuffer = malloc(myData->bytesPerSample * numChannels * myData->framesPerBurst);
+        if (parameters->useNonInterleaved) {
+            /* Allocate an array of pointers to each channel's data. */
+            void **ptrArray = malloc(sizeof(void *) * numChannels);
+            for (int channelIndex = 0; channelIndex < numChannels; channelIndex++)
+            {
+                ptrArray[channelIndex] = malloc(myData->bytesPerSample * myData->framesPerBurst);
+            }
+            myData->audioBuffer = ptrArray;
+        } else {
+            myData->audioBuffer = malloc(myData->bytesPerSample * numChannels * myData->framesPerBurst);
+        }
     }
 }
 
 static void PaQaTeardownData(PaQaData *myData,
                           const PaQaTestParameters *parameters)
 {
-    (void) parameters;
-    free(myData->audioBuffer);
+    if (parameters->useCallback == 0) {
+        /* We need our own buffer for blocking IO. */
+        int numChannels = (parameters->mode == MODE_OUTPUT)
+                ? parameters->numOutputChannels
+                : parameters->numInputChannels;
+        if (parameters->useNonInterleaved) {
+            /* Free each channel's data. */
+            void **ptrArray = (void **)myData->audioBuffer;
+            for (int channelIndex = 0; channelIndex < numChannels; channelIndex++)
+            {
+                free(ptrArray[channelIndex]);
+            }
+        }
+        free(myData->audioBuffer);
+    }
 }
 
 static float NextSineSample( PaSineOscillator *sineOscillator )
@@ -336,7 +364,7 @@ static PaError CheckBlockingIO(PaStream *stream,
         } else if (data->parameters->mode == MODE_INPUT) {
             result = Pa_ReadStream(stream, data->audioBuffer, data->framesPerBurst);
             ASSERT_EQ(paNoError, result);
-            callbackResult = QaCallback(data->audioBuffer,
+            callbackResult = QaCallback(data->audioBuffer, /* ignored */
                                         NULL /*outputBuffer */,
                                         data->framesPerBurst,
                                         NULL /* timeInfo */, // TODO
@@ -537,11 +565,11 @@ static void RunQuickTest( void )
     TestSingleStreamParameters(parameters);
 
     parameters.useCallback = 0;
-    TestSingleStreamParameters(parameters); /* Blocking */
+    TestSingleStreamParameters(parameters); /* Blocking, Interleaved */
     parameters.useNonInterleaved = 1;
     TestSingleStreamParameters(parameters); /* Blocking, NonInterleaved */
     parameters.useCallback = 1;
-    TestSingleStreamParameters(parameters); /* NonInterleaved */
+    TestSingleStreamParameters(parameters); /* Callback, NonInterleaved */
     parameters.useCallback = 1;
 #endif
 
@@ -585,13 +613,13 @@ static void RunQuickTest( void )
     parameters.numOutputChannels = 2;
     parameters.format = paFloat32;
     parameters.useCallback = 0;
-    TestSingleStreamParameters(parameters); /* Blocking */
+    TestSingleStreamParameters(parameters); /* Blocking, float */
     parameters.useCallback = 1;
-    TestSingleStreamParameters(parameters);  /* Blocking */
+    TestSingleStreamParameters(parameters); /* Callback, float */
     parameters.format = paInt16;
-    TestSingleStreamParameters(parameters);
+    TestSingleStreamParameters(parameters); /* Callback, int16 */
     parameters.format = paInt32;
-    TestSingleStreamParameters(parameters);
+    TestSingleStreamParameters(parameters); /* Callback, int32 */
 }
 
 static const double constStandardSampleRates_[] = {
