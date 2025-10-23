@@ -139,13 +139,6 @@ are defaulted to 1.
 #define PA_USE_PULSEAUDIO 1
 #endif
 
-#ifndef PA_USE_SGI
-#define PA_USE_SGI 0
-#elif (PA_USE_SGI != 0) && (PA_USE_SGI != 1)
-#undef PA_USE_SGI
-#define PA_USE_SGI 1
-#endif
-
 #ifndef PA_USE_COREAUDIO
 #define PA_USE_COREAUDIO 0
 #elif (PA_USE_COREAUDIO != 0) && (PA_USE_COREAUDIO != 1)

@@ -357,34 +357,6 @@ case "${host_os}" in
         DLL_LIBS="${DLL_LIBS} -lwinmm"
         ;;
 
-  irix* )
-        dnl SGI IRIX audio library (AL) configuration (Pieter, oct 2-13, 2003).
-        dnl The 'dmedia' library is needed to read the Unadjusted System Time (UST).
-        dnl
-        AC_CHECK_LIB(pthread, pthread_create, , AC_MSG_ERROR([IRIX posix thread library not found!]))
-        AC_CHECK_LIB(audio,   alOpenPort,     , AC_MSG_ERROR([IRIX audio library not found!]))
-        AC_CHECK_LIB(dmedia,  dmGetUST,       , AC_MSG_ERROR([IRIX digital media library not found!]))
-
-        dnl See the '#ifdef PA_USE_SGI' in file pa_unix/pa_unix_hostapis.c
-        dnl which selects the appropriate PaXXX_Initialize() function.
-        dnl
-        AC_DEFINE(PA_USE_SGI,1)
-
-        CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix"
-
-        dnl The _REENTRANT option for pthread safety. Perhaps not necessary but it 'll do no harm.
-        dnl
-        THREAD_CFLAGS="-D_REENTRANT"
-
-        OTHER_OBJS="pa_sgi/pa_sgi.o src/os/unix/pa_unix_hostapis.o src/os/unix/pa_unix_util.o"
-
-        dnl SGI books say -lpthread should be the last of the libs mentioned.
-        dnl
-        LIBS="-lm -ldmedia -laudio -lpthread"
-        PADLL="libportaudio.so"
-        SHARED_FLAGS=""
-        ;;
-
   *)
         dnl Unix configuration
 
