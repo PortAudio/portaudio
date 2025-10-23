@@ -77,7 +77,6 @@ static struct PaUtilAllocationGroupLink *AllocateLinks( long count,
         struct PaUtilAllocationGroupLink *nextSpare )
 {
     struct PaUtilAllocationGroupLink *result;
-    int i;
 
     result = (struct PaUtilAllocationGroupLink *)PaUtil_AllocateZeroInitializedMemory(
             sizeof(struct PaUtilAllocationGroupLink) * count );
@@ -88,7 +87,7 @@ static struct PaUtilAllocationGroupLink *AllocateLinks( long count,
         result[0].next = nextBlock;
 
         /* the spare links */
-        for( i=1; i<count; ++i )
+        for( int i=1; i<count; ++i )
         {
             result[i].buffer = 0;
             result[i].next = &result[i+1];
