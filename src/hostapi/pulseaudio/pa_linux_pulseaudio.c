@@ -396,8 +396,8 @@ void PaPulseAudio_SinkListCb( pa_context * c,
     }
 
     if( _PaPulseAudio_AddAudioDevice( pulseaudioHostApi,
-                                      pulseaudioDeviceName,
                                       l->name,
+                                      pulseaudioDeviceName,
                                       0,
                                       l->sample_spec.channels,
                                       0,
@@ -448,8 +448,8 @@ void PaPulseAudio_SourceListCb( pa_context * c,
     }
 
     if( _PaPulseAudio_AddAudioDevice( pulseaudioHostApi,
-                                      pulseaudioDeviceName,
                                       l->name,
+                                      pulseaudioDeviceName,
                                       l->sample_spec.channels,
                                       0,
                                       PA_PULSEAUDIO_DEFAULT_MIN_LATENCY,
