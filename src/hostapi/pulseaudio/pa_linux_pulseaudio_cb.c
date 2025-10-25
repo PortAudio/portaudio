@@ -109,13 +109,16 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
 void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
                                   pa_operation **operation)
 {
-    unsigned int wait = 1000;
+    unsigned int wait = 10;
     pa_operation *localOperation = (*operation);
     pa_operation_state_t localOperationState = PA_OPERATION_RUNNING;
 
-    /* Since the primary operations are conducted locally, a wait time
-     * of 1 to 3 seconds, followed by an additional 1000 milliseconds,
-     * is deemed sufficient to to detect successful completion or to detect an error.
+    /* Functions blocks main thread wait maximum ~1 seconds.
+     *
+     * Normally release operation should happen at once
+     *
+     * This because Pulseaudio server can vanish middle of
+     * operation and loop just waits for reply from server
      */
     while( wait > 0 )
     {
@@ -139,6 +142,7 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
         PaPulseAudio_UnLock( hostapi->mainloop );
 
         wait --;
+        usleep(100);
     }
 
     /* Do not wait if operation is DONE or CANCELLED */
@@ -286,8 +290,9 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
     }
 
-    /* If input is desired without output (non-duplex operation),
-     * the following calculation should be utilized.
+    /* If there is input stream available then calculate Portaudio
+     * needed bytes per request as Pulseaudio can ask mainly any amount
+     * of bytes also check callback availability.
      */
     if( stream->inputStream )
     {
@@ -843,10 +848,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     {
         /* The tlength parameter functions similarly to fragsize in
          * the recording process, as explained in the preceding comments.
-         *
-         * In the future, this should be adjusted as necessary when
-         * conditions change; currently, it serves as a satisfactory
-         * default.
          */
         stream->outputBufferAttr.tlength = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->outputSampleSpec );
@@ -943,9 +944,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         goto startstreamcb_error;
     }
 
-    /* It must be ensured that no errors are encountered during
-     * initialization.
-     */
     ret = paNoError;
 
     /* Stream is now active */
