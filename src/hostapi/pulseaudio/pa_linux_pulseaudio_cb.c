@@ -952,7 +952,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
                                      stream );
     }
 
-    /* It is essential to always unlock to prevent being locked out. */
     startstreamcb_end:
     return ret;
 
