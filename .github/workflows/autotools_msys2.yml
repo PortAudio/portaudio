@@ -1,0 +1,79 @@
+name: MSYS2 autotools build (Windows)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  # GitHub CI Actions-specific environment variables:
+
+  # Location for user-local `make install`
+  PORTAUDIO_INSTALL_DIR: ${HOME}/.local
+
+  # Environment variables for compiling and running the test program.
+  # Usually none of this is needed as `make install` would install to system locations
+  # where include and library search paths are already set up to just work.
+  # gcc environment variables. see https://gcc.gnu.org/onlinedocs/gcc/Environment-Variables.html
+  C_INCLUDE_PATH: ${HOME}/.local/include
+  LIBRARY_PATH: ${HOME}/.local/lib
+  # LD_LIBRARY_PATH: ${HOME}/.local/lib
+  # NOTE: msys2 doesn't use LD_LIBRARY_PATH. .dll files are installed in .local/bin
+  # so add ./local/bin to PATH
+  BIN_PATH: ${HOME}/.local/bin
+
+jobs:
+  msys2-ucrt64:
+    # based on official recommended msys2 CI setup. see:  https://www.msys2.org/docs/ci/
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - name: checkout PortAudio git repo
+      uses: actions/checkout@v3
+    - name: setup msys2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: git mingw-w64-ucrt-x86_64-gcc
+    # regenerate configure script due to MSYS2 "Known Issues" see: https://www.msys2.org/docs/autotools/
+    - name: setup autotools for autoreconf
+      run: |
+        pacman --noconfirm -S "${MINGW_PACKAGE_PREFIX}-autotools"
+        pacman --noconfirm -S "autoconf-archive"
+    - name: autoreconf
+      run: |
+        autoreconf -fvi
+    # test configure and build
+    - name: configure
+      run: ./configure --prefix=${{ env.PORTAUDIO_INSTALL_DIR }}
+    - name: make
+      run: make
+    # test make install
+    - name: install
+      run: make install
+    - name: list install dirs (post-install)
+      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.BIN_PATH }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }}
+    - name: build patest_init.c (test just calls Pa_Initialize();Pa_Terminate();)
+      run: |
+        C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
+        LIBRARY_PATH=${{ env.LIBRARY_PATH }}
+        gcc -o patest_init.exe ./test/patest_init.c -lportaudio
+        ls
+    - name: run patest_init.exe
+      run: |
+        export PATH=${{ env.BIN_PATH }}:$PATH
+        ./patest_init.exe
+      # test make uninstall
+    - name: uninstall
+      run: make uninstall
+    - name: list install dirs (post-uninstall)
+      run: ls ${{ env.PORTAUDIO_INSTALL_DIR }} ${{ env.BIN_PATH }} ${{ env.C_INCLUDE_PATH }} ${{ env.LIBRARY_PATH }}
+    - name: build patest_init.c to check uninstall (expect failure)
+      run: |
+        C_INCLUDE_PATH=${{ env.C_INCLUDE_PATH }}
+        LIBRARY_PATH=${{ env.LIBRARY_PATH }}
+        if gcc -o patest_init.exe ./test/patest_init.c -lportaudio; then exit 1; else exit 0; fi

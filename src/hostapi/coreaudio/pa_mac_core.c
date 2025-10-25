@@ -232,6 +232,37 @@ PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
     return result;
 }
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
+PaError PaMacCore_GetOSWorkgroup( PaDeviceIndex device, os_workgroup_t *workgroup )
+{
+    PaError result;
+    PaUtilHostApiRepresentation *hostApi;
+
+    result = PaUtil_GetHostApiRepresentation( &hostApi, paCoreAudio );
+
+    if( result == paNoError )
+    {
+        PaDeviceIndex hostApiDeviceIndex;
+        result = PaUtil_DeviceIndexToHostApiDeviceIndex( &hostApiDeviceIndex, device, hostApi );
+        if( result == paNoError )
+        {
+            PaMacAUHAL *macCoreHostApi = (PaMacAUHAL*)hostApi;
+            AudioDeviceID macCoreDeviceId = macCoreHostApi->devIds[hostApiDeviceIndex];
+            UInt32 propSize = sizeof( os_workgroup_t );
+
+            // return the workgroup for the output scope unless the device only has inputs,
+            // in which case return the workgroup for the input scope
+            Boolean isInputOnly = 0;
+            if( macCoreHostApi->inheritedHostApiRep.deviceInfos[hostApiDeviceIndex]->maxOutputChannels == 0 )
+                isInputOnly = 1;
+
+            result = WARNING(PaMacCore_AudioDeviceGetProperty( macCoreDeviceId, 0, isInputOnly, kAudioDevicePropertyIOThreadOSWorkgroup, &propSize, workgroup ) );
+        }
+    }
+
+    return result;
+}
+#endif
 
 AudioDeviceID PaMacCore_GetStreamInputDevice( PaStream* s )
 {

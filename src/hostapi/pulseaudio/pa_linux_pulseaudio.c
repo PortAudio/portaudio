@@ -1270,11 +1270,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             goto openstream_error;
         }
 
-        if( result != paNoError )
-        {
-            goto openstream_error;
-        }
-
         stream->outputDevice = outputParameters->device;
 
         /* Convert positive suggestedLatency from seconds to microseconds, otherwise default to zero. */
@@ -1367,6 +1362,13 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( stream )
     {
+        /* If the blocking input ring buffer was allocated, release it. */
+        if( stream->inputRing.buffer )
+        {
+            free( stream->inputRing.buffer );
+            stream->inputRing.buffer = NULL;
+        }
+
         PaUtil_FreeMemory( stream->inputStreamName );
         PaUtil_FreeMemory( stream->outputStreamName );
         PaUtil_FreeMemory( stream );

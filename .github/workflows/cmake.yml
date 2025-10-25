@@ -78,20 +78,20 @@ jobs:
       with:
         path: ${{ matrix.asio_sdk_cache_path }}
         key: ${{ hashFiles('.github/asiosdk-version.txt') }}
-               
+
     - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v7
+      uses: lukka/run-vcpkg@v11
       if: ${{ matrix.vcpkg_triplet }} != null
       with:
         vcpkgDirectory: ${{ github.workspace }}/../vcpkg
         vcpkgTriplet: ${{ matrix.vcpkg_triplet }}
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: build/vcpkg_installed
-        # vcpkg commit: [libxml2] Fix ICU support option, hash: ca9ac0b, date: Dec 1, 2023, https://github.com/microsoft/vcpkg/commits
-        vcpkgGitCommitId: ca9ac0ba65965937fb66783c4f726c2c755ad9d9
+        # latest vcpkg commit as of Aug 29, 2025, https://github.com/microsoft/vcpkg/commits
+        vcpkgGitCommitId: 5300a2a461a53b76405db4fcbe6aeb0eea43935d
         # Required when using vcpkg.json manifest in repository
         setupOnly: true
-        
+
     - name: Configure PortAudio library
       run: cmake
            -G "${{ matrix.cmake_generator }}"
