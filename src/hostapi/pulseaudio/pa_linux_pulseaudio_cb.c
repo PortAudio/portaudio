@@ -190,7 +190,7 @@ void _PaPulseAudio_WriteRingBuffer( PaUtilRingBuffer *ringbuffer,
     /*
      * If insufficient space is available, read data from
      * the ring buffer to ensure that it is not full and to prevent
-     * audio underrun.
+     * audio overrun.
      *
      * Attempting to read an excessive amount of data when there is
      * insufficient space will result in failure; however, the
