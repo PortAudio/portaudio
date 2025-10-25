@@ -320,8 +320,9 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
     }
 
-    /* If input is desired without output (non-duplex operation),
-     * the following calculation should be utilized.
+    /* If there is input stream available then calculate Portaudio
+     * needed bytes per request as Pulseaudio can ask mainly any amount
+     * of bytes also check callback availability.
      */
     if( stream->inputStream )
     {
@@ -381,15 +382,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
         PaUtil_BeginCpuLoadMeasurement( &stream->cpuLoadMeasurer );
 
-        /* In the context of PortAudio duplex operation, it is required
-         * that the same amount of data be written and read. Failure to
-         * adhere to this requirement may result in malfunctioning
-         * behavior of PortAudio.
-         *
-         * This necessity dictates the implementation approach.
-         * PulseAudio operates independently of this constraint,
-         * necessitating minor adjustments.
-         */
         PaUtil_BeginBufferProcessing( &stream->bufferProcessor,
                                       &timeInfo,
                                       0 );
@@ -835,10 +827,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     {
         /* The tlength parameter functions similarly to fragsize in
          * the recording process, as explained in the preceding comments.
-         *
-         * In the future, this should be adjusted as necessary when
-         * conditions change; currently, it serves as a satisfactory
-         * default.
          */
         stream->outputBufferAttr.tlength = pa_usec_to_bytes( pulseaudioReqFrameSize,
                                                              &stream->outputSampleSpec );
@@ -935,9 +923,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         goto startstreamcb_error;
     }
 
-    /* It must be ensured that no errors are encountered during
-     * initialization.
-     */
     ret = paNoError;
 
     /* Stream is now active */
