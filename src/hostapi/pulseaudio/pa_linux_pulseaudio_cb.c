@@ -277,7 +277,7 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
     if( stream->outputStream )
     {
-        /* Calculate how many bytes go into to one frame */
+        /* Calculate the host buffer size in bytes */
         pulseaudioInputBytes = pulseaudioOutputBytes = (hostFramesPerBuffer * stream->outputFrameSize);
 
         if( stream->bufferProcessor.streamCallback )
