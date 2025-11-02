@@ -371,7 +371,7 @@ void PaPulseAudio_SinkListCb( pa_context * c,
 {
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi =
         (PaPulseAudio_HostApiRepresentation *) userdata;
-    const char *pulseaudioDeviceName = NULL;
+    const char *pulseaudioDeviceDescription = NULL;
 
 
     /* If this is null we have big problems and we probably are out of memory */
@@ -388,16 +388,16 @@ void PaPulseAudio_SinkListCb( pa_context * c,
         goto error;
     }
 
-    pulseaudioDeviceName = l->name;
+    pulseaudioDeviceDescription = l->name;
 
     if( l->description != NULL )
     {
-        pulseaudioDeviceName = l->description;
+        pulseaudioDeviceDescription = l->description;
     }
 
     if( _PaPulseAudio_AddAudioDevice( pulseaudioHostApi,
-                                      pulseaudioDeviceName,
                                       l->name,
+                                      pulseaudioDeviceDescription,
                                       0,
                                       l->sample_spec.channels,
                                       0,
@@ -423,7 +423,7 @@ void PaPulseAudio_SourceListCb( pa_context * c,
 {
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi =
         (PaPulseAudio_HostApiRepresentation *) userdata;
-    const char *pulseaudioDeviceName = NULL;
+    const char *pulseaudioDeviceDescription = NULL;
 
 
     /* If this is null we have big problems and we probably are out of memory */
@@ -440,16 +440,16 @@ void PaPulseAudio_SourceListCb( pa_context * c,
         goto error;
     }
 
-    pulseaudioDeviceName = l->name;
+    pulseaudioDeviceDescription = l->name;
 
     if( l->description != NULL )
     {
-        pulseaudioDeviceName = l->description;
+        pulseaudioDeviceDescription = l->description;
     }
 
     if( _PaPulseAudio_AddAudioDevice( pulseaudioHostApi,
-                                      pulseaudioDeviceName,
                                       l->name,
+                                      pulseaudioDeviceDescription,
                                       l->sample_spec.channels,
                                       0,
                                       PA_PULSEAUDIO_DEFAULT_MIN_LATENCY,
