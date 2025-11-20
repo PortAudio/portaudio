@@ -81,7 +81,6 @@ void BiquadFilter_SetupNotch( BiquadFilter *filter, double ratio, double Q )
 */
 void BiquadFilter_Filter( BiquadFilter *filter, float *inputs, float *outputs, int numSamples )
 {
-    int i;
     double xn, yn;
     // Pull values from structure to speed up the calculation.
     double a0 = filter->a0;
@@ -94,7 +93,7 @@ void BiquadFilter_Filter( BiquadFilter *filter, float *inputs, float *outputs, i
     double yn1 = filter->yn1;
     double yn2 = filter->yn2;
 
-    for( i=0; i<numSamples; i++)
+    for( int i=0; i<numSamples; i++)
     {
         // Generate outputs by filtering inputs.
         xn = inputs[i];
