@@ -94,6 +94,7 @@ jobs:
 
     - name: Configure PortAudio library
       run: cmake
+           --fresh
            -G "${{ matrix.cmake_generator }}"
            ${{ matrix.cmake_options }}
            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/../vcpkg/scripts/buildsystems/vcpkg.cmake
@@ -106,14 +107,18 @@ jobs:
            -DPA_WARNINGS_ARE_ERRORS=ON
            -S .
            -B ${{ github.workspace }}/build
-    - name: Build PortAudio library
-      run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
+    - name: Build PortAudio library STATIC
+      run: cmake -DPA_BUILD_SHARED_LIBS=OFF --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
+    - name: Build PortAudio library CLEAN
+      run: cmake -DPA_BUILD_SHARED_LIBS=OFF --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --target clean
+    - name: Build PortAudio library SHARED
+      run: cmake -DPA_BUILD_SHARED_LIBS=ON --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
     - name: Install PortAudio library
       run: cmake --install ${{ github.workspace }}/build --config ${{ env.cmake_build_type }}
-     
+
       # Required for vcpkg packages to be found by CMake's find_package()
     - name: Enter build-test
-      run: cd ${{ github.workspace }}/test/test_use_cmake     
+      run: cd ${{ github.workspace }}/test/test_use_cmake
     - name: Configure build-test
       run: cmake
            -G "${{ matrix.cmake_generator }}"
