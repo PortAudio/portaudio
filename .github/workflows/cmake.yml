@@ -92,7 +92,7 @@ jobs:
         # Required when using vcpkg.json manifest in repository
         setupOnly: true
 
-    - name: Configure PortAudio library
+    - name: Configure PortAudio library for STATIC
       run: cmake
            --fresh
            -G "${{ matrix.cmake_generator }}"
@@ -105,15 +105,22 @@ jobs:
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
            -DPA_WARNINGS_ARE_ERRORS=ON
+           -DPA_BUILD_SHARED_LIBS=OFF
            -S .
            -B ${{ github.workspace }}/build
     - name: Build PortAudio library STATIC
-      run: cmake -DPA_BUILD_SHARED_LIBS=OFF --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
     - name: Build PortAudio library CLEAN
-      run: cmake -DPA_BUILD_SHARED_LIBS=OFF --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --target clean
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --target clean
+
+    - name: Configure PortAudio library for SHARED
+      run: cmake
+           -S .
+           -B ${{ github.workspace }}/build
+           -DPA_BUILD_SHARED_LIBS=ON
     - name: Build PortAudio library SHARED
       run: cmake -DPA_BUILD_SHARED_LIBS=ON --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
-    - name: Install PortAudio library
+    - name: Install PortAudio library SHARED
       run: cmake --install ${{ github.workspace }}/build --config ${{ env.cmake_build_type }}
 
       # Required for vcpkg packages to be found by CMake's find_package()
