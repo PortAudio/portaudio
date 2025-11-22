@@ -119,7 +119,7 @@ jobs:
            -B ${{ github.workspace }}/build
            -DPA_BUILD_SHARED_LIBS=ON
     - name: Build PortAudio library SHARED
-      run: cmake -DPA_BUILD_SHARED_LIBS=ON --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
+      run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
     - name: Install PortAudio library SHARED
       run: cmake --install ${{ github.workspace }}/build --config ${{ env.cmake_build_type }}
 
