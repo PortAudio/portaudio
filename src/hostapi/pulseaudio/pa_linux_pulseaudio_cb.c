@@ -802,7 +802,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
         if( result == paNoError && stream->inputDevice != defaultInputDevice )
         {
             pulseaudioName = pulseaudioHostApi->
-                        pulseaudioDeviceNames[stream->inputDevice];
+                                deviceInfoArray[stream->inputDevice].name;
         }
 
         if ( result == paNoError )
@@ -882,7 +882,7 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
             if( result == paNoError && stream->outputDevice != defaultOutputDevice )
             {
                 pulseaudioName = pulseaudioHostApi->
-                                    pulseaudioDeviceNames[stream->outputDevice];
+                                    deviceInfoArray[stream->outputDevice].name;
             }
 
             if(result == paNoError)
