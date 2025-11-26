@@ -76,7 +76,7 @@ void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFo
 
         case paInt8:
         {
-            char *data = (char *)input;
+            signed char *data = (signed char *)input;
             for( i=0; i<numSamples; i++ )
             {
                 int value = *data++;
@@ -130,12 +130,12 @@ void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat o
 
         case paInt8:
         {
-            char *data = (char *)output;
+            signed char *data = (signed char *)output;
             for( i=0; i<numSamples; i++ )
             {
                 float value = *input++;
                 int byte = (int) (value * 127);
-                *data++ = (char) byte;
+                *data++ = (signed char) byte;
             }
         }
             break;

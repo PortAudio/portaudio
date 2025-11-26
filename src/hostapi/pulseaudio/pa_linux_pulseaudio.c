@@ -51,14 +51,13 @@
 */
 
 
-#include <string.h>     /* strlen() */
-
 #include "pa_linux_pulseaudio_cb_internal.h"
 #include "pa_linux_pulseaudio_block_internal.h"
 
 /* PulseAudio headers */
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <pulse/pulseaudio.h>
 
 /* This is used to identify process name for PulseAudio. */
@@ -564,7 +563,6 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 {
     PaError result = paNoError;
     int i;
-    int deviceCount;
     int ret = 0;
     int lockTaken = 0;
     PaPulseAudio_HostApiRepresentation *pulseaudioHostApi = NULL;
@@ -650,12 +648,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                 PaPulseAudio_ServerInfoCb,
                                 pulseaudioHostApi );
 
-    while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
-    {
-        pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-    }
+    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
 
-    pa_operation_unref( pulseaudioOperation );
+    PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                   &pulseaudioOperation );
+
+    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
 
     /* Add the "Default" sink at index 0 */
     if( _PaPulseAudio_AddAudioDevice( pulseaudioHostApi,
@@ -701,12 +701,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                        PaPulseAudio_SinkListCb,
                                        pulseaudioHostApi );
 
-    while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
-    {
-        pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-    }
+    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
 
-    pa_operation_unref( pulseaudioOperation );
+    PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                   &pulseaudioOperation );
+
+    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
 
     /* List PulseAudio sources. If found callback: PaPulseAudio_SourceListCb */
     pulseaudioOperation =
@@ -714,12 +716,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
                                          PaPulseAudio_SourceListCb,
                                          pulseaudioHostApi );
 
-    while( pa_operation_get_state( pulseaudioOperation ) == PA_OPERATION_RUNNING )
-    {
-        pa_threaded_mainloop_wait( pulseaudioHostApi->mainloop );
-    }
+    PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
+    lockTaken = 0;
 
-    pa_operation_unref( pulseaudioOperation );
+    PaPulseAudio_ReleaseOperation( pulseaudioHostApi,
+                                   &pulseaudioOperation );
+
+    PaPulseAudio_Lock( pulseaudioHostApi->mainloop );
+    lockTaken = 1;
 
     (*hostApi)->info.deviceCount = pulseaudioHostApi->deviceCount;
 
@@ -1363,6 +1367,13 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     if( stream )
     {
+        /* If the blocking input ring buffer was allocated, release it. */
+        if( stream->inputRing.buffer )
+        {
+            free( stream->inputRing.buffer );
+            stream->inputRing.buffer = NULL;
+        }
+
         PaUtil_FreeMemory( stream->inputStreamName );
         PaUtil_FreeMemory( stream->outputStreamName );
         PaUtil_FreeMemory( stream );
@@ -1461,11 +1472,8 @@ PaError PaPulseAudio_RenameSource( PaStream *s, const char *streamName )
     op = pa_stream_set_name( stream->inputStream, streamName, RenameStreamCb, stream );
     PaPulseAudio_UnLock( stream->mainloop );
 
-    /* Wait for completion. */
-    while (pa_operation_get_state( op ) == PA_OPERATION_RUNNING)
-    {
-        pa_threaded_mainloop_wait( stream->mainloop );
-    }
+    PaPulseAudio_ReleaseOperation( stream->hostapi,
+                                   &op );
 
     return result;
 }
@@ -1498,10 +1506,8 @@ PaError PaPulseAudio_RenameSink( PaStream *s, const char *streamName )
     PaPulseAudio_UnLock( stream->mainloop );
 
     /* Wait for completion. */
-    while (pa_operation_get_state( op ) == PA_OPERATION_RUNNING)
-    {
-        pa_threaded_mainloop_wait( stream->mainloop );
-    }
+    PaPulseAudio_ReleaseOperation( stream->hostapi,
+                                   &op );
 
     return result;
 }

@@ -673,7 +673,6 @@ int PaQa_RunLoopback( LoopbackContext *loopbackContext )
     PaError err = 0;
     TestParameters *test = loopbackContext->test;
 
-
     if( test->flags & PAQA_FLAG_TWO_STREAMS )
     {
         if( test->flags & PAQA_FLAG_USE_BLOCKING_IO )
@@ -722,12 +721,30 @@ static int PaQa_SaveTestResultToWaveFile( UserOptions *userOptions, PaQaRecordin
 }
 
 /*******************************************************************/
-static int PaQa_SetupLoopbackContext( LoopbackContext *loopbackContextPtr, TestParameters *testParams )
+static int PaQa_SetupLoopbackContext(
+        LoopbackContext *loopbackContextPtr,
+        TestParameters *testParams )
 {
     int i;
+    int err;
     // Setup loopback context.
     memset( loopbackContextPtr, 0, sizeof(LoopbackContext) );
     loopbackContextPtr->test = testParams;
+
+    // Check to see if the selected formats are supported.
+    err = Pa_IsFormatSupported( &testParams->inputParameters, NULL, testParams->sampleRate );
+    if( err != paFormatIsSupported )
+    {
+        printf( "Input not supported for this format! Reason = %s\n", Pa_GetErrorText( err ) );
+        return err;
+    }
+    err = Pa_IsFormatSupported( NULL, &testParams->outputParameters, testParams->sampleRate );
+    if( err != paFormatIsSupported )
+    {
+        printf( "Output not supported for this format! Reason = %s\n", Pa_GetErrorText( err ) );
+        return err;
+    }
+
     for( i=0; i<testParams->samplesPerFrame; i++ )
     {
         int err = PaQa_InitializeRecording( &loopbackContextPtr->recordings[i], testParams->maxFrames, testParams->sampleRate );
@@ -849,7 +866,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
         {
             double latencyMSec;
 
-            printf( "%4lu-%4lu | ",
+            printf( "%4lu,%4lu | ",
                    loopbackContext.minFramesPerBuffer,
                    loopbackContext.maxFramesPerBuffer
                    );
@@ -1182,19 +1199,8 @@ int PaQa_CheckForLoopBack( UserOptions *userOptions, PaDeviceIndex inputDevice, 
     testParams.maxFrames = (int) (LOOPBACK_DETECTION_DURATION_SECONDS * testParams.sampleRate);
     minAmplitude = testParams.amplitude / 4.0;
 
-    // Check to see if the selected formats are supported.
-    if( Pa_IsFormatSupported( &testParams.inputParameters, NULL, testParams.sampleRate ) != paFormatIsSupported )
-    {
-        printf( "Input not supported for this format!\n" );
-        return 0;
-    }
-    if( Pa_IsFormatSupported( NULL, &testParams.outputParameters, testParams.sampleRate ) != paFormatIsSupported )
-    {
-        printf( "Output not supported for this format!\n" );
-        return 0;
-    }
-
-    PaQa_SetupLoopbackContext( &loopbackContext, &testParams );
+    err = PaQa_SetupLoopbackContext( &loopbackContext, &testParams );
+    if( err ) return err;
 
     if( inputDevice == outputDevice )
     {
@@ -1293,7 +1299,7 @@ static int CheckLoopbackAndScan( UserOptions *userOptions,
 /*******************************************************************/
 /**
  * Scan every combination of output to input device.
- * If a loopback is found the analyse the combination.
+ * If a loopback is found then analyse the combination.
  * The scan can be overridden using the -i and -o command line options.
  */
 static int ScanForLoopback(UserOptions *userOptions)
@@ -1348,7 +1354,7 @@ int TestSampleFormatConversion( void )
     int i;
     const float floatInput[] = { 1.0, 0.5, -0.5, -1.0 };
 
-    const char charInput[] = { 127, 64, -64, -128 };
+    const signed char charInput[] = { 127, 64, -64, -128 };
     const unsigned char ucharInput[] = { 255, 128+64, 64, 0 };
     const short shortInput[] = { 32767, 32768/2, -32768/2, -32768 };
     const int int_minus_2147483648 = (-2147483647 - 1); /*"-2147483648" as a signed integer. See PR #814*/
@@ -1358,7 +1364,7 @@ int TestSampleFormatConversion( void )
     short shortOutput[4];
     int intOutput[4];
     unsigned char ucharOutput[4];
-    char charOutput[4];
+    signed char charOutput[4];
 
     QA_ASSERT_EQUALS("int must be 32-bit", 4, (int) sizeof(int) );
     QA_ASSERT_EQUALS("short must be 16-bit", 2, (int) sizeof(short) );

@@ -87,6 +87,8 @@ To fix this issue replace the line:
 with:
     delete [] lpdrv;
 
+In the cmake build of portaudio this is already done for you.
+
 Explanation: lpdrv is allocated as an array on the line:
     lpdrv = new ASIODRVSTRUCT[1];
 Hence it must also be deleted as an array as per standard C++ rules.

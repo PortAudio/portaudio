@@ -195,10 +195,13 @@ PaPulseAudio_Stream;
                 return errorCode; \
             } \
     } \
-    if( !pastream->isActive || pastream->isStopped ) \
+    if( !(pastream)->isActive || (pastream)->isStopped ) \
     { \
-            return paStreamIsStopped; \
+        return paStreamIsStopped; \
     }
+
+void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
+                                  pa_operation **pulseaudioOperation);
 
 void PaPulseAudio_Lock( pa_threaded_mainloop *mainloop );
 
@@ -224,7 +227,6 @@ PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                     PaStreamFlags streamFlags,
                     PaStreamCallback * streamCallback,
                     void *userData );
-
 
 PaError IsStreamStopped( PaStream * s );
 PaError IsStreamActive( PaStream * stream );

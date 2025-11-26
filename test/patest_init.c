@@ -1,13 +1,14 @@
-/** @file patest_ringmix.c
+/** @file patest_init.c
     @ingroup test_src
-    @brief Ring modulate inputs to left output, mix inputs to right output.
+    @brief Initialize and terminate PortAudio
+    @author Ross Bencina
 */
 /*
  * $Id$
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com
- * Copyright (c) 1999-2000 Ross Bencina and Phil Burk
+ * Copyright (c) 1999-2024 Ross Bencina and Phil Burk
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files
@@ -40,47 +41,36 @@
  * license above.
  */
 
-
 #include <stdio.h>
+
 #include "portaudio.h"
-/* This will be called asynchronously by the PortAudio engine. */
-static int myCallback( const void *inputBuffer, void *outputBuffer,
-                            unsigned long framesPerBuffer,
-                            const PaStreamCallbackTimeInfo* timeInfo,
-                            PaStreamCallbackFlags statusFlags,
-                            void *userData )
-{
-    const float *in  = (const float *) inputBuffer;
-    float *out = (float *) outputBuffer;
-    float leftInput, rightInput;
-    unsigned int i;
 
-    /* Read input buffer, process data, and fill output buffer. */
-    for( i=0; i<framesPerBuffer; i++ )
-    {
-        leftInput = *in++;      /* Get interleaved samples from input buffer. */
-        rightInput = *in++;
-        *out++ = leftInput * rightInput;            /* ring modulation */
-        *out++ = 0.5f * (leftInput + rightInput);   /* mix */
-    }
-    return 0;
-}
-
-/* Open a PortAudioStream to input and output audio data. */
+int main(void);
 int main(void)
 {
-    PaStream *stream;
-    Pa_Initialize();
-    Pa_OpenDefaultStream(
-        &stream,
-        2, 2,               /* stereo input and output */
-        paFloat32,  44100.0,
-        64,                 /* 64 frames per buffer */
-        myCallback, NULL );
-    Pa_StartStream( stream );
-    Pa_Sleep( 10000 );    /* Sleep for 10 seconds while processing. */
-    Pa_StopStream( stream );
-    Pa_CloseStream( stream );
+    PaError err;
+
+    printf("PortAudio Test: initialize and terminate.\n");
+
+    err = Pa_Initialize();
+    if( err != paNoError ) {
+        fprintf( stderr, "An error occurred while initializing PortAudio\n" );
+        goto error;
+    }
+
+    err = Pa_Terminate();
+    if( err != paNoError ) {
+        fprintf( stderr, "An error occurred while terminating PortAudio\n" );
+        goto error;
+    }
+
+    printf("Test completed successfully.\n");
+    return err;
+
+error:
     Pa_Terminate();
-    return 0;
+
+    fprintf( stderr, "Error number: %d\n", err );
+    fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
+    return err;
 }

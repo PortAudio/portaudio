@@ -106,7 +106,7 @@
 
 #if !defined(__CYGWIN__) && !defined(UNDER_CE)
 #define CREATE_THREAD (HANDLE)_beginthreadex
-#undef CLOSE_THREAD_HANDLE /* as per documentation we don't call CloseHandle on a thread created with _beginthreadex */
+#define CLOSE_THREAD_HANDLE CloseHandle /* NOTE: _beginthreadex requires handle to be closed with CloseHandle */
 #define PA_THREAD_FUNC static unsigned WINAPI
 #define PA_THREAD_ID unsigned
 #else
@@ -318,7 +318,6 @@ typedef struct PaWinDsStream
 #endif
     HANDLE           processingThread;
     PA_THREAD_ID     processingThreadId;
-    HANDLE           processingThreadCompleted;
 #endif
 
 } PaWinDsStream;
@@ -1725,7 +1724,7 @@ error:
 
 static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
                                     unsigned long *pollingPeriodFrames,
-                                    int isFullDuplex,
+                                    int hasInput, int hasOutput,
                                     unsigned long suggestedInputLatencyFrames,
                                     unsigned long suggestedOutputLatencyFrames,
                                     double sampleRate, unsigned long userFramesPerBuffer )
@@ -1754,7 +1753,7 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
     else
     {
         unsigned long targetBufferingLatencyFrames = suggestedInputLatencyFrames;
-        if( isFullDuplex )
+        if( hasInput && hasOutput )
         {
             /* In full duplex streams we know that the buffer adapter adds userFramesPerBuffer
                extra fixed latency. so we subtract it here as a fixed latency before computing
@@ -1790,6 +1789,21 @@ static void CalculateBufferSettings( unsigned long *hostBufferSizeFrames,
         {
             *pollingPeriodFrames = maximumPollingPeriodFrames;
         }
+    }
+
+    /* In some (most?) systems, DirectSound has an odd limitation where it always uses
+       a fixed 31.25 ms granularity for the read cursor, regardless of parameters.
+       This in turn means that if we allocate an input buffer that is less than 31.25 ms,
+       the read cursor will stay stuck at zero. See https://github.com/PortAudio/portaudio/issues/775
+       To work around this problem, ensure that the input host buffer is large enough
+       for at least two 31.25 ms buffer "halves".
+
+       On pre-Vista Windows, we don't do this because DirectSound is implemented very
+       differently, and is therefore unlikely to suffer from the same issue.
+    */
+    if( hasInput && PaWinUtil_GetOsVersion() >= paOsVersionWindowsVistaServer2008 )
+    {
+        *hostBufferSizeFrames = max( *hostBufferSizeFrames, 2 * 0.03125 * sampleRate );
     }
 }
 
@@ -2092,16 +2106,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         }
 #endif
 
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-        stream->processingThreadCompleted = CreateEvent( NULL, /* bManualReset = */ TRUE, /* bInitialState = */ FALSE, NULL );
-        if( stream->processingThreadCompleted == NULL )
-        {
-            result = paUnanticipatedHostError;
-            PA_DS_SET_LAST_DIRECTSOUND_ERROR( GetLastError() );
-            goto error;
-        }
-#endif
-
         /* set up i/o parameters */
 
         if( userRequestedHostInputBufferSizeFrames > 0 || userRequestedHostOutputBufferSizeFrames > 0 )
@@ -2120,7 +2124,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         else
         {
             CalculateBufferSettings( (unsigned long*)&stream->hostBufferSizeFrames, &pollingPeriodFrames,
-                    /* isFullDuplex = */ (inputParameters && outputParameters),
+                    /* hasInput = */ !!inputParameters,
+                    /* hasOutput = */ !!outputParameters,
                     suggestedInputLatencyFrames,
                     suggestedOutputLatencyFrames,
                     sampleRate, framesPerBuffer );
@@ -2292,11 +2297,6 @@ error:
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
         if( stream->waitableTimer != NULL )
             CloseHandle( stream->waitableTimer );
-#endif
-
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-        if( stream->processingThreadCompleted != NULL )
-            CloseHandle( stream->processingThreadCompleted );
 #endif
 
         if( stream->pDirectSoundOutputBuffer )
@@ -2785,8 +2785,6 @@ PA_THREAD_FUNC ProcessingThreadProc( void *pArg )
     }
 #endif /* PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT */
 
-    SetEvent( stream->processingThreadCompleted );
-
     return 0;
 }
 
@@ -2806,10 +2804,6 @@ static PaError CloseStream( PaStream* s )
 #ifdef PA_WIN_DS_USE_WAITABLE_TIMER_OBJECT
     if( stream->waitableTimer != NULL )
         CloseHandle( stream->waitableTimer );
-#endif
-
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-    CloseHandle( stream->processingThreadCompleted );
 #endif
 
     // Cleanup the sound buffers
@@ -2905,10 +2899,6 @@ static PaError StartStream( PaStream *s )
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
 
     ResetEvent( stream->processingCompleted );
-
-#ifndef PA_WIN_DS_USE_WMME_TIMER
-    ResetEvent( stream->processingThreadCompleted );
-#endif
 
     if( stream->bufferProcessor.inputChannelCount > 0 )
     {
@@ -3051,9 +3041,7 @@ error:
 #ifndef PA_WIN_DS_USE_WMME_TIMER
     if( stream->processingThread )
     {
-#ifdef CLOSE_THREAD_HANDLE
         CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
-#endif
         stream->processingThread = NULL;
     }
 #endif
@@ -3089,13 +3077,11 @@ static PaError StopStream( PaStream *s )
 #else
     if( stream->processingThread )
     {
-        if( WaitForSingleObject( stream->processingThreadCompleted, 30*100 ) == WAIT_TIMEOUT )
+        if( WaitForSingleObject( stream->processingThread, 30*100 ) == WAIT_TIMEOUT )
             return paUnanticipatedHostError;
 
-#ifdef CLOSE_THREAD_HANDLE
-        CloseHandle( stream->processingThread ); /* Delete thread. */
+        CLOSE_THREAD_HANDLE( stream->processingThread ); /* Delete thread. */
         stream->processingThread = NULL;
-#endif
 
     }
 #endif
