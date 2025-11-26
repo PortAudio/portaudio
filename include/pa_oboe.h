@@ -87,31 +87,34 @@ enum class PaOboe_InputPreset : int32_t {
 enum class PaOboe_PerformanceMode : int32_t { None = 10 , PowerSaving = 11 , LowLatency = 12 };
 
 /**
+ * Enum class that emulates Oboe::SharingMode
+ */
+enum class PaOboe_SharingMode : int32_t {  Exclusive = 0, Shared = 1 };
+
+/**
+ * Enum class that emulates Oboe::ContentType
+ */
+enum class PaOboe_ContentType : int32_t { Speech = 1, Music = 2, Movie = 3, Sonification = 4 };
+
+/**
  *  The android stream type and recording preset as defined in Oboe.
  */
 typedef struct PaOboeStreamInfo {
+    // REquired fields to allow casting into PaUtilHostApiSpecificStreamInfoHeader
+    unsigned long size;
+    PaHostApiTypeId hostApiType; 
+    unsigned long version;
+
     PaOboe_Usage androidOutputUsage;
     PaOboe_InputPreset androidInputPreset;
+    PaOboe_PerformanceMode performanceMode;
+    PaOboe_SharingMode sharingMode;
+    PaOboe_ContentType contentType;
+    const char* packageName;
 } PaOboeStreamInfo;
 
-
-/**
- * Provide PaOboe with the ID of the device the user chose - oboe cannot build a device list,
- * but can select the device if provided with its ID.
- * @param direction - the direction of the stream for which we want to set the device.
- * @param deviceID - the ID of the chosen device chosen by the user.
- */
-void PaOboe_SetSelectedDevice(PaOboe_Direction direction, int32_t deviceID);
-
-
-/**
- * \brief   Provide PaOboe with the performance mode chosen by the user. If this method isn't called, the default mode
- *          is LowLatency.
- * @param   direction - the direction of the stream for which we want to set the performance mode.
- * @param   performanceMode - the performance mode chosen by the user.
- */
-void PaOboe_SetPerformanceMode(PaOboe_Direction direction, PaOboe_PerformanceMode performanceMode);
-
+/** Initialize host API specific structure, call this before setting relevant attributes. */
+void PaOboe_InitializeStreamInfo( PaOboeStreamInfo *info );
 
 /**
  * Provide PA Oboe with native buffer information. If you call this function, you must do so before
@@ -133,6 +136,16 @@ void PaOboe_SetNativeBufferSize(unsigned long bufferSize);
  * android.media.property.OUTPUT_SAMPLE_RATE.
  */
 void PaOboe_SetNumberOfBuffers(unsigned numberOfBuffers);
+
+/**
+ * Since Obee doesn't have the ability to detect devices, this helper functions allows the user to register devices, 
+ * previously detected thanks to the JNI interface, since Google is committed to only allow this option to detect devices.
+ * @param name The device name
+ * @param direction The device direction
+ * @param channelCounts The device channel count
+ * @param sampleRate The device default sampleRate
+ */
+void PaOboe_RegisterDevice(const char* name, PaOboe_Direction direction, int channelCounts, int sampleRate);
 
 #ifdef __cplusplus
 }

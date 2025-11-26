@@ -113,11 +113,11 @@ PaUtilHostApiInitializer *paHostApiInitializers[] =
 #endif
 
 #if PA_USE_PULSEAUDIO
-                PaPulseAudio_Initialize,
+        PaPulseAudio_Initialize,
 #endif
 
 #if PA_USE_OBOE
-                PaOboe_Initialize,
+        PaOboe_Initialize,
 #endif
 
 #if PA_USE_SKELETON

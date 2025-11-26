@@ -30,6 +30,7 @@ Please feel free to join. See http://www.portaudio.com for details.
     src/os                  = os specific (but host api neutral) code
     src/hostapi             = implementations for different host apis
 
+
 ### Host API Implementations:
 
     src/hostapi/alsa        = Advanced Linux Sound Architecture (ALSA)

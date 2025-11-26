@@ -19,10 +19,6 @@ libtool
 portaudio-2.0.pc
 autom4te.cache/*
 
-# build_all_PaOboe.sh CMake output folder
-build
-build_old
-
 # Precompiled Headers
 *.gch
 *.pch
@@ -58,7 +54,5 @@ CMakeSettings.json
 # VSCode
 .vscode*
 
-# idea
-.idea*
-
 # Common build directories of users and VSCode
+build*
