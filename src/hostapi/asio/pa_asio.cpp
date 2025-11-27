@@ -1629,6 +1629,9 @@ typedef struct PaAsioStream
     PaStreamCallbackFlags callbackFlags;
 
     PaAsioStreamBlockingState *blockingState; /**< Blocking i/o data struct, or NULL when using callback interface. */
+
+    /* Message callbacks copied from PaAsioStreamInfo */
+    PaAsio_MessageCallback *messageCallback[2];
 }
 PaAsioStream;
 
@@ -1871,10 +1874,28 @@ static PaError ValidateAsioSpecificStreamInfo(
 {
     if( streamInfo )
     {
-        if( streamInfo->size != sizeof( PaAsioStreamInfo )
-                || streamInfo->version != 1 )
+        switch( streamInfo->version )
         {
+        case 0:
+            /* NOTE: Struct version 0 is invalid, possibly indicative of uninitialized data. */
             return paIncompatibleHostApiSpecificStreamInfo;
+
+        case 1:
+            /* NOTE: V1 structure's size is smaller by one pointer. */
+            if( streamInfo->size < sizeof( PaAsioStreamInfo ) - sizeof(PaAsio_MessageCallback*) )
+                return paIncompatibleHostApiSpecificStreamInfo;
+            break;
+
+        case 2:
+            if( streamInfo->size != sizeof( PaAsioStreamInfo ) )
+                return paIncompatibleHostApiSpecificStreamInfo;
+            break;
+
+        default:
+            /* Newer versions of the struct must not be smaller. */
+            if( streamInfo->size < sizeof( PaAsioStreamInfo ) )
+                return paIncompatibleHostApiSpecificStreamInfo;
+            break;
         }
 
         if( streamInfo->flags & paAsioUseChannelSelectors )
@@ -1890,6 +1911,12 @@ static PaError ValidateAsioSpecificStreamInfo(
                     return paInvalidChannelCount;
                 }
             }
+        }
+
+        if( streamInfo->flags & paAsioUseMessageCallback )
+        {
+            if( streamInfo->version < 2 || !streamInfo->messageCallback )
+                return paIncompatibleHostApiSpecificStreamInfo;
         }
     }
 
@@ -2004,7 +2031,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
     PaAsioHostApiRepresentation *asioHostApi = (PaAsioHostApiRepresentation*)hostApi;
     PaAsioStream *stream = 0;
-    PaAsioStreamInfo *inputStreamInfo, *outputStreamInfo;
+    PaAsioStreamInfo *inputStreamInfo = NULL, *outputStreamInfo = NULL;
     unsigned long framesPerHostBuffer;
     int inputChannelCount, outputChannelCount;
     PaSampleFormat inputSampleFormat, outputSampleFormat;
@@ -2744,6 +2771,21 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     stream->isStopped = 1;
     stream->isActive = 0;
 
+    stream->messageCallback[0] = NULL;
+    stream->messageCallback[1] = NULL;
+    if( usingBlockingIo )
+    {
+        /* Disable message callback due to policy of overwriting userData above. */
+    }
+    else
+    {
+        /* Message callback may be defined in versions >= 2 of ASIO streamInfo. */
+        if( inputStreamInfo && ( inputStreamInfo->flags & paAsioUseMessageCallback) )
+            stream->messageCallback[0] = inputStreamInfo->messageCallback;
+        if( outputStreamInfo && (outputStreamInfo->flags & paAsioUseMessageCallback) )
+            stream->messageCallback[1] = outputStreamInfo->messageCallback;
+    }
+
     asioHostApi->openAsioDeviceIndex = asioDeviceIndex;
 
     theAsioStream = stream;
@@ -3178,6 +3220,26 @@ previousTime = paTimeInfo.currentTime;
 }
 
 
+static long fireMessageCallback( PaAsioStream *asioStream, long messageType, long value, void* message, double* opt )
+{
+    void *userData = asioStream->streamRepresentation.userData;
+
+    long ret = 0;
+
+    /* Fire callbacks and determine whether one and/or the other handles the message. */
+    if( asioStream->messageCallback[0] )
+    {
+        if( (*asioStream->messageCallback[0])( messageType, value, message, opt, userData ) ) ret = 1;
+    }
+    if( asioStream->messageCallback[1] )
+    {
+        if( (*asioStream->messageCallback[1])( messageType, value, message, opt, userData ) ) ret = 1;
+    }
+
+    return ret;
+}
+
+
 static void sampleRateChanged(ASIOSampleRate sRate)
 {
     // TAKEN FROM THE ASIO SDK
@@ -3188,14 +3250,25 @@ static void sampleRateChanged(ASIOSampleRate sRate)
     // AES/EBU or S/PDIF digital input at the audio device.
     // You might have to update time/sample related conversion routines, etc.
 
-    (void) sRate; /* unused parameter */
-    PA_DEBUG( ("sampleRateChanged : %d \n", sRate));
+    double opt = sRate;
+
+    PA_DEBUG( ("asioSampleRateChanged : %f hz\n", opt));
+
+    if (!theAsioStream)
+    {
+        /* Some ASIO drivers will fire messages during OpenStream.  We ignore them. */
+        PA_DEBUG( ("    ...message blocked, device not open yet.\n"));
+        return;
+    }
+
+    fireMessageCallback( theAsioStream, paAsioSampleRateChanged, 0, 0, &opt );
 }
 
 static long asioMessages(long selector, long value, void* message, double* opt)
 {
 // TAKEN FROM THE ASIO SDK
     // currently the parameters "value", "message" and "opt" are not used.
+    int doClientCallback = 0, paAsioMessageType = 0;
     long ret = 0;
 
     (void) message; /* unused parameters */
@@ -3203,13 +3276,26 @@ static long asioMessages(long selector, long value, void* message, double* opt)
 
     PA_DEBUG( ("asioMessages : %d , %d \n", selector, value));
 
+    if (!theAsioStream)
+    {
+        /* Some ASIO drivers will fire messages during OpenStream.  We ignore them. */
+        PA_DEBUG( ("    ...message blocked, device not open yet.\n"));
+        return 0;
+    }
+
     switch(selector)
     {
         case kAsioSelectorSupported:
             if(value == kAsioResetRequest
-            || value == kAsioEngineVersion
             || value == kAsioResyncRequest
             || value == kAsioLatenciesChanged
+            || value == kAsioBufferSizeChange)
+            {
+                /* Did the client register a callback? */
+                if( theAsioStream->messageCallback[0] || theAsioStream->messageCallback[1] )
+                    ret = 1L;
+            }
+            if(value == kAsioEngineVersion
             // the following three were added for ASIO 2.0, you don't necessarily have to support them
             || value == kAsioSupportsTimeInfo
             || value == kAsioSupportsTimeCode
@@ -3219,6 +3305,8 @@ static long asioMessages(long selector, long value, void* message, double* opt)
 
         case kAsioBufferSizeChange:
             //printf("kAsioBufferSizeChange \n");
+            paAsioMessageType = paAsioBufferSizeChange;
+            doClientCallback = 1;
             break;
 
         case kAsioResetRequest:
@@ -3227,13 +3315,9 @@ static long asioMessages(long selector, long value, void* message, double* opt)
             // Reset the driver is done by completely destruct is. I.e. ASIOStop(), ASIODisposeBuffers(), Destruction
             // Afterwards you initialize the driver again.
 
-            /*FIXME: commented the next line out
-
-                see: "PA/ASIO ignores some driver notifications it probably shouldn't"
-                http://www.portaudio.com/trac/ticket/108
-            */
-            //asioDriverInfo.stopped;  // In this sample the processing will just stop
-            ret = 1L;
+            // Notify the application, which should then reset the stream.
+            paAsioMessageType = paAsioResetRequest;
+            doClientCallback = 1;
             break;
 
         case kAsioResyncRequest:
@@ -3243,14 +3327,16 @@ static long asioMessages(long selector, long value, void* message, double* opt)
             // Windows Multimedia system, which could loose data because the Mutex was hold too long
             // by another thread.
             // However a driver can issue it in other situations, too.
-            ret = 1L;
+            paAsioMessageType = paAsioResyncRequest;
+            doClientCallback = 1;
             break;
 
         case kAsioLatenciesChanged:
             // This will inform the host application that the drivers were latencies changed.
             // Beware, it this does not mean that the buffer sizes have changed!
             // You might need to update internal delay data.
-            ret = 1L;
+            paAsioMessageType = paAsioLatenciesChanged;
+            doClientCallback = 1;
             //printf("kAsioLatenciesChanged \n");
             break;
 
@@ -3276,6 +3362,10 @@ static long asioMessages(long selector, long value, void* message, double* opt)
             ret = 0;
             break;
     }
+
+    if( doClientCallback != 0 )
+        ret = fireMessageCallback( theAsioStream, paAsioMessageType, value, message, opt );
+
     return ret;
 }
 
