@@ -32,8 +32,10 @@ if(PA_WARNINGS_ARE_ERRORS)
             # Do *NOT* add warnings to this list. Instead, fix your code so that it doesn't produce the warning.
             # TODO: fix the offending code so that we don't have to exclude specific warnings anymore.
             -Wno-error=deprecated-declarations  # https://github.com/PortAudio/portaudio/issues/213 https://github.com/PortAudio/portaudio/issues/641
-            -Wno-error=stringop-overflow
         )
+        if (NOT EMSCRIPTEN)
+            add_compile_options(-Wno-error=stringop-overflow)
+        endif()
         if (CMAKE_C_COMPILER_ID MATCHES "Clang")
              # Don't fail on older clang versions that don't recognize the latest warnings in the list above.
              # Note that unrecognized warning options are not a fatal error on GCC, and in fact, GCC will choke on this option. Hence the conditional.
@@ -398,6 +400,38 @@ elseif(UNIX)
       target_compile_definitions(portaudio PUBLIC PA_USE_SNDIO=1)
       set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_SNDIO=1")
       set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} sndio")
+    endif()
+
+    if(EMSCRIPTEN)
+      option(PA_USE_WEBAUDIO "Enable support for Web Audio" ON)
+
+      if(PA_USE_WEBAUDIO)
+        target_sources(PortAudio PRIVATE
+          src/hostapi/webaudio/pa_webaudio.c
+        )
+        target_compile_definitions(PortAudio PUBLIC PA_USE_WEBAUDIO=1)
+        target_compile_options(PortAudio PUBLIC -pthread)
+        target_link_options(PortAudio PUBLIC
+          -sAUDIO_WORKLET
+          -sWASM_WORKERS
+          -sEXPORTED_RUNTIME_METHODS=emscriptenGetAudioObject
+        )
+
+        option(PA_WEBAUDIO_ASYNCIFY "Build with -sASYNCIFY and use async operations. Recommended when intending to call PortAudio from the main thread to avoid blocking." ON)
+        if(PA_WEBAUDIO_ASYNCIFY)
+          target_compile_definitions(PortAudio PUBLIC PA_WEBAUDIO_ASYNCIFY=1)
+          target_link_options(PortAudio PUBLIC
+            -sASYNCIFY
+            -sASYNCIFY_IMPORTS=emscripten_asm_const_int
+          )
+        endif()
+        set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_WEBAUDIO=1")
+      endif()
+
+      # This makes it easy to run the examples. The default output format is .js
+      # and is set in the Emscripten toolchain file, so it cannot be overriden
+      # from the command-line with -DCMAKE_EXECUTABLE_SUFFIX.
+      set(CMAKE_EXECUTABLE_SUFFIX ".html")
     endif()
   endif()
 endif()
