@@ -41,7 +41,7 @@
 
 /** @file
  @ingroup public_header
- @brief The portable PortAudio API.
+ @brief The portable PortAudio API.  TRIGGER CI BUILDS
 */
 
 
