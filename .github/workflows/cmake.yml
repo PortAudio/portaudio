@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        PA_BUILD_SHARED_LIBS: [ON, OFF]
+        shared: [ON, OFF]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
@@ -62,12 +62,12 @@ jobs:
               -DCMAKE_FRAMEWORK=ON
 
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.name }}
+    name: "${{ matrix.name }} ${{ matrix.shared }}"
     env:
       cmake_build_type: RelWithDebInfo
     steps:
     - name: Checkout PortAudio Git repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
     - name: "Install dependencies [Ubuntu]"
       run: |
         sudo apt-get update
@@ -105,7 +105,7 @@ jobs:
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
            -DPA_WARNINGS_ARE_ERRORS=ON
-           -DPA_BUILD_SHARED_LIBS=${{matrix.PA_BUILD_SHARED_LIBS}}
+           -DPA_BUILD_SHARED_LIBS=${{ matrix.shared }}
            -S .
            -B ${{ github.workspace }}/build
     - name: Build PortAudio library
