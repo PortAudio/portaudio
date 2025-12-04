@@ -7,7 +7,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pa_shared_libs: [ON, OFF]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
@@ -62,7 +61,7 @@ jobs:
               -DCMAKE_FRAMEWORK=ON
 
     runs-on: ${{ matrix.os }}
-    name: "${{ matrix.name }} Shared=${{ matrix.pa_shared_libs }}"
+    name: ${{ matrix.name }}
     env:
       cmake_build_type: RelWithDebInfo
     steps:
@@ -101,7 +100,6 @@ jobs:
            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/../out
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
-           -DPA_BUILD_SHARED_LIBS=${{ matrix.pa_shared_libs }}
            -DPA_USE_SKELETON=ON
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
