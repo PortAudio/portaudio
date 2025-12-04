@@ -67,7 +67,7 @@ jobs:
       cmake_build_type: RelWithDebInfo
     steps:
     - name: Checkout PortAudio Git repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v2
     - name: "Install dependencies [Ubuntu]"
       run: |
         sudo apt-get update
