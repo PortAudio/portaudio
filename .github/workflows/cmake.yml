@@ -7,6 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        pa_shared_libs: [ON, OFF]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
