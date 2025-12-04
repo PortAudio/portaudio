@@ -7,6 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        PA_BUILD_SHARED_LIBS: [ON, OFF]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
@@ -104,16 +105,17 @@ jobs:
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
            -DPA_WARNINGS_ARE_ERRORS=ON
+           -DPA_BUILD_SHARED_LIBS=${{matrix.PA_BUILD_SHARED_LIBS}}
            -S .
            -B ${{ github.workspace }}/build
     - name: Build PortAudio library
       run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
     - name: Install PortAudio library
       run: cmake --install ${{ github.workspace }}/build --config ${{ env.cmake_build_type }}
-     
+
       # Required for vcpkg packages to be found by CMake's find_package()
     - name: Enter build-test
-      run: cd ${{ github.workspace }}/test/test_use_cmake     
+      run: cd ${{ github.workspace }}/test/test_use_cmake
     - name: Configure build-test
       run: cmake
            -G "${{ matrix.cmake_generator }}"
