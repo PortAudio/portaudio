@@ -62,7 +62,7 @@ jobs:
               -DCMAKE_FRAMEWORK=ON
 
     runs-on: ${{ matrix.os }}
-    name: "${{ matrix.name }} ${{ matrix.shared }}"
+    name: "${{ matrix.name }} Shared=${{ matrix.shared }}"
     env:
       cmake_build_type: RelWithDebInfo
     steps:
@@ -101,11 +101,11 @@ jobs:
            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/../out
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+           -DPA_BUILD_SHARED_LIBS=${{ matrix.shared }}
            -DPA_USE_SKELETON=ON
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
            -DPA_WARNINGS_ARE_ERRORS=ON
-           -DPA_BUILD_SHARED_LIBS=${{ matrix.shared }}
            -S .
            -B ${{ github.workspace }}/build
     - name: Build PortAudio library
