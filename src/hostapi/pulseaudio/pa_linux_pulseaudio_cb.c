@@ -290,10 +290,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
         }
     }
 
-    /* If there is input stream available then calculate Portaudio
-     * needed bytes per request as Pulseaudio can ask mainly any amount
-     * of bytes also check callback availability.
-     */
     if( stream->inputStream )
     {
         pulseaudioInputBytes = pulseaudioOutputBytes = (hostFramesPerBuffer * stream->inputFrameSize);
