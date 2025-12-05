@@ -10,14 +10,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         pa_shared_libs: [ON, OFF]
         include:
-          - os: ubuntu-latest
-            name: Ubuntu GCC
+          - name: Ubuntu GCC
+            os: ubuntu-latest
             vcpkg_triplet: x64-linux
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DPA_USE_OSS=ON
-          - os: ubuntu-latest
-            name: Ubuntu MinGW
+          - name: Ubuntu MinGW
+            os: ubuntu-latest
             asio_sdk_cache_path: asiosdk.zip
             dependencies_extras: mingw-w64
             vcpkg_triplet: x64-mingw-static
@@ -63,7 +63,7 @@ jobs:
               -DCMAKE_FRAMEWORK=ON
 
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.name }}
+    name: "${{ matrix.name }} Shared=${{ matrix.pa_shared_libs }}"
     env:
       cmake_build_type: RelWithDebInfo
     steps:
@@ -106,6 +106,7 @@ jobs:
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
            -DPA_WARNINGS_ARE_ERRORS=ON
+           -DPA_BUILD_SHARED_LIBS=${{ matrix.pa_shared_libs }}
            -S .
            -B ${{ github.workspace }}/build
     - name: Build PortAudio library
