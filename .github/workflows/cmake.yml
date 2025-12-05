@@ -18,7 +18,6 @@ jobs:
               -DPA_USE_OSS=ON
           - os: ubuntu-latest
             name: Ubuntu MinGW
-            os: ubuntu-latest
             asio_sdk_cache_path: asiosdk.zip
             dependencies_extras: mingw-w64
             vcpkg_triplet: x64-mingw-static
