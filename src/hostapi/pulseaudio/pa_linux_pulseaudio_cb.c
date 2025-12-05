@@ -426,9 +426,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
                                        hostFramesPerBuffer );
         }
 
-        /* If output is enabled and the buffer data is not NULL,
-         *  a pointer to the output ring buffer is assigned.
-         */
         if( isOutputCb )
         {
 
