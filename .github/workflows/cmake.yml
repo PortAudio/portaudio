@@ -7,7 +7,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pa_shared_libs: [ON, OFF]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
@@ -60,6 +59,7 @@ jobs:
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=ON
+        pa_shared_libs: [ON, OFF]
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
