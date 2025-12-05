@@ -7,15 +7,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
         pa_shared_libs: [ON, OFF]
         include:
-          - name: Ubuntu GCC
-            os: ubuntu-latest
+          - os: ubuntu-latest
+            name: Ubuntu GCC
             vcpkg_triplet: x64-linux
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DPA_USE_OSS=ON
-          - name: Ubuntu MinGW
+          - os: ubuntu-latest
+            name: Ubuntu MinGW
             os: ubuntu-latest
             asio_sdk_cache_path: asiosdk.zip
             dependencies_extras: mingw-w64
