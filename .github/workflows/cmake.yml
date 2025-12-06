@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        pa_shared_libs: [ON, OFF]
+        shared_libs: [ON, OFF]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
@@ -63,7 +63,7 @@ jobs:
               -DCMAKE_FRAMEWORK=ON
 
     runs-on: ${{ matrix.os }}
-    name: "${{ matrix.name }} Shared=${{ matrix.pa_shared_libs }}"
+    name: "${{ matrix.name }} shared=${{ matrix.shared_libs }}"
     env:
       cmake_build_type: RelWithDebInfo
     steps:
@@ -106,7 +106,7 @@ jobs:
            -DPA_BUILD_TESTS=ON
            -DPA_BUILD_EXAMPLES=ON
            -DPA_WARNINGS_ARE_ERRORS=ON
-           -DPA_BUILD_SHARED_LIBS=${{ matrix.pa_shared_libs }}
+           -DPA_BUILD_SHARED_LIBS=${{ matrix.shared_libs }}
            -S .
            -B ${{ github.workspace }}/build
     - name: Build PortAudio library
