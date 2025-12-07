@@ -8,15 +8,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        name: [Ubuntu-GCC, Ubuntu-MinGW, Windows-MSVC, Windows-MinGW, macOS-Clang, macOS-Clang-framework]
         shared_libs: [ON, OFF]
         include:
-          - name: Ubuntu GCC
+          - name: Ubuntu-GCC
             os: ubuntu-latest
             vcpkg_triplet: x64-linux
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DPA_USE_OSS=ON
-          - name: Ubuntu MinGW
+          - name: Ubuntu-MinGW
             os: ubuntu-latest
             asio_sdk_cache_path: asiosdk.zip
             dependencies_extras: mingw-w64
@@ -27,7 +28,7 @@ jobs:
               -DPA_USE_ASIO=ON
               -DPA_USE_JACK=OFF
               -DASIO_SDK_ZIP_PATH=asiosdk.zip
-          - name: Windows MSVC
+          - name: Windows-MSVC
             os: windows-latest
             vcpkg_triplet: x64-windows
             cmake_generator: "Visual Studio 17 2022"
@@ -38,7 +39,7 @@ jobs:
             cmake_options:
               -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
-          - name: Windows MinGW
+          - name: Windows-MinGW
             os: windows-latest
             vcpkg_triplet: x64-mingw-static
             cmake_generator: "MinGW Makefiles"
@@ -49,13 +50,13 @@ jobs:
             cmake_options:
               -DPA_USE_ASIO=ON
               -DASIO_SDK_ZIP_PATH="asiosdk.zip"
-          - name: macOS Clang
+          - name: macOS-Clang
             os: macOS-latest
             vcpkg_triplet: arm64-osx
             cmake_generator: "Unix Makefiles"
             cmake_options:
               -DCMAKE_FRAMEWORK=OFF
-          - name: macOS Clang framework
+          - name: macOS-Clang-framework
             os: macOS-latest
             vcpkg_triplet: arm64-osx
             cmake_generator: "Unix Makefiles"
