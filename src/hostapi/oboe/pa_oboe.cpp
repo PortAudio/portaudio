@@ -57,12 +57,15 @@
 #include "pa_unix_util.h"
 #include "pa_util.h"
 
+#include <mutex>
 #include <pthread.h>
 #include <ctime>
 #include <cstring>
 #include <cstdint>
 #include <string.h>
+#include <vector>
 #include "oboe/Oboe.h"
+#include "portaudio.h"
 
 #include <android/log.h>
 #include <android/api-level.h>
@@ -149,26 +152,14 @@ static signed long GetStreamReadAvailable(PaStream *stream);
 
 static signed long GetStreamWriteAvailable(PaStream *stream);
 
-static unsigned long GetApproximateLowBufferSize();
-
 // Commonly used parameters initialized.
-static unsigned long paOboe_nativeBufferSize = 0;
-static unsigned paOboe_numberOfBuffers = 2;
+static constexpr int kDelayBeforeCloseMillis = 100; // Copied from AudioStream::kMaxDelayBeforeCloseMillis;
 
 using namespace oboe;
 
-//Useful global variables
-struct RegisteredDevice {
-    char* name;
-    PaOboe_Direction direction;
-    int channelCount;
-    int sampleRate;
-};
-RegisteredDevice* paOboe_registeredDevices = NULL;
-size_t paOboe_registeredDeviceCount = 0;
-
 class OboeEngine;
 class OboeMediator;
+struct PaOboeHostApiRepresentation;
 
 /**
  * Stream structure, useful to store relevant information. It's needed by Portaudio.
@@ -183,8 +174,9 @@ typedef struct PaOboeStream {
     bool isActive;
     bool doStop;
     bool doAbort;
-    bool hasOutput;
-    bool hasInput;
+
+    inline bool hasOutput() const { return outputBuffers; }
+    inline bool hasInput() const { return inputBuffers; }
 
     int callbackResult;
     DataCallbackResult oboeCallbackResult;
@@ -196,21 +188,21 @@ typedef struct PaOboeStream {
     // Buffers are managed by the callback function in Oboe.
     void **outputBuffers;
     int currentOutputBuffer;
+    unsigned numOutputBuffers;
     void **inputBuffers;
     int currentInputBuffer;
+    unsigned numInputBuffers;
 
     unsigned long framesPerHostCallback;
     unsigned bytesPerFrame;
 
-    OboeMediator* oboeMediator;
+    std::shared_ptr<OboeMediator> oboeMediator;
 } PaOboeStream;
-
 
 class OboeMediator: public AudioStreamCallback {
 public:
-    OboeMediator(PaOboeStream* paOboeStream) {
-        mOboeCallbackStream = paOboeStream;
-    }
+    OboeMediator(PaOboeStream* paOboeStream): mOboeCallbackStream(paOboeStream) {}
+    ~OboeMediator();
 
     //Callback function for non-blocking streams
     DataCallbackResult onAudioReady(AudioStream *oboeStream, void *audioData,
@@ -218,15 +210,8 @@ public:
     //Callback utils
     void onErrorAfterClose(AudioStream *oboeStream, oboe::Result error) override;
     void resetCallbackCounters();
-    void setOutputCallback() { mOutputBuilder.setDataCallback(this)->setErrorCallback(this); }
-    void setInputCallback() { mInputBuilder.setDataCallback(this)->setErrorCallback(this); }
-
-    //getter and setter of mOboeEngine and mOboeCallbackStream
-    OboeEngine *getEngine() { return mOboeEngine; }
-    void setEngine(OboeEngine *oboeEngine) { mOboeEngine = oboeEngine; }
-
-    PaOboeStream *getStreamAddress() { return mOboeCallbackStream; }
-    void setCallbackStream(PaOboeStream *paOboeStream) { mOboeCallbackStream = paOboeStream; }
+    void setOutputCallback(std::shared_ptr<OboeMediator> instance) { mOutputBuilder.setDataCallback(instance)->setErrorCallback(instance); }
+    void setInputCallback(std::shared_ptr<OboeMediator> instance) { mInputBuilder.setDataCallback(instance)->setErrorCallback(instance); }
 
     //The only instances of output and input streams that will be used, and their builders
     std::shared_ptr <AudioStream> mOutputStream;
@@ -235,8 +220,6 @@ public:
     AudioStreamBuilder mInputBuilder;
 
 private:
-    OboeEngine *mOboeEngine;
-
     //callback utils
     PaOboeStream *mOboeCallbackStream;
     unsigned long mFramesProcessed{};
@@ -246,20 +229,21 @@ private:
 
 
 /**
- * Stream engine of the host API - Oboe. We allocate only one instance of the engine per PaOboeStream, and
+ * Stream engine of the host API - Oboe. We use a signleton instance of the engine for all PaOboeStream, and
  * we call its functions when we want to operate directly on Oboe. More information on each function is
  * provided right before its implementation.
  */
 class OboeEngine {
 public:
-    OboeEngine();
+    static OboeEngine &getInstance() {
+        static OboeEngine instance;
+        return instance;
+    }
 
     //Stream-managing functions
-    bool tryStream(Direction direction, int32_t deviceId, int32_t sampleRate, int32_t channelCount);
-
-    PaError openStream(PaOboeStream *paOboeStream, Direction direction, int32_t deviceId, int32_t sampleRate,
-                       Usage outputUsage, InputPreset inputPreset, PerformanceMode performanceMode,
-                       SharingMode sharingMode, const char* packageName, ContentType contentType);
+    PaError openStream(PaOboeStream *paOboeStream, Direction direction, PaDeviceIndex paDeviceId, int32_t sampleRate,
+                       Usage androidOutputUsage, InputPreset androidInputPreset, PerformanceMode performanceMode,
+                       SharingMode sharingMode, const char* packageName, ContentType contentType, SampleRateConversionQuality sampleRateConversionQuality);
 
     bool startStream(PaOboeStream *paOboeStream);
 
@@ -279,8 +263,31 @@ public:
     //Engine utils
     void constructPaOboeStream(PaOboeStream* paOboeStream);
 
+    PaErrorCode setNumberOfBuffers(unsigned numberOfBuffers);
+    unsigned getNumberOfBuffers() const { return mNumberOfBuffers; }
+    PaErrorCode setNativeBufferSize(unsigned long bufferSize);
+    PaErrorCode registerDevice(const char* name, int32_t id, PaOboe_Direction direction, int channelCount, int sampleRate);
+    PaErrorCode initializeDeviceList(PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex, PaOboeHostApiRepresentation *oboeHostApi);
+
 private:
-    OboeMediator* mTerminableMediator;
+    OboeEngine() = default;
+
+    unsigned long getLowBufferSize() const;
+    struct RegisteredDevice {
+        char* name;
+        int32_t id;
+        PaOboe_Direction direction;
+        int channelCount;
+        int sampleRate;
+    };
+
+    unsigned long mNativeBufferSize{0};
+    unsigned mNumberOfBuffers{2};
+    std::vector<RegisteredDevice> mRegisteredDevices = {};
+    std::shared_ptr<OboeMediator> mTerminableMediator;
+    bool mHasInitialised{false};
+
+    std::mutex mMutex;
 
     //Conversion utils
     static AudioFormat PaToOboeFormat(PaSampleFormat paFormat);
@@ -297,53 +304,10 @@ typedef struct PaOboeHostApiRepresentation {
 
     PaUtilAllocationGroup *allocations;
 
-    OboeEngine *oboeEngine;
 } PaOboeHostApiRepresentation;
 
 
 /*----------------------------- OboeEngine functions implementation -----------------------------*/
-
-
-/**
- * \brief   Constructor.
- */
-OboeEngine::OboeEngine() {}
-
-
-/**
- * \brief   Tries to open a stream with the direction direction, sample rate sampleRate and/or
- *          channel count channelCount. It then closes the stream. It's used to see if the requested
- *          parameters are supported by the devices that are going to be used.
- * @param   direction the Direction of the stream;
- * @param   sampleRate the sample rate we want to try;
- * @param   channelCount the channel count we want to try;
- * @return  true if the stream was opened with Result::OK, false otherwise.
- */
-bool OboeEngine::tryStream(Direction direction, int32_t deviceId, int32_t sampleRate, int32_t channelCount) {
-    Result result;
-
-    std::shared_ptr <AudioStream> oboeStream;
-    AudioStreamBuilder builder;
-
-    builder.setDeviceId(deviceId)
-            // Arbitrary format usually broadly supported. Later, we'll open streams with correct formats.
-            // FIXME: if needed, modify this format to whatever you require
-            ->setFormat(AudioFormat::Float)
-            ->setDirection(direction)
-            ->setSampleRate(sampleRate)
-            ->setChannelCount(channelCount)
-            ->openStream(oboeStream);
-
-    if (result != Result::OK) {
-        LOGE("[OboeEngine::TryStream]\t Couldn't open the stream in TryStream. Error: %s",
-             convertToText(result));
-        return false;
-    }
-
-    oboeStream->close();
-
-    return true;
-}
 
 
 /**
@@ -354,26 +318,42 @@ bool OboeEngine::tryStream(Direction direction, int32_t deviceId, int32_t sample
  *          function if not.
  * @param   paOboeStream The stream we want to open
  * @param   direction The Oboe::Direction of the stream we want to open;
+ * @param   paDeviceId The sample rate of the stream we want to open;
  * @param   sampleRate The sample rate of the stream we want to open;
  * @param   androidOutputUsage The Oboe::Usage of the output stream we want to open
  *              (only matters with Android Api level >= 28);
  * @param   androidInputPreset The Preset of the input stream we want to open
  *              (only matters with Android Api level >= 28).
+ * @param   performanceMode The Oboe performance mode.
+ * @param   sharingMode The Oboe sharing mode.
+ * @param   packageName The optional package name to use in oboe.
+ * @param   contentType The Oboe content type.
+ * @param   sampleRateConversionQuality The Oboe sample rate conversion quality.
  * @return  paNoError if everything goes as expected, paUnanticipatedHostError if Oboe fails to open
  *          a stream, and paInsufficientMemory if the memory allocation of the buffers fails.
  */
-PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, int32_t deviceId, int32_t sampleRate,
+PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, PaDeviceIndex paDeviceId, int32_t sampleRate,
                                Usage androidOutputUsage, InputPreset androidInputPreset, PerformanceMode performanceMode,
-                               SharingMode sharingMode, const char* packageName, ContentType contentType) {
+                               SharingMode sharingMode, const char* packageName, ContentType contentType, SampleRateConversionQuality sampleRateConversionQuality) {
     PaError error = paNoError;
     Result result;
+
+    if (paDeviceId >= mRegisteredDevices.size() || paDeviceId < 0){
+        LOGE("[OboeEngine::openStream]\t Device ID out of bount! %d given, but only %d devices known.", paDeviceId, mRegisteredDevices.size());
+        return paDeviceUnavailable;
+    }
+    int32_t deviceId = mRegisteredDevices[paDeviceId].id;
+    if (static_cast<Direction>(mRegisteredDevices[paDeviceId].direction) != direction){
+        LOGE("[OboeEngine::openStream]\t Device ID %d has incompatible direction.", paDeviceId);
+        return paDeviceUnavailable;
+    }
 
     if (paOboeStream == nullptr) {
         LOGE("[OboeEngine::openStream]\t paOboeStream is a nullptr.");
         return paInternalError;
     }
 
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
     if(!(paOboeStream->isBlocking)){
         mediator->resetCallbackCounters();
@@ -386,28 +366,32 @@ PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, 
                 ->setSampleRate(sampleRate)
                 ->setDirection(Direction::Input)
                 ->setDeviceId(deviceId)
+                ->setSampleRateConversionQuality(sampleRateConversionQuality)
                 ->setPerformanceMode(performanceMode)
                 ->setInputPreset(androidInputPreset)
                 ->setFramesPerCallback(paOboeStream->framesPerHostCallback);
 
         if (!(paOboeStream->isBlocking)) {
-            mediator->setInputCallback();
+            mediator->setInputCallback(mediator);
         }
 
         result = mediator->mInputBuilder.openStream(mediator->mInputStream);
 
-        if (result != Result::OK) {
+        if (result != Result::OK || !mediator->mInputStream) {
             LOGE("[OboeEngine::OpenStream]\t Oboe couldn't open the input stream: %s",
                  convertToText(result));
             return paUnanticipatedHostError;
         }
 
+        mediator->mInputStream->setDelayBeforeCloseMillis(kDelayBeforeCloseMillis);
+        mediator->mInputStream->setPerformanceHintEnabled(performanceMode == PerformanceMode::LowLatency);
         mediator->mInputStream->setBufferSizeInFrames(mediator->mInputStream->getFramesPerBurst() *
-                                                               paOboe_numberOfBuffers);
+                                                               getNumberOfBuffers());
+        paOboeStream->numInputBuffers = getNumberOfBuffers();
         paOboeStream->inputBuffers =
-                (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(int32_t * ));
+                (void **) PaUtil_AllocateZeroInitializedMemory(paOboeStream->numInputBuffers * sizeof(int32_t * ));
 
-        for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
+        for (int i = 0; i < paOboeStream->numInputBuffers; ++i) {
             paOboeStream->inputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
                     paOboeStream->framesPerHostCallback *
                             paOboeStream->bytesPerFrame *
@@ -437,8 +421,8 @@ PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, 
                 ->setUsage(androidOutputUsage)
                 ->setFramesPerCallback(paOboeStream->framesPerHostCallback);
 
-        if (!(paOboeStream->isBlocking)) {
-            mediator->setOutputCallback();
+        if (!paOboeStream->isBlocking) {
+            mediator->setOutputCallback(mediator);
         }
 
         // We could also add AAudioExtensions library to allow the use of mmap and improve low latency performance
@@ -451,12 +435,14 @@ PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, 
             return paUnanticipatedHostError;
         }
 
-        mediator->mOutputStream->setBufferSizeInFrames(mediator->mOutputStream->getFramesPerBurst() *
-                                                                paOboe_numberOfBuffers);
+        mediator->mOutputStream->setDelayBeforeCloseMillis(kDelayBeforeCloseMillis);
+        mediator->mOutputStream->setPerformanceHintEnabled(performanceMode == PerformanceMode::LowLatency);
+        mediator->mOutputStream->setBufferSizeInFrames(mediator->mOutputStream->getFramesPerBurst() * getNumberOfBuffers());
+        paOboeStream->numOutputBuffers = getNumberOfBuffers();
         paOboeStream->outputBuffers =
-                (void **) PaUtil_AllocateZeroInitializedMemory(paOboe_numberOfBuffers * sizeof(int32_t * ));
+            (void **) PaUtil_AllocateZeroInitializedMemory(paOboeStream->numOutputBuffers * sizeof(int32_t * ));
 
-        for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
+        for (int i = 0; i < paOboeStream->numOutputBuffers; ++i) {
             paOboeStream->outputBuffers[i] = (void *) PaUtil_AllocateZeroInitializedMemory(
                     paOboeStream->framesPerHostCallback *
                             paOboeStream->bytesPerFrame *
@@ -486,15 +472,15 @@ PaError OboeEngine::openStream(PaOboeStream *paOboeStream, Direction direction, 
  */
 bool OboeEngine::startStream(PaOboeStream *paOboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
-    if (paOboeStream->hasInput) {
+    if (paOboeStream->hasInput()) {
         inputResult = mediator->mInputStream->requestStart();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::startStream]\t Oboe couldn't start the input stream: %s",
                  convertToText(inputResult));
     }
-    if (paOboeStream->hasOutput) {
+    if (paOboeStream->hasOutput()) {
         outputResult = mediator->mOutputStream->requestStart();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::startStream]\t Oboe couldn't start the output stream: %s",
@@ -513,15 +499,15 @@ bool OboeEngine::startStream(PaOboeStream *paOboeStream) {
  */
 bool OboeEngine::stopStream(PaOboeStream *paOboeStream) {
     Result outputResult = Result::OK, inputResult = Result::OK;
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
-    if (paOboeStream->hasInput) {
+    if (paOboeStream->hasInput()) {
         inputResult = mediator->mInputStream->requestStop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::stopStream]\t Oboe couldn't stop the input stream: %s",
                  convertToText(inputResult));
     }
-    if (paOboeStream->hasOutput) {
+    if (paOboeStream->hasOutput()) {
         outputResult = mediator->mOutputStream->requestStop();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::stopStream]\t Oboe couldn't stop the output stream: %s",
@@ -543,7 +529,7 @@ bool OboeEngine::stopStream(PaOboeStream *paOboeStream) {
 bool OboeEngine::restartStream(PaOboeStream* paOboeStream, int direction) {
     bool outcome = true;
     Result result;
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
     switch (direction) {
         case 1: //output-only
@@ -597,16 +583,16 @@ bool OboeEngine::closeStream(PaOboeStream *paOboeStream) {
         return false;
     }
 
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
-    if (paOboeStream->hasOutput) {
+    if (paOboeStream->hasOutput()) {
         outputResult = mediator->mOutputStream->close();
         if (outputResult == Result::ErrorClosed) {
             outputResult = Result::OK;
             LOGW("[OboeEngine::closeStream]\t Tried to close output stream, but was already closed.");
         }
     }
-    if (paOboeStream->hasInput) {
+    if (paOboeStream->hasInput()) {
         inputResult = mediator->mInputStream->close();
         if (inputResult == Result::ErrorClosed) {
             inputResult = Result::OK;
@@ -631,9 +617,9 @@ bool OboeEngine::abortStream(PaOboeStream *paOboeStream) {
         return false;
     }
 
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
-    if (paOboeStream->hasInput) {
+    if (paOboeStream->hasInput()) {
         inputResult = mediator->mInputStream->stop();
         if (inputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to stop: %s",
@@ -643,7 +629,7 @@ bool OboeEngine::abortStream(PaOboeStream *paOboeStream) {
             LOGE("[OboeEngine::abortStream]\t Couldn't force the input stream to close: %s",
                  convertToText(inputResult));
     }
-    if (paOboeStream->hasOutput) {
+    if (paOboeStream->hasOutput()) {
         outputResult = mediator->mOutputStream->stop();
         if (outputResult != Result::OK)
             LOGE("[OboeEngine::abortStream]\t Couldn't force the output stream to stop: %s",
@@ -669,7 +655,7 @@ bool OboeEngine::abortStream(PaOboeStream *paOboeStream) {
  */
 bool OboeEngine::writeStream(PaOboeStream *paOboeStream, const void *buffer, int32_t framesToWrite) {
     bool outcome = true;
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
     ResultWithValue <int32_t> result = mediator->mOutputStream->write(buffer, framesToWrite, TIMEOUT_NS);
 
@@ -698,7 +684,7 @@ bool OboeEngine::writeStream(PaOboeStream *paOboeStream, const void *buffer, int
  */
 bool OboeEngine::readStream(PaOboeStream *paOboeStream, void *buffer, int32_t framesToRead) {
     bool outcome = true;
-    OboeMediator* mediator = paOboeStream->oboeMediator;
+    auto& mediator = paOboeStream->oboeMediator;
 
     ResultWithValue <int32_t> result = mediator->mInputStream->read(buffer, framesToRead, TIMEOUT_NS);
 
@@ -721,10 +707,123 @@ bool OboeEngine::readStream(PaOboeStream *paOboeStream, void *buffer, int32_t fr
  * @return  the address of the paOboeStream.
  */
 void OboeEngine::constructPaOboeStream(PaOboeStream* paOboeStream) {
-    mTerminableMediator = paOboeStream->oboeMediator = new OboeMediator(paOboeStream);
-    paOboeStream->oboeMediator->setEngine(this);
+    paOboeStream->oboeMediator = std::make_shared<OboeMediator>(paOboeStream);
+    mTerminableMediator = paOboeStream->oboeMediator;
 }
 
+/**
+ * \brief   Set the number of buffers to use - must be set before PA init.
+ * @return  Error if PA has already be init'ed.
+ */
+PaErrorCode OboeEngine::setNumberOfBuffers(unsigned numberOfBuffers) {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mHasInitialised){
+        return paCanNotInitializeRecursively;
+    }
+    mNumberOfBuffers = numberOfBuffers;
+    return paNoError;
+}
+
+/**
+ * \brief   Set the number of buffers to use - must be set before PA init.
+ * @return  Error if PA has already be init'ed.
+ */
+PaErrorCode OboeEngine::setNativeBufferSize(unsigned long bufferSize) {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mHasInitialised){
+        return paCanNotInitializeRecursively;
+    }
+    mNativeBufferSize = bufferSize;
+    return paNoError;
+}
+
+
+/**
+ * \brief   Get a sensible value for the buffer size.
+ * @return  256 for Android API Level <= 23, 192 otherwise or in case that a buffer size was specifically set via PaOboe_setNativeBufferSize, use this value.
+ */
+unsigned long OboeEngine::getLowBufferSize() const {
+    /* If the user has set paOboe_nativeBufferSize by querying the optimal buffer size via java,
+           use the user-defined value since that will offer the lowest possible latency. */
+    if (mNativeBufferSize){
+        return mNativeBufferSize;
+    }
+
+    if (__ANDROID_API__ <= 23)
+        return 256;
+    else
+        return 192;
+}
+
+/**
+ * \brief   Register devices, prior to PA init.
+ * @return  Ok or error if no more device can be registered due to an error.
+ */
+PaErrorCode OboeEngine::registerDevice(const char* name, int32_t id, PaOboe_Direction direction, int channelCount, int sampleRate) {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mHasInitialised){
+        return paCanNotInitializeRecursively;
+    }
+    mRegisteredDevices.emplace_back(RegisteredDevice{
+        (char*)malloc(sizeof(char)*strlen(name)),
+        id,
+        direction,
+        channelCount,
+        sampleRate,
+    });
+    strcpy(mRegisteredDevices.back().name, name);
+    return paNoError;
+}
+
+/**
+ * \brief   Register devices, prior to PA init.
+ * @return  Ok or error if no more device can be registered due to an error.
+ */
+PaErrorCode OboeEngine::initializeDeviceList(PaUtilHostApiRepresentation *hostApi, PaHostApiIndex hostApiIndex, PaOboeHostApiRepresentation *oboeHostApi) {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    mHasInitialised = true;
+
+    int deviceCount = mRegisteredDevices.size();
+
+    hostApi->deviceInfos = (PaDeviceInfo **) PaUtil_GroupAllocateZeroInitializedMemory(
+            oboeHostApi->allocations, sizeof(PaDeviceInfo * ) * deviceCount);
+
+    if (!hostApi->deviceInfos) {
+        return paInsufficientMemory;
+    }
+
+    /* allocate all device info structs in a contiguous block */
+    PaDeviceInfo *deviceInfoArray = (PaDeviceInfo *) PaUtil_GroupAllocateZeroInitializedMemory(
+            oboeHostApi->allocations, sizeof(PaDeviceInfo) * deviceCount);
+    if (!deviceInfoArray) {
+        return paInsufficientMemory;
+    }
+
+    for (int i = 0; i < deviceCount; ++i) {
+        const auto& registeredDevice = mRegisteredDevices[i];
+        PaDeviceInfo *deviceInfo = &deviceInfoArray[i];
+        deviceInfo->structVersion = 2;
+        deviceInfo->hostApi = hostApiIndex;
+        deviceInfo->name = registeredDevice.name;
+
+        deviceInfo->maxOutputChannels = registeredDevice.direction == PaOboe_Direction::Output ? registeredDevice.channelCount : 0;
+        deviceInfo->maxInputChannels = registeredDevice.direction == PaOboe_Direction::Input ? registeredDevice.channelCount : 0;
+        deviceInfo->defaultSampleRate = registeredDevice.sampleRate;
+
+        deviceInfo->defaultLowInputLatency =
+                (double) getLowBufferSize() / deviceInfo->defaultSampleRate;
+        deviceInfo->defaultLowOutputLatency =
+                (double) getLowBufferSize() / deviceInfo->defaultSampleRate;
+        deviceInfo->defaultHighInputLatency =
+                (double) getLowBufferSize() * 4 / deviceInfo->defaultSampleRate;
+        deviceInfo->defaultHighOutputLatency =
+                (double) getLowBufferSize() * 4 / deviceInfo->defaultSampleRate;
+
+        hostApi->deviceInfos[i] = deviceInfo;
+        ++hostApi->info.deviceCount;
+    }
+    return paNoError;
+}
 
 /**
  * \brief   Converts PaSampleFormat values into Oboe::AudioFormat values.
@@ -759,6 +858,27 @@ AudioFormat OboeEngine::PaToOboeFormat(PaSampleFormat paFormat) {
 }
 
 /*----------------------------- OboeMediator functions implementations -----------------------------*/
+
+OboeMediator::~OboeMediator(){
+    if (!mOboeCallbackStream) return;
+
+    if (mOboeCallbackStream->hasOutput()){
+        for (int i = 0; i < mOboeCallbackStream->numOutputBuffers; ++i) {
+            PaUtil_FreeMemory(mOboeCallbackStream->outputBuffers[i]);
+        }
+        PaUtil_FreeMemory(mOboeCallbackStream->outputBuffers);
+    }
+
+    if (mOboeCallbackStream->hasInput()){
+        for (int i = 0; i < mOboeCallbackStream->numInputBuffers; ++i) {
+            PaUtil_FreeMemory(mOboeCallbackStream->inputBuffers[i]);
+        }
+        PaUtil_FreeMemory(mOboeCallbackStream->inputBuffers);
+    }
+
+    PaUtil_FreeMemory(mOboeCallbackStream);
+}
+
 /**
  * \brief   Oboe's callback routine.
  */
@@ -787,7 +907,7 @@ OboeMediator::onAudioReady(AudioStream *oboeStream, void *audioData, int32_t num
     PaUtil_BeginBufferProcessing(&mOboeCallbackStream->bufferProcessor,
                                  &mTimeInfo, mOboeCallbackStream->cbFlags);
 
-    if (mOboeCallbackStream->hasOutput) {
+    if (mOboeCallbackStream->hasOutput()) {
         mOboeCallbackStream->outputBuffers[mOboeCallbackStream->currentOutputBuffer] = audioData;
         PaUtil_SetOutputFrameCount(&mOboeCallbackStream->bufferProcessor, numFrames);
         PaUtil_SetInterleavedOutputChannels(&mOboeCallbackStream->bufferProcessor, 0,
@@ -795,12 +915,12 @@ OboeMediator::onAudioReady(AudioStream *oboeStream, void *audioData, int32_t num
                                                     mOboeCallbackStream->currentOutputBuffer],
                                             0);
     }
-    if (mOboeCallbackStream->hasInput) {
+    if (mOboeCallbackStream->hasInput()) {
         audioData = mOboeCallbackStream->inputBuffers[mOboeCallbackStream->currentInputBuffer];
         PaUtil_SetInputFrameCount(&mOboeCallbackStream->bufferProcessor, 0);
         PaUtil_SetInterleavedInputChannels(&mOboeCallbackStream->bufferProcessor, 0,
                                            (void *) ((PaInt16 **) mOboeCallbackStream->inputBuffers)[
-                                                   mOboeCallbackStream->currentInputBuffer],
+                                                    mOboeCallbackStream->currentInputBuffer],
                                            0);
     }
 
@@ -817,12 +937,12 @@ OboeMediator::onAudioReady(AudioStream *oboeStream, void *audioData, int32_t num
      * this will be 0 when paComplete + empty buffers or paAbort
      */
     if (mFramesProcessed > 0) {
-        if (mOboeCallbackStream->hasOutput) {
+        if (mOboeCallbackStream->hasOutput()) {
             mOboeCallbackStream->currentOutputBuffer =
-                    (mOboeCallbackStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
+                    (mOboeCallbackStream->currentOutputBuffer + 1) % mOboeCallbackStream->numOutputBuffers;
         }
-        if (mOboeCallbackStream->hasInput) {
-            mOboeCallbackStream->currentInputBuffer = (mOboeCallbackStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
+        if (mOboeCallbackStream->hasInput()) {
+            mOboeCallbackStream->currentInputBuffer = (mOboeCallbackStream->currentInputBuffer + 1) % mOboeCallbackStream->numInputBuffers;
         }
     }
 
@@ -853,14 +973,13 @@ OboeMediator::onAudioReady(AudioStream *oboeStream, void *audioData, int32_t num
  */
 void OboeMediator::onErrorAfterClose(AudioStream *oboeStream, Result error) {
     if (error == oboe::Result::ErrorDisconnected) {
-        OboeEngine* oboeEngine = getEngine();
         LOGW("[OboeMediator::onErrorAfterClose]\t ErrorDisconnected - Restarting stream(s)");
         int i = 0;
-        if(mOboeCallbackStream->hasOutput)
+        if(mOboeCallbackStream->hasOutput())
             i++;
-        if(mOboeCallbackStream->hasInput)
+        if(mOboeCallbackStream->hasInput())
             i+=2;
-        if (!oboeEngine->restartStream(mOboeCallbackStream, i))
+        if (!OboeEngine::getInstance().restartStream(mOboeCallbackStream, i))
             LOGE("[OboeMediator::onErrorAfterClose]\t Couldn't restart stream(s)");
     } else
         LOGE("[OboeMediator::onErrorAfterClose]\t Error was %s", oboe::convertToText(error));
@@ -879,49 +998,6 @@ void OboeMediator::resetCallbackCounters() {
 /*----------------------------- PaSkeleton functions implementations -----------------------------*/
 
 /**
- * \brief   Checks if the requested sample rate is supported by the output device using
- *          OboeEngine::tryStream.
- *          This function is used by PaOboe_Initialize, IsFormatSupported, and OpenStream.
- * @param   oboeHostApi points towards a OboeHostApiRepresentation (see struct defined at the top of this file);
- * @param   sampleRate is the sample rate we want to check.
- * @return  PaNoError regardless of the outcome of the check, but warns in the Logs if the sample
- *          rate was changed by Oboe.
- */
-PaError IsOutputSampleRateSupported(PaOboeHostApiRepresentation *oboeHostApi, int32_t deviceId, double sampleRate) {
-    if (!(oboeHostApi->oboeEngine->tryStream(Direction::Output, deviceId,
-                                               sampleRate,
-                                               kUnspecified)))
-        LOGW("[PaOboe - IsOutputSampleRateSupported]\t Sample Rate was changed by Oboe.");
-
-    /*  Since Oboe manages the sample rate in a smart way, we can avoid blocking the process if the
-        sample rate we requested wasn't supported.  */
-    return paNoError;
-}
-
-
-/**
- * \brief   Checks if the requested sample rate is supported by the input device using
- *          OboeEngine::tryStream.
- *          This function is used by PaOboe_Initialize, IsFormatSupported, and OpenStream.
- * @param   oboeHostApi points towards a OboeHostApiRepresentation (see struct defined at the top of
- *              this file);
- * @param   sampleRate is the sample rate we want to check.
- * @return  PaNoError regardless of the outcome of the check, but warns in the Logs if the sample
- *          rate was changed by Oboe.
- */
-PaError IsInputSampleRateSupported(PaOboeHostApiRepresentation *oboeHostApi, int32_t deviceId, double sampleRate) {
-    if (!(oboeHostApi->oboeEngine->tryStream(Direction::Input, deviceId,
-                                               sampleRate,
-                                               kUnspecified)))
-        LOGW("[PaOboe - IsInputSampleRateSupported]\t Sample Rate was changed by Oboe.");
-
-    /*  Since Oboe manages the sample rate in a smart way, we can avoid blocking the process if the
-        sample rate we requested wasn't supported.  */
-    return paNoError;
-}
-
-
-/**
  * \brief   Initializes common parameters and the OboeEngine, and allocates the memory necessary to
  *          start the audio streams.
  * @param   hostApi points towards a *HostApiRepresentation, which is a structure representing the
@@ -931,18 +1007,14 @@ PaError IsInputSampleRateSupported(PaOboeHostApiRepresentation *oboeHostApi, int
  */
 PaError PaOboe_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex) {
     PaError result = paNoError;
-    int deviceCount;
     PaOboeHostApiRepresentation *oboeHostApi;
-    PaDeviceInfo *deviceInfoArray;
-    
+
     oboeHostApi = (PaOboeHostApiRepresentation *) PaUtil_AllocateZeroInitializedMemory(
             sizeof(PaOboeHostApiRepresentation));
     if (!oboeHostApi) {
         result = paInsufficientMemory;
         goto error;
     }
-
-    oboeHostApi->oboeEngine = new OboeEngine();
 
     oboeHostApi->allocations = PaUtil_CreateAllocationGroup();
     if (!oboeHostApi->allocations) {
@@ -954,66 +1026,14 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
     // Info initialization.
     (*hostApi)->info.structVersion = 1;
     (*hostApi)->info.type = paOboe;
-    (*hostApi)->info.name = "android Oboe";
+    (*hostApi)->info.name = "Android Oboe";
     (*hostApi)->info.defaultOutputDevice = 0;
     (*hostApi)->info.defaultInputDevice = 0;
     (*hostApi)->info.deviceCount = 0;
 
-    deviceCount = paOboe_registeredDeviceCount;
-    (*hostApi)->deviceInfos = (PaDeviceInfo **) PaUtil_GroupAllocateZeroInitializedMemory(
-            oboeHostApi->allocations, sizeof(PaDeviceInfo * ) * deviceCount);
-
-    if (!(*hostApi)->deviceInfos) {
-        result = paInsufficientMemory;
+    result = OboeEngine::getInstance().initializeDeviceList(*hostApi, hostApiIndex, oboeHostApi);
+    if (result != paNoError) {
         goto error;
-    }
-
-    /* allocate all device info structs in a contiguous block */
-    deviceInfoArray = (PaDeviceInfo *) PaUtil_GroupAllocateZeroInitializedMemory(
-            oboeHostApi->allocations, sizeof(PaDeviceInfo) * deviceCount);
-    if (!deviceInfoArray) {
-        result = paInsufficientMemory;
-        goto error;
-    }
-
-    for (int i = 0; i < deviceCount; ++i) {
-        PaDeviceInfo *deviceInfo = &deviceInfoArray[i];
-        deviceInfo->structVersion = 2;
-        deviceInfo->hostApi = hostApiIndex;
-        deviceInfo->name = paOboe_registeredDevices[i].name;
-
-        /* Try channels in order of preference - Stereo > Mono. */
-        const int32_t channelsToTry[] = {2, 1};
-        const int32_t channelsToTryLength = 2;
-
-        deviceInfo->maxOutputChannels = paOboe_registeredDevices[i].direction == PaOboe_Direction::Output ? paOboe_registeredDevices[i].channelCount : 0;
-        deviceInfo->maxInputChannels = paOboe_registeredDevices[i].direction == PaOboe_Direction::Input ? paOboe_registeredDevices[i].channelCount : 0;
-        deviceInfo->defaultSampleRate = paOboe_registeredDevices[i].sampleRate;
-        /* If the user has set paOboe_nativeBufferSize by querying the optimal buffer size via java,
-           use the user-defined value since that will offer the lowest possible latency. */
-
-        if (paOboe_nativeBufferSize != 0) {
-            deviceInfo->defaultLowInputLatency =
-                    (double) paOboe_nativeBufferSize / deviceInfo->defaultSampleRate;
-            deviceInfo->defaultLowOutputLatency =
-                    (double) paOboe_nativeBufferSize / deviceInfo->defaultSampleRate;
-            deviceInfo->defaultHighInputLatency =
-                    (double) paOboe_nativeBufferSize * 4 / deviceInfo->defaultSampleRate;
-            deviceInfo->defaultHighOutputLatency =
-                    (double) paOboe_nativeBufferSize * 4 / deviceInfo->defaultSampleRate;
-        } else {
-            deviceInfo->defaultLowInputLatency =
-                    (double) GetApproximateLowBufferSize() / deviceInfo->defaultSampleRate;
-            deviceInfo->defaultLowOutputLatency =
-                    (double) GetApproximateLowBufferSize() / deviceInfo->defaultSampleRate;
-            deviceInfo->defaultHighInputLatency =
-                    (double) GetApproximateLowBufferSize() * 4 / deviceInfo->defaultSampleRate;
-            deviceInfo->defaultHighOutputLatency =
-                    (double) GetApproximateLowBufferSize() * 4 / deviceInfo->defaultSampleRate;
-        }
-
-        (*hostApi)->deviceInfos[i] = deviceInfo;
-        ++(*hostApi)->info.deviceCount;
     }
 
     (*hostApi)->Terminate = Terminate;
@@ -1064,9 +1084,6 @@ PaError PaOboe_Initialize(PaUtilHostApiRepresentation **hostApi, PaHostApiIndex 
  */
 static void Terminate(struct PaUtilHostApiRepresentation *hostApi) {
     auto *oboeHostApi = (PaOboeHostApiRepresentation *) hostApi;
-
-    if (oboeHostApi->oboeEngine != nullptr)
-        delete oboeHostApi->oboeEngine;
 
     if (oboeHostApi->allocations) {
         PaUtil_FreeAllAllocations(oboeHostApi->allocations);
@@ -1124,13 +1141,17 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
                     static_cast<InputPreset>(
                                 ((PaOboeStreamInfo *) inputParameters->hostApiSpecificStreamInfo)->androidInputPreset
                             );
-            if (androidInputPreset != InputPreset::Generic &&
-                androidInputPreset != InputPreset::Camcorder &&
-                androidInputPreset != InputPreset::VoiceRecognition &&
-                androidInputPreset != InputPreset::VoiceCommunication &&
-                androidInputPreset != InputPreset::VoicePerformance) {
-                LOGV("[PaOboe - IsFormatSupported]\t Request an unsupported input preset %d", androidInputPreset);
-                return paIncompatibleHostApiSpecificStreamInfo;
+            switch (androidInputPreset) {
+                // Supported types
+                case InputPreset::Generic:
+                case InputPreset::Camcorder:
+                case InputPreset::VoiceRecognition:
+                case InputPreset::VoiceCommunication:
+                case InputPreset::VoicePerformance:
+                    break;
+                default:
+                    LOGW("[PaOboe - IsFormatSupported]\t Request an unsupported input preset %d", androidInputPreset);
+                    return paIncompatibleHostApiSpecificStreamInfo;
             }
         }
     } else {
@@ -1165,31 +1186,24 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
                     static_cast<Usage>(
                                 ((PaOboeStreamInfo *) outputParameters->hostApiSpecificStreamInfo)->androidOutputUsage
                             );
-            if (androidOutputUsage != Usage::Media &&
-                androidOutputUsage != Usage::Notification &&
-                androidOutputUsage != Usage::NotificationEvent &&
-                androidOutputUsage != Usage::NotificationRingtone &&
-                androidOutputUsage != Usage::VoiceCommunication &&
-                androidOutputUsage != Usage::VoiceCommunicationSignalling &&
-                androidOutputUsage != Usage::Alarm &&
-                androidOutputUsage != Usage::Game) {
-                LOGV("[PaOboe - IsFormatSupported]\t Request an unsupported usage %d", androidOutputUsage);
-                return paIncompatibleHostApiSpecificStreamInfo;
+            switch (androidOutputUsage) {
+                // Supported types
+                case Usage::Media:
+                case Usage::Notification:
+                case Usage::NotificationEvent:
+                case Usage::NotificationRingtone:
+                case Usage::VoiceCommunication:
+                case Usage::VoiceCommunicationSignalling:
+                case Usage::Alarm:
+                case Usage::Game:
+                    break;
+                default:
+                    LOGW("[PaOboe - IsFormatSupported]\t Request an unsupported usage %d", androidOutputUsage);
+                    return paIncompatibleHostApiSpecificStreamInfo;
             }
         }
     } else {
         outputChannelCount = 0;
-    }
-
-    if (outputChannelCount > 0) {
-        if (IsOutputSampleRateSupported(oboeHostApi, (int32_t)outputParameters->device, sampleRate) != paNoError) {
-            return paInvalidSampleRate;
-        }
-    }
-    if (inputChannelCount > 0) {
-        if (IsInputSampleRateSupported(oboeHostApi, (int32_t)inputParameters->device, sampleRate) != paNoError) {
-            return paInvalidSampleRate;
-        }
     }
 
     return paFormatIsSupported;
@@ -1208,20 +1222,22 @@ static PaError IsFormatSupported(struct PaUtilHostApiRepresentation *hostApi,
  *              the correct amount of memory.
  * @return  the value returned by OboeEngine::openStream.
  */
-static PaError InitializeOutputStream(PaOboeStream* paOboeStream, PaOboeHostApiRepresentation *oboeHostApi, int32_t deviceId,
+static PaError InitializeOutputStream(PaOboeStream* paOboeStream, PaOboeHostApiRepresentation *oboeHostApi, PaDeviceIndex deviceId,
                                       Usage androidOutputUsage, double sampleRate, PerformanceMode performanceMode,
-                                      SharingMode sharingMode, const char* packageName, ContentType contentType) {
+                                      SharingMode sharingMode, const char* packageName, ContentType contentType,
+                                      SampleRateConversionQuality sampleRateConversionQuality) {
 
     LOGV("[PaOboe - OpenStream]\t Initialize output stream %d", deviceId);
-    return oboeHostApi->oboeEngine->openStream(paOboeStream,
+    return OboeEngine::getInstance().openStream(paOboeStream,
                                                  Direction::Output, deviceId,
                                                  sampleRate,
                                                  androidOutputUsage,
-                                                 Generic,
+                                                 Generic,  //Input preset won't be used, so we put the default value.
                                                  performanceMode,
                                                  sharingMode,
                                                  packageName,
-                                                 contentType); //Input preset won't be used, so we put the default value.
+                                                 contentType,
+                                                 sampleRateConversionQuality);
 }
 
 
@@ -1239,10 +1255,11 @@ static PaError InitializeOutputStream(PaOboeStream* paOboeStream, PaOboeHostApiR
  */
 static PaError InitializeInputStream(PaOboeStream* paOboeStream, PaOboeHostApiRepresentation *oboeHostApi, int32_t deviceId,
                                      InputPreset androidInputPreset, double sampleRate, PerformanceMode performanceMode,
-                                     SharingMode sharingMode, const char* packageName, ContentType contentType) {
+                                     SharingMode sharingMode, const char* packageName, ContentType contentType,
+                                      SampleRateConversionQuality sampleRateConversionQuality) {
 
     LOGV("[PaOboe - OpenStream]\t Initialize input stream %d", deviceId);
-    return oboeHostApi->oboeEngine->openStream(paOboeStream,
+    return OboeEngine::getInstance().openStream(paOboeStream,
                                                  Direction::Input, deviceId,
                                                  sampleRate,
                                                  Usage::Media,   //Usage won't be used, so we put the default value.
@@ -1250,7 +1267,8 @@ static PaError InitializeInputStream(PaOboeStream* paOboeStream, PaOboeHostApiRe
                                                  performanceMode,
                                                  sharingMode,
                                                  packageName,
-                                                 contentType);
+                                                 contentType,
+                                                 sampleRateConversionQuality);
 }
 
 
@@ -1294,9 +1312,29 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
     SharingMode sharingMode = SharingMode::Shared;
     const char* packageName = "org.portaudio";
     ContentType contentType = ContentType::Speech;
+    SampleRateConversionQuality sampleRateConversionQuality = SampleRateConversionQuality::None;
 
-    PaOboeStream* paOboeStream = (PaOboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(PaOboeStream));;
-    oboeHostApi->oboeEngine->constructPaOboeStream(paOboeStream);
+    PaOboeStream* paOboeStream = (PaOboeStream *) PaUtil_AllocateZeroInitializedMemory(sizeof(PaOboeStream));
+    OboeEngine::getInstance().constructPaOboeStream(paOboeStream);
+
+    const auto oboeParametersFromPAParameters =
+        [&androidOutputUsage, &androidInputPreset, &performanceMode,
+            &sharingMode, &packageName, &contentType,
+            &sampleRateConversionQuality](PaOboeStreamInfo * streamInfo){
+        androidOutputUsage =
+                static_cast<Usage>(streamInfo->androidOutputUsage);
+        androidInputPreset =
+                static_cast<InputPreset>(streamInfo->androidInputPreset);
+        performanceMode =
+                static_cast<PerformanceMode>(streamInfo->performanceMode);
+        sharingMode =
+                static_cast<SharingMode>(streamInfo->sharingMode);
+        packageName = streamInfo->packageName;
+        contentType =
+                static_cast<ContentType>(streamInfo->contentType);
+        sampleRateConversionQuality =
+                static_cast<SampleRateConversionQuality>(streamInfo->sampleRateConversionQuality);
+    };
 
     if (!paOboeStream) {
         error = paInsufficientMemory;
@@ -1321,19 +1359,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
 
         /* validate inputStreamInfo */
         if (inputParameters->hostApiSpecificStreamInfo) {
-            // Only has an effect on ANDROID_API>=28.
-            PaOboeStreamInfo * streamInfo = (PaOboeStreamInfo *) inputParameters->hostApiSpecificStreamInfo;
-            androidOutputUsage =
-                    static_cast<Usage>(streamInfo->androidOutputUsage);
-            androidInputPreset =
-                    static_cast<InputPreset>(streamInfo->androidInputPreset);
-            performanceMode =
-                    static_cast<PerformanceMode>(streamInfo->performanceMode);
-            sharingMode =
-                    static_cast<SharingMode>(streamInfo->sharingMode);
-            packageName = streamInfo->packageName;
-            contentType =
-                    static_cast<ContentType>(streamInfo->contentType);
+            oboeParametersFromPAParameters((PaOboeStreamInfo *) inputParameters->hostApiSpecificStreamInfo);
         }
         hostInputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paOboeDefaultFormat, inputSampleFormat);
@@ -1361,16 +1387,7 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
 
         /* validate outputStreamInfo */
         if (outputParameters->hostApiSpecificStreamInfo) {
-            PaOboeStreamInfo * streamInfo = (PaOboeStreamInfo *) outputParameters->hostApiSpecificStreamInfo;
-            androidOutputUsage =
-                    static_cast<Usage>(streamInfo->androidOutputUsage);
-            performanceMode =
-                    static_cast<PerformanceMode>(streamInfo->performanceMode);
-            sharingMode =
-                    static_cast<SharingMode>(streamInfo->sharingMode);
-            packageName = streamInfo->packageName;
-            contentType =
-                    static_cast<ContentType>(streamInfo->contentType);
+            oboeParametersFromPAParameters((PaOboeStreamInfo *) outputParameters->hostApiSpecificStreamInfo);
         }
         hostOutputSampleFormat = PaUtil_SelectClosestAvailableFormat(
                 paOboeDefaultFormat, outputSampleFormat);
@@ -1397,15 +1414,9 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
         framesPerHostBuffer = framesPerBuffer;
     }
 
-    if (streamCallback) {
-        PaUtil_InitializeStreamRepresentation(&(paOboeStream->streamRepresentation),
-                                              &oboeHostApi->callbackStreamInterface,
-                                              streamCallback, userData);
-    } else {
-        PaUtil_InitializeStreamRepresentation(&(paOboeStream->streamRepresentation),
-                                              &oboeHostApi->blockingStreamInterface,
-                                              streamCallback, userData);
-    }
+    PaUtil_InitializeStreamRepresentation(&(paOboeStream->streamRepresentation),
+                                            streamCallback ? &oboeHostApi->callbackStreamInterface : &oboeHostApi->blockingStreamInterface,
+                                            streamCallback, userData);
 
     PaUtil_InitializeCpuLoadMeasurer(&(paOboeStream->cpuLoadMeasurer), sampleRate);
 
@@ -1436,26 +1447,26 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
 //        PaUnixThreading_Initialize(); TODO: see if threading works with this version of PortAudio
 
     if (inputChannelCount > 0) {
-        paOboeStream->hasInput = true;
         paOboeStream->streamRepresentation.streamInfo.inputLatency =
                 ((PaTime) PaUtil_GetBufferProcessorInputLatencyFrames(
                         &(paOboeStream->bufferProcessor)) +
                         paOboeStream->framesPerHostCallback) / sampleRate;
-        ENSURE(InitializeInputStream(paOboeStream, oboeHostApi, (int32_t)inputParameters->device,
-                                     androidInputPreset, sampleRate, performanceMode, sharingMode, packageName, contentType),
+        ENSURE(InitializeInputStream(paOboeStream, oboeHostApi, inputParameters->device,
+                                     androidInputPreset, sampleRate, performanceMode, sharingMode, packageName,
+                                     contentType, sampleRateConversionQuality),
                "Initializing input stream failed")
-    } else { paOboeStream->hasInput = false; }
+    }
 
     if (outputChannelCount > 0) {
-        paOboeStream->hasOutput = true;
         paOboeStream->streamRepresentation.streamInfo.outputLatency =
                 ((PaTime) PaUtil_GetBufferProcessorOutputLatencyFrames(
                         &paOboeStream->bufferProcessor)
                  + paOboeStream->framesPerHostCallback) / sampleRate;
-        ENSURE(InitializeOutputStream(paOboeStream, oboeHostApi, (int32_t)outputParameters->device,
-                                      androidOutputUsage, sampleRate, performanceMode, sharingMode, packageName, contentType),
+        ENSURE(InitializeOutputStream(paOboeStream, oboeHostApi, outputParameters->device,
+                                      androidOutputUsage, sampleRate, performanceMode, sharingMode, packageName,
+                                      contentType, sampleRateConversionQuality),
                "Initializing output stream failed");
-    } else { paOboeStream->hasOutput = false; }
+    }
 
     *paStream = (PaStream *) paOboeStream;
     return error;
@@ -1481,29 +1492,13 @@ static PaError OpenStream(struct PaUtilHostApiRepresentation *hostApi,
 static PaError CloseStream(PaStream *paStream) {
     LOGV("[PaOboe - CloseStream]\t CloseStream called.");
     auto *paOboeStream = (PaOboeStream *) paStream;
-    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
 
-    if (!(oboeEngine->closeStream(paOboeStream)))
+    if (!(OboeEngine::getInstance().closeStream(paOboeStream)))
         LOGW("[PaOboe - CloseStream]\t Some errors have occurred in closing oboe streams - see OboeEngine::CloseStream logs.");
 
     PaUtil_TerminateBufferProcessor(&paOboeStream->bufferProcessor);
     PaUtil_TerminateStreamRepresentation(&paOboeStream->streamRepresentation);
 
-    // FIXME this is leading to a segfault - is the stream still active shortly after closing? 
-    // Try to wait for state change in vain
-    // for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
-    //     if (paOboeStream->hasOutput)
-    //         PaUtil_FreeMemory(paOboeStream->outputBuffers[i]);
-    //     if (paOboeStream->hasInput)
-    //         PaUtil_FreeMemory(paOboeStream->inputBuffers[i]);
-    // }
-
-    // if (paOboeStream->hasOutput)
-    //     PaUtil_FreeMemory(paOboeStream->outputBuffers);
-    // if (paOboeStream->hasInput)
-    //     PaUtil_FreeMemory(paOboeStream->inputBuffers);
-
-    // PaUtil_FreeMemory(paOboeStream);
     return paNoError;
 }
 
@@ -1517,7 +1512,6 @@ static PaError CloseStream(PaStream *paStream) {
  */
 static PaError StartStream(PaStream *paStream) {
     auto *paOboeStream = (PaOboeStream *) paStream;
-    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
 
     PaUtil_ResetBufferProcessor(&paOboeStream->bufferProcessor);
 
@@ -1533,19 +1527,20 @@ static PaError StartStream(PaStream *paStream) {
     paOboeStream->currentOutputBuffer = 0;
     paOboeStream->currentInputBuffer = 0;
 
+    auto numBuffers = OboeEngine::getInstance().getNumberOfBuffers();
     /* Initialize buffers */
-    for (int i = 0; i < paOboe_numberOfBuffers; ++i) {
-        if (paOboeStream->hasOutput) {
+    for (int i = 0; i < numBuffers; ++i) {
+        if (paOboeStream->hasOutput()) {
             memset(paOboeStream->outputBuffers[paOboeStream->currentOutputBuffer], 0,
                    paOboeStream->framesPerHostCallback * paOboeStream->bytesPerFrame *
                            paOboeStream->bufferProcessor.outputChannelCount);
-            paOboeStream->currentOutputBuffer = (paOboeStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
+            paOboeStream->currentOutputBuffer = (paOboeStream->currentOutputBuffer + 1) % numBuffers;
         }
-        if (paOboeStream->hasInput) {
+        if (paOboeStream->hasInput()) {
             memset(paOboeStream->inputBuffers[paOboeStream->currentInputBuffer], 0,
                    paOboeStream->framesPerHostCallback * paOboeStream->bytesPerFrame *
                            paOboeStream->bufferProcessor.inputChannelCount);
-            paOboeStream->currentInputBuffer = (paOboeStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
+            paOboeStream->currentInputBuffer = (paOboeStream->currentInputBuffer + 1) % numBuffers;
         }
     }
 
@@ -1559,7 +1554,7 @@ static PaError StartStream(PaStream *paStream) {
     paOboeStream->doStop = false;
     paOboeStream->doAbort = false;
 
-    if (!(oboeEngine->startStream(paOboeStream)))
+    if (!(OboeEngine::getInstance().startStream(paOboeStream)))
         return paUnanticipatedHostError;
     else
         return paNoError;
@@ -1576,7 +1571,6 @@ static PaError StartStream(PaStream *paStream) {
 static PaError StopStream(PaStream *paStream) {
     PaError error = paNoError;
     auto *paOboeStream = (PaOboeStream *) paStream;
-    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
 
     if (paOboeStream->isStopped) {
         LOGW("[PaOboe - StopStream]\t Stream was already stopped.");
@@ -1584,7 +1578,7 @@ static PaError StopStream(PaStream *paStream) {
         if (!(paOboeStream->isBlocking)) {
             paOboeStream->doStop = true;
         }
-        if (!(oboeEngine->stopStream(paOboeStream))) {
+        if (!(OboeEngine::getInstance().stopStream(paOboeStream))) {
             LOGE("[PaOboe - StopStream]\t Couldn't stop the stream(s) correctly - see OboeEngine::StopStream logs.");
             error = paUnanticipatedHostError;
         }
@@ -1610,7 +1604,6 @@ static PaError StopStream(PaStream *paStream) {
 static PaError AbortStream(PaStream *paStream) {
     PaError error = paNoError;
     auto *paOboeStream = (PaOboeStream *) paStream;
-    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
     LOGI("[PaOboe - AbortStream]\t Aborting stream.");
 
     if (!paOboeStream->isBlocking) {
@@ -1618,7 +1611,7 @@ static PaError AbortStream(PaStream *paStream) {
     }
 
     /* stop immediately so enqueue has no effect */
-    if (!(oboeEngine->abortStream(paOboeStream))) {
+    if (!(OboeEngine::getInstance().abortStream(paOboeStream))) {
         LOGE("[PaOboe - AbortStream]\t Couldn't abort the stream - see OboeEngine::abortStream logs.");
         error = paUnanticipatedHostError;
     }
@@ -1643,7 +1636,6 @@ static PaError AbortStream(PaStream *paStream) {
  */
 static PaError ReadStream(PaStream *paStream, void *buffer, unsigned long frames) {
     auto *paOboeStream = (PaOboeStream *) paStream;
-    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
     void *userBuffer = buffer;
     unsigned framesToRead;
     PaError error = paNoError;
@@ -1651,11 +1643,11 @@ static PaError ReadStream(PaStream *paStream, void *buffer, unsigned long frames
     while (frames > 0) {
         framesToRead = PA_MIN(paOboeStream->framesPerHostCallback, frames);
 
-        if (!(oboeEngine->readStream(paOboeStream, userBuffer, framesToRead *
+        if (!(OboeEngine::getInstance().readStream(paOboeStream, userBuffer, framesToRead *
                 paOboeStream->bufferProcessor.inputChannelCount)))
             error = paInternalError;
 
-        paOboeStream->currentInputBuffer = (paOboeStream->currentInputBuffer + 1) % paOboe_numberOfBuffers;
+        paOboeStream->currentInputBuffer = (paOboeStream->currentInputBuffer + 1) % paOboeStream->numInputBuffers;
         frames -= framesToRead;
     }
 
@@ -1673,7 +1665,6 @@ static PaError ReadStream(PaStream *paStream, void *buffer, unsigned long frames
  */
 static PaError WriteStream(PaStream *paStream, const void *buffer, unsigned long frames) {
     auto *paOboeStream = (PaOboeStream *) paStream;
-    auto *oboeEngine = paOboeStream->oboeMediator->getEngine();
     const void *userBuffer = buffer;
     unsigned framesToWrite;
     PaError error = paNoError;
@@ -1681,11 +1672,11 @@ static PaError WriteStream(PaStream *paStream, const void *buffer, unsigned long
     while (frames > 0) {
         framesToWrite = PA_MIN(paOboeStream->framesPerHostCallback, frames);
 
-        if (!(oboeEngine->writeStream(paOboeStream, userBuffer, framesToWrite *
+        if (!(OboeEngine::getInstance().writeStream(paOboeStream, userBuffer, framesToWrite *
                 paOboeStream->bufferProcessor.outputChannelCount)))
             error = paInternalError;
 
-        paOboeStream->currentOutputBuffer = (paOboeStream->currentOutputBuffer + 1) % paOboe_numberOfBuffers;
+        paOboeStream->currentOutputBuffer = (paOboeStream->currentOutputBuffer + 1) % paOboeStream->numOutputBuffers;
         frames -= framesToWrite;
     }
 
@@ -1703,7 +1694,7 @@ static PaError WriteStream(PaStream *paStream, const void *buffer, unsigned long
  */
 static signed long GetStreamReadAvailable(PaStream *paStream) {
     auto *paOboeStream = (PaOboeStream *) paStream;
-    return paOboeStream->framesPerHostCallback * (paOboe_numberOfBuffers - paOboeStream->currentInputBuffer);
+    return paOboeStream->framesPerHostCallback * (paOboeStream->numInputBuffers - paOboeStream->currentInputBuffer);
 }
 
 
@@ -1715,7 +1706,7 @@ static signed long GetStreamReadAvailable(PaStream *paStream) {
  */
 static signed long GetStreamWriteAvailable(PaStream *paStream) {
     auto *paOboeStream = (PaOboeStream *) paStream;
-    return paOboeStream->framesPerHostCallback * (paOboe_numberOfBuffers - paOboeStream->currentOutputBuffer);
+    return paOboeStream->framesPerHostCallback * (paOboeStream->numOutputBuffers - paOboeStream->currentOutputBuffer);
 }
 
 
@@ -1770,40 +1761,18 @@ static double GetStreamCpuLoad(PaStream *paStream) {
     return PaUtil_GetCpuLoad(&paOboeStream->cpuLoadMeasurer);
 }
 
-
-/*----------------------------------- PaOboe Utility Functions -----------------------------------*/
-
-/**
- * \brief   In case that no buffer size was specifically set via PaOboe_setNativeBufferSize, this
- *          function is called to get a sensible value for the buffer size.
- * @return  256 for Android API Level <= 23, 192 otherwise.
- */
-static unsigned long GetApproximateLowBufferSize() {
-    if (__ANDROID_API__ <= 23)
-        return 256;
-    else
-        return 192;
-}
-
 /*----------------------------- Implementation of PaOboe.h functions -----------------------------*/
 
-void PaOboe_RegisterDevice(const char* name, PaOboe_Direction direction, int channelCount, int sampleRate) {
-    paOboe_registeredDevices = (RegisteredDevice*)realloc(paOboe_registeredDevices, sizeof(RegisteredDevice) * (paOboe_registeredDeviceCount + 1));
-    RegisteredDevice* device = &paOboe_registeredDevices[paOboe_registeredDeviceCount];
-    device->name = (char*)malloc(sizeof(char)*strlen(name));
-    strcpy(device->name, name);
-    device->direction = direction;
-    device->channelCount = channelCount;
-    device->sampleRate = sampleRate;
-    paOboe_registeredDeviceCount++;
+PaErrorCode PaOboe_RegisterDevice(const char* name, int32_t id, PaOboe_Direction direction, int channelCount, int sampleRate) {
+    return OboeEngine::getInstance().registerDevice(name, id, direction, channelCount, sampleRate);
 }
 
-void PaOboe_SetNativeBufferSize(unsigned long bufferSize) {
-    paOboe_nativeBufferSize = bufferSize;
+PaErrorCode PaOboe_SetNativeBufferSize(unsigned long bufferSize) {
+    return OboeEngine::getInstance().setNativeBufferSize(bufferSize);
 }
 
-void PaOboe_SetNumberOfBuffers(unsigned numberOfBuffers) {
-    paOboe_numberOfBuffers = numberOfBuffers;
+PaErrorCode PaOboe_SetNumberOfBuffers(unsigned numberOfBuffers) {
+    return OboeEngine::getInstance().setNumberOfBuffers(numberOfBuffers);
 }
 
 void PaOboe_InitializeStreamInfo( PaOboeStreamInfo *info )

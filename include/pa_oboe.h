@@ -97,12 +97,17 @@ enum class PaOboe_SharingMode : int32_t {  Exclusive = 0, Shared = 1 };
 enum class PaOboe_ContentType : int32_t { Speech = 1, Music = 2, Movie = 3, Sonification = 4 };
 
 /**
+ * Enum class that emulates Oboe::SampleRateConversionQuality
+ */
+enum class PaOboe_SampleRateConversionQuality : int32_t { None = 0, Fastest = 1, Low = 2, Medium = 3, High = 4, Best = 5 };
+
+/**
  *  The android stream type and recording preset as defined in Oboe.
  */
 typedef struct PaOboeStreamInfo {
     // REquired fields to allow casting into PaUtilHostApiSpecificStreamInfoHeader
     unsigned long size;
-    PaHostApiTypeId hostApiType; 
+    PaHostApiTypeId hostApiType;
     unsigned long version;
 
     PaOboe_Usage androidOutputUsage;
@@ -110,6 +115,7 @@ typedef struct PaOboeStreamInfo {
     PaOboe_PerformanceMode performanceMode;
     PaOboe_SharingMode sharingMode;
     PaOboe_ContentType contentType;
+    PaOboe_SampleRateConversionQuality sampleRateConversionQuality;
     const char* packageName;
 } PaOboeStreamInfo;
 
@@ -125,7 +131,7 @@ void PaOboe_InitializeStreamInfo( PaOboeStreamInfo *info );
  * as well, and use the sample rate defined in AudioManager's android.media.property.OUTPUT_SAMPLE_RATE.
  * All three together will enable the AUDIO_OUTPUT_FLAG_FAST flag.
  */
-void PaOboe_SetNativeBufferSize(unsigned long bufferSize);
+PaErrorCode PaOboe_SetNativeBufferSize(unsigned long bufferSize);
 
 /**
  * Provide PA Oboe with native buffer information. If you call this function, you must do so before
@@ -135,17 +141,18 @@ void PaOboe_SetNativeBufferSize(unsigned long bufferSize);
  * buffer size when doing this, and use the sample rate defined in AudioManager's
  * android.media.property.OUTPUT_SAMPLE_RATE.
  */
-void PaOboe_SetNumberOfBuffers(unsigned numberOfBuffers);
+PaErrorCode PaOboe_SetNumberOfBuffers(unsigned numberOfBuffers);
 
 /**
- * Since Obee doesn't have the ability to detect devices, this helper functions allows the user to register devices, 
+ * Since Obee doesn't have the ability to detect devices, this helper functions allows the user to register devices,
  * previously detected thanks to the JNI interface, since Google is committed to only allow this option to detect devices.
  * @param name The device name
+ * @param id The device ID, as obtained from the Java AudioManager, with AudioManager.getDevices()
  * @param direction The device direction
  * @param channelCounts The device channel count
  * @param sampleRate The device default sampleRate
  */
-void PaOboe_RegisterDevice(const char* name, PaOboe_Direction direction, int channelCounts, int sampleRate);
+PaErrorCode PaOboe_RegisterDevice(const char* name, int32_t id, PaOboe_Direction direction, int channelCount, int sampleRate);
 
 #ifdef __cplusplus
 }
