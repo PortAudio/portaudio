@@ -7,7 +7,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # os: [ubuntu-latest, windows-latest, macOS-latest]
         name: [Ubuntu-GCC, Ubuntu-MinGW, Windows-MSVC, Windows-MinGW, macOS-Clang, macOS-Clang-framework]
         shared_libs: [ON, OFF]
         include:
