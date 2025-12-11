@@ -5,6 +5,10 @@ project(PortAudio VERSION 19.8)
 # General PortAudio stuff
 #
 
+# Policy: By default, build PortAudio as a shared library.
+# There are two ways to override the default behavior:
+# 1. User can select shared or static PortAudio library build by explicitly defining PA_BUILD_SHARED_LIBS to ON or OFF (e.g. on the command line or an importing project)
+# 2. If PA_BUILD_SHARED_LIBS is not set we respect the standard CMake BUILD_SHARED_LIBS variable if it is set.
 if (NOT DEFINED PA_BUILD_SHARED_LIBS)
     if (DEFINED BUILD_SHARED_LIBS)
         set(PA_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
