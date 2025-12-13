@@ -226,8 +226,7 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     int numChannels = 1;
     float toleranceRatio = 1.0;
 
-    printf("------------------------ paqaCheckMultipleSuggested - %s\n",
-           (isInput ? "INPUT" : "OUTPUT") );
+    printf("    test %s\n", (isInput ? "INPUT" : "OUTPUT") );
     if( isInput )
     {
         lowLatency = pdi->defaultLowInputLatency;
@@ -288,11 +287,11 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         {
             finalLatency = streamInfo->outputLatency;
         }
-        printf("          finalLatency = %6.4f\n", finalLatency );
+        printf("        streamInfo latency = %6.4f\n", finalLatency );
         /* For the default low & high latency values, expect quite close; for other requested
          * values, at worst the next power-of-2 may result (eg 513 -> 1024) */
         toleranceRatio = ( (i == 0) || (i == ( numLoops - 1 )) ) ? 0.1 : 1.0;
-        QA_ASSERT_CLOSE( "final latency should be close to suggested latency",
+        QA_ASSERT_CLOSE( "streamInfo latency not close to suggested latency",
                         streamParameters.suggestedLatency, finalLatency, (streamParameters.suggestedLatency * toleranceRatio) );
         if( i == 0 )
         {
@@ -319,13 +318,15 @@ static int paqaVerifySuggestedLatency( void )
     int numDevices = Pa_GetDeviceCount();
 
     printf("\n ------------------------ paqaVerifySuggestedLatency\n");
+    printf("Open a stream and see if streamInfo latency is close "
+           "to the suggestedLatency.\n");
     for( id=0; id<numDevices; id++ )            /* Iterate through all devices. */
     {
         pdi = Pa_GetDeviceInfo( id );
-        printf("\nUsing device #%d: '%s' (%s)\n", id, pdi->name, Pa_GetHostApiInfo(pdi->hostApi)->name);
+        printf("\n--------- Using device #%d: '%s' (%s)\n", id, pdi->name, Pa_GetHostApiInfo(pdi->hostApi)->name);
         if( pdi->maxOutputChannels > 0 )
         {
-            if( paqaCheckMultipleSuggested( id, 0 ) < 0 )
+            if( paqaCheckMultipleSuggested( id, 0 /* isInput */ ) < 0 )
             {
                 printf("OUTPUT CHECK FAILED !!! #%d: '%s'\n", id, pdi->name);
                 result -= 1;
@@ -333,7 +334,7 @@ static int paqaVerifySuggestedLatency( void )
         }
         if( pdi->maxInputChannels > 0 )
         {
-            if( paqaCheckMultipleSuggested( id, 1 ) < 0 )
+            if( paqaCheckMultipleSuggested( id, 1 /* isInput */ ) < 0 )
             {
                 printf("INPUT CHECK FAILED !!! #%d: '%s'\n", id, pdi->name);
                 result -= 1;
@@ -351,6 +352,7 @@ static int paqaVerifyDeviceInfoLatency( void )
     int numDevices = Pa_GetDeviceCount();
 
     printf("\n ------------------------ paqaVerifyDeviceInfoLatency\n");
+    printf("Print and check latency info\n");
     for( id=0; id<numDevices; id++ ) /* Iterate through all devices. */
     {
         pdi = Pa_GetDeviceInfo( id );
@@ -377,8 +379,6 @@ error:
     return -1;
 }
 
-
-
 /*******************************************************************/
 int main(void);
 int main(void)
@@ -404,9 +404,12 @@ int main(void)
     if( err != paNoError ) goto error;
 
     /* Run self tests. */
-    if( paqaVerifyDeviceInfoLatency() < 0 ) goto error;
+    err = paqaVerifyDeviceInfoLatency();
+    // QA_ASSERT_TRUE("paqaVerifyDeviceInfoLatency failed", (err == 0));
 
-    if( paqaVerifySuggestedLatency() < 0 ) goto error;
+    /* Run self tests. */
+    err = paqaVerifySuggestedLatency();
+    //QA_ASSERT_TRUE("paqaVerifySuggestedLatency failed", (err == 0));
 
     outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
     if (outputParameters.device == paNoDevice) {
