@@ -100,6 +100,7 @@
 #   endif
 #elif (_MSC_VER >= 1400) && !defined(_WIN32_WCE)
 #   include <intrin.h>
+/* note that MSVC intrinsics _ReadWriteBarrier(), _ReadBarrier(), _WriteBarrier() are just compiler barriers *not* memory barriers */
 #   if defined(_M_IX86) || defined(_M_X64)
 #       pragma intrinsic(_ReadWriteBarrier)
 #       pragma intrinsic(_ReadBarrier)
