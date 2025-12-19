@@ -277,9 +277,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         if( err != paNoError ) goto error;
 
         streamInfo = Pa_GetStreamInfo( stream );
-
-        err = Pa_CloseStream( stream );
-
+        // Get the latency from the streamInfo now because it will be invalid after the
+        // stream is closed.
         if( isInput )
         {
             finalLatency = streamInfo->inputLatency;
@@ -288,6 +287,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         {
             finalLatency = streamInfo->outputLatency;
         }
+        err = Pa_CloseStream( stream );
+
         printf("          finalLatency = %6.4f\n", finalLatency );
         /* For the default low & high latency values, expect quite close; for other requested
          * values, at worst the next power-of-2 may result (eg 513 -> 1024) */
