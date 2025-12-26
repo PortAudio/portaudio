@@ -224,7 +224,6 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     const PaDeviceInfo *pdi = Pa_GetDeviceInfo( deviceIndex );
     double previousLatency = 0.0;
     int numChannels = 1;
-    float toleranceRatio = 1.0;
 
     printf("------------------------ paqaCheckMultipleSuggested - %s\n",
            (isInput ? "INPUT" : "OUTPUT") );
@@ -287,23 +286,15 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         {
             finalLatency = streamInfo->outputLatency;
         }
+        printf("          finalLatency = %6.4f\n", finalLatency );
         err = Pa_CloseStream( stream );
 
-        printf("          finalLatency = %6.4f\n", finalLatency );
-        /* For the default low & high latency values, expect quite close; for other requested
-         * values, at worst the next power-of-2 may result (eg 513 -> 1024) */
-        toleranceRatio = ( (i == 0) || (i == ( numLoops - 1 )) ) ? 0.1 : 1.0;
-        QA_ASSERT_CLOSE( "final latency should be close to suggested latency",
-                        streamParameters.suggestedLatency, finalLatency, (streamParameters.suggestedLatency * toleranceRatio) );
-        if( i == 0 )
-        {
-            previousLatency = finalLatency;
-        }
-    }
+        QA_ASSERT_TRUE("Latency should increase monotonically with the suggested latency.",
+                       finalLatency > (previousLatency  - 0.001));
+        QA_ASSERT_TRUE( "Final latency is too high above the suggested latency.",
+                       finalLatency < (streamParameters.suggestedLatency + 0.010) );
 
-    if( numLoops > 1 )
-    {
-        QA_ASSERT_TRUE( " final latency should increase with suggested latency", (finalLatency > previousLatency) );
+        previousLatency = finalLatency;
     }
 
     return 0;
