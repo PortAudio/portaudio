@@ -289,10 +289,10 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         printf("          finalLatency = %6.4f\n", finalLatency );
         err = Pa_CloseStream( stream );
 
-        QA_ASSERT_TRUE("Latency should increase monotonically with the suggested latency.",
-                       finalLatency > (previousLatency  - 0.001));
+        QA_ASSERT_TRUE( "Latency should increase monotonically with the suggested latency.",
+                        finalLatency > (previousLatency  - 0.001));
         QA_ASSERT_TRUE( "Final latency is too high above the suggested latency.",
-                       finalLatency < (streamParameters.suggestedLatency + 0.010) );
+                        finalLatency < (streamParameters.suggestedLatency + 0.010) );
 
         previousLatency = finalLatency;
     }
