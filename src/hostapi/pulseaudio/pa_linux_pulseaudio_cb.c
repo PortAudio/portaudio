@@ -245,12 +245,12 @@ static int _PaPulseaudio_WriteZero(PaPulseAudio_Stream *stream,
         return ret;
     }
 
-    /* Allocate memory to make it faster to output stuff */
+    /* Prepare memory to make it faster to output stuff */
     if( pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize ) )
     {
         PA_DEBUG( ("Portaudio %s: Can't output to stream!\n",
         __FUNCTION__) );
-        return paInsufficientMemory;
+        return paUnanticipatedHostError;
     }
 
     memset( bufferData, 0x00, tmpSize);
@@ -435,12 +435,12 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
 
             size_t tmpSize = pulseaudioOutputBytes;
 
-            /* Allocate memory to make it faster to output stuff */
+            /* Prepare memory to make it faster to output stuff */
             if( pa_stream_begin_write( stream->outputStream, &bufferData, &tmpSize ) )
             {
                 PA_DEBUG( ("Portaudio %s: Can't output to stream!\n",
                 __FUNCTION__) )
-                return paNotInitialized;
+                return paUnanticipatedHostError;
             }
 
             PaUtil_SetInterleavedOutputChannels( &stream->bufferProcessor,
