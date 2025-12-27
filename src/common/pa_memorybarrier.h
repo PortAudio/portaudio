@@ -110,13 +110,21 @@
 #   endif
 #elif (_MSC_VER >= 1400) && !defined(_WIN32_WCE)
 #   include <intrin.h>
-#   pragma intrinsic(_ReadWriteBarrier)
-#   pragma intrinsic(_ReadBarrier)
-#   pragma intrinsic(_WriteBarrier)
 /* note that MSVC intrinsics _ReadWriteBarrier(), _ReadBarrier(), _WriteBarrier() are just compiler barriers *not* memory barriers */
-#   define PaUtil_FullMemoryBarrier()  _ReadWriteBarrier()
-#   define PaUtil_ReadMemoryBarrier()  _ReadBarrier()
-#   define PaUtil_WriteMemoryBarrier() _WriteBarrier()
+#   if defined(_M_ARM64)
+        /* https://learn.microsoft.com/en-us/cpp/intrinsics/arm64-intrinsics?view=msvc-170 */
+#       define PaUtil_FullMemoryBarrier()  __dmb(_ARM64_BARRIER_ISH)
+#       define PaUtil_ReadMemoryBarrier()  __dmb(_ARM64_BARRIER_ISHLD)
+#       define PaUtil_WriteMemoryBarrier() __dmb(_ARM64_BARRIER_ISHST)
+#   else
+#       pragma intrinsic(_ReadWriteBarrier)
+#       pragma intrinsic(_ReadBarrier)
+#       pragma intrinsic(_WriteBarrier)
+        /* https://learn.microsoft.com/en-us/cpp/intrinsics/readbarrier?view=msvc-170 */
+#       define PaUtil_FullMemoryBarrier()  _ReadWriteBarrier()
+#       define PaUtil_ReadMemoryBarrier()  _ReadBarrier()
+#       define PaUtil_WriteMemoryBarrier() _WriteBarrier()
+#   endif
 #elif defined(_WIN32_WCE)
 #   define PaUtil_FullMemoryBarrier()
 #   define PaUtil_ReadMemoryBarrier()
