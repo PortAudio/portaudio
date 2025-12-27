@@ -351,29 +351,6 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
          */
         PA_PULSEAUDIO_IS_ERROR( stream, paStreamIsStopped )
 
-        /* There is only Record stream so
-         * see if we have enough stuff to feed record stream
-         * If not then bail out.
-         */
-        if( isInputCb &&
-            PaUtil_GetRingBufferReadAvailable(&stream->inputRing) < pulseaudioInputBytes )
-        {
-            if(isOutputCb && (pulseaudioOutputWritten < length) && !stream->missedBytes)
-            {
-                stream->missedBytes = length - pulseaudioOutputWritten;
-            }
-            else
-            {
-                stream->missedBytes = 0;
-            }
-            break;
-        }
-        else if( pulseaudioOutputWritten >= length)
-        {
-            stream->missedBytes = 0;
-            break;
-        }
-
         if(  stream->outputStream )
         {
             PaPulseAudio_updateTimeInfo( stream->outputStream,
@@ -735,7 +712,6 @@ PaError PaPulseAudio_StartStreamCb( PaStream * s )
     stream->isStopped = 1;
     stream->pulseaudioIsActive = 1;
     stream->pulseaudioIsStopped = 0;
-    stream->missedBytes = 0;
 
     /* Ready the processor */
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
@@ -987,8 +963,6 @@ static PaError RequestStop( PaPulseAudio_Stream * stream,
     stream->isStopped = 1;
     stream->pulseaudioIsActive = 0;
     stream->pulseaudioIsStopped = 1;
-
-    stream->missedBytes = 0;
 
     /* Test if there is something that we can play */
     if( stream->outputStream

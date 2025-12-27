@@ -143,8 +143,6 @@ typedef struct PaPulseAudio_Stream
 
     PaUtilRingBuffer inputRing;
 
-    size_t missedBytes;
-
     /* Used in communication between threads
      *
      * State machine works like this:
