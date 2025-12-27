@@ -109,15 +109,17 @@ int PaPulseAudio_updateTimeInfo( pa_stream * s,
 void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
                                   pa_operation **operation)
 {
-    unsigned int waitOperation = 1000;
+    /* Micro second (us) equal to one millionth (0.000001 or 10-6)
+     * of a second then 3 seconds (which is very long time to wait
+     * for operation to end) is then 3000000 us
+     */
+    int32_t wait_us = (3 * 1000000);
+    const uint32_t sleep_us = 100;
     pa_operation *localOperation = (*operation);
     pa_operation_state_t localOperationState = PA_OPERATION_RUNNING;
 
-    // As mainly operation is done when running locally
-    // done after 1-3 then 1000 is enough to wait if
-    // something goes wrong
 
-    while( waitOperation > 0 )
+    while( wait_us > 0 )
     {
 
         PaPulseAudio_Lock( hostapi->mainloop );
@@ -135,7 +137,8 @@ void PaPulseAudio_ReleaseOperation(PaPulseAudio_HostApiRepresentation *hostapi,
         }
         PaPulseAudio_UnLock( hostapi->mainloop );
 
-        waitOperation --;
+        wait_us -= sleep_us;
+        usleep(sleep_us);
     }
 
     // No wait if operation have been DONE or CANCELLED
