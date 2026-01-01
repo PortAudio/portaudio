@@ -3301,6 +3301,7 @@ PaWinWdmFilter** BuildFilterList( int* pFilterCount, int* pNoOfPaDevices, PaErro
     *pFilterCount = filterCount;
     *pNoOfPaDevices = noOfPaDevices;
 
+    PA_LOGL_;
     return ppFilters;
 }
 
