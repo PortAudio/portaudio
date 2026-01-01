@@ -2874,7 +2874,7 @@ error:
 */
 static void FilterFree(PaWinWdmFilter* filter)
 {
-    PA_LOGL_;
+    PA_LOGE_;
     if( filter )
     {
         if (--filter->filterRefCount > 0)
@@ -2910,7 +2910,7 @@ static void FilterFree(PaWinWdmFilter* filter)
             CloseHandle( filter->handle );
         PaUtil_FreeMemory( filter );
     }
-    PA_LOGE_;
+    PA_LOGL_;
 }
 
 /**
