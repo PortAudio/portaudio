@@ -1710,7 +1710,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                     assert(wcscmp(symbLinkName, pin->parentFilter->topologyFilter->devInfo.filterPath) == 0);
                 }
 
-                PA_DEBUG(("PinNew: Opening topology filter..."));
+                PA_DEBUG(("PinNew: Opening topology filter...\n"));
 
                 result = FilterUse(pin->parentFilter->topologyFilter);
                 if (result == paNoError)
