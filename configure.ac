@@ -455,13 +455,14 @@ case "${host_os}" in
            AC_DEFINE(PA_USE_ASIHPI,1)
         fi
 
-        ## If pthread support is in libc then we do not need -lpthread
-        if [[ "$have_libc_pthread" = "yes" ]] ; then
-           DLL_LIBS="$DLL_LIBS -lm"
-           LIBS="$LIBS -lm"
-        else
-           DLL_LIBS="$DLL_LIBS -lm -lpthread"
-           LIBS="$LIBS -lm -lpthread"
+        ## add math library
+        DLL_LIBS="$DLL_LIBS -lm"
+        LIBS="$LIBS -lm"
+
+        ## if pthread support is in libc then we do not need -lpthread
+        if [[ "$have_libc_pthread" != "yes" ]] ; then
+           DLL_LIBS="$DLL_LIBS -lpthread"
+           LIBS="$LIBS -lpthread"
         fi
 
         PADLL="libportaudio.so"
