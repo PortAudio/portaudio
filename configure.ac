@@ -390,8 +390,11 @@ case "${host_os}" in
 
         CFLAGS="$CFLAGS -I\$(top_srcdir)/src/os/unix"
 
-        AC_CHECK_LIB(pthread, pthread_create,[have_pthread="yes"],
-                AC_MSG_ERROR([libpthread not found!]))
+        AC_CHECK_LIB(pthread, pthread_join, have_pthread=yes, have_pthread=no)
+        AC_CHECK_LIB(c, pthread_join, have_libc_pthread=yes, have_libc_pthread=no)
+        if [[ "$have_pthread" = "no" ] && [ "$have_libc_pthread" = "no" ]] ; then
+           AC_MSG_ERROR([pthread not found in libpthread or libc!])
+        fi
 
         if [[ "$have_alsa" = "yes" ] && [ "$with_alsa" != "no" ]] ; then
            DLL_LIBS="$DLL_LIBS -lasound"
@@ -452,8 +455,16 @@ case "${host_os}" in
            AC_DEFINE(PA_USE_ASIHPI,1)
         fi
 
-        DLL_LIBS="$DLL_LIBS -lm -lpthread"
-        LIBS="$LIBS -lm -lpthread"
+        ## add math library
+        DLL_LIBS="$DLL_LIBS -lm"
+        LIBS="$LIBS -lm"
+
+        ## if pthread support is not in libc then we need -lpthread
+        if [[ "$have_libc_pthread" = "no" ]] ; then
+           DLL_LIBS="$DLL_LIBS -lpthread"
+           LIBS="$LIBS -lpthread"
+        fi
+
         PADLL="libportaudio.so"
 
         ## support sun cc compiler flags
