@@ -1710,7 +1710,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                     assert(wcscmp(symbLinkName, pin->parentFilter->topologyFilter->devInfo.filterPath) == 0);
                 }
 
-                PA_DEBUG(("PinNew: Opening topology filter..."));
+                PA_DEBUG(("PinNew: Opening topology filter...\n"));
 
                 result = FilterUse(pin->parentFilter->topologyFilter);
                 if (result == paNoError)
@@ -2874,7 +2874,7 @@ error:
 */
 static void FilterFree(PaWinWdmFilter* filter)
 {
-    PA_LOGL_;
+    PA_LOGE_;
     if( filter )
     {
         if (--filter->filterRefCount > 0)
@@ -2910,7 +2910,7 @@ static void FilterFree(PaWinWdmFilter* filter)
             CloseHandle( filter->handle );
         PaUtil_FreeMemory( filter );
     }
-    PA_LOGE_;
+    PA_LOGL_;
 }
 
 /**
@@ -3301,6 +3301,7 @@ PaWinWdmFilter** BuildFilterList( int* pFilterCount, int* pNoOfPaDevices, PaErro
     *pFilterCount = filterCount;
     *pNoOfPaDevices = noOfPaDevices;
 
+    PA_LOGL_;
     return ppFilters;
 }
 
