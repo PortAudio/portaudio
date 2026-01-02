@@ -459,8 +459,8 @@ case "${host_os}" in
         DLL_LIBS="$DLL_LIBS -lm"
         LIBS="$LIBS -lm"
 
-        ## if pthread support is in libc then we do not need -lpthread
-        if [[ "$have_libc_pthread" != "yes" ]] ; then
+        ## if pthread support is not in libc then we need -lpthread
+        if [[ "$have_libc_pthread" = "no" ]] ; then
            DLL_LIBS="$DLL_LIBS -lpthread"
            LIBS="$LIBS -lpthread"
         fi
