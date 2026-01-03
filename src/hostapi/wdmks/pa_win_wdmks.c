@@ -1106,6 +1106,7 @@ static ULONG GetConnectedPin(ULONG startPin, BOOL forward, PaWinWdmFilter* filte
 
         if (forward ? conn->ToNode == KSFILTER_NODE : conn->FromNode == KSFILTER_NODE)
         {
+            PA_LOGL_;
             return forward ? conn->ToNodePin : conn->FromNodePin;
         }
         else
@@ -2076,10 +2077,14 @@ static PaError PinSetState(PaWinWdmPin* pin, KSSTATE state)
     prop.Id  = KSPROPERTY_CONNECTION_STATE;
     prop.Flags = KSPROPERTY_TYPE_SET;
 
-    if( pin == NULL )
+    if( pin == NULL ) {
+        PA_LOGL_;
         return paInternalError;
-    if( pin->handle == NULL )
+    }
+    if( pin->handle == NULL ) {
+        PA_LOGL_;
         return paInternalError;
+    }
 
     result = WdmSyncIoctl(pin->handle, IOCTL_KS_PROPERTY, &prop, sizeof(KSPROPERTY), &state, sizeof(KSSTATE), NULL);
 
@@ -2097,9 +2102,15 @@ static PaError PinInstantiate(PaWinWdmPin* pin)
     PA_LOGE_;
 
     if( pin == NULL )
+    {
+        PA_LOGL_;
         return paInternalError;
+    }
     if(!pin->pinConnect)
+    {
+        PA_LOGL_;
         return paInternalError;
+    }
 
     FilterUse(pin->parentFilter);
 
@@ -2119,12 +2130,15 @@ static PaError PinInstantiate(PaWinWdmPin* pin)
         {
         case ERROR_INVALID_PARAMETER:
             /* First case when pin actually don't support the format */
+            PA_LOGL_;
             return paSampleFormatNotSupported;
         case ERROR_BAD_COMMAND:
             /* Case when pin is occupied (by another application) */
+            PA_LOGL_;
             return paDeviceUnavailable;
         default:
             /* All other cases */
+            PA_LOGL_;
             return paInvalidDevice;
         }
     }
@@ -2171,9 +2185,15 @@ static PaError PinSetFormat(PaWinWdmPin* pin, const WAVEFORMATEX* format)
     PA_LOGE_;
 
     if( pin == NULL )
+    {
+        PA_LOGL_;
         return paInternalError;
+    }
     if( format == NULL )
+    {
+        PA_LOGL_;
         return paInternalError;
+    }
 
     size = GetWfexSize(format) + sizeof(KSPIN_CONNECT) + sizeof(KSDATAFORMAT_WAVEFORMATEX) - sizeof(WAVEFORMATEX);
 
@@ -2181,7 +2201,10 @@ static PaError PinSetFormat(PaWinWdmPin* pin, const WAVEFORMATEX* format)
     {
         newConnect = PaUtil_AllocateZeroInitializedMemory( size );
         if( newConnect == NULL )
+        {
+            PA_LOGL_;
             return paInsufficientMemory;
+        }
         memcpy( newConnect, (void*)pin->pinConnect, min(pin->pinConnectSize,size) );
         PaUtil_FreeMemory( pin->pinConnect );
         pin->pinConnect = (KSPIN_CONNECT*)newConnect;
@@ -2880,6 +2903,7 @@ static void FilterFree(PaWinWdmFilter* filter)
         if (--filter->filterRefCount > 0)
         {
             /* Ok, a stream has a ref count to this filter */
+            PA_LOGL_;
             return;
         }
 
@@ -2935,6 +2959,7 @@ static PaError FilterUse(PaWinWdmFilter* filter)
 
         if( filter->handle == NULL )
         {
+            PA_LOGL_;
             return paDeviceUnavailable;
         }
     }
@@ -3085,6 +3110,7 @@ PaWinWdmFilter** BuildFilterList( int* pFilterCount, int* pNoOfPaDevices, PaErro
     if( handle == INVALID_HANDLE_VALUE )
     {
         *pResult = paUnanticipatedHostError;
+        PA_LOGL_;
         return NULL;
     }
     PA_DEBUG(("Setup called\n"));
@@ -3146,6 +3172,7 @@ PaWinWdmFilter** BuildFilterList( int* pFilterCount, int* pNoOfPaDevices, PaErro
         if(handle != NULL)
             SetupDiDestroyDeviceInfoList(handle);
         *pResult = paInsufficientMemory;
+        PA_LOGL_;
         return NULL;
     }
 
@@ -3941,6 +3968,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( inputSampleFormat & paCustomFormat )
         {
             PaWinWDM_SetLastErrorInfo(paSampleFormatNotSupported, "IsFormatSupported: Custom input format not supported");
+            PA_LOGL_;
             return paSampleFormatNotSupported;
         }
 
@@ -3950,6 +3978,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( inputParameters->device == paUseHostApiSpecificDeviceSpecification )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidDevice, "IsFormatSupported: paUseHostApiSpecificDeviceSpecification not supported");
+            PA_LOGL_;
             return paInvalidDevice;
         }
 
@@ -3957,6 +3986,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( inputChannelCount > hostApi->deviceInfos[ inputParameters->device ]->maxInputChannels )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidChannelCount, "IsFormatSupported: Invalid input channel count");
+            PA_LOGL_;
             return paInvalidChannelCount;
         }
 
@@ -3964,6 +3994,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( inputParameters->hostApiSpecificStreamInfo )
         {
             PaWinWDM_SetLastErrorInfo(paIncompatibleHostApiSpecificStreamInfo, "Host API stream info not supported");
+            PA_LOGL_;
             return paIncompatibleHostApiSpecificStreamInfo; /* this implementation doesn't use custom stream info */
         }
 
@@ -3983,6 +4014,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if (testFormat == 0)
         {
             PaWinWDM_SetLastErrorInfo(result, "IsFormatSupported(capture) failed: no testformat found!");
+            PA_LOGL_;
             return paUnanticipatedHostError;
         }
 
@@ -4027,6 +4059,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
             if( result != paNoError )
             {
                 PaWinWDM_SetLastErrorInfo(result, "IsFormatSupported(capture) failed: sr=%u,ch=%u,bits=%u", wfx.Format.nSamplesPerSec, wfx.Format.nChannels, wfx.Format.wBitsPerSample);
+                PA_LOGL_;
                 return result;
             }
         }
@@ -4052,6 +4085,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( outputSampleFormat & paCustomFormat )
         {
             PaWinWDM_SetLastErrorInfo(paSampleFormatNotSupported, "IsFormatSupported: Custom output format not supported");
+            PA_LOGL_;
             return paSampleFormatNotSupported;
         }
 
@@ -4061,6 +4095,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( outputParameters->device == paUseHostApiSpecificDeviceSpecification )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidDevice, "IsFormatSupported: paUseHostApiSpecificDeviceSpecification not supported");
+            PA_LOGL_;
             return paInvalidDevice;
         }
 
@@ -4068,6 +4103,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( outputChannelCount > hostApi->deviceInfos[ outputParameters->device ]->maxOutputChannels )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidChannelCount, "Invalid output channel count");
+            PA_LOGL_;
             return paInvalidChannelCount;
         }
 
@@ -4075,6 +4111,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if( outputParameters->hostApiSpecificStreamInfo )
         {
             PaWinWDM_SetLastErrorInfo(paIncompatibleHostApiSpecificStreamInfo, "Host API stream info not supported");
+            PA_LOGL_;
             return paIncompatibleHostApiSpecificStreamInfo; /* this implementation doesn't use custom stream info */
         }
 
@@ -4094,6 +4131,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         if (testFormat == 0)
         {
             PaWinWDM_SetLastErrorInfo(result, "IsFormatSupported(render) failed: no testformat found!");
+            PA_LOGL_;
             return paUnanticipatedHostError;
         }
 
@@ -4139,6 +4177,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
             if( result != paNoError )
             {
                 PaWinWDM_SetLastErrorInfo(result, "IsFormatSupported(render) failed: %u,%u,%u", wfx.Format.nSamplesPerSec, wfx.Format.nChannels, wfx.Format.wBitsPerSample);
+                PA_LOGL_;
                 return result;
             }
         }
@@ -4341,6 +4380,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if( inputParameters->device == paUseHostApiSpecificDeviceSpecification )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidDevice, "paUseHostApiSpecificDeviceSpecification(in) not supported");
+            PA_LOGL_;
             return paInvalidDevice;
         }
 
@@ -4348,6 +4388,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if( userInputChannels > hostApi->deviceInfos[ inputParameters->device ]->maxInputChannels )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidChannelCount, "Invalid input channel count");
+            PA_LOGL_;
             return paInvalidChannelCount;
         }
 
@@ -4356,6 +4397,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if(result != paNoError)
         {
             PaWinWDM_SetLastErrorInfo(result, "Host API stream info not supported (in)");
+            PA_LOGL_;
             return result; /* this implementation doesn't use custom stream info */
         }
     }
@@ -4376,6 +4418,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if( outputParameters->device == paUseHostApiSpecificDeviceSpecification )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidDevice, "paUseHostApiSpecificDeviceSpecification(out) not supported");
+            PA_LOGL_;
             return paInvalidDevice;
         }
 
@@ -4383,6 +4426,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if( userOutputChannels > hostApi->deviceInfos[ outputParameters->device ]->maxOutputChannels )
         {
             PaWinWDM_SetLastErrorInfo(paInvalidChannelCount, "Invalid output channel count");
+            PA_LOGL_;
             return paInvalidChannelCount;
         }
 
@@ -4391,6 +4435,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
         if (result != paNoError)
         {
             PaWinWDM_SetLastErrorInfo(result, "Host API stream info not supported (out)");
+            PA_LOGL_;
             return result; /* this implementation doesn't use custom stream info */
         }
     }
@@ -4404,6 +4449,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( (streamFlags & paPlatformSpecificFlags) != 0 )
     {
         PaWinWDM_SetLastErrorInfo(paInvalidFlag, "Invalid flag supplied");
+        PA_LOGL_;
         return paInvalidFlag; /* unexpected platform specific flag */
     }
 
@@ -6220,6 +6266,7 @@ static PaError StartStream( PaStream *s )
 
     if (stream->streamThread != NULL)
     {
+        PA_LOGL_;
         return paStreamIsNotStopped;
     }
 
