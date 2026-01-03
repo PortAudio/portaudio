@@ -964,7 +964,7 @@ static const KSTOPOLOGY_CONNECTION* GetConnectionTo(const KSTOPOLOGY_CONNECTION*
     const KSTOPOLOGY_CONNECTION* retval = NULL;
     const KSTOPOLOGY_CONNECTION* connections = (const KSTOPOLOGY_CONNECTION*)(filter->connections + 1);
     (void)muxIdx;
-    PA_DEBUG(("GetConnectionTo: Checking %u connections... (pFrom = %p)", filter->connections->Count, pFrom));
+    PA_DEBUG(("GetConnectionTo: Checking %u connections... (pFrom = %p)\n", filter->connections->Count, pFrom));
     for (i = 0; i < filter->connections->Count; ++i)
     {
         const KSTOPOLOGY_CONNECTION* pConn = connections + i;
@@ -1749,7 +1749,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
 #if !PA_WDMKS_USE_CATEGORY_FOR_PIN_NAMES
                             wchar_t pinName[MAX_PATH];
 
-                            PA_DEBUG(("PinNew: Getting pin name property..."));
+                            PA_DEBUG(("PinNew: Getting pin name property...\n"));
 
                             /* Ok, try pin name also, and favor that if available */
                             result = WdmGetPinPropertySimple(pin->parentFilter->topologyFilter->handle,
@@ -1858,7 +1858,7 @@ static PaWinWdmPin* PinNew(PaWinWdmFilter* parentFilter, unsigned long pinId, Pa
                                 }
                                 else
                                 {
-                                    PA_DEBUG(("PinNew: Failed to get pin category"));
+                                    PA_DEBUG(("PinNew: Failed to get pin category\n"));
                                 }
                             }
                         }
@@ -2048,7 +2048,7 @@ static void PinClose(PaWinWdmPin* pin)
     PA_LOGE_;
     if( pin == NULL )
     {
-        PA_DEBUG(("Closing NULL pin!"));
+        PA_DEBUG(("Closing NULL pin!\n"));
         PA_LOGL_;
         return;
     }
@@ -3990,7 +3990,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         valid bits = 24 (instead of 24 bit samples) */
         if (pFilter->devInfo.streamingType == Type_kWaveRT && testFormat == paInt24)
         {
-            PA_DEBUG(("IsFormatSupported (capture): WaveRT overriding testFormat paInt24 with paInt32 (24 valid bits)"));
+            PA_DEBUG(("IsFormatSupported (capture): WaveRT overriding testFormat paInt24 with paInt32 (24 valid bits)\n"));
             testFormat = paInt32;
             validBits = 24;
         }
@@ -4101,7 +4101,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
         valid bits = 24 (instead of 24 bit samples) */
         if (pFilter->devInfo.streamingType == Type_kWaveRT && testFormat == paInt24)
         {
-            PA_DEBUG(("IsFormatSupported (render): WaveRT overriding testFormat paInt24 with paInt32 (24 valid bits)"));
+            PA_DEBUG(("IsFormatSupported (render): WaveRT overriding testFormat paInt24 with paInt32 (24 valid bits)\n"));
             testFormat = paInt32;
             validBits = 24;
         }
@@ -4265,20 +4265,20 @@ static PaError ValidateSpecificStreamParameters(
         if( streamInfo->size != sizeof( PaWinWDMKSInfo )
             || streamInfo->version != 1 )
         {
-            PA_DEBUG(("Stream parameters: size or version not correct"));
+            PA_DEBUG(("Stream parameters: size or version not correct\n"));
             return paIncompatibleHostApiSpecificStreamInfo;
         }
 
         if (!!(streamInfo->flags & ~(paWinWDMKSOverrideFramesize | paWinWDMKSUseGivenChannelMask)))
         {
-            PA_DEBUG(("Stream parameters: non supported flags set"));
+            PA_DEBUG(("Stream parameters: non supported flags set\n"));
             return paIncompatibleHostApiSpecificStreamInfo;
         }
 
         if (streamInfo->noOfPackets != 0 &&
             (streamInfo->noOfPackets < 2 || streamInfo->noOfPackets > 8))
         {
-            PA_DEBUG(("Stream parameters: noOfPackets %u out of range [2,8]", streamInfo->noOfPackets));
+            PA_DEBUG(("Stream parameters: noOfPackets %u out of range [2,8]\n", streamInfo->noOfPackets));
             return paIncompatibleHostApiSpecificStreamInfo;
         }
 
@@ -4286,13 +4286,13 @@ static PaError ValidateSpecificStreamParameters(
         {
             if (isInput)
             {
-                PA_DEBUG(("Stream parameters: Channels mask setting not supported for input stream"));
+                PA_DEBUG(("Stream parameters: Channels mask setting not supported for input stream\n"));
                 return paIncompatibleHostApiSpecificStreamInfo;
             }
 
             if (streamInfo->channelMask & PAWIN_SPEAKER_RESERVED)
             {
-                PA_DEBUG(("Stream parameters: Given channels mask 0x%08X not supported", streamInfo->channelMask));
+                PA_DEBUG(("Stream parameters: Given channels mask 0x%08X not supported\n", streamInfo->channelMask));
                 return paIncompatibleHostApiSpecificStreamInfo;
             }
         }
@@ -5989,7 +5989,7 @@ PA_THREAD_FUNC ProcessingThread(void* pParam)
             LARGE_INTEGER dueTime = {0};
 
             timerPeriod=max(timerPeriod/5,1);
-            PA_DEBUG(("Timer event handles=0x%04X,0x%04X period=%u ms", timerEventHandles[0], timerEventHandles[1], timerPeriod));
+            PA_DEBUG(("Timer event handles=0x%04X,0x%04X period=%u ms\n", timerEventHandles[0], timerEventHandles[1], timerPeriod));
             hTimer = CreateWaitableTimer(0, FALSE, NULL);
             if (hTimer == NULL)
             {
@@ -6060,13 +6060,13 @@ PA_THREAD_FUNC ProcessingThread(void* pParam)
         we can't rely on the timeout of WFMO to check for device timeouts, we need to keep tally. */
         if (info.stream->capture.pPin && (dwCurrentTime - timeStamp[0]) >= info.timeout)
         {
-            PA_DEBUG(("Timeout for capture device (%u ms)!", info.timeout, (dwCurrentTime - timeStamp[0])));
+            PA_DEBUG(("Timeout for capture device (%u ms)!\n", info.timeout, (dwCurrentTime - timeStamp[0])));
             result = paTimedOut;
             break;
         }
         if (info.stream->render.pPin && (dwCurrentTime - timeStamp[1]) >= info.timeout)
         {
-            PA_DEBUG(("Timeout for render device (%u ms)!", info.timeout, (dwCurrentTime - timeStamp[1])));
+            PA_DEBUG(("Timeout for render device (%u ms)!\n", info.timeout, (dwCurrentTime - timeStamp[1])));
             result = paTimedOut;
             break;
         }
@@ -6235,7 +6235,7 @@ static PaError StartStream( PaStream *s )
     * priority to real time for best low latency support
     * Disabled by default because RT processes can easily block the OS */
     /*ret = SetPriorityClass(GetCurrentProcess(),REALTIME_PRIORITY_CLASS);
-    PA_DEBUG(("Class ret = %d;",ret));*/
+    PA_DEBUG(("Class ret = %d;\n",ret));*/
 
     stream->streamThread = CREATE_THREAD_FUNCTION (NULL, 0, ProcessingThread, stream, CREATE_SUSPENDED, NULL);
     if(stream->streamThread == NULL)
@@ -6298,7 +6298,7 @@ static PaError StopStream( PaStream *s )
         }
         else
         {
-            PA_DEBUG(("StopStream: GECT says not active, but streamActive is not false ??"));
+            PA_DEBUG(("StopStream: GECT says not active, but streamActive is not false ??\n"));
             result = paUnanticipatedHostError;
             PaWinWDM_SetLastErrorInfo(result, "StopStream: GECT says not active, but streamActive = %d", stream->streamActive);
         }
