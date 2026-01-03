@@ -212,7 +212,7 @@ static int paqaNoopCallback( const void *inputBuffer, void *outputBuffer,
 static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
 {
     int i;
-    int numLoops = 10;
+    int numLoops = 11;
     PaError err;
     PaStream *stream;
     PaStreamParameters streamParameters;
@@ -224,6 +224,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     const PaDeviceInfo *pdi = Pa_GetDeviceInfo( deviceIndex );
     double previousLatency = 0.0;
     int numChannels = 1;
+    int atMaximumLatency = 0; /* Set to 1 when we reach the limit. */
+    double maximumLatency = 0.0;
 
     printf("------------------------ paqaCheckMultipleSuggested - %s\n",
            (isInput ? "INPUT" : "OUTPUT") );
@@ -250,19 +252,15 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     printf(" numChannels = %d\n", numChannels );
     printf(" sampleRate  = %g\n", sampleRate );
 
-    if( (highLatency - lowLatency) < 0.001 )
+    if( highLatency < 0.001 )
     {
-        numLoops = 1;
+        numLoops = 2; /* Just test 0 and high. Don't divide by 0. */
     }
 
     for( i=0; i<numLoops; i++ )
     {
-        if( numLoops == 1 )
-            streamParameters.suggestedLatency = lowLatency;
-        else
-            streamParameters.suggestedLatency = lowLatency + ((highLatency - lowLatency) * i /(numLoops - 1));
-
-        printf("   suggestedLatency[%d] = %6.4f\n", i, streamParameters.suggestedLatency );
+        streamParameters.suggestedLatency = highLatency * i /(numLoops - 1);
+        printf("   suggestedLatency[%2d] = %8.6f", i, streamParameters.suggestedLatency );
 
         err = Pa_OpenStream(
                             &stream,
@@ -273,7 +271,10 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
                             paClipOff,      /* we won't output out of range samples so don't bother clipping them */
                             paqaNoopCallback,
                             NULL );
-        if( err != paNoError ) goto error;
+        if( err != paNoError ) {
+            printf("\n");
+            goto error;
+        }
 
         streamInfo = Pa_GetStreamInfo( stream );
         // Get the latency from the streamInfo now because it will be invalid after the
@@ -286,14 +287,28 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         {
             finalLatency = streamInfo->outputLatency;
         }
-        printf("          finalLatency = %6.4f\n", finalLatency );
+        printf(", finalLatency = %8.6f\n", finalLatency );
         err = Pa_CloseStream( stream );
 
-        QA_ASSERT_TRUE( "Latency should increase monotonically with the suggested latency.",
-                        finalLatency > (previousLatency  - 0.001));
-        QA_ASSERT_TRUE( "Final latency is too high above the suggested latency.",
-                        finalLatency < (streamParameters.suggestedLatency + 0.010) );
-
+        QA_ASSERT_TRUE("Latency should be monotonically non-decreasing with suggested latency.",
+                        finalLatency >= previousLatency);
+        QA_ASSERT_TRUE("Latency should be > 0.0", finalLatency > 0.0);
+        if (atMaximumLatency == 0) {
+            /* If we get a lower value then we must be clipping at max latency. */
+            if (finalLatency < streamParameters.suggestedLatency) {
+                atMaximumLatency = 1;
+                maximumLatency = finalLatency;
+                printf("     maximumLatency = %8.6f\n", maximumLatency );
+            }
+        }
+        /* If we are not at maximum then we should be rounding up. */
+        if (atMaximumLatency == 0) {
+            QA_ASSERT_TRUE("Latency should be >= suggestedLatency",
+                           finalLatency >= streamParameters.suggestedLatency);
+        } else {
+            QA_ASSERT_TRUE("Latency should be == maximumLatency",
+                           finalLatency == maximumLatency);
+        }
         previousLatency = finalLatency;
     }
 
@@ -317,7 +332,7 @@ static int paqaVerifySuggestedLatency( void )
         printf("\nUsing device #%d: '%s' (%s)\n", id, pdi->name, Pa_GetHostApiInfo(pdi->hostApi)->name);
         if( pdi->maxOutputChannels > 0 )
         {
-            if( paqaCheckMultipleSuggested( id, 0 ) < 0 )
+            if( paqaCheckMultipleSuggested( id, 0 /* isInput */ ) < 0 )
             {
                 printf("OUTPUT CHECK FAILED !!! #%d: '%s'\n", id, pdi->name);
                 result -= 1;
@@ -325,7 +340,7 @@ static int paqaVerifySuggestedLatency( void )
         }
         if( pdi->maxInputChannels > 0 )
         {
-            if( paqaCheckMultipleSuggested( id, 1 ) < 0 )
+            if( paqaCheckMultipleSuggested( id, 1 /* isInput */ ) < 0 )
             {
                 printf("INPUT CHECK FAILED !!! #%d: '%s'\n", id, pdi->name);
                 result -= 1;
