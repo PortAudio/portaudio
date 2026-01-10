@@ -365,6 +365,17 @@ static int _PaPulseAudio_ProcessAudio(PaPulseAudio_Stream *stream,
          */
         PA_PULSEAUDIO_IS_ERROR( stream, paStreamIsStopped )
 
+        /* If we have written enough bytes (If output is enabled)
+         * or there is no enough bytes to be for input
+         * break out from loop
+         */
+        if( (isInputCb &&
+            PaUtil_GetRingBufferReadAvailable(&stream->inputRing) < pulseaudioInputBytes) ||
+            pulseaudioOutputWritten >= length )
+        {
+            break;
+        }
+
         if(  stream->outputStream )
         {
             PaPulseAudio_updateTimeInfo( stream->outputStream,
