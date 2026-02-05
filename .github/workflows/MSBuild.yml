@@ -21,9 +21,9 @@ jobs:
 
     steps:
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1
+      uses: microsoft/setup-msbuild@v2
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
 
     - name: Upgrade VC Project File
       # We maintain our vcproj file in an old format to maintain backwards compatibility

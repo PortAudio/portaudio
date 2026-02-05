@@ -32,7 +32,7 @@ jobs:
         shell: msys2 {0}
     steps:
     - name: checkout PortAudio git repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
     - name: setup msys2
       uses: msys2/setup-msys2@v2
       with:

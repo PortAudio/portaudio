@@ -49,10 +49,10 @@ jobs:
         shell: bash
     steps:
     - name: checkout PortAudio git repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v6
 
     - name: setup vcpkg
-      uses: lukka/run-vcpkg@v7
+      uses: lukka/run-vcpkg@v11
       if: ${{ matrix.vcpkg_triplet }} != null
       with:
         vcpkgDirectory: ${{ github.workspace }}/../vcpkg
