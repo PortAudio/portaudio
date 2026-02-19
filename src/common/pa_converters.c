@@ -58,12 +58,14 @@
  Int32_To_Int16_Dither, Int32_To_Int8_Dither, Int16_To_Int32
 */
 
+#include <math.h>
 
 #include "pa_converters.h"
 #include "pa_dither.h"
 #include "pa_endianness.h"
 #include "pa_types.h"
 
+#define PA_FLOAT_TO_INT32(x) ((PaInt32) floorf(x))
 
 PaSampleFormat PaUtil_SelectClosestAvailableFormat(
         PaSampleFormat availableFormats, PaSampleFormat format )
@@ -320,12 +322,17 @@ PaUtilConverterTable paConverters = {
 #define PA_CLIP_( val, min, max )\
     { val = ((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)); }
 
-
 static const float const_1_div_128_ = 1.0f / 128.0f;  /* 8 bit multiplier */
 
 static const float const_1_div_32768_ = 1.0f / 32768.f; /* 16 bit multiplier */
 
 static const double const_1_div_2147483648_ = 1.0 / 2147483648.0; /* 32 bit multiplier */
+
+/* Define half bit constant to cancel the bias caused by truncation when right shifting. */
+static const int const_half_bit_16 = 0x4000;
+
+/* Define half bit constant to cancel the bias caused by truncation when calling floorf. */
+static const float const_half_bit_float = 0.5f;
 
 /* -------------------------------------------------------------------------- */
 
@@ -365,7 +372,7 @@ static void Float32_To_Int32_Dither(
         double dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
-        *dest = (PaInt32) dithered;
+        *dest = PA_FLOAT_TO_INT32( dithered );
 
         src += sourceStride;
         dest += destinationStride;
@@ -388,7 +395,7 @@ static void Float32_To_Int32_Clip(
         /* REVIEW */
         double scaled = (double)*src * 0x7FFFFFFF;
         PA_CLIP_( scaled, -2147483648., 2147483647.  );
-        *dest = (PaInt32) scaled;
+        *dest = PA_FLOAT_TO_INT32( scaled );
 
         src += sourceStride;
         dest += destinationStride;
@@ -412,7 +419,7 @@ static void Float32_To_Int32_DitherClip(
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
         PA_CLIP_( dithered, -2147483648., 2147483647.  );
-        *dest = (PaInt32) dithered;
+        *dest = PA_FLOAT_TO_INT32( dithered );
 
         src += sourceStride;
         dest += destinationStride;
@@ -436,7 +443,7 @@ static void Float32_To_Int24(
     {
         /* convert to 32 bit and drop the low 8 bits */
         double scaled = (double)(*src) * 2147483647.0;
-        temp = (PaInt32) scaled;
+        temp = PA_FLOAT_TO_INT32( scaled );
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -472,7 +479,7 @@ static void Float32_To_Int24_Dither(
         /* use smaller scaler to prevent overflow when we add the dither */
         double dithered = ((double)*src * (2147483646.0)) + dither;
 
-        temp = (PaInt32) dithered;
+        temp = PA_FLOAT_TO_INT32( dithered );
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -507,7 +514,7 @@ static void Float32_To_Int24_Clip(
         /* convert to 32 bit and drop the low 8 bits */
         double scaled = (double)*src * 0x7FFFFFFF;
         PA_CLIP_( scaled, -2147483648., 2147483647.  );
-        temp = (PaInt32) scaled;
+        temp = PA_FLOAT_TO_INT32( scaled );
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -544,7 +551,7 @@ static void Float32_To_Int24_DitherClip(
         double dithered = ((double)*src * (2147483646.0)) + dither;
         PA_CLIP_( dithered, -2147483648., 2147483647.  );
 
-        temp = (PaInt32) dithered;
+        temp = PA_FLOAT_TO_INT32( dithered );
 
 #if defined(PA_LITTLE_ENDIAN)
         dest[0] = (unsigned char)(temp >> 8);
@@ -574,7 +581,7 @@ static void Float32_To_Int16(
 
     while( count-- )
     {
-        short samp = (short) (*src * (32767.0f));
+        short samp = (short) floorf(*src * (32767.0f));
         *dest = samp;
 
         src += sourceStride;
@@ -594,12 +601,11 @@ static void Float32_To_Int16_Dither(
 
     while( count-- )
     {
-
-        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither = PaUtil_GenerateFloatTriangularDither( ditherGenerator ) + const_half_bit_float;
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (32766.0f)) + dither;
 
-        *dest = (PaInt16) dithered;
+        *dest = (PaInt16) PA_FLOAT_TO_INT32( dithered );
 
         src += sourceStride;
         dest += destinationStride;
@@ -619,7 +625,7 @@ static void Float32_To_Int16_Clip(
 
     while( count-- )
     {
-        long samp = (PaInt32) (*src * (32767.0f));
+        long samp = PA_FLOAT_TO_INT32( *src * 32767.0f );
 
         PA_CLIP_( samp, -0x8000, 0x7FFF );
         *dest = (PaInt16) samp;
@@ -638,15 +644,14 @@ static void Float32_To_Int16_DitherClip(
 {
     float *src = (float*)sourceBuffer;
     PaInt16 *dest =  (PaInt16*)destinationBuffer;
-    (void)ditherGenerator; /* unused parameter */
 
     while( count-- )
     {
 
-        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator ) + const_half_bit_float;
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (32766.0f)) + dither;
-        PaInt32 samp = (PaInt32) dithered;
+        PaInt32 samp = PA_FLOAT_TO_INT32(dithered);
         PA_CLIP_( samp, -0x8000, 0x7FFF );
         *dest = (PaInt16) samp;
 
@@ -688,10 +693,10 @@ static void Float32_To_Int8_Dither(
 
     while( count-- )
     {
-        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator ) + const_half_bit_float;
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
-        PaInt32 samp = (PaInt32) dithered;
+        PaInt32 samp = PA_FLOAT_TO_INT32( dithered );
         *dest = (signed char) samp;
 
         src += sourceStride;
@@ -734,10 +739,10 @@ static void Float32_To_Int8_DitherClip(
 
     while( count-- )
     {
-        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator ) + const_half_bit_float;
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
-        PaInt32 samp = (PaInt32) dithered;
+        PaInt32 samp = PA_FLOAT_TO_INT32( dithered );
         PA_CLIP_( samp, -0x80, 0x7F );
         *dest = (signed char) samp;
 
@@ -779,7 +784,7 @@ static void Float32_To_UInt8_Dither(
 
     while( count-- )
     {
-        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator ) + const_half_bit_float;
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
         PaInt32 samp = (PaInt32) dithered;
@@ -825,7 +830,7 @@ static void Float32_To_UInt8_DitherClip(
 
     while( count-- )
     {
-        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator );
+        float dither  = PaUtil_GenerateFloatTriangularDither( ditherGenerator ) + const_half_bit_float;
         /* use smaller scaler to prevent overflow when we add the dither */
         float dithered = (*src * (126.0f)) + dither;
         PaInt32 samp = 128 + (PaInt32) dithered;
@@ -934,19 +939,12 @@ static void Int32_To_Int16_Dither(
 
     while( count-- )
     {
-        /* REVIEW */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
-#if 1
-        *dest = (PaInt16) ((((*src)>>1) + dither) >> 15);
-#else
-        /* EXPERIMENTAL force clip after dither. see ticket #112
-           Clip the intermediate value because adding the dither could cause
-           a numeric wraparound when shifting.
-        */
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16;
         PaInt32 temp = (((*src)>>1) + dither);
+        /* Clip the intermediate value because adding the dither could cause
+         * a numeric wraparound when shifting. */
         PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
         *dest = (PaInt16) (temp >> 15);
-#endif
 
         src += sourceStride;
         dest += destinationStride;
@@ -987,10 +985,14 @@ static void Int32_To_Int8_Dither(
     while( count-- )
     {
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16) << 8;
 
         /* apply dither, truncate resulting 32-bit value to 8-bit */
-        *dest = (signed char) ((((*src) >> 1) + dither) >> 23);
+        PaInt32 temp = (((*src)>>1) + dither);
+        /* Clip the intermediate value because adding the dither could cause
+         * a numeric wraparound when shifting. */
+        PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
+        *dest = (signed char) (temp >> 23);
 
         src += sourceStride;
         dest += destinationStride;
@@ -1032,10 +1034,14 @@ static void Int32_To_UInt8_Dither(
     while( count-- )
     {
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16) << 8;
 
         /* apply dither, truncate resulting 32-bit value to 8-bit and convert to unsigned */
-        *dest = (unsigned char) ((((src[0] >> 1) + dither) >> 23) + 128);
+        PaInt32 temp = (((*src) >> 1) + dither);
+        /* Clip the intermediate value because adding the dither could cause
+         * a numeric wraparound when shifting. */
+        PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
+        *dest = (unsigned char) (temp >> 23) + 128;
 
         src += sourceStride;
         dest += destinationStride;
@@ -1168,7 +1174,7 @@ static void Int24_To_Int16_Dither(
 #endif
 
         /* REVIEW */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator );
+        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16;
         *dest = (PaInt16) (((temp >> 1) + dither) >> 15);
 
         src  += sourceStride * 3;
@@ -1232,7 +1238,7 @@ static void Int24_To_Int8_Dither(
 #endif
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16) << 8;
 
         /* apply dither, truncate resulting 32-bit value to 8-bit */
         *dest = (signed char) (((temp >> 1) + dither) >> 23);
@@ -1298,7 +1304,7 @@ static void Int24_To_UInt8_Dither(
 #endif
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16) << 8;
 
         /* apply dither, truncate resulting 32-bit value to 8-bit and convert to unsigned */
         *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
@@ -1423,10 +1429,14 @@ static void Int16_To_Int8_Dither(
         temp = ((PaInt32)src[0]) << 16;
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16) << 8;
 
         /* apply dither, truncate resulting 32-bit value to 8-bit */
-        *dest = (signed char) (((temp >> 1) + dither) >> 23);
+        temp = ((temp >> 1) + dither);
+        /* Clip the intermediate value because adding the dither could cause
+         * a numeric wraparound when shifting. */
+        PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
+        *dest = (signed char) (temp >> 23);
 
         src += sourceStride;
         dest += destinationStride;
@@ -1471,10 +1481,14 @@ static void Int16_To_UInt8_Dither(
         temp = ((PaInt32)src[0]) << 16;
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaUtil_Generate16BitTriangularDither( ditherGenerator ) + const_half_bit_16) << 8;
 
-        /* apply dither, truncate resulting 32-bit value to 8-bit and convert to unsigned */
-        *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
+        /* apply dither, truncate resulting 32-bit value to 8-bit */
+        temp = ((temp >> 1) + dither);
+        /* Clip the intermediate value because adding the dither could cause
+         * a numeric wraparound when shifting. */
+        PA_CLIP_(temp, (PaInt32) 0xC0000000, (PaInt32) 0x3FFFFFFF);
+        *dest = (unsigned char) ((temp >> 23) + 128);
 
         src += sourceStride;
         dest += destinationStride;
