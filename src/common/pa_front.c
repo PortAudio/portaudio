@@ -198,7 +198,7 @@ static void TerminateHostApis( void )
 static PaError InitializeHostApis( void )
 {
     PaError result = paNoError;
-    int i, initializerCount, baseDeviceIndex;
+    int initializerCount, baseDeviceIndex;
 
     initializerCount = CountHostApiInitializers();
 
@@ -215,7 +215,7 @@ static PaError InitializeHostApis( void )
     deviceCount_ = 0;
     baseDeviceIndex = 0;
 
-    for( i=0; i< initializerCount; ++i )
+    for( int i=0; i< initializerCount; ++i )
     {
         hostApis_[hostApisCount_] = NULL;
 
@@ -484,7 +484,6 @@ const char *Pa_GetErrorText( PaError errorCode )
 PaHostApiIndex Pa_HostApiTypeIdToHostApiIndex( PaHostApiTypeId type )
 {
     PaHostApiIndex result;
-    int i;
 
     PA_LOGAPI_ENTER_PARAMS( "Pa_HostApiTypeIdToHostApiIndex" );
     PA_LOGAPI(("\tPaHostApiTypeId type: %d\n", type ));
@@ -497,7 +496,7 @@ PaHostApiIndex Pa_HostApiTypeIdToHostApiIndex( PaHostApiTypeId type )
     {
         result = paHostApiNotFound;
 
-        for( i=0; i < hostApisCount_; ++i )
+        for( int i=0; i < hostApisCount_; ++i )
         {
             if( hostApis_[i]->info.type == type )
             {
@@ -517,7 +516,6 @@ PaError PaUtil_GetHostApiRepresentation( struct PaUtilHostApiRepresentation **ho
         PaHostApiTypeId type )
 {
     PaError result;
-    int i;
 
     if( !PA_IS_INITIALISED_ )
     {
@@ -527,7 +525,7 @@ PaError PaUtil_GetHostApiRepresentation( struct PaUtilHostApiRepresentation **ho
     {
         result = paHostApiNotFound;
 
-        for( i=0; i < hostApisCount_; ++i )
+        for( int i=0; i < hostApisCount_; ++i )
         {
             if( hostApis_[i]->info.type == type )
             {

@@ -57,9 +57,8 @@ double PaQa_GetNthFrequency( double baseFrequency, int index )
 /*==========================================================================================*/
 void PaQa_EraseBuffer( float *buffer, int numFrames, int samplesPerFrame )
 {
-    int i;
     int numSamples = numFrames * samplesPerFrame;
-    for( i=0; i<numSamples; i++ )
+    for( int i=0; i<numSamples; i++ )
     {
         *buffer++ = 0.0;
     }
@@ -77,8 +76,7 @@ void PaQa_SetupSineGenerator( PaQaSineGenerator *generator, double frequency, do
 /*==========================================================================================*/
 void PaQa_MixSine( PaQaSineGenerator *generator, float *buffer, int numSamples, int stride )
 {
-    int i;
-    for( i=0; i<numSamples; i++ )
+    for( int i=0; i<numSamples; i++ )
     {
         float value = sinf( (float) generator->phase ) * generator->amplitude;
         *buffer += value; // Mix with existing value.
@@ -95,9 +93,8 @@ void PaQa_MixSine( PaQaSineGenerator *generator, float *buffer, int numSamples, 
 /*==========================================================================================*/
 void PaQa_GenerateCrackDISABLED( float *buffer, int numSamples, int stride )
 {
-    int i;
     int offset = numSamples/2;
-    for( i=0; i<numSamples; i++ )
+    for( int i=0; i<numSamples; i++ )
     {
         float phase = (MATH_TWO_PI * 0.5 * (i - offset)) / numSamples;
         float cosp = cosf( phase );
@@ -137,7 +134,6 @@ void PaQa_TerminateRecording( PaQaRecording *recording )
 /*==========================================================================================*/
 int PaQa_WriteRecording( PaQaRecording *recording, float *buffer, int numFrames, int stride )
 {
-    int i;
     int framesToWrite;
     float *data = &recording->buffer[recording->numFrames];
 
@@ -147,7 +143,7 @@ int PaQa_WriteRecording( PaQaRecording *recording, float *buffer, int numFrames,
         framesToWrite = recording->maxFrames - recording->numFrames;
     }
 
-    for( i=0; i<framesToWrite; i++ )
+    for( int i=0; i<framesToWrite; i++ )
     {
         *data++ = *buffer;
         buffer += stride;
@@ -159,7 +155,6 @@ int PaQa_WriteRecording( PaQaRecording *recording, float *buffer, int numFrames,
 /*==========================================================================================*/
 int PaQa_WriteSilence( PaQaRecording *recording, int numFrames )
 {
-    int i;
     int framesToRecord;
     float *data = &recording->buffer[recording->numFrames];
 
@@ -169,7 +164,7 @@ int PaQa_WriteSilence( PaQaRecording *recording, int numFrames )
         framesToRecord = recording->maxFrames - recording->numFrames;
     }
 
-    for( i=0; i<framesToRecord; i++ )
+    for( int i=0; i<framesToRecord; i++ )
     {
         *data++ = 0.0f;
     }
@@ -180,7 +175,6 @@ int PaQa_WriteSilence( PaQaRecording *recording, int numFrames )
 /*==========================================================================================*/
 int PaQa_RecordFreeze( PaQaRecording *recording, int numFrames )
 {
-    int i;
     int framesToRecord;
     float *data = &recording->buffer[recording->numFrames];
 
@@ -190,7 +184,7 @@ int PaQa_RecordFreeze( PaQaRecording *recording, int numFrames )
         framesToRecord = recording->maxFrames - recording->numFrames;
     }
 
-    for( i=0; i<framesToRecord; i++ )
+    for( int i=0; i<framesToRecord; i++ )
     {
         // Copy old value forward as if the signal had frozen.
         data[i] = data[i-1];
@@ -218,10 +212,9 @@ int PaQa_SaveRecordingToWaveFile( PaQaRecording *recording, const char *filename
 
     while( numLeft > 0 )
     {
-        int i;
         int numToSave = (numLeft > NUM_SAMPLES) ? NUM_SAMPLES : numLeft;
         // Convert double samples to shorts.
-        for( i=0; i<numToSave; i++ )
+        for( int i=0; i<numToSave; i++ )
         {
             double fval = *buffer++;
             // Convert float to int and clip to short range.
@@ -250,14 +243,13 @@ error:
 
 double PaQa_MeasureCrossingSlope( float *buffer, int numFrames )
 {
-    int i;
     double slopeTotal = 0.0;
     int slopeCount = 0;
     float previous;
     double averageSlope = 0.0;
 
     previous = buffer[0];
-    for( i=1; i<numFrames; i++ )
+    for( int i=1; i<numFrames; i++ )
     {
         float current = buffer[i];
         if( (current > 0.0) && (previous < 0.0) )
@@ -541,7 +533,6 @@ void PaQa_FadeInRecording( PaQaRecording *recording, int startFrame, int count )
 int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalysisResult *analysisResult )
 {
     int result = 0;
-    int i;
     double maxAmplitude;
     int maxPosition;
 
@@ -580,7 +571,7 @@ int PaQa_DetectPop( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalys
     // Scan remaining signal looking for peak.
     maxAmplitude = 0.0;
     maxPosition = -1;
-    for( i=(int) analysisResult->latency; i<hipassOutput.numFrames; i++ )
+    for( int i=(int) analysisResult->latency; i<hipassOutput.numFrames; i++ )
     {
         float x = hipassOutput.buffer[i];
         float mag = fabs( x );
@@ -610,7 +601,6 @@ error:
 /*==========================================================================================*/
 int PaQa_DetectPhaseError( PaQaRecording *recording, PaQaTestTone *testTone, PaQaAnalysisResult *analysisResult )
 {
-    int i;
     double period = testTone->sampleRate / testTone->frequency;
     int cycleSize = (int) (period + 0.5);
 
@@ -629,7 +619,7 @@ int PaQa_DetectPhaseError( PaQaRecording *recording, PaQaTestTone *testTone, PaQ
     analysisResult->droppedFramesPosition = -1.0;
     analysisResult->addedFramesPosition = -1.0;
 
-    for( i=analysisResult->latency; i<(recording->numFrames - windowSize); i += skip )
+    for( int i=analysisResult->latency; i<(recording->numFrames - windowSize); i += skip )
     {
         double expectedPhase = previousPhase + (skip * MATH_TWO_PI / period);
         double expectedPhaseIncrement = PaQa_ComputePhaseDifference( expectedPhase, previousPhase );

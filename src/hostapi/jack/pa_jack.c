@@ -518,7 +518,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     // Add 1 for null terminator.
     size_t device_name_regex_escaped_size = jack_client_name_size() * 2 + 1;
     size_t port_regex_size = device_name_regex_escaped_size + strlen(port_regex_suffix);
-    unsigned long port_index, client_index, i;
+    unsigned long port_index, client_index;
     double globalSampleRate;
     regex_t port_regex;
     unsigned long numClients = 0, numPorts = 0;
@@ -568,7 +568,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         tmp_client_name[match_info.rm_eo - match_info.rm_so] = '\0';
 
         /* do we know about this port's client yet? */
-        for( i = 0; i < numClients; i++ )
+        for( unsigned int i = 0; i < numClients; i++ )
         {
             if( strcmp( tmp_client_name, client_names[i] ) == 0 )
                 client_seen = TRUE;
@@ -647,7 +647,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
             curDevInfo->defaultLowInputLatency = curDevInfo->defaultHighInputLatency =
                 port_get_min_latency( p, JackCaptureLatency ) / globalSampleRate;
 
-            for( i = 0; clientPorts[i] != NULL; i++)
+            for( int i = 0; clientPorts[i] != NULL; i++)
             {
                 /* The number of ports returned is the number of output channels.
                  * We don't care what they are, we just care how many */
@@ -668,7 +668,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
             curDevInfo->defaultLowOutputLatency = curDevInfo->defaultHighOutputLatency =
                 port_get_min_latency( p, JackPlaybackLatency ) / globalSampleRate;
 
-            for( i = 0; clientPorts[i] != NULL; i++)
+            for( int i = 0; clientPorts[i] != NULL; i++)
             {
                 /* The number of ports returned is the number of input channels.
                  * We don't care what they are, we just care how many */
@@ -1030,18 +1030,17 @@ error:
  */
 static void CleanUpStream( PaJackStream *stream, int terminateStreamRepresentation, int terminateBufferProcessor )
 {
-    int i;
     assert( stream );
 
     if( stream->isBlockingStream )
         BlockingEnd( stream );
 
-    for( i = 0; i < stream->num_incoming_connections; ++i )
+    for( int i = 0; i < stream->num_incoming_connections; ++i )
     {
         if( stream->local_input_ports[i] )
             ASSERT_CALL( jack_port_unregister( stream->jack_client, stream->local_input_ports[i] ), 0 );
     }
-    for( i = 0; i < stream->num_outgoing_connections; ++i )
+    for( int i = 0; i < stream->num_outgoing_connections; ++i )
     {
         if( stream->local_output_ports[i] )
             ASSERT_CALL( jack_port_unregister( stream->jack_client, stream->local_output_ports[i] ), 0 );
@@ -1650,11 +1649,9 @@ static int JackCallback( jack_nframes_t frames, void *userData )
         /* If we have just entered inactive state, silence output */
         if( !stream->is_active && !stream->isSilenced )
         {
-            int i;
-
             /* Silence buffer after entering inactive state */
             PA_DEBUG(( "Silencing the output\n" ));
-            for( i = 0; i < stream->num_outgoing_connections; ++i )
+            for( int i = 0; i < stream->num_outgoing_connections; ++i )
             {
                 jack_default_audio_sample_t *buffer = jack_port_get_buffer( stream->local_output_ports[i], frames );
                 memset( buffer, 0, sizeof (jack_default_audio_sample_t) * frames );
@@ -1691,7 +1688,6 @@ static PaError StartStream( PaStream *s )
 {
     PaError result = paNoError;
     PaJackStream *stream = (PaJackStream*)s;
-    int i;
 
     /* Ready the processor */
     PaUtil_ResetBufferProcessor( &stream->bufferProcessor );
@@ -1701,7 +1697,7 @@ static PaError StartStream( PaStream *s )
 
     if( stream->num_incoming_connections > 0 )
     {
-        for( i = 0; i < stream->num_incoming_connections; i++ )
+        for( int i = 0; i < stream->num_incoming_connections; i++ )
         {
             int r = jack_connect( stream->jack_client, jack_port_name( stream->remote_output_ports[i] ),
                     jack_port_name( stream->local_input_ports[i] ) );
@@ -1711,7 +1707,7 @@ static PaError StartStream( PaStream *s )
 
     if( stream->num_outgoing_connections > 0 )
     {
-        for( i = 0; i < stream->num_outgoing_connections; i++ )
+        for( int i = 0; i < stream->num_outgoing_connections; i++ )
         {
             int r = jack_connect( stream->jack_client, jack_port_name( stream->local_output_ports[i] ),
                     jack_port_name( stream->remote_input_ports[i] ) );
@@ -1753,7 +1749,6 @@ error:
 static PaError RealStop( PaJackStream *stream, int abort )
 {
     PaError result = paNoError;
-    int i;
 
     if( stream->isBlockingStream )
         BlockingWaitEmpty ( stream );
@@ -1780,7 +1775,7 @@ error:
 
     if( !stream->hostApi->jackIsDown )  /* XXX: Well? */
     {
-        for( i = 0; i < stream->num_incoming_connections; i++ )
+        for( int i = 0; i < stream->num_incoming_connections; i++ )
         {
             if( jack_port_connected( stream->local_input_ports[i] ) )
             {
@@ -1788,7 +1783,7 @@ error:
                         paUnanticipatedHostError );
             }
         }
-        for( i = 0; i < stream->num_outgoing_connections; i++ )
+        for( int i = 0; i < stream->num_outgoing_connections; i++ )
         {
             if( jack_port_connected( stream->local_output_ports[i] ) )
             {

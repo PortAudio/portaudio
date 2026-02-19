@@ -155,7 +155,6 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
                         PaStreamCallbackFlags statusFlags,
                         void *userData )
 {
-    int i;
     LoopbackContext *loopbackContext = (LoopbackContext *) userData;
 
 
@@ -200,7 +199,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
         }
 
         // Read each channel from the buffer.
-        for( i=0; i<channelsPerFrame; i++ )
+        for( int i=0; i<channelsPerFrame; i++ )
         {
             loopbackContext->done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
                                         in + i,
@@ -224,7 +223,7 @@ static int RecordAndPlaySinesCallback( const void *inputBuffer, void *outputBuff
         }
 
         PaQa_EraseBuffer( out, framesPerBuffer, channelsPerFrame );
-        for( i=0; i<channelsPerFrame; i++ )
+        for( int i=0; i<channelsPerFrame; i++ )
         {
             PaQa_MixSine( &loopbackContext->generators[i],
                          out + i,
@@ -465,7 +464,6 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
                                       LoopbackContext *loopbackContext
                                       )
 {
-    int i;
     float *in = (float *)g_ReadWriteBuffer;
     float *out = (float *)g_ReadWriteBuffer;
     PaError err;
@@ -494,7 +492,7 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
 
 
     // Save in a recording.
-    for( i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
+    for( int i=0; i<loopbackContext->test->inputParameters.channelCount; i++ )
     {
         done |= PaQa_WriteRecording( &loopbackContext->recordings[i],
                  in + i,
@@ -506,7 +504,7 @@ static int RecordAndPlayBlockingIO( PaStream *inStream,
     available = Pa_GetStreamWriteAvailable( outStream );
     if( available > (2*framesPerBuffer) ) available = (2*framesPerBuffer);
     PaQa_EraseBuffer( out, available, loopbackContext->test->outputParameters.channelCount );
-    for( i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
+    for( int i=0; i<loopbackContext->test->outputParameters.channelCount; i++ )
     {
         PaQa_MixSine( &loopbackContext->generators[i],
                   out + i,
@@ -725,7 +723,6 @@ static int PaQa_SetupLoopbackContext(
         LoopbackContext *loopbackContextPtr,
         TestParameters *testParams )
 {
-    int i;
     int err;
     // Setup loopback context.
     memset( loopbackContextPtr, 0, sizeof(LoopbackContext) );
@@ -745,12 +742,12 @@ static int PaQa_SetupLoopbackContext(
         return err;
     }
 
-    for( i=0; i<testParams->samplesPerFrame; i++ )
+    for( int i=0; i<testParams->samplesPerFrame; i++ )
     {
         int err = PaQa_InitializeRecording( &loopbackContextPtr->recordings[i], testParams->maxFrames, testParams->sampleRate );
         QA_ASSERT_EQUALS( "PaQa_InitializeRecording failed", paNoError, err );
     }
-    for( i=0; i<testParams->samplesPerFrame; i++ )
+    for( int i=0; i<testParams->samplesPerFrame; i++ )
     {
         PaQa_SetupSineGenerator( &loopbackContextPtr->generators[i], PaQa_GetNthFrequency( testParams->baseFrequency, i ),
                                 testParams->amplitude, testParams->sampleRate );
@@ -764,10 +761,9 @@ error:
 /*******************************************************************/
 static void PaQa_TeardownLoopbackContext( LoopbackContext *loopbackContextPtr )
 {
-    int i;
     if( loopbackContextPtr->test != NULL )
     {
-        for( i=0; i<loopbackContextPtr->test->samplesPerFrame; i++ )
+        for( int i=0; i<loopbackContextPtr->test->samplesPerFrame; i++ )
         {
             PaQa_TerminateRecording( &loopbackContextPtr->recordings[i] );
         }
@@ -818,7 +814,6 @@ static void PaQa_PrintFullErrorReport( PaQaAnalysisResult *analysisResultPtr, in
  */
 static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *testParams )
 {
-    int i;
     LoopbackContext loopbackContext;
     PaError err = paNoError;
     PaQaTestTone testTone;
@@ -855,7 +850,7 @@ static int PaQa_SingleLoopBackTest( UserOptions *userOptions, TestParameters *te
            );
 
     // Analyse recording to detect glitches.
-    for( i=0; i<testParams->samplesPerFrame; i++ )
+    for( int i=0; i<testParams->samplesPerFrame; i++ )
     {
         double freq = PaQa_GetNthFrequency( testParams->baseFrequency, i );
         testTone.frequency = freq;
@@ -1351,7 +1346,6 @@ error:
 /*==========================================================================================*/
 int TestSampleFormatConversion( void )
 {
-    int i;
     const float floatInput[] = { 1.0, 0.5, -0.5, -1.0 };
 
     const signed char charInput[] = { 127, 64, -64, -128 };
@@ -1371,25 +1365,25 @@ int TestSampleFormatConversion( void )
 
     // from Float ======
     PaQa_ConvertFromFloat( floatInput, 4, paUInt8, ucharOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE_INT( "paFloat32 -> paUInt8 -> error", ucharInput[i], ucharOutput[i], 1 );
     }
 
     PaQa_ConvertFromFloat( floatInput, 4, paInt8, charOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE_INT( "paFloat32 -> paInt8 -> error", charInput[i], charOutput[i], 1 );
     }
 
     PaQa_ConvertFromFloat( floatInput, 4, paInt16, shortOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE_INT( "paFloat32 -> paInt16 error", shortInput[i], shortOutput[i], 1 );
     }
 
     PaQa_ConvertFromFloat( floatInput, 4, paInt32, intOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE_INT( "paFloat32 -> paInt32 error", intInput[i], intOutput[i], 0x00010000 );
     }
@@ -1398,28 +1392,28 @@ int TestSampleFormatConversion( void )
     // to Float ======
     memset( floatOutput, 0, sizeof(floatOutput) );
     PaQa_ConvertToFloat( ucharInput, 4, paUInt8, floatOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE( "paUInt8 -> paFloat32 error", floatInput[i], floatOutput[i], 0.01 );
     }
 
     memset( floatOutput, 0, sizeof(floatOutput) );
     PaQa_ConvertToFloat( charInput, 4, paInt8, floatOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE( "paInt8 -> paFloat32 error", floatInput[i], floatOutput[i], 0.01 );
     }
 
     memset( floatOutput, 0, sizeof(floatOutput) );
     PaQa_ConvertToFloat( shortInput, 4, paInt16, floatOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE( "paInt16 -> paFloat32 error", floatInput[i], floatOutput[i], 0.001 );
     }
 
     memset( floatOutput, 0, sizeof(floatOutput) );
     PaQa_ConvertToFloat( intInput, 4, paInt32, floatOutput );
-    for( i=0; i<4; i++ )
+    for( int i=0; i<4; i++ )
     {
         QA_ASSERT_CLOSE( "paInt32 -> paFloat32 error", floatInput[i], floatOutput[i], 0.00001 );
     }

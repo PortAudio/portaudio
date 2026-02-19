@@ -42,10 +42,10 @@
 /*******************************************************************/
 void PaQa_ListAudioDevices(void)
 {
-    int     i, numDevices;
+    int     numDevices;
     const   PaDeviceInfo *deviceInfo;
     numDevices = Pa_GetDeviceCount();
-    for( i=0; i<numDevices; i++ )
+    for( int i=0; i<numDevices; i++ )
     {
         deviceInfo = Pa_GetDeviceInfo( i );
         printf( "#%d: ", i );
@@ -59,13 +59,12 @@ void PaQa_ListAudioDevices(void)
 /*******************************************************************/
 void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFormat, float *output )
 {
-    int i;
     switch( inFormat )
     {
         case paUInt8:
         {
             unsigned char *data = (unsigned char *)input;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 int value = *data++;
                 value -= 128;
@@ -77,7 +76,7 @@ void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFo
         case paInt8:
         {
             signed char *data = (signed char *)input;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 int value = *data++;
                 *output++ = value / 128.0f;
@@ -88,7 +87,7 @@ void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFo
         case paInt16:
         {
             short *data = (short *)input;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 *output++ = *data++ / 32768.0f;
             }
@@ -98,7 +97,7 @@ void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFo
         case paInt32:
         {
             int *data = (int *)input;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 int value = (*data++) >> 8;
                 float fval = (float) (value / ((double) 0x00800000));
@@ -113,13 +112,12 @@ void PaQa_ConvertToFloat( const void *input, int numSamples, PaSampleFormat inFo
 /*******************************************************************/
 void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat outFormat, void *output )
 {
-    int i;
     switch( outFormat )
     {
         case paUInt8:
         {
             unsigned char *data = (unsigned char *)output;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 float value = *input++;
                 int byte = ((int) (value * 127)) + 128;
@@ -131,7 +129,7 @@ void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat o
         case paInt8:
         {
             signed char *data = (signed char *)output;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 float value = *input++;
                 int byte = (int) (value * 127);
@@ -143,7 +141,7 @@ void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat o
         case paInt16:
         {
             short *data = (short *)output;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 float value = *input++;
                 // Use asymmetric conversion to avoid clipping.
@@ -156,7 +154,7 @@ void PaQa_ConvertFromFloat( const float *input, int numSamples, PaSampleFormat o
         case paInt32:
         {
             int *data = (int *)output;
-            for( i=0; i<numSamples; i++ )
+            for( int i=0; i<numSamples; i++ )
             {
                 float value = *input++;
                 // Use asymmetric conversion to avoid clipping.
