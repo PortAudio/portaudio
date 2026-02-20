@@ -110,7 +110,7 @@ of a device for the duration of active stream using those devices
 /* The PA_HP_TRACE macro is used in RT parts, so it can be switched off without affecting
 the rest of the debug tracing */
 #if 1
-#define PA_HP_TRACE(x)  PaUtil_AddHighSpeedLogMessage x ;
+#define PA_HP_TRACE(x)  PAUTIL_ADD_HIGH_SPEED_LOG_MESSAGE(x);
 #else
 #define PA_HP_TRACE(x)
 #endif
