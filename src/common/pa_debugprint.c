@@ -55,16 +55,16 @@
 
 #include "pa_debugprint.h"
 
-// for OutputDebugStringA
+/* for OutputDebugStringA */
 #if defined(_MSC_VER) && defined(PA_ENABLE_MSVC_DEBUG_OUTPUT)
-    #define WIN32_LEAN_AND_MEAN // exclude rare headers
+    #define WIN32_LEAN_AND_MEAN /* exclude rare headers */
     #include "windows.h"
 #endif
 
-// User callback
+/* User callback */
 static PaUtilLogCallback userCB = NULL;
 
-// Sets user callback
+/* Sets user callback */
 void PaUtil_SetDebugPrintFunction(PaUtilLogCallback cb)
 {
     userCB = cb;
@@ -87,7 +87,7 @@ void PaUtil_SetDebugPrintFunction(PaUtilLogCallback cb)
 
 void PaUtil_DebugPrint( const char *format, ... )
 {
-    // Optional logging into Output console of Visual Studio
+    /* Optional logging into Output console of Visual Studio */
 #if defined(_MSC_VER) && defined(PA_ENABLE_MSVC_DEBUG_OUTPUT)
     {
         char buf[PA_LOG_BUF_SIZE];
@@ -100,7 +100,7 @@ void PaUtil_DebugPrint( const char *format, ... )
     }
 #endif
 
-    // Output to User-Callback
+    /* Output to User-Callback */
     if (userCB != NULL)
     {
         char strdump[PA_LOG_BUF_SIZE];
@@ -112,7 +112,7 @@ void PaUtil_DebugPrint( const char *format, ... )
         va_end(ap);
     }
     else
-    // Standard output to stderr
+    /* Standard output to stderr */
     {
         va_list ap;
         va_start(ap, format);
