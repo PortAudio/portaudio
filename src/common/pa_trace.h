@@ -92,6 +92,7 @@ typedef void* LogHandle;
 int PaUtil_InitializeHighSpeedLog(LogHandle* phLog, unsigned maxSizeInBytes);
 void PaUtil_ResetHighSpeedLogTimeRef(LogHandle hLog);
 int PaUtil_AddHighSpeedLogMessage(LogHandle hLog, const char* fmt, ...);
+#define PAUTIL_ADD_HIGH_SPEED_LOG_MESSAGE(x) PaUtil_AddHighSpeedLogMessage x
 void PaUtil_DumpHighSpeedLog(LogHandle hLog, const char* fileName);
 void PaUtil_DiscardHighSpeedLog(LogHandle hLog);
 
@@ -100,10 +101,9 @@ void PaUtil_DiscardHighSpeedLog(LogHandle hLog);
 #define PaUtil_ResetTraceMessages() /* noop */
 #define PaUtil_AddTraceMessage(msg,data) /* noop */
 #define PaUtil_DumpTraceMessages() /* noop */
-
+#define PAUTIL_ADD_HIGH_SPEED_LOG_MESSAGE(x)
 #define PaUtil_InitializeHighSpeedLog(phLog, maxSizeInBytes)  (0)
 #define PaUtil_ResetHighSpeedLogTimeRef(hLog)
-#define PaUtil_AddHighSpeedLogMessage(...)   (0)
 #define PaUtil_DumpHighSpeedLog(hLog, fileName)
 #define PaUtil_DiscardHighSpeedLog(hLog)
 
