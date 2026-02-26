@@ -74,7 +74,7 @@
 #include "pa_types.h"
 #include "pa_hostapi.h"
 #include "pa_stream.h"
-#include "pa_trace.h" /* still useful?*/
+#include "pa_trace.h"
 #include "pa_debugprint.h"
 
 #ifndef PA_GIT_REVISION
