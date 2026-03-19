@@ -41,9 +41,9 @@ In the same window opened in Step 1, run the following commands to prepare for t
     cd build
     cmake ../portaudio
 
-With the last command, by default, a static library will be built. If you want a shared library (i.e., `.dll`, `.dylib`, or `.so`), you will want to add `-DPA_BUILD_SHARED_LIBS=ON` to the last command above like so:
+With the last command, by default, a shared library (i.e., `.dll`, `.dylib`, or `.so`) will be built. If you want a static library (i.e. .a, .lib), you will want to add `-DPA_BUILD_SHARED_LIBS=OFF` to the last command above like so:
 
-    cmake -DPA_BUILD_SHARED_LIBS=ON ../portaudio
+    cmake -DPA_BUILD_SHARED_LIBS=OFF ../portaudio
 
 Also, by default, CMake will build a debug version of PortAudio. If you want a release version, add `--config Release` to the last command as seen in the three commands above:
 
