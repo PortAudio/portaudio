@@ -59,7 +59,7 @@ Also, by default, CMake will build a debug version of PortAudio. If you want a r
 
     cmake --config Release ../portaudio
 
-You can also mix and match `--config` and -DPA_BUILD_SHARED_LIBS` like so if desired:
+You can also mix and match `--config` and `-DPA_BUILD_SHARED_LIBS` like so if desired:
 
     cmake -DPA_BUILD_SHARED_LIBS=ON --config Release ../portaudio
 
