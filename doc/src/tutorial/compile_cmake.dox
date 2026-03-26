@@ -85,7 +85,7 @@ To build _both_ examples _and_ tests alongside a normal PortAudio build, run the
 
     cmake -DPA_BUILD_TESTS=ON -DPA_BUILD_EXAMPLES=ON ../portaudio
 
-Once build the tests, they will be under the `tests/` directory in your build folder. For examples, they will be under `examples/`. On Windows, both tests and example will be under an additional folder named after the configuration you built in their respective folders. By default, this will be `Debug`, but it could also be under `Release/` if you built the `Release` configuration.
+Later, when you build the tests, they will be under the `tests/` directory in your build folder. For examples, they will be under `examples/`. On Windows, both tests and example will be under an additional folder named after the configuration you built in their respective folders. By default, this will be `Debug`, but it could also be under `Release/` if you built the `Release` configuration.
 
 PortAudio's build options are explained further in @ref compile_cmake_general_options. For more about running PortAudio tests and examples, see @ref compile_cmake_general_running_tests_examples.
 
