@@ -97,7 +97,7 @@ If you plan to install your build of PortAudio later, you may want to adjust the
 
 @subsection compile_cmake_general_build Step 3: Build PortAudio
 
-To begin the actual build, run one last command, also in the same window opened in Step 1:
+Now that you have configured the build system, to build PortAudio run one last command, also in the same window opened in Step 1:
 
     cmake --build .
 
