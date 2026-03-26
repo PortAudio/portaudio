@@ -21,6 +21,16 @@ Often do Git and CMake come bundled with developer tools. For example, when inst
 
 On Windows and macOS, PortAudio does not need any additional dependencies. On other systems, including Linux, you will need to install additional development packages for the necessary audio backends you plan to enable in PortAudio. To do this, see the @ref compile_cmake_audio_backends section.
 
+We will follow three steps to build PortAudio:
+
+- @ref compile_cmake_general_clone 
+- @ref compile_cmake_general_configure
+- @ref compile_cmake_general_build
+
+and then, optionally:
+
+@ref compile_cmake_general_install
+
 @subsection compile_cmake_general_clone Step 1: Get the PortAudio Source Code
 
 Before you proceed with building PortAudio, you must ensure that you have the PortAudio source code. If you already have the source code, you may skip to the next section.
