@@ -55,6 +55,8 @@ With the last command, by default, the build system will be configured to build 
 
     cmake -DPA_BUILD_SHARED_LIBS=OFF ../portaudio
 
+(NOTE: PortAudio also supports the standard CMake `BUILD_SHARED_LIBS` mechanism.)
+
 Also, by default, CMake will build a debug version of PortAudio. If you want a release version, add `--config Release` to the last command as seen in the three commands above:
 
     cmake --config Release ../portaudio
