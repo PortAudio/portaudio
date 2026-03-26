@@ -17,7 +17,7 @@ Before doing _anything_, you need to have the appropriate software installed. Th
 - [Git](https://git-scm.org)
 - [CMake](https://cmake.org)
 
-Often do Git and CMake come bundled with developer tools. For example, when installing Visual Studio on Windows, you can have the Visual Studio Installer install CMake for you. Otherwise, you will need to download them separately from their respective websites. On Linux and similar systems, use your system's package manager to install them. Consult your distribution's documentation and/or your favorite search engine for more information on how to do this if you don't know already.
+Git and CMake often come bundled with developer tools. For example, when installing Visual Studio on Windows, you can have the Visual Studio Installer install CMake for you. Otherwise, you will need to download them separately from their respective websites. On Linux and similar systems, use your system's package manager to install them. Consult your distribution's documentation and/or your favorite search engine for more information on how to do this if you don't know already.
 
 On Windows and macOS, PortAudio does not need any additional dependencies. On other systems, including Linux, you will need to install additional development packages for the necessary audio backends you plan to enable in PortAudio. To do this, see the @ref compile_cmake_audio_backends section.
 
