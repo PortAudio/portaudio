@@ -3081,7 +3081,7 @@ end:
 error:
     if( streamStarted )
     {
-        AbortStream( stream );
+        AbortStream( (PaStream*)stream );
     }
     stream->isActive = 0;
 
@@ -4602,7 +4602,7 @@ static PaError WriteStream( PaStream* s, const void *buffer, unsigned long frame
         /* Start stream after one period of samples worth */
 
         /* Frames residing in buffer */
-        PA_ENSURE( err = GetStreamWriteAvailable( stream ) );
+        PA_ENSURE( err = GetStreamWriteAvailable( (PaStream*)stream ) );
         framesAvail = err;
         hwAvail = stream->playback.alsaBufferSize - framesAvail;
 
