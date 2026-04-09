@@ -23,7 +23,7 @@ On Windows and macOS, PortAudio does not need any additional dependencies. On ot
 
 We will follow three steps to build PortAudio:
 
-- @ref compile_cmake_general_clone 
+- @ref compile_cmake_general_clone
 - @ref compile_cmake_general_configure
 - @ref compile_cmake_general_build
 
@@ -155,7 +155,7 @@ And, finally, the Windows equivalent:
 
 PortAudio's CMake build system also features several configuration options. For a list of options, see @ref compile_cmake_options. Append them to your configure command in the format `-DOPTION_NAME=VALUE`, with `VALUE` usually being either `ON` or `OFF`. For example, `cmake /path/to/portaudio -DPA_BUILD_TESTS=ON`. Note that you should not need to restart with a fresh, empty build directory each time you change a config option, but if you encounter problems, then you should start with a fresh build directory and try again.
 
-If you want to use a different build file generator, add `-G "Generator Name"` to the initial configuration `cmake` command, where "Generator Name"` names the generator that you want to use, for example "Ninja". We will only cover the default generators (Visual Studio projects and Unix Makefiles) here, but if you are experienced with other generators, you are free to use them. The command `cmake --help` lists all available build file generators.
+If you want to use a different build file generator, add `-G "Generator Name"` to the initial configuration `cmake` command, where "Generator Name" names the generator that you want to use, for example "Ninja". We will only cover the default generators (Visual Studio projects and Unix Makefiles) here, but if you are experienced with other generators, you are free to use them. The command `cmake --help` lists all available build file generators.
 
 The following sections give platform-specific examples. Note that these examples assume that you have created a build directory outside the source tree named `pabuild`.
 
