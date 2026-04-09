@@ -19,7 +19,7 @@ libtool
 portaudio-2.0.pc
 autom4te.cache/*
 
-# Doxygen docs
+# Doxygen output
 doc/html/*
 
 # Precompiled Headers
