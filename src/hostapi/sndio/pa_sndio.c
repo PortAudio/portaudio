@@ -417,7 +417,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi, PaStream
     sndioStream->mode = mode;
     sndioStream->hdl = hdl;
     sndioStream->par = par;
-    *paStream = sndioStream;
+    *paStream = (PaStream*)sndioStream;
     PA_DEBUG( ( "OpenStream: done\n" ) );
     return paNoError;
 }
