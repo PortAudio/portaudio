@@ -113,6 +113,8 @@ jobs:
       run: cmake --build ${{ github.workspace }}/build --config ${{ env.cmake_build_type }} --parallel 4
     - name: Install PortAudio library
       run: cmake --install ${{ github.workspace }}/build --config ${{ env.cmake_build_type }}
+    - name: List Install Dirs (post-install)
+      run: ls -Ra ${{ github.workspace }}/build
 
       # Required for vcpkg packages to be found by CMake's find_package()
     - name: Enter build-test
