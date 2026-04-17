@@ -167,7 +167,11 @@ int main(void)
         {   /* Use wide char on windows, so we can show UTF-8 encoded device names */
             wchar_t wideName[MAX_PATH];
             MultiByteToWideChar(CP_UTF8, 0, deviceInfo->name, -1, wideName, MAX_PATH-1);
+        #if __USE_MINGW_ANSI_STDIO
+            wprintf( L"Name                        = %S\n", wideName );
+        #else
             wprintf( L"Name                        = %s\n", wideName );
+        #endif
         }
 #else
         printf( "Name                        = %s\n", deviceInfo->name );
@@ -186,6 +190,7 @@ int main(void)
 /* ASIO specific latency information */
         if( Pa_GetHostApiInfo( deviceInfo->hostApi )->type == paASIO ){
             long minLatency, maxLatency, preferredLatency, granularity;
+            double currentSampleRate;
 
             err = PaAsio_GetAvailableLatencyValues( i,
                     &minLatency, &maxLatency, &preferredLatency, &granularity );
@@ -198,6 +203,9 @@ int main(void)
                 printf( "ASIO buffer granularity     = power of 2\n" );
             else
                 printf( "ASIO buffer granularity     = %ld\n", granularity  );
+
+            err = PaAsio_GetSampleRate( i, &currentSampleRate );
+            printf( "ASIO current sample rate    = %8.2f\n", currentSampleRate);
         }
 #endif /* PA_USE_ASIO */
 #endif /* WIN32 */
