@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
+      uses: microsoft/setup-msbuild@v3
 
     - uses: actions/checkout@v6
 
