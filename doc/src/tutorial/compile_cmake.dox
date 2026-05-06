@@ -204,21 +204,21 @@ First, create a build folder and change into it:
 
     $ mkdir build && cd build
 
-Then, run the configure command to configure the build for a **static library**:
+Then, run the `cmake` command to configure the build for a **static library**:
 
-    $ cmake -G "Unix Makefiles" /path/to/portaudio/source
+    $ cmake /path/to/portaudio/source
 
-If you want a **shared library** configuration, add `-DPA_BUILD_SHARED_LIBS=ON` after `-G "Unix Makefiles"` like so:
+If you want a **shared library** configuration, add `-DPA_BUILD_SHARED_LIBS=ON`:
 
-    $ cmake -G "Unix Makefiles" -DPA_BUILD_SHARED_LIBS=ON /path/to/portaudio/source
+    $ cmake -DPA_BUILD_SHARED_LIBS=ON /path/to/portaudio/source
 
-(In both cases, the `-G "Unix Makefiles"` is used to ensure Unix Makefiles are generated).
+By default, this will create Unix Makefiles.  If you have [Ninja](https://ninja-build.org/) installed and wish to use it instead, you can add `-G Ninja` to the configure command.
 
 Once configuration is done, run the following command to build PortAudio:
 
-    $ make
+    $ cmake --build .
 
-Alternatively, you can run `cmake --build .` this does the same thing. For either command you use, add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based on the number CPU threads on your computer).
+You can add `-j <num>` to speed up the build (`<num>` being the number of jobs to give the build, usually based on the number CPU threads on your computer).
 
 Unlike on Windows, the actual library files will be in the root of build directory regardless of configuration.
 
@@ -231,8 +231,8 @@ From an alternative perspective, if you are familiar with autotools, you'll real
 would be:
 
     $ cmake -DCMAKE_INSTALL_PREFIX=/install_location /path/to/portaudio/source # Assume we're in the build directory 'pabuild'
-    $ make
-    $ make install
+    $ cmake --build .
+    $ cmake --build . --target install
 
 @subsection compile_cmake_audio_backends Audio Backend Developer Packages
 
