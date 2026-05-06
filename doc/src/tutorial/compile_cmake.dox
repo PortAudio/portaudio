@@ -306,11 +306,11 @@ This section contains options that configure your build. Some options are specif
 
 @section cmake_using Using PortAudio in Your CMake Project
 
-PortAudio defines two CMake targets: `PortAudio::portaudio`, for a dynamic library, and `PortAudio::portaudio_static`, for a static library.
+PortAudio defines two CMake targets: `PortAudio::portaudio`, for a dynamic library, and `PortAudio::portaudio_static`, for a static library, which can be added to `target_link_libraries` for your project's targets.
 
 To use these targets, there are two ways: using `find_package()` or `add_subdirectory()`.
 
-@subsection cmake_using_find_package Using the `find_package()` CMake Command
+@subsection cmake_using_find_package Using the find_package() CMake Command
 
 The easiest way is to use the aforementioned targets is to have PortAudio installed via a package manager (your distribution's package manager, vcpkg, etc) and use the `find_package()` CMake command. Use the command as follows:
 
@@ -332,15 +332,23 @@ If none of these options are possible, you can also set `PortAudio_DIR` to point
 
     cmake -S . -B build -DPortAudio_DIR=/home/me/portaudio19/lib/cmake/portaudio
 
-@subsection cmake_using_add_subdirectory Using the `add_subdirectory()` CMake Command
+@subsection cmake_using_add_subdirectory Using the add_subdirectory() CMake Command
 
 If you do not want to install PortAudio on your system, you may also include PortAudio in your project's source tree (e.g., as a Git submodule) or similar. In that case, use the `add_subdirectory()` CMake command as follows:
 
-    add_subdirectory("/path/to/portaudio/source")
+    add_subdirectory(relative/path/to/portaudio)
 
-Optionally, you may add an extra parameter for the build directory and/or `EXCLUDE_FROM_ALL`. If you add `EXCLUDE_FROM_ALL`, this excludes PortAudio from a default build.
+In this case, you must also remove the `PortAudio::` namespace from the `portaudio` or `portaudio_static` target when using it in your project, and also ensure that these target names don't collide with any existing ones.  This is a [longstanding issue in CMake](https://gitlab.kitware.com/cmake/cmake/-/work_items/22687).
 
-@subsection cmake_using_pkg_config Using `pkg-config`
+You can also add PortAudio from a directory outside your source tree, in which case you must add a second argument for the subdirectory of your build directory where the PortAudio binaries will be built.
+
+    add_subdirectory(/absolute/path/to/portaudio portaudio)
+
+Make sure it doesn't conflict with an existing directory in your project!
+
+Optionally, you may add `EXCLUDE_FROM_ALL`. If you add `EXCLUDE_FROM_ALL`, this excludes PortAudio from a default build.
+
+@subsection cmake_using_pkg_config Using pkg-config
 
 As of this writing, not all GNU/Linux distribution packages of PortAudio install the necessary `.cmake` files for `find_package()` to work correctly.  If this is the case, you can also use
 [`pkg-config`](http://pkg-config.freedesktop.org/) to obtain the necessary compiler flags to link programs against PortAudio.  For example, if your program's target is called `patest`:
