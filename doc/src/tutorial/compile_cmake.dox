@@ -306,7 +306,7 @@ This section contains options that configure your build. Some options are specif
 
 @section cmake_using Using PortAudio in Your CMake Project
 
-PortAudio defines two CMake targets: `portaudio`, for a dynamic library, and `portaudio_static`, for a static library.
+PortAudio defines two CMake targets: `PortAudio::portaudio`, for a dynamic library, and `PortAudio::portaudio_static`, for a static library.
 
 To use these targets, there are two ways: using `find_package()` or `add_subdirectory()`.
 
@@ -320,7 +320,17 @@ Optionally add `REQUIRED` after `portaudio` to make it a required dependency:
 
     find_package(portaudio REQUIRED)
 
-This also works if you installed PortAudio as described above in @ref compile_cmake_general_build and the install prefix (specified by `CMAKE_INSTALL_PREFIX`) used is in either your system `PATH` or `CMAKE_MODULE_PATH`.
+Unfortunately, not all distribution packages currently install the necessary `.cmake` files for this to function correctly, see @ref cmake_using_pkg_config below for another option.
+
+This also works if you installed PortAudio as described above in @ref compile_cmake_general_build and the install prefix (specified by `CMAKE_INSTALL_PREFIX`) used is:
+
+- also your project's [`CMAKE_INSTALL_PATH`](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+- in the CMake or environment variable [`CMAKE_PREFIX_PATH`](https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html)
+- the prefix for a directory in your system `PATH` (for example, if you installed PortAudio in `/opt/portaudio`, your `PATH` contains `/opt/portaudio/bin`)
+
+If none of these options are possible, you can also set `PortAudio_DIR` to point to the installed directory containing these files when configuring your project, for instance, if you installed PortAudio in `/home/me/portaudio19`:
+
+    cmake -S . -B build -DPortAudio_DIR=/home/me/portaudio19/lib/cmake/portaudio
 
 @subsection cmake_using_add_subdirectory Using the `add_subdirectory()` CMake Command
 
@@ -329,5 +339,20 @@ If you do not want to install PortAudio on your system, you may also include Por
     add_subdirectory("/path/to/portaudio/source")
 
 Optionally, you may add an extra parameter for the build directory and/or `EXCLUDE_FROM_ALL`. If you add `EXCLUDE_FROM_ALL`, this excludes PortAudio from a default build.
+
+@subsection cmake_using_pkg_config Using `pkg-config`
+
+As of this writing, not all GNU/Linux distribution packages of PortAudio install the necessary `.cmake` files for `find_package()` to work correctly.  If this is the case, you can also use
+[`pkg-config`](http://pkg-config.freedesktop.org/) to obtain the necessary compiler flags to link programs against PortAudio.  For example, if your program's target is called `patest`:
+
+     find_package(PkgConfig)
+     if(PKG_CONFIG_FOUND)
+       pkg_check_modules(PORTAUDIO portaudio-2.0)
+       if(PORTAUDIO_FOUND)
+         target_link_libraries(patest ${PORTAUDIO_LIBRARIES})
+         target_include_directories(patest PUBLIC ${PORTAUDIO_INCLUDE_DIRS})
+       endif()
+     endif()
+
 
 */
