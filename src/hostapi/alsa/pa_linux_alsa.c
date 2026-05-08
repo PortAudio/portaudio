@@ -969,7 +969,7 @@ static PaError ProbeDeviceDefaults( snd_pcm_t* pcm, int isPlug, StreamDirection 
     }
     printf( "%s: lowBufferFrames = %u, highBufferFrames = %u\n",
             __FUNCTION__, lowBufferFrames, highBufferFrames );
-    
+
     /* Clip to ensure optimal low value. */
     if (lowBufferFrames < kLowBufferFrames) lowBufferFrames = kLowBufferFrames;
     /* Base the high latency case on values four times larger. */
@@ -977,7 +977,7 @@ static PaError ProbeDeviceDefaults( snd_pcm_t* pcm, int isPlug, StreamDirection 
     /* Clip to ensure optimal high value. */
     if (highBufferFrames > lowTimesN) highBufferFrames = lowTimesN;
     if (highBufferFrames > kHighBufferFrames) highBufferFrames = kHighBufferFrames;
-    
+
     /* Assume period is 1/4 the buffer so it will normally be 3/4 full. */
     *defaultLowLatency = (double) ((lowBufferFrames * 3) / 4) / defaultSr;
     *defaultHighLatency = (double) ((highBufferFrames * 3) / 4) / defaultSr;
