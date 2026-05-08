@@ -163,6 +163,7 @@ _PA_DEFINE_FUNC(snd_pcm_hw_params_get_periods_max);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_set_period_size);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_get_period_size_min);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_get_period_size_max);
+_PA_DEFINE_FUNC(snd_pcm_hw_params_get_buffer_size_min);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_get_buffer_size_max);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_get_rate_min);
 _PA_DEFINE_FUNC(snd_pcm_hw_params_get_rate_max);
@@ -448,6 +449,7 @@ static int PaAlsa_LoadLibrary()
     _PA_LOAD_FUNC(snd_pcm_hw_params_set_period_size);
     _PA_LOAD_FUNC(snd_pcm_hw_params_get_period_size_min);
     _PA_LOAD_FUNC(snd_pcm_hw_params_get_period_size_max);
+    _PA_LOAD_FUNC(snd_pcm_hw_params_get_buffer_size_min);
     _PA_LOAD_FUNC(snd_pcm_hw_params_get_buffer_size_max);
     _PA_LOAD_FUNC(snd_pcm_hw_params_get_rate_min);
     _PA_LOAD_FUNC(snd_pcm_hw_params_get_rate_max);
@@ -534,6 +536,7 @@ static int PaAlsa_LoadLibrary()
     _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_periods_max);
     _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_period_size_min);
     _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_period_size_max);
+    _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_buffer_size_min);
     _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_buffer_size_max);
     _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_rate_min);
     _PA_VALIDATE_LOAD_REPLACEMENT(snd_pcm_hw_params_get_rate_max);
@@ -844,18 +847,22 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
  * traits like max channels, suitable default latencies and default sample rate. Upon error, max channels is set to zero,
  * and a suitable result returned. The device is closed before returning.
  */
-static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, int openBlocking,
+static PaError ProbeDeviceDefaults( snd_pcm_t* pcm, int isPlug, StreamDirection mode, int openBlocking,
         PaAlsaDeviceInfo* devInfo )
 {
     PaError result = paNoError;
     snd_pcm_hw_params_t *hwParams;
-    snd_pcm_uframes_t alsaBufferFrames, alsaPeriodFrames;
     unsigned int minChans = 0;
     unsigned int maxChans = 0;
     int* minChannels, * maxChannels;
+    snd_pcm_uframes_t lowBufferFrames = 0;
+    snd_pcm_uframes_t highBufferFrames = 0;
+    int ret = 0;
     double * defaultLowLatency, * defaultHighLatency;
     double defaultSr = devInfo->baseDeviceInfo.defaultSampleRate;
     unsigned int approximateSampleRate = 0;
+    const int kLowBufferFrames = 512;
+    const int kHighBufferFrames = 2048;
 
     assert( pcm );
 
@@ -947,32 +954,35 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
         PA_DEBUG(( "%s: Limiting number of plugin channels to %u\n", __FUNCTION__, maxChans ));
     }
 
-    /* TWEAKME:
-     * Giving values for default min and max latency is not straightforward.
-     *  * for low latency, we want to give the lowest value that will work reliably.
-     *      This varies based on the sound card, kernel, CPU, etc.  Better to give
-     *      sub-optimal latency than to give a number too low and cause dropouts.
-     *  * for high latency we want to give a large enough value that dropouts are basically impossible.
-     *      This doesn't really require as much tweaking, since providing too large a number will
-     *      just cause us to select the nearest setting that will work at stream config time.
+    /*
+     * Choose a reasonable low and high latency based on the min and max buffer size.
      */
-    /* Try low latency values, (sometimes the buffer & period that result are larger) */
-    alsaBufferFrames = 512;
-    alsaPeriodFrames = 128;
-    ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, NULL ), paUnanticipatedHostError );
-    *defaultLowLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
-
-    /* Base the high latency case on values four times larger */
-    alsaBufferFrames = 2048;
-    alsaPeriodFrames = 512;
-    /* Have to reset hwParams, to set new buffer size; need to also set sample rate again */
-    ENSURE_( alsa_snd_pcm_hw_params_any( pcm, hwParams ), paUnanticipatedHostError );
-    ENSURE_( SetApproximateSampleRate( pcm, hwParams, &approximateSampleRate ), paUnanticipatedHostError );
-    defaultSr = (double) approximateSampleRate;
-    ENSURE_( alsa_snd_pcm_hw_params_set_buffer_size_near( pcm, hwParams, &alsaBufferFrames ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_hw_params_set_period_size_near( pcm, hwParams, &alsaPeriodFrames, NULL ), paUnanticipatedHostError );
-    *defaultHighLatency = (double) (alsaBufferFrames - alsaPeriodFrames) / defaultSr;
+    ret = alsa_snd_pcm_hw_params_get_buffer_size_min( hwParams, &lowBufferFrames );
+    if (ret) {
+        printf( "%s: alsa_snd_pcm_hw_params_get_buffer_size_min() returned %d !\n", __FUNCTION__, ret );
+        lowBufferFrames = kLowBufferFrames;
+    }
+    ret = alsa_snd_pcm_hw_params_get_buffer_size_max( hwParams, &highBufferFrames );
+    if (ret) {
+        printf( "%s: alsa_snd_pcm_hw_params_get_buffer_size_max() returned %d !\n", __FUNCTION__, ret );
+        highBufferFrames = kHighBufferFrames;
+    }
+    printf( "%s: lowBufferFrames = %u, highBufferFrames = %u\n",
+            __FUNCTION__, lowBufferFrames, highBufferFrames );
+    
+    /* Clip to ensure optimal low value. */
+    if (lowBufferFrames < kLowBufferFrames) lowBufferFrames = kLowBufferFrames;
+    /* Base the high latency case on values four times larger. */
+    const snd_pcm_uframes_t lowTimesN = lowBufferFrames * 4;
+    /* Clip to ensure optimal high value. */
+    if (highBufferFrames > lowTimesN) highBufferFrames = lowTimesN;
+    if (highBufferFrames > kHighBufferFrames) highBufferFrames = kHighBufferFrames;
+    
+    /* Assume period is 1/4 the buffer so it will normally be 3/4 full. */
+    *defaultLowLatency = (double) ((lowBufferFrames * 3) / 4) / defaultSr;
+    *defaultHighLatency = (double) ((highBufferFrames * 3) / 4) / defaultSr;
+    printf( "%s: defaultLowLatency = %f, defaultHighLatency = %f\n",
+            __FUNCTION__, *defaultLowLatency, *defaultHighLatency );
 
     *minChannels = (int)minChans;
     *maxChannels = (int)maxChans;
@@ -1209,7 +1219,7 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
     if( deviceHwInfo->hasCapture &&
         OpenPcm( &pcm, deviceHwInfo->alsaName, SND_PCM_STREAM_CAPTURE, blocking, 0 ) >= 0 )
     {
-        if( GropeDevice( pcm, deviceHwInfo->isPlug, StreamDirection_In, blocking, devInfo ) != paNoError )
+        if( ProbeDeviceDefaults( pcm, deviceHwInfo->isPlug, StreamDirection_In, blocking, devInfo ) != paNoError )
         {
             /* Error */
             PA_DEBUG(( "%s: Failed groping %s for capture\n", __FUNCTION__, deviceHwInfo->alsaName ));
@@ -1221,7 +1231,7 @@ static PaError FillInDevInfo( PaAlsaHostApiRepresentation *alsaApi, HwDevInfo* d
     if( deviceHwInfo->hasPlayback &&
         OpenPcm( &pcm, deviceHwInfo->alsaName, SND_PCM_STREAM_PLAYBACK, blocking, 0 ) >= 0 )
     {
-        if( GropeDevice( pcm, deviceHwInfo->isPlug, StreamDirection_Out, blocking, devInfo ) != paNoError )
+        if( ProbeDeviceDefaults( pcm, deviceHwInfo->isPlug, StreamDirection_Out, blocking, devInfo ) != paNoError )
         {
             /* Error */
             PA_DEBUG(( "%s: Failed groping %s for playback\n", __FUNCTION__, deviceHwInfo->alsaName ));
@@ -1869,6 +1879,7 @@ static PaError TestParameters( const PaUtilHostApiRepresentation *hostApi, const
                 result = paUnanticipatedHostError;
             }
 
+            printf( "%s: ret = %d\n", __FUNCTION__, ret );
             ENSURE_( ret, result );
         }
     }
