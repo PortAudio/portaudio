@@ -4187,6 +4187,25 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
             }
             res = alsa_snd_pcm_readn( self->pcm, bufs, *numFrames );
         }
+#ifdef PA_ALSA_DEBUG_READI
+        {
+            static int debugCount = 0;
+            if( debugCount < 20 )
+            {
+                int32_t *samples = (int32_t *)self->nonMmapBuffer;
+                int32_t maxVal = 0;
+                unsigned long i;
+                for( i = 0; i < (unsigned long)res * self->numHostChannels && i < 64; ++i )
+                {
+                    int32_t v = samples[i] < 0 ? -samples[i] : samples[i];
+                    if( v > maxVal ) maxVal = v;
+                }
+                PA_DEBUG(( "PA_READI_DEBUG: res=%d requested=%lu maxSample=%d interleaved=%d\n",
+                           res, *numFrames, maxVal, self->hostInterleaved ));
+                ++debugCount;
+            }
+        }
+#endif
         if( res == -EPIPE )
         {
             *xrun = 1;
