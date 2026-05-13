@@ -1775,14 +1775,23 @@ static PaError AlsaOpen( const PaUtilHostApiRepresentation *hostApi, const PaStr
     PA_DEBUG(( "%s: Opening device %s\n", __FUNCTION__, deviceName ));
     fprintf( stderr, "PA_ALSA_OPEN: device='%s' direction=%s\n", deviceName,
              streamDir == StreamDirection_In ? "capture" : "playback" );
+#ifdef PA_ALSA_NO_MMAP
+    /* Open in blocking mode directly — some hardware (RP1/TAC5112) produces
+     * capture silence when initially opened with SND_PCM_NONBLOCK */
+    if( (ret = OpenPcm( pcm, deviceName, streamDir == StreamDirection_In ? SND_PCM_STREAM_CAPTURE : SND_PCM_STREAM_PLAYBACK,
+                    0, 1 )) < 0 )
+#else
     if( (ret = OpenPcm( pcm, deviceName, streamDir == StreamDirection_In ? SND_PCM_STREAM_CAPTURE : SND_PCM_STREAM_PLAYBACK,
                     SND_PCM_NONBLOCK, 1 )) < 0 )
+#endif
     {
         /* Not to be closed */
         *pcm = NULL;
         ENSURE_( ret, -EBUSY == ret ? paDeviceUnavailable : paBadIODeviceCombination );
     }
+#ifndef PA_ALSA_NO_MMAP
     ENSURE_( alsa_snd_pcm_nonblock( *pcm, 0 ), paUnanticipatedHostError );
+#endif
 
 end:
     return result;
