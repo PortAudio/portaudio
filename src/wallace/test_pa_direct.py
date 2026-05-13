@@ -124,7 +124,7 @@ if err != paNoError:
     print(f"Pa_Initialize failed: {pa.Pa_GetErrorText(err).decode()}")
     sys.exit(1)
 
-print(f"PortAudio: {pa.Pa_GetVersionText().decode()}")
+print(f"PortAudio: {pa.Pa_GetVersionText().decode()}", flush=True)
 
 # Setup parameters — device 0, same as pa_loopback
 device = 0
@@ -165,16 +165,18 @@ info = pa.Pa_GetStreamInfo(stream)
 if info:
     print(f"Input latency:  {info.contents.inputLatency * 1000:.3f} ms")
     print(f"Output latency: {info.contents.outputLatency * 1000:.3f} ms")
-    print(f"Sample rate:    {info.contents.sampleRate:.0f}")
+    print(f"Sample rate:    {info.contents.sampleRate:.0f}", flush=True)
 
+print("Calling Pa_StartStream...", flush=True)
 err = pa.Pa_StartStream(stream)
+print(f"Pa_StartStream returned: {err}", flush=True)
 if err != paNoError:
-    print(f"Pa_StartStream failed: {pa.Pa_GetErrorText(err).decode()}")
+    print(f"Pa_StartStream failed: {pa.Pa_GetErrorText(err).decode()}", flush=True)
     pa.Pa_CloseStream(stream)
     pa.Pa_Terminate()
     sys.exit(1)
 
-print("Loopback running — Ctrl+C to stop")
+print("Loopback running — Ctrl+C to stop", flush=True)
 
 while running and pa.Pa_IsStreamActive(stream):
     pa.Pa_Sleep(100)
