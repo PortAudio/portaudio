@@ -2039,6 +2039,20 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
     dir = 0;
     ENSURE_( alsa_snd_pcm_hw_params_set_periods_min( pcm, hwParams, &minPeriods, &dir ), paUnanticipatedHostError );
 
+#ifdef PA_ALSA_NO_MMAP
+    self->canMmap = 0;
+    if( self->userInterleaved )
+    {
+        accessMode          = SND_PCM_ACCESS_RW_INTERLEAVED;
+        alternateAccessMode = SND_PCM_ACCESS_RW_NONINTERLEAVED;
+    }
+    else
+    {
+        accessMode          = SND_PCM_ACCESS_RW_NONINTERLEAVED;
+        alternateAccessMode = SND_PCM_ACCESS_RW_INTERLEAVED;
+    }
+    PA_DEBUG(( "%s: PA_ALSA_NO_MMAP defined, forcing RW access mode\n", __FUNCTION__ ));
+#else
     if( self->userInterleaved )
     {
         accessMode          = SND_PCM_ACCESS_MMAP_INTERLEAVED;
@@ -2075,6 +2089,7 @@ static PaError PaAlsaStreamComponent_InitialConfigure( PaAlsaStreamComponent *se
             alternateAccessMode = SND_PCM_ACCESS_RW_INTERLEAVED;
         }
     }
+#endif
 
     PA_DEBUG(( "%s: device can MMAP: %s\n", __FUNCTION__, ( self->canMmap ? "YES" : "NO" ) ));
 
@@ -2965,9 +2980,24 @@ static void SilenceBuffer( PaAlsaStream *stream )
     const snd_pcm_channel_area_t *areas;
     snd_pcm_uframes_t frames = (snd_pcm_uframes_t)alsa_snd_pcm_avail_update( stream->playback.pcm ), offset;
 
+#ifdef PA_ALSA_NO_MMAP
+    if( frames > 0 )
+    {
+        int frameSize = alsa_snd_pcm_format_size( stream->playback.nativeFormat, 1 )
+                        * stream->playback.numHostChannels;
+        unsigned int bufSize = frames * frameSize;
+        void *silenceBuf = calloc( 1, bufSize );
+        if( silenceBuf )
+        {
+            alsa_snd_pcm_writei( stream->playback.pcm, silenceBuf, frames );
+            free( silenceBuf );
+        }
+    }
+#else
     alsa_snd_pcm_mmap_begin( stream->playback.pcm, &areas, &offset, &frames );
     alsa_snd_pcm_areas_silence( areas, offset, stream->playback.numHostChannels, frames, stream->playback.nativeFormat );
     alsa_snd_pcm_mmap_commit( stream->playback.pcm, offset, frames );
+#endif
 }
 
 /** Start/prepare pcm(s) for streaming.
