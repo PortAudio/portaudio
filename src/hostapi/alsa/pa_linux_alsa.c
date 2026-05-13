@@ -2183,8 +2183,8 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
     ENSURE_( alsa_snd_pcm_sw_params_set_start_threshold( self->pcm, swParams, self->framesPerPeriod ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_sw_params_set_stop_threshold( self->pcm, swParams, self->alsaBufferSize ), paUnanticipatedHostError );
 
-    /* Silence buffer in the case of underrun */
-    if( !primeBuffers ) /* XXX: Make sense? */
+    /* Silence buffer in the case of underrun (playback only) */
+    if( !primeBuffers && self->streamDir == StreamDirection_Out )
     {
         snd_pcm_uframes_t boundary;
         ENSURE_( alsa_snd_pcm_sw_params_get_boundary( swParams, &boundary ), paUnanticipatedHostError );
