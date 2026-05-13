@@ -51,7 +51,7 @@ sp = _ffi.new('PaStream**')
 
 # Convert ctypes callback to cffi function pointer
 cb_addr = ctypes.cast(cb, ctypes.c_void_p).value
-cffi_cb = _ffi.cast('PaStreamCallback', cb_addr)
+cffi_cb = _ffi.cast('PaStreamCallback*', cb_addr)
 
 # === CFFI Pa_OpenStream ===
 err = _lib.Pa_OpenStream(sp, ip, op, 48000.0, 1024, 0, cffi_cb, _ffi.NULL)
