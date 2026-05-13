@@ -4200,8 +4200,8 @@ static PaError PaAlsaStreamComponent_RegisterChannels( PaAlsaStreamComponent* se
                     int32_t v = samples[i] < 0 ? -samples[i] : samples[i];
                     if( v > maxVal ) maxVal = v;
                 }
-                PA_DEBUG(( "PA_READI_DEBUG: res=%d requested=%lu maxSample=%d interleaved=%d\n",
-                           res, *numFrames, maxVal, self->hostInterleaved ));
+                fprintf( stderr, "PA_READI_DEBUG: res=%d requested=%lu maxSample=%d interleaved=%d\n",
+                         res, *numFrames, maxVal, self->hostInterleaved );
                 ++debugCount;
             }
         }
