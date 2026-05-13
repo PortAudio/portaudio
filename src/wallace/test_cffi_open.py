@@ -57,14 +57,12 @@ if err != 0:
     print(f"Pa_StartStream failed: {err}", flush=True)
     sys.exit(1)
 
-# ctypes Pa_Sleep loop (releases GIL)
-stream_addr = int(_ffi.cast('uintptr_t', sp[0]))
-ct_stream = ctypes.c_void_p(stream_addr)
-print("Running (cffi callback, ctypes sleep) — Ctrl+C to stop", flush=True)
-while running[0] and pa.Pa_IsStreamActive(ct_stream):
-    pa.Pa_Sleep(100)
+# === ALL CFFI: Pa_Sleep loop (holds GIL) ===
+print("Running (ALL cffi — callback + sleep) — Ctrl+C to stop", flush=True)
+while running[0] and _lib.Pa_IsStreamActive(sp[0]):
+    _lib.Pa_Sleep(100)
 
-pa.Pa_StopStream(ct_stream)
-pa.Pa_CloseStream(ct_stream)
-pa.Pa_Terminate()
+_lib.Pa_StopStream(sp[0])
+_lib.Pa_CloseStream(sp[0])
+_lib.Pa_Terminate()
 print(f"Done. {count[0]} cbs.", flush=True)
