@@ -2980,8 +2980,13 @@ static void SilenceBuffer( PaAlsaStream *stream )
     const snd_pcm_channel_area_t *areas;
     snd_pcm_uframes_t frames = (snd_pcm_uframes_t)alsa_snd_pcm_avail_update( stream->playback.pcm ), offset;
 
-#ifdef PA_ALSA_NO_MMAP
-    if( frames > 0 )
+    if( stream->playback.canMmap )
+    {
+        alsa_snd_pcm_mmap_begin( stream->playback.pcm, &areas, &offset, &frames );
+        alsa_snd_pcm_areas_silence( areas, offset, stream->playback.numHostChannels, frames, stream->playback.nativeFormat );
+        alsa_snd_pcm_mmap_commit( stream->playback.pcm, offset, frames );
+    }
+    else if( frames > 0 )
     {
         int frameSize = alsa_snd_pcm_format_size( stream->playback.nativeFormat, 1 )
                         * stream->playback.numHostChannels;
@@ -2993,11 +2998,6 @@ static void SilenceBuffer( PaAlsaStream *stream )
             free( silenceBuf );
         }
     }
-#else
-    alsa_snd_pcm_mmap_begin( stream->playback.pcm, &areas, &offset, &frames );
-    alsa_snd_pcm_areas_silence( areas, offset, stream->playback.numHostChannels, frames, stream->playback.nativeFormat );
-    alsa_snd_pcm_mmap_commit( stream->playback.pcm, offset, frames );
-#endif
 }
 
 /** Start/prepare pcm(s) for streaming.
@@ -3021,11 +3021,9 @@ static PaError AlsaStart( PaAlsaStream *stream, int priming )
             {
                 /* Buffer isn't primed, so prepare and silence */
                 ENSURE_( alsa_snd_pcm_prepare( stream->playback.pcm ), paUnanticipatedHostError );
-                if( stream->playback.canMmap )
-                    SilenceBuffer( stream );
+                SilenceBuffer( stream );
             }
-            if( stream->playback.canMmap )
-                ENSURE_( alsa_snd_pcm_start( stream->playback.pcm ), paUnanticipatedHostError );
+            ENSURE_( alsa_snd_pcm_start( stream->playback.pcm ), paUnanticipatedHostError );
         }
         else
             ENSURE_( alsa_snd_pcm_prepare( stream->playback.pcm ), paUnanticipatedHostError );
