@@ -1773,6 +1773,8 @@ static PaError AlsaOpen( const PaUtilHostApiRepresentation *hostApi, const PaStr
         deviceName = streamInfo->deviceString;
 
     PA_DEBUG(( "%s: Opening device %s\n", __FUNCTION__, deviceName ));
+    fprintf( stderr, "PA_ALSA_OPEN: device='%s' direction=%s\n", deviceName,
+             streamDir == StreamDirection_In ? "capture" : "playback" );
     if( (ret = OpenPcm( pcm, deviceName, streamDir == StreamDirection_In ? SND_PCM_STREAM_CAPTURE : SND_PCM_STREAM_PLAYBACK,
                     SND_PCM_NONBLOCK, 1 )) < 0 )
     {
