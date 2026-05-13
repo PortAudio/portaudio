@@ -1983,6 +1983,14 @@ static PaError PaAlsaStreamComponent_Initialize( PaAlsaStreamComponent *self, Pa
     self->streamDir = streamDir;
     self->canMmap = 0;
     self->nonMmapBuffer = NULL;
+
+    fprintf( stderr, "PA_INIT: dir=%s devIdx=%d userCh=%d hostCh=%d userFmt=0x%lx hostFmt=0x%lx "
+             "nativeFmt=%d interleaved=%d isPlug=%d latency=%.6f\n",
+             streamDir == StreamDirection_In ? "capture" : "playback",
+             params->device, self->numUserChannels, self->numHostChannels,
+             (unsigned long)userSampleFormat, (unsigned long)hostSampleFormat,
+             (int)self->nativeFormat, self->hostInterleaved, self->deviceIsPlug,
+             params->suggestedLatency );
     self->nonMmapBufferSize = 0;
 
     if( !callbackMode && !self->userInterleaved )
@@ -2179,6 +2187,9 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
     if( alsa_snd_pcm_hw_params_get_buffer_size != NULL )
     {
         ENSURE_( alsa_snd_pcm_hw_params_get_buffer_size( hwParams, &self->alsaBufferSize ), paUnanticipatedHostError );
+        fprintf( stderr, "PA_HWCFG: dir=%s period=%lu buffer=%lu canMmap=%d\n",
+                 self->streamDir == StreamDirection_In ? "capture" : "playback",
+                 self->framesPerPeriod, self->alsaBufferSize, self->canMmap );
     }
     else
     {
