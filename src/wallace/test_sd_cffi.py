@@ -11,7 +11,18 @@ import sounddevice as sd
 _ffi = sd._ffi
 _lib = sd._lib
 
-sys.stderr.write(f"Library loaded, Pa already initialized\n")
+# Undo sounddevice's Pa_Initialize (which redirected stderr to /dev/null)
+# and re-initialize cleanly
+sys.stderr.write("Re-initializing PortAudio (undoing sounddevice's init)...\n")
+_lib.Pa_Terminate()
+sd._initialized -= 1
+err = _lib.Pa_Initialize()
+sd._initialized += 1
+if err != _lib.paNoError:
+    sys.stderr.write(f"Pa_Initialize failed: {err}\n")
+    sys.exit(1)
+
+sys.stderr.write(f"Library loaded, Pa re-initialized\n")
 sys.stderr.write(f"Version: {_ffi.string(_lib.Pa_GetVersionText()).decode()}\n")
 sys.stderr.flush()
 
