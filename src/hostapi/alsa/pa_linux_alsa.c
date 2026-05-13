@@ -2185,18 +2185,21 @@ static PaError PaAlsaStreamComponent_FinishConfigure( PaAlsaStreamComponent *sel
     ENSURE_( alsa_snd_pcm_sw_params_set_start_threshold( self->pcm, swParams, self->framesPerPeriod ), paUnanticipatedHostError );
     ENSURE_( alsa_snd_pcm_sw_params_set_stop_threshold( self->pcm, swParams, self->alsaBufferSize ), paUnanticipatedHostError );
 
-    /* Silence buffer in the case of underrun (playback only) */
-    if( !primeBuffers && self->streamDir == StreamDirection_Out )
+    if( self->streamDir == StreamDirection_Out )
     {
-        snd_pcm_uframes_t boundary;
-        ENSURE_( alsa_snd_pcm_sw_params_get_boundary( swParams, &boundary ), paUnanticipatedHostError );
-        ENSURE_( alsa_snd_pcm_sw_params_set_silence_threshold( self->pcm, swParams, 0 ), paUnanticipatedHostError );
-        ENSURE_( alsa_snd_pcm_sw_params_set_silence_size( self->pcm, swParams, boundary ), paUnanticipatedHostError );
-    }
+        /* Silence buffer in the case of underrun (playback only) */
+        if( !primeBuffers )
+        {
+            snd_pcm_uframes_t boundary;
+            ENSURE_( alsa_snd_pcm_sw_params_get_boundary( swParams, &boundary ), paUnanticipatedHostError );
+            ENSURE_( alsa_snd_pcm_sw_params_set_silence_threshold( self->pcm, swParams, 0 ), paUnanticipatedHostError );
+            ENSURE_( alsa_snd_pcm_sw_params_set_silence_size( self->pcm, swParams, boundary ), paUnanticipatedHostError );
+        }
 
-    ENSURE_( alsa_snd_pcm_sw_params_set_avail_min( self->pcm, swParams, self->framesPerPeriod ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_sw_params_set_xfer_align( self->pcm, swParams, 1 ), paUnanticipatedHostError );
-    ENSURE_( alsa_snd_pcm_sw_params_set_tstamp_mode( self->pcm, swParams, SND_PCM_TSTAMP_ENABLE ), paUnanticipatedHostError );
+        ENSURE_( alsa_snd_pcm_sw_params_set_avail_min( self->pcm, swParams, self->framesPerPeriod ), paUnanticipatedHostError );
+        ENSURE_( alsa_snd_pcm_sw_params_set_xfer_align( self->pcm, swParams, 1 ), paUnanticipatedHostError );
+        ENSURE_( alsa_snd_pcm_sw_params_set_tstamp_mode( self->pcm, swParams, SND_PCM_TSTAMP_ENABLE ), paUnanticipatedHostError );
+    }
 
     /* Set the parameters! */
     ENSURE_( alsa_snd_pcm_sw_params( self->pcm, swParams ), paUnanticipatedHostError );
