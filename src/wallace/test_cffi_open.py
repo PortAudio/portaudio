@@ -64,13 +64,13 @@ print("cffi Pa_OpenStream: OK", flush=True)
 stream_addr = int(_ffi.cast('uintptr_t', sp[0]))
 ct_stream = ctypes.c_void_p(stream_addr)
 
-# ctypes Pa_StartStream + Pa_Sleep loop
-err = pa.Pa_StartStream(ct_stream)
+# === CFFI Pa_StartStream ===
+err = _lib.Pa_StartStream(sp[0])
 if err != 0:
     print(f"Pa_StartStream failed: {err}", flush=True)
     sys.exit(1)
 
-print("Running — Ctrl+C to stop", flush=True)
+print("Running (cffi StartStream, ctypes sleep) — Ctrl+C to stop", flush=True)
 while running[0] and pa.Pa_IsStreamActive(ct_stream):
     pa.Pa_Sleep(100)
 
