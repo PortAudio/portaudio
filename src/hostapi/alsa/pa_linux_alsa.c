@@ -3023,7 +3023,9 @@ static PaError AlsaStart( PaAlsaStream *stream, int priming )
                 ENSURE_( alsa_snd_pcm_prepare( stream->playback.pcm ), paUnanticipatedHostError );
                 SilenceBuffer( stream );
             }
-            ENSURE_( alsa_snd_pcm_start( stream->playback.pcm ), paUnanticipatedHostError );
+            /* SilenceBuffer may auto-start the PCM via writei if start_threshold is reached */
+            if( alsa_snd_pcm_state( stream->playback.pcm ) != SND_PCM_STATE_RUNNING )
+                ENSURE_( alsa_snd_pcm_start( stream->playback.pcm ), paUnanticipatedHostError );
         }
         else
             ENSURE_( alsa_snd_pcm_prepare( stream->playback.pcm ), paUnanticipatedHostError );
