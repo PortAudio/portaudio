@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""Test: import sounddevice (full import with Pa_Initialize),
-then use our known-working cffi approach for the stream.
-If zeros → sounddevice's import corrupts something.
-If works → sounddevice's Stream class setup is the issue."""
+"""Test: import sounddevice + NumPy-style callback.
+Tests if sounddevice's callback wrapper (NumPy arrays) causes zeros."""
 
 import sys
 import signal
+import numpy as np
 
-# Full sounddevice import (does Pa_Initialize, registers atexit, etc.)
 import sounddevice as sd
 
 _ffi = sd._ffi
 _lib = sd._lib
-# NOTE: Pa_Initialize already done by sounddevice — skip our own
 
 import ctypes
 pa = ctypes.CDLL('/usr/local/lib/libportaudio.so.2')
@@ -26,18 +23,22 @@ count = [0]
 running = [True]
 signal.signal(signal.SIGINT, lambda s, f: running.__setitem__(0, False))
 
+CHANNELS = 2
+SAMPLESIZE = 4  # int32
+
 @_ffi.callback('PaStreamCallback', error=_lib.paAbort)
 def cb(inp, outp, frames, ti, flags, ud):
-    n = frames * 2
-    in_buf = _ffi.cast('int32_t*', inp)
-    out_buf = _ffi.cast('int32_t*', outp)
-    mx = 0
-    for i in range(min(n, 64)):
-        v = in_buf[i] if in_buf[i] >= 0 else -in_buf[i]
-        if v > mx: mx = v
-        out_buf[i] = in_buf[i]
-    for i in range(64, n):
-        out_buf[i] = in_buf[i]
+    # Mimic sounddevice's callback wrapper: create NumPy arrays from pointers
+    in_buf = np.frombuffer(_ffi.buffer(
+        _ffi.cast('char*', inp), frames * CHANNELS * SAMPLESIZE),
+        dtype='int32').reshape(frames, CHANNELS)
+    out_buf = np.frombuffer(_ffi.buffer(
+        _ffi.cast('char*', outp), frames * CHANNELS * SAMPLESIZE),
+        dtype='int32').reshape(frames, CHANNELS)
+
+    mx = np.max(np.abs(in_buf))
+    out_buf[:] = in_buf
+
     count[0] += 1
     if count[0] <= 20: sys.stderr.write(f"cb: frames={frames} max={mx}\n")
     return _lib.paContinue if running[0] else _lib.paComplete
