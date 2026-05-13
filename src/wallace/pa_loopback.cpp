@@ -75,6 +75,7 @@ int main(int argc, char *argv[]) {
     double sampleRate = 48000;
     int channels = 2;
     unsigned long blockSize = 512;
+    double latency = 0.0;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -82,6 +83,7 @@ int main(int argc, char *argv[]) {
         else if (arg == "-r" && i + 1 < argc) sampleRate = std::stod(argv[++i]);
         else if (arg == "-c" && i + 1 < argc) channels = std::stoi(argv[++i]);
         else if (arg == "-b" && i + 1 < argc) blockSize = std::stoul(argv[++i]);
+        else if (arg == "-l" && i + 1 < argc) latency = std::stod(argv[++i]);
         else if (arg == "-D" && i + 1 < argc) alsaDeviceString = argv[++i];
         else if (arg == "-h") { print_usage(argv[0]); return 0; }
         else { fprintf(stderr, "Unknown: %s\n", argv[i]); print_usage(argv[0]); return 1; }
@@ -138,11 +140,13 @@ int main(int argc, char *argv[]) {
 
     inputParams.channelCount = channels;
     inputParams.sampleFormat = paInt32;
-    inputParams.suggestedLatency = 0.0;
+    inputParams.suggestedLatency = latency;
 
     outputParams.channelCount = channels;
     outputParams.sampleFormat = paInt32;
-    outputParams.suggestedLatency = 0.0;
+    outputParams.suggestedLatency = latency;
+
+    fprintf(stderr, "Latency: %.6f\n", latency);
 
     LoopbackData data = { channels, 0 };
 
