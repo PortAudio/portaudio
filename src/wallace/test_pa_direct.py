@@ -10,10 +10,19 @@ import signal
 import sys
 import os
 
-# Load PortAudio
-lib_path = ctypes.util.find_library('portaudio')
-if not lib_path:
-    lib_path = 'libportaudio.so.2'
+# Load PortAudio — use explicit path if LD_LIBRARY_PATH is set, else find_library
+import os
+if os.environ.get('LD_LIBRARY_PATH'):
+    # find_library uses ldconfig cache and ignores LD_LIBRARY_PATH
+    for d in os.environ['LD_LIBRARY_PATH'].split(':'):
+        candidate = os.path.join(d, 'libportaudio.so.2')
+        if os.path.exists(candidate):
+            lib_path = candidate
+            break
+    else:
+        lib_path = ctypes.util.find_library('portaudio') or 'libportaudio.so.2'
+else:
+    lib_path = ctypes.util.find_library('portaudio') or 'libportaudio.so.2'
 pa = ctypes.CDLL(lib_path)
 print(f"Loaded: {lib_path}")
 
