@@ -967,8 +967,8 @@ static PaError ProbeDeviceDefaults( snd_pcm_t* pcm, int isPlug, StreamDirection 
         printf( "%s: alsa_snd_pcm_hw_params_get_buffer_size_max() returned %d !\n", __FUNCTION__, ret );
         highBufferFrames = kHighBufferFrames;
     }
-    printf( "%s: lowBufferFrames = %u, highBufferFrames = %u\n",
-            __FUNCTION__, lowBufferFrames, highBufferFrames );
+    printf( "%s: BEFORE lowBufferFrames = %d, highBufferFrames = %d\n",
+            __FUNCTION__, (int) lowBufferFrames, (int) highBufferFrames );
 
     /* Clip to ensure optimal low value. */
     if (lowBufferFrames < kLowBufferFrames) lowBufferFrames = kLowBufferFrames;
@@ -977,6 +977,8 @@ static PaError ProbeDeviceDefaults( snd_pcm_t* pcm, int isPlug, StreamDirection 
     /* Clip to ensure optimal high value. */
     if (highBufferFrames > lowTimesN) highBufferFrames = lowTimesN;
     if (highBufferFrames > kHighBufferFrames) highBufferFrames = kHighBufferFrames;
+    printf( "%s: AFTER lowBufferFrames = %d, highBufferFrames = %d\n",
+            __FUNCTION__, (int) lowBufferFrames, (int) highBufferFrames );
 
     /* Assume period is 1/4 the buffer so it will normally be 3/4 full. */
     *defaultLowLatency = (double) ((lowBufferFrames * 3) / 4) / defaultSr;
