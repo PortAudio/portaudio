@@ -28,8 +28,8 @@ def callback(indata, outdata, frames, t, status):
         sys.stderr.write(f"cb: frames={frames} max={mx}\n")
 
 print("Opening sd.Stream...", flush=True)
-stream = sd.Stream(device=0, samplerate=48000, channels=2, dtype='int32',
-                   blocksize=1024, latency=0, callback=callback)
+stream = sd.Stream(device=0, samplerate=48000, channels=4, dtype='float32',
+                   blocksize=480, latency=0, callback=callback)
 
 print("Starting...", flush=True)
 stream.start()
