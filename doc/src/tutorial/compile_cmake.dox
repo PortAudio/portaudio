@@ -127,7 +127,7 @@ As usual, you can alternatively invoke the build tool CMake has generated build 
 
 @subsection compile_cmake_general_running_tests_examples Running Tests and Examples
 
-As stated earlier, tests and examples are located within the `test` and `examples` folders, respectively. Likewise, Windows has an exception where both tests and examples are under an additional subdirectory named after the current configuration in their respective directories. (This also happens with multi-config generators too). In this example, we are going to assume that you have built these tests with the default `Debug` configuration. If your configuration is different, then adjust the examples accordingly. For a list of all possible build configurations, please see @ref compile_cmake_options_general.
+As stated earlier, tests and examples are located within the `test` and `examples` folders, respectively. Likewise, Windows has an exception where both tests and examples are under an additional subdirectory named after the current configuration in their respective directories. (This also happens with multi-config generators on other platforms). In this example, we are going to assume that you have built these tests with the default `Debug` configuration. If your configuration is different, then adjust the examples accordingly. For a list of all possible build configurations, please see @ref compile_cmake_options_general.
 
 To list tests, run the following command in the same terminal or command prompt window used earlier (substitute `ls` with `dir` at the Windows Command Prompt):
 
