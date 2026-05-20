@@ -57,7 +57,7 @@ With the last command, by default, the build system will be configured to build 
 
 (NOTE: PortAudio also supports the standard CMake `BUILD_SHARED_LIBS` mechanism.)
 
-Also, by default, CMake will build a debug version of PortAudio. If you want a release version, add `-DCMAKE_BUILD_TYPE=Release` to the last command as seen in the three commands above:
+On Unix systems, or when using Makefiles on Windows, this will also configure CMake to build a debug version of PortAudio by default. If you want a release version by default, add `-DCMAKE_BUILD_TYPE=Release` to the last command as seen in the three commands above:
 
     cmake -DCMAKE_BUILD_TYPE=Release ../portaudio
 
@@ -65,7 +65,9 @@ You can also mix and match `-DCMAKE_BUILD_TYPE=Release` and `-DPA_BUILD_SHARED_L
 
     cmake -DPA_BUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release ../portaudio
 
-At this point, the build files for PortAudio have been generated and placed in the `build` directory. For Windows, the library files will be in a folder named after your configuration (e.g., `Debug/`, `Release/`, `RelWithDebInfo/`, etc.). For other systems, they will simply be in the root of your build directory. Now you are ready to begin the actual build.
+At this point, the build files for PortAudio have been generated and placed in the `build` directory.
+
+When using Visual Studio to build on Windows, or the "Ninja Multi-Config" generator on Unix, the library files will be in a folder named after your configuration (e.g., `Debug/`, `Release/`, `RelWithDebInfo/`, etc.). Otherwise, they will simply end up in the root of your build directory. Now you are ready to begin the actual build.
 
 @subsubsection compile_cmake_general_configure_tests_examples Building Tests and Examples
 
@@ -103,6 +105,10 @@ Now that you have configured the build system, to build PortAudio run one last c
 
 Alternatively, you can directly invoke the build tool that CMake has generated build files for. For example, if CMake has generated Makefiles (usually the default on macOS, Linux, and similar OSes), then you could simply run `make`. If CMake has generated a Visual Studio project (`.sln`, `.vcproj`) (usually the default on Windows), you could open the generated Visual Studio project and build PortAudio from within Visual Studio (or alternatively run `msbuild` if that's your preference).
 
+If you are using a [multi-configuration generator](https://cmake.org/cmake/help/latest/manual/cmake-buildsystem.7.html#build-configurations) such as Visual Studio or "Ninja Multi-Config", you can use the `--config` option to control which configuration (Debug, Release, etc...) gets built:
+
+   cmake --build . --config Debug
+
 To summarize all of the steps above:
 
 1. Before getting started, clone the PortAudio source code from GitHub using Git. You can't do anything else without source code.
@@ -117,7 +123,7 @@ Optionally, if you want to install your newly built PortAudio build, you can do 
 
     cmake --build . -t install
 
-As usual, you can alternatively invoke the build tool CMake has generated build files for itself. Be sure to build the `install` target. Note that this will install PortAudio into your system directories, so be careful
+As usual, you can alternatively invoke the build tool CMake has generated build files for itself. Be sure to build the `install` target. Note that this will install PortAudio into your system directories, so be careful.
 
 @subsection compile_cmake_general_running_tests_examples Running Tests and Examples
 
@@ -127,7 +133,7 @@ To list tests, run the following command in the same terminal or command prompt 
 
     ls test/
 
-On Windows, `test/` should be the following:
+On Windows with Visual Studio, `test/` should be the following:
 
     dir test\Debug
 
@@ -135,7 +141,7 @@ To actually run a test, run the following command:
 
     test/patest_sometest
 
-On Windows:
+On Windows with Visual Studio:
 
     test/Debug/patest_sometest.exe
 
@@ -176,13 +182,15 @@ Once configuration is successful, you can then start the build by running the fo
 
     C:\pabuild> cmake --build .
 
-This builds a _debug_ config of PortAudio. If you need a release config of PortAudio, add `-DCMAKE_BUILD_TYPE=Release` to the above command like so:
+This builds a _debug_ config of PortAudio. If you need a release config of PortAudio, add `--config Release` to the above command like so:
 
-    C:\pabuild> cmake -DCMAKE_BUILD_TYPE=Release --build .
+    C:\pabuild> cmake --build . --config Release
+
+(note that `--config Release` must come *after* `--build .` for this to work)
 
 Alternatively, you can open the resulting `portaudio.sln` file in Visual Studio and build PortAudio that way.
 
-The actual PortAudio library itself will be output to a directory named after the configuration you just built. For example, if you built the `Debug` configuration, your files will be under `Debug/` in your build folder. If you built the `Release` configuration, your files will be under `Release/` in your build folder. This is due to CMake's Visual Studio Generator being a multi-config generator (meaning you can build multiple configurations without having to regenerate the build system). If you were building CMake on Linux using the Ninja Multi-Config generator, you will notice similar behavior.
+The actual PortAudio library itself will be output to a directory named after the configuration you just built. For example, if you built the `Debug` configuration, your files will be under `Debug/` in your build folder. If you built the `Release` configuration, your files will be under `Release/` in your build folder. This is due to CMake's Visual Studio Generator being a multi-config generator (meaning you can build multiple configurations without having to regenerate the build system). When building on Unix using the Ninja Multi-Config generator, you will notice similar behavior.
 
 For more CMake options, see @ref compile_cmake_options_general.
 
@@ -212,7 +220,7 @@ If you want a **shared library** configuration, add `-DPA_BUILD_SHARED_LIBS=ON`:
 
     $ cmake -DPA_BUILD_SHARED_LIBS=ON /path/to/portaudio/source
 
-By default, this will create Unix Makefiles.  If you have [Ninja](https://ninja-build.org/) installed and wish to use it instead, you can add `-G Ninja` to the configure command.
+By default, this will create Unix Makefiles.  If you have [Ninja](https://ninja-build.org/) installed and wish to use it instead, you can add `-G Ninja` to the configure command.  To use the abovementioned "Ninja Multi-Config" generator, you could add `-G "Ninja Multi-Config"`
 
 Once configuration is done, run the following command to build PortAudio:
 
