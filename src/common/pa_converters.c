@@ -759,7 +759,10 @@ static void Float32_To_UInt8(
 
     while( count-- )
     {
-        unsigned char samp = (unsigned char)(128 + ((unsigned char) (*src * (127.0f))));
+        /* Cast to int before biasing: converting a negative float directly to unsigned char is
+           undefined behavior (C11 6.3.1.4) and saturates to 0 on some targets (e.g. AArch64),
+           collapsing the negative half of the signal to 128. */
+        unsigned char samp = (unsigned char)(128 + (int)(*src * (127.0f)));
         *dest = samp;
 
         src += sourceStride;
