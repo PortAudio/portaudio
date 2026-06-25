@@ -392,7 +392,7 @@ OceanWave* InitializeWave(double SR, float attackInSeconds, float maxLevel, floa
  */
 static float GenerateFloatRandom(float minValue, float maxValue)
 {
-    return minValue + ((maxValue - minValue) * rand()) / RAND_MAX;
+    return minValue + ((maxValue - minValue) * (float) rand()) / (float) RAND_MAX;
 }
 
 /*******************************************************************/
