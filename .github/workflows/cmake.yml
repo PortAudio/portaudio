@@ -2,6 +2,8 @@ name: CMake build
 
 on: [push, pull_request]
 
+# Adding a comment to force CI to run and fail.
+
 jobs:
   build:
     strategy:
