@@ -387,6 +387,9 @@ OceanWave* InitializeWave(double SR, float attackInSeconds, float maxLevel, floa
     return wave;
 }
 
+/* This is failing CI because of "implicit conversion from 'int' to 'float'".
+ * Make a new PR so we can reproduce the CI failure and fix it.
+ */
 static float GenerateFloatRandom(float minValue, float maxValue)
 {
     return minValue + ((maxValue - minValue) * rand()) / RAND_MAX;
