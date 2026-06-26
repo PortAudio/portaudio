@@ -87,7 +87,9 @@ jobs:
       uses: lukka/run-vcpkg@v11
       if: ${{ matrix.vcpkg_triplet }} != null
       with:
-        vcpkgDirectory: ${{ github.workspace }}/../vcpkg
+        # Place vcpkg inside the checked-out repository workspace so git operations
+        # performed by the action operate within the repo tree.
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
         vcpkgTriplet: ${{ matrix.vcpkg_triplet }}
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         additionalCachedPaths: build/vcpkg_installed
@@ -100,7 +102,7 @@ jobs:
       run: cmake
            -G "${{ matrix.cmake_generator }}"
            ${{ matrix.cmake_options }}
-           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/../vcpkg/scripts/buildsystems/vcpkg.cmake
+           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/../out
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
@@ -123,7 +125,7 @@ jobs:
       run: cmake
            -G "${{ matrix.cmake_generator }}"
            ${{ matrix.cmake_options }}
-           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/../vcpkg/scripts/buildsystems/vcpkg.cmake
+           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/../out
            -DCMAKE_BUILD_TYPE=${{ env.cmake_build_type }}
            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
