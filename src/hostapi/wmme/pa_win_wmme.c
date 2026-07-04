@@ -760,12 +760,15 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     DetectDefaultSampleRate( winMmeDeviceInfo, winMmeInputDeviceId,
             QueryInputWaveFormatEx, deviceInfo->maxInputChannels );
 
-    if (memcmp(&wic.NameGuid, &GUID_NULL, sizeof(wic.NameGuid)) != 0) {
-        WCHAR GUIDstr[100] = { 0 };
-        LPSTR uniqueID = (LPSTR)PaUtil_GroupAllocateZeroInitializedMemory(winMmeHostApi->allocations, (long)100 * sizeof(char));
-        if (StringFromGUID2(&wic.NameGuid, GUIDstr, 100) > 0 && uniqueID) {
-            CopyWCharStringToUtf8CString(uniqueID, 100, GUIDstr);
-            deviceInfo->uniqueID = uniqueID;
+    {
+        static const GUID nullNameGuid = { 0 };
+        if (memcmp(&wic.NameGuid, &nullNameGuid, sizeof(wic.NameGuid)) != 0) {
+            WCHAR GUIDstr[100] = { 0 };
+            LPSTR uniqueID = (LPSTR)PaUtil_GroupAllocateZeroInitializedMemory(winMmeHostApi->allocations, (long)100 * sizeof(char));
+            if (StringFromGUID2(&wic.NameGuid, GUIDstr, 100) > 0 && uniqueID) {
+                CopyWCharStringToUtf8CString(uniqueID, 100, GUIDstr);
+                deviceInfo->uniqueID = uniqueID;
+            }
         }
     }
 
