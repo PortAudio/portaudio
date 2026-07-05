@@ -56,34 +56,18 @@
 #define PA_MIN_( a, b ) ( ((a)<(b)) ? (a) : (b) )
 
 
-/* greatest common divisor - PGCD in French */
+/* greatest common divisor */
 static unsigned long GCD( unsigned long a, unsigned long b )
 {
     return (b==0) ? a : GCD( b, a%b);
 }
 
-/* least common multiple - PPCM in French */
-static unsigned long LCM( unsigned long a, unsigned long b )
-{
-    return (a*b) / GCD(a,b);
-}
-
-#define PA_MAX_( a, b ) (((a) > (b)) ? (a) : (b))
-
 static unsigned long CalculateFrameShift( unsigned long M, unsigned long N )
 {
-    unsigned long result = 0;
-    unsigned long i;
-    unsigned long lcm;
-
     assert( M > 0 );
     assert( N > 0 );
-
-    lcm = LCM( M, N );
-    for( i = M; i < lcm; i += M )
-        result = PA_MAX_( result, i % N );
-
-    return result;
+    /* https://lac2026.sciencesconf.org/722511 */
+    return N - GCD( M, N );
 }
 
 
