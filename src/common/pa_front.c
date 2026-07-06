@@ -77,6 +77,11 @@
 #include "pa_trace.h"
 #include "pa_debugprint.h"
 
+#if PA_USE_JACK
+#include <jack/jack.h>
+static void PaJack_SilenceErrorCallback(const char *msg) { (void)msg; }
+#endif /* PA_USE_JACK */
+
 #ifndef PA_GIT_REVISION
 #include "pa_gitrevision.h"
 #endif
@@ -382,6 +387,10 @@ PaError Pa_Initialize( void )
         PaUtil_InitializeClock();
         PaUtil_ResetTraceMessages();
 
+#if PA_USE_JACK
+        jack_set_error_function(PaJack_SilenceErrorCallback);
+#endif
+
         result = InitializeHostApis();
         if( result == paNoError )
             ++initializationCount_;
@@ -409,6 +418,10 @@ PaError Pa_Terminate( void )
             CloseOpenStreams();
 
             TerminateHostApis();
+
+#if PA_USE_JACK
+            jack_set_error_function(NULL);
+#endif
 
             PaUtil_DumpTraceMessages();
         }
