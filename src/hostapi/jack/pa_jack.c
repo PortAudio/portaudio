@@ -62,6 +62,16 @@
 #include <jack/types.h>
 #include <jack/jack.h>
 
+static void PaJack_SilenceErrorCallback(const char *msg) { (void)msg; }
+
+__attribute__((constructor)) static void PaJack_SilenceEarly(void) {
+  jack_set_error_function(PaJack_SilenceErrorCallback);
+}
+
+__attribute__((destructor)) static void PaJack_RestoreErrorCallback(void) {
+  jack_set_error_function(NULL);
+}
+
 #include "pa_util.h"
 #include "pa_pthread_util.h"
 #include "pa_hostapi.h"
@@ -890,6 +900,8 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     }
 
     PaUtil_FreeMemory( jackHostApi );
+
+    jack_set_error_function(NULL);
 
     free( jackErr_ );
     jackErr_ = NULL;

@@ -740,8 +740,13 @@ static const PaAlsaDeviceInfo *GetDeviceInfo( const PaUtilHostApiRepresentation 
     return (const PaAlsaDeviceInfo *)hostApi->deviceInfos[device];
 }
 
-static void AlsaErrorHandler(const char *file, int line, const char *function,
-                             int err, const char *fmt, ...) {}
+static void AlsaLogHandler(int prio, int interface, const char *file, int line,
+                           const char *function, int errcode, const char *fmt,
+                           va_list arg) {
+  (void)prio;
+  (void)interface;
+  (void)arg;
+}
 
 PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
@@ -767,8 +772,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
 
-    ENSURE_(snd_lib_error_set_handler(AlsaErrorHandler),
-            paUnanticipatedHostError);
+    snd_lib_log_set_local(AlsaLogHandler);
 
     PA_ENSURE( BuildDeviceList( alsaHostApi ) );
 
@@ -815,7 +819,7 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     assert( hostApi );
 
-    snd_lib_error_set_handler(NULL);
+    snd_lib_log_set_local(NULL);
 
     if( alsaHostApi->allocations )
     {
