@@ -66,7 +66,11 @@ static unsigned long CalculateFrameShift( unsigned long M, unsigned long N )
 {
     assert( M > 0 );
     assert( N > 0 );
-    /* https://lac2026.sciencesconf.org/722511 */
+    /*
+        The minimum required delay is calculated according to:
+        M. Rath & M. Geier, "Minimum required delay for realtime block size adaptation in digital audio signal processing",
+        Linux Audio Conference 2026; https://lac2026.sciencesconf.org/722511
+    */
     return N - GCD( M, N );
 }
 
