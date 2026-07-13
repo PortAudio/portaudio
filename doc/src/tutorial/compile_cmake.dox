@@ -278,7 +278,7 @@ This section contains options that configure your build. Some options are specif
 @note All options here default to `ON` if available except for the OSS, ASIO, and skeleton backends.
 
 - **`-DPA_USE_ALSA=ON|OFF`**: (Linux/Unix-like/etc. Only). Use the ASLA host API. Requires ALSA.
-    - **`-DPA_ALSA_DYNAMIC=ON|OFF`**: Dynamically load libasound with dlopen using @ref PaAlsa_SetLibraryPathName.
+    - **`-DPA_ALSA_DYNAMIC=ON|OFF`**: Dynamically load libasound with dlopen using @ref PaAlsa_SetLibraryPathName. Off by default[3].
 - **`-DPA_USE_ASIO=ON|OFF`**: (Windows Only). Use the ASIO host API. Requires the ASIO SDK[1].
 - **`-DPA_USE_AUDIOIO=ON|OFF`**: (Solaris Only). Use the audioio host API.
 - **`-DPA_USE_DS=ON|OFF`**: (Windows Only). Use the DirectSound host API.
@@ -295,6 +295,8 @@ This section contains options that configure your build. Some options are specif
 [1] Before compiling PortAudio with ASIO, please read IMPORTANT WARNING in @ref compile_cmake_win_asio above.
 
 [2] To avoid confusing end-users, the OSS backend is intentionally off by default because there are no OSS devices on modern Linux systems.
+
+[3] Unlike the other options in this section, `PA_ALSA_DYNAMIC` defaults to `OFF`.
 
 @subsubsection compile_cmake_options_pa_misc Miscellaneous Build Options
 
