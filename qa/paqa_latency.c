@@ -225,7 +225,7 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     double previousLatency = 0.0;
     int numChannels = 1;
     int atMaximumLatency = 0; /* Set to 1 when we reach the limit. */
-    double maximumLatency = 0.0;
+    double detectedMaximumLatency = 0.0;
 
     printf("------------------------ paqaCheckMultipleSuggested - %s\n",
            (isInput ? "INPUT" : "OUTPUT") );
@@ -247,10 +247,11 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
     streamParameters.sampleFormat = paFloat32;
     sampleRate = pdi->defaultSampleRate;
 
-    printf(" lowLatency  = %g\n", lowLatency );
-    printf(" highLatency = %g\n", highLatency );
-    printf(" numChannels = %d\n", numChannels );
-    printf(" sampleRate  = %g\n", sampleRate );
+    printf(" lowLatency   = %g\n", lowLatency );
+    printf(" highLatency  = %g\n", highLatency );
+    printf(" numChannels  = %d\n", numChannels );
+    printf(" sampleRate   = %g Hz\n", sampleRate );
+    printf(" samplePeriod = %e seconds\n", 1.0 / sampleRate );
 
     if( highLatency < 0.001 )
     {
@@ -287,7 +288,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
         {
             finalLatency = streamInfo->outputLatency;
         }
-        printf(", finalLatency = %8.6f\n", finalLatency );
+        printf(", finalLatency = %8.6f", finalLatency );
+        printf(", (final - suggested) = %e\n", (finalLatency - streamParameters.suggestedLatency) );
         err = Pa_CloseStream( stream );
 
         QA_ASSERT_TRUE("Latency should be monotonically non-decreasing with suggested latency.",
@@ -297,8 +299,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
             /* If we get a lower value then we must be clipping at max latency. */
             if (finalLatency < streamParameters.suggestedLatency) {
                 atMaximumLatency = 1;
-                maximumLatency = finalLatency;
-                printf("     maximumLatency = %8.6f\n", maximumLatency );
+                detectedMaximumLatency = finalLatency;
+                printf("     detectedMaximumLatency = %8.6f\n", detectedMaximumLatency );
             }
         }
         /* If we are not at maximum then we should be rounding up. */
@@ -306,8 +308,8 @@ static int paqaCheckMultipleSuggested( PaDeviceIndex deviceIndex, int isInput )
             QA_ASSERT_TRUE("Latency should be >= suggestedLatency",
                            finalLatency >= streamParameters.suggestedLatency);
         } else {
-            QA_ASSERT_TRUE("Latency should be == maximumLatency",
-                           finalLatency == maximumLatency);
+            QA_ASSERT_TRUE("Latency should be == detectedMaximumLatency",
+                           finalLatency == detectedMaximumLatency);
         }
         previousLatency = finalLatency;
     }
@@ -411,13 +413,14 @@ int main(void)
     if( err != paNoError ) goto error;
 
     /* Run self tests. */
-    if( paqaVerifyDeviceInfoLatency() < 0 ) goto error;
+    if( (err = paqaVerifyDeviceInfoLatency()) < 0 ) goto error;
 
-    if( paqaVerifySuggestedLatency() < 0 ) goto error;
+    if( (err = paqaVerifySuggestedLatency()) < 0 ) goto error;
 
     outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
     if (outputParameters.device == paNoDevice) {
         fprintf(stderr,"Error: No default output device.\n");
+        err = paInvalidDevice;
         goto error;
     }
 
@@ -477,13 +480,15 @@ int main(void)
     if( err != paNoError ) goto error;
 
     Pa_Terminate();
+    printf("------------- SUMMARY ---------------------\n");
     printf("SUCCESS - test finished.\n");
-    return err;
+    return 0;
 
 error:
     Pa_Terminate();
+    printf("------------- SUMMARY ---------------------\n");
     fprintf( stderr, "ERROR - test failed.\n" );
     fprintf( stderr, "Error number: %d\n", err );
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
-    return err;
+    return -err; /* exit codes are truncated to an unsigned byte */
 }
