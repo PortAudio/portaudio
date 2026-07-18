@@ -414,7 +414,6 @@ static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
     if( 0 != PaMacCore_AudioHardwareGetProperty(kAudioHardwarePropertyDefaultInputDevice,
             &size,
             &auhalHostApi->defaultIn) ) {
-        int i;
         auhalHostApi->defaultIn  = kAudioDeviceUnknown;
         VDBUG(("Failed to get default input device from OS."));
         VDBUG((" I will substitute the first available input Device."));
@@ -431,7 +430,6 @@ static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
     if( 0 != PaMacCore_AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice,
             &size,
             &auhalHostApi->defaultOut) ) {
-        int i;
         auhalHostApi->defaultIn  = kAudioDeviceUnknown;
         VDBUG(("Failed to get default output device from OS."));
         VDBUG((" I will substitute the first available output Device."));
@@ -2871,4 +2869,36 @@ static double GetStreamCpuLoad( PaStream* s )
     VVDBUG(("GetStreamCpuLoad()\n"));
 
     return PaUtil_GetCpuLoad( &stream->cpuLoadMeasurer );
+}
+
+
+/*
+ * Return the PortAudio device index corresponding to a native
+ * CoreAudio AudioDeviceID. Useful when interoperating with
+ * other CoreAudio APIs that use AudioDeviceID directly.
+ */
+PaDeviceIndex PaMacCore_GetDeviceIndexForAudioDeviceID(AudioDeviceID id)
+{
+    PaUtilHostApiRepresentation *hostApi;
+    PaMacAUHAL *auhalHostApi;
+    PaError err;
+    int i;
+
+    err = PaUtil_GetHostApiRepresentation(&hostApi, paCoreAudio);
+    if (err != paNoError)
+        return paNoDevice;
+
+    auhalHostApi = (PaMacAUHAL *)hostApi;
+
+    for (i = 0; i < auhalHostApi->devCount; i++)
+    {
+        VVDBUG(("PA %lu -> CoreAudio %u\n",
+             (unsigned long)(hostApi->privatePaFrontInfo.baseDeviceIndex + i),
+             (unsigned int)auhalHostApi->devIds[i]));
+	        
+	    if (auhalHostApi->devIds[i] == id)
+            return hostApi->privatePaFrontInfo.baseDeviceIndex + i;
+    }
+
+    return paNoDevice;
 }
