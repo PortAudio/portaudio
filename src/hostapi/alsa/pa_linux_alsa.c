@@ -93,6 +93,8 @@
 /* Defines Alsa function types and pointers to these functions. */
 #define _PA_DEFINE_FUNC(x)  typedef typeof(x) x##_ft; static x##_ft *alsa_##x = 0
 
+#define PA_START_TIMEOUT_SECONDS 2.0
+
 /* Alloca helper. */
 #define __alsa_snd_alloca(ptr,type) do { size_t __alsa_alloca_size = alsa_##type##_sizeof(); (*ptr) = (type##_t *) alloca(__alsa_alloca_size); memset(*ptr, 0, __alsa_alloca_size); } while (0)
 
@@ -3068,7 +3070,8 @@ static PaError StartStream( PaStream *s )
 
     if( stream->callbackMode )
     {
-        PA_ENSURE( PaUnixThread_New( &stream->thread, &CallbackThreadFunc, stream, 1., stream->rtSched ) );
+        PA_ENSURE( PaUnixThread_New( &stream->thread, &CallbackThreadFunc, stream,
+                PA_START_TIMEOUT_SECONDS, stream->rtSched ) );
     }
     else
     {
