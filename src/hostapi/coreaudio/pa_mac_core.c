@@ -414,6 +414,7 @@ static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
     if( 0 != PaMacCore_AudioHardwareGetProperty(kAudioHardwarePropertyDefaultInputDevice,
             &size,
             &auhalHostApi->defaultIn) ) {
+        int i;
         auhalHostApi->defaultIn  = kAudioDeviceUnknown;
         VDBUG(("Failed to get default input device from OS."));
         VDBUG((" I will substitute the first available input Device."));
@@ -430,6 +431,7 @@ static PaError gatherDeviceInfo(PaMacAUHAL *auhalHostApi)
     if( 0 != PaMacCore_AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice,
             &size,
             &auhalHostApi->defaultOut) ) {
+        int i;
         auhalHostApi->defaultIn  = kAudioDeviceUnknown;
         VDBUG(("Failed to get default output device from OS."));
         VDBUG((" I will substitute the first available output Device."));
