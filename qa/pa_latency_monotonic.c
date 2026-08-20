@@ -1,11 +1,11 @@
-/** @file paqa_latency.c
+/** @file paqa_latency_monotonic.c
     @ingroup qa_src
-    @brief Test latency estimates.
+    @brief Test monotonic latency behavior.
     @author Ross Bencina <rossb@audiomulch.com>
     @author Phil Burk <philburk@softsynth.com>
 */
 /*
- * $Id: patest_sine.c 1368 2008-03-01 00:38:27Z rossb $
+ * $Id: paqa_latency_monotonic.c 1368 2008-03-01 00:38:27Z rossb $
  *
  * This program uses the PortAudio Portable Audio Library.
  * For more information see: http://www.portaudio.com/
