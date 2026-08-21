@@ -303,6 +303,7 @@ __attribute__((constructor)) static void PaAlsa_InstallLogHandler( void )
     snd_lib_log_set_handler_ft setLogHandler;
     snd_lib_error_set_handler_ft setErrorHandler;
 
+    /* Return immediately if a PortAudio handler is already installed. */
     if( g_AlsaSetLogHandler != NULL || g_AlsaSetErrorHandler != NULL )
         return;
 
@@ -334,6 +335,10 @@ __attribute__((constructor)) static void PaAlsa_InstallLogHandler( void )
     }
     else if( setErrorHandler != NULL )
     {
+        /* The old snd_lib_error_set_handler API does not provide any
+           means to detect an existing error handler. Always install the
+           PortAudio error handler, replacing any already-registered
+           handler. */
         setErrorHandler( AlsaErrorHandler );
         g_AlsaSetErrorHandler = setErrorHandler;
     }
