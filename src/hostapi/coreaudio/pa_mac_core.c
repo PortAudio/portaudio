@@ -65,6 +65,7 @@
 #include "pa_mac_core_internal.h"
 
 #include <string.h> /* strlen(), memcmp() etc. */
+#include <math.h>
 #include <libkern/OSAtomic.h>
 
 #include "pa_mac_core.h"
@@ -1649,7 +1650,7 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
     // Use maximum of suggested input and output latencies.
     if( inputParameters )
     {
-        UInt32 suggestedLatencyFrames = inputParameters->suggestedLatency * sampleRate;
+        UInt32 suggestedLatencyFrames = (UInt32) ceil( inputParameters->suggestedLatency * sampleRate );
         // Calculate a buffer size assuming we are double buffered.
         SInt32 variableLatencyFrames = suggestedLatencyFrames - fixedInputLatency;
         // Prevent negative latency.
@@ -1658,7 +1659,7 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
     }
     if( outputParameters )
     {
-        UInt32 suggestedLatencyFrames = outputParameters->suggestedLatency * sampleRate;
+        UInt32 suggestedLatencyFrames = (UInt32) ceil( outputParameters->suggestedLatency * sampleRate );
         SInt32 variableLatencyFrames = suggestedLatencyFrames - fixedOutputLatency;
         variableLatencyFrames = MAX( variableLatencyFrames, 0 );
         resultBufferSizeFrames = MAX( resultBufferSizeFrames, (UInt32) variableLatencyFrames );
@@ -1719,6 +1720,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
     UInt32 fixedInputLatency = 0;
     UInt32 fixedOutputLatency = 0;
+    const double kLatencyEpsilon = 1e-10; /* Rounding error in frames. */
     // Accumulate contributions to latency in these variables.
     UInt32 inputLatencyFrames = 0;
     UInt32 outputLatencyFrames = 0;
@@ -2043,7 +2045,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( inputParameters )
     {
         inputLatencyFrames += PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor);
-        stream->streamRepresentation.streamInfo.inputLatency = inputLatencyFrames / sampleRate;
+        double latency = inputLatencyFrames / sampleRate;
+        if( latency < inputParameters->suggestedLatency &&
+            (inputParameters->suggestedLatency - latency) * sampleRate < kLatencyEpsilon )
+        {
+            latency = inputParameters->suggestedLatency;
+        }
+        stream->streamRepresentation.streamInfo.inputLatency = latency;
     }
     else
     {
@@ -2053,7 +2061,13 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( outputParameters )
     {
         outputLatencyFrames += PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor);
-        stream->streamRepresentation.streamInfo.outputLatency = outputLatencyFrames / sampleRate;
+        double latency = outputLatencyFrames / sampleRate;
+        if( latency < outputParameters->suggestedLatency &&
+            (outputParameters->suggestedLatency - latency) * sampleRate < kLatencyEpsilon )
+        {
+            latency = outputParameters->suggestedLatency;
+        }
+        stream->streamRepresentation.streamInfo.outputLatency = latency;
     }
     else
     {
