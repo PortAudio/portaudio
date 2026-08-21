@@ -91,7 +91,8 @@ EXAMPLES = \
 SELFTESTS = \
 	bin/paqa_devs \
 	bin/paqa_errs \
-	bin/paqa_latency
+	bin/paqa_latency \
+	bin/paqa_latency_monotonic
 
 TESTS = \
 	bin/patest1 \
