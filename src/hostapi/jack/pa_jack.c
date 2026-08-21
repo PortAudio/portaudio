@@ -62,16 +62,6 @@
 #include <jack/types.h>
 #include <jack/jack.h>
 
-static void PaJack_SilenceErrorCallback(const char *msg) { (void)msg; }
-
-__attribute__((constructor)) static void PaJack_SilenceEarly(void) {
-  jack_set_error_function(PaJack_SilenceErrorCallback);
-}
-
-__attribute__((destructor)) static void PaJack_RestoreErrorCallback(void) {
-  jack_set_error_function(NULL);
-}
-
 #include "pa_util.h"
 #include "pa_pthread_util.h"
 #include "pa_hostapi.h"
@@ -83,6 +73,29 @@ __attribute__((destructor)) static void PaJack_RestoreErrorCallback(void) {
 #include "pa_debugprint.h"
 
 #include "pa_jack.h"
+
+/* Suppress JACK's stderr logging before jack_client_open(); PaJack_Initialize()
+   installs its own silent JackErrorCallback() only after that. Restore the default on
+   unload so that JACK is not left holding a pointer into unmapped code.
+*/
+#ifndef PA_ENABLE_DEBUG_OUTPUT
+
+static void JackSilentErrorCallback( const char *msg )
+{
+    (void)msg;
+}
+
+__attribute__((constructor)) static void PaJack_ConstructErrorCallback( void )
+{
+    jack_set_error_function( JackSilentErrorCallback );
+}
+
+__attribute__((destructor)) static void PaJack_DestructErrorCallback( void )
+{
+    jack_set_error_function( NULL );
+}
+
+#endif /* PA_ENABLE_DEBUG_OUTPUT */
 
 static pthread_t mainThread_;
 static char *jackErr_ = NULL;
@@ -900,8 +913,6 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     }
 
     PaUtil_FreeMemory( jackHostApi );
-
-    jack_set_error_function(NULL);
 
     free( jackErr_ );
     jackErr_ = NULL;
