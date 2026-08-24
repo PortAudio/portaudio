@@ -348,21 +348,24 @@ static void startStopCallback(
     AudioUnitElement     inElement )
 {
     PaMacCoreStream *stream = (PaMacCoreStream *) inRefCon;
-    UInt32 isRunning;
-    UInt32 size = sizeof( isRunning );
-    OSStatus err;
-    err = AudioUnitGetProperty( ci, kAudioOutputUnitProperty_IsRunning, inScope, inElement, &isRunning, &size );
-    assert( !err );
-    if( err )
-        isRunning = false; //it's very unclear what to do in case of error here. There's no real way to notify the user, and crashing seems unreasonable.
-    if( isRunning )
+    /* CoreAudio can deliver this notification synchronously on the HAL IO
+       thread while it holds the HAL IOContext mutex, so we must not call back
+       into the AudioUnit here: AudioUnitGetProperty takes the AudioUnit
+       instance mutex, which a concurrent Pa_StopStream already holds inside
+       AudioOutputUnitStop while it waits for that same IOContext mutex -- an
+       AB-BA deadlock. Infer the stop transition from stream->state instead:
+       StopStream/AbortStream set STOPPING before stopping the units, and
+       StartStream sets ACTIVE before starting them, so state != STOPPING
+       filters the same transitions the kAudioOutputUnitProperty_IsRunning
+       query did. (Trade-off: a spontaneous device stop with the stream still
+       ACTIVE no longer fires the streamFinishedCallback.) */
+    if( stream->state != STOPPING )
         return; //We are only interested in when we are stopping
     // -- if we are using 2 I/O units, we only need one notification!
     if( stream->inputUnit && stream->outputUnit && stream->inputUnit != stream->outputUnit && ci == stream->inputUnit )
         return;
     PaStreamFinishedCallback *sfc = stream->streamRepresentation.streamFinishedCallback;
-    if( stream->state == STOPPING )
-        stream->state = STOPPED ;
+    stream->state = STOPPED ;
     if( sfc )
         sfc( stream->streamRepresentation.userData );
 }
