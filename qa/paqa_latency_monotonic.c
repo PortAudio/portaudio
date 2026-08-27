@@ -174,7 +174,7 @@ static int paqaCheckStreamLatencyIsMonotonic(
                 printf("     detectedMaximumLatency = %8.6f\n", detectedMaximumLatency );
             }
         }
-        /* If we are not at maximum then we should be rounding up. */
+        /* Now check that reported latency behaves correctly: */
         if (atMaximumLatency == 0) {
             /* Below the maximum, stream should always round latency up. */
             QA_ASSERT_TRUE("Latency should be >= suggestedLatency",

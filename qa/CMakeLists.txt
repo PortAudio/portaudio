@@ -4,5 +4,6 @@ if(LINK_PRIVATE_SYMBOLS)
   add_test(paqa_dither)
 endif()
 add_test(paqa_latency)
+add_test(paqa_latency_monotonic)
 
 subdirs(loopback)

@@ -177,13 +177,7 @@ PaError paqaCheckLatency( PaStreamParameters *outputParamsPtr,
     printf("  maxDeltaDacTime = %f\n", dataPtr->maxDeltaDacTime );
 
     err = Pa_StopStream( stream );
-    if( err != paNoError ) goto error;
-
-    err = Pa_CloseStream( stream );
-    Pa_Sleep( 1 * 1000 );
-
-    printf("-------------------------------------\n\n");
-    return err;
+    /* Fall through into error block. */
 
 error:
     Pa_CloseStream( stream );
