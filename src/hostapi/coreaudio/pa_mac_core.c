@@ -1720,6 +1720,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
     UInt32 fixedInputLatency = 0;
     UInt32 fixedOutputLatency = 0;
+    /* Most of the tests pass with just the ceil() call. But there was one failure that
+     * needed this epsilon fix. The reportedLatency was low by 1e-19.
+     * This value value was chosen because it is much smaller than the human scale and
+     * much larger than the scale of the rounding errors.
+     */
     const double kLatencyEpsilon = 1e-10; /* Rounding error in frames. */
     // Accumulate contributions to latency in these variables.
     UInt32 inputLatencyFrames = 0;
