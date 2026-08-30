@@ -2872,3 +2872,35 @@ static double GetStreamCpuLoad( PaStream* s )
 
     return PaUtil_GetCpuLoad( &stream->cpuLoadMeasurer );
 }
+
+
+/*
+ * Return the PortAudio device index corresponding to a native
+ * CoreAudio AudioDeviceID. Useful when interoperating with
+ * other CoreAudio APIs that use AudioDeviceID directly.
+ */
+PaDeviceIndex PaMacCore_GetDeviceIndexForAudioDeviceID(AudioDeviceID id)
+{
+    PaUtilHostApiRepresentation *hostApi;
+    PaMacAUHAL *auhalHostApi;
+    PaError err;
+    int i;
+
+    err = PaUtil_GetHostApiRepresentation(&hostApi, paCoreAudio);
+    if (err != paNoError)
+        return paNoDevice;
+
+    auhalHostApi = (PaMacAUHAL *)hostApi;
+
+    for (i = 0; i < auhalHostApi->devCount; i++)
+    {
+        VVDBUG(("PA %lu -> CoreAudio %u\n",
+             (unsigned long)(hostApi->privatePaFrontInfo.baseDeviceIndex + i),
+             (unsigned int)auhalHostApi->devIds[i]));
+	        
+	    if (auhalHostApi->devIds[i] == id)
+            return hostApi->privatePaFrontInfo.baseDeviceIndex + i;
+    }
+
+    return paNoDevice;
+}
