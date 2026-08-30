@@ -48,7 +48,7 @@ doc/html/*
 # Visual Studio 2017/2019 state folder
 .vs/
 
-# Visual Studio CMake build output folder 
+# Visual Studio CMake build output folder
 out/
 
 # Visual Studio CMake settings file
@@ -56,6 +56,9 @@ CMakeSettings.json
 
 # VSCode
 .vscode*
+
+# JetBrains
+.idea/
 
 # Common build directories of users and VSCode
 build*
