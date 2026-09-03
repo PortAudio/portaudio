@@ -65,6 +65,7 @@
 #include <CoreServices/CoreServices.h>
 #include <AudioUnit/AudioUnit.h>
 #include <AudioToolbox/AudioToolbox.h>
+#include <dispatch/dispatch.h>
 
 #include "portaudio.h"
 #include "pa_util.h"
@@ -173,6 +174,16 @@ typedef struct PaMacCoreStream
     double sampleRate;
     PaMacCoreDeviceProperties  inputProperties;
     PaMacCoreDeviceProperties  outputProperties;
+
+    /* The kAudioOutputUnitProperty_IsRunning listener may not do any work in
+       the CoreAudio context it is delivered in (see startStopCallback); it
+       just pokes this dispatch source, whose handler runs on the serial queue
+       and detects stops that happened without StopStream/AbortStream. */
+    dispatch_queue_t startStopQueue;
+    dispatch_source_t startStopSource;
+    /* Set by StartStream, consumed (atomically) by whoever fires the
+       streamFinishedCallback, so it fires at most once per start. */
+    volatile int32_t streamFinishedArmed;
 
     /* data updated by main thread and notifications, protected by timingInformationMutex */
     int timingInformationMutexIsInitialized;
