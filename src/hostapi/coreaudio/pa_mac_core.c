@@ -64,19 +64,19 @@
 
 #include "pa_mac_core_internal.h"
 
+#include <fenv.h>
+/* This PRAGMA can reduce performance. So consider moving this into its
+ * own file along with rounded_divide().
+ */
+#pragma STDC FENV_ACCESS ON
+
 #include <string.h> /* strlen(), memcmp() etc. */
 #include <math.h>
 #include <libkern/OSAtomic.h>
 
-#include <fenv.h>
-#pragma STDC FENV_ACCESS ON
-
 #include "pa_mac_core.h"
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
-
-#include <fenv.h>
-#pragma STDC FENV_ACCESS ON
 
 #ifdef __cplusplus
 extern "C"
@@ -2073,7 +2073,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     {
         outputLatencyFrames += PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor);
         /* round upward so that reported latency is not less than actual latency */
-       stream->streamRepresentation.streamInfo.outputLatency = rounded_divide(outputLatencyFrames, sampleRate, FE_UPWARD);
+        stream->streamRepresentation.streamInfo.outputLatency = rounded_divide(outputLatencyFrames, sampleRate, FE_UPWARD);
     }
     else
     {
