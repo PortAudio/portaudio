@@ -62,14 +62,22 @@
  * PaMacCore_SetError() will do this.
  */
 
-#include "pa_mac_core_internal.h"
+#include <fenv.h>
+/* This PRAGMA can reduce performance. So consider moving this into its
+ * own file along with rounded_divide().
+ */
+#pragma STDC FENV_ACCESS ON
 
-#include <string.h> /* strlen(), memcmp() etc. */
+#include <math.h>
 #include <libkern/OSAtomic.h>
+#include <string.h> /* strlen(), memcmp() etc. */
 
+#include "pa_mac_core_internal.h"
 #include "pa_mac_core.h"
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
+
+#include "pa_debugprint.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -81,6 +89,18 @@ extern "C"
 
 /* prototypes for functions declared in this file */
 PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+
+static double rounded_divide(double numerator, double denominator, int round)
+{
+    int old_mode = fegetround();
+    if (fesetround(round) == 0) {
+            double result = numerator / denominator;
+            fesetround(old_mode);
+            return result;
+    }
+    PaUtil_DebugPrint("pa_mac_core.c: fesetround(%d) failed!\n", round);
+    return numerator / denominator;
+}
 
 /*
  * Function declared in pa_mac_core.h. Sets up a PaMacCoreStreamInfoStruct
@@ -1649,7 +1669,7 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
     // Use maximum of suggested input and output latencies.
     if( inputParameters )
     {
-        UInt32 suggestedLatencyFrames = inputParameters->suggestedLatency * sampleRate;
+        UInt32 suggestedLatencyFrames = (UInt32) ceil( inputParameters->suggestedLatency * sampleRate );
         // Calculate a buffer size assuming we are double buffered.
         SInt32 variableLatencyFrames = suggestedLatencyFrames - fixedInputLatency;
         // Prevent negative latency.
@@ -1658,7 +1678,7 @@ static UInt32 CalculateOptimalBufferSize( PaMacAUHAL *auhalHostApi,
     }
     if( outputParameters )
     {
-        UInt32 suggestedLatencyFrames = outputParameters->suggestedLatency * sampleRate;
+        UInt32 suggestedLatencyFrames = (UInt32) ceil( outputParameters->suggestedLatency * sampleRate );
         SInt32 variableLatencyFrames = suggestedLatencyFrames - fixedOutputLatency;
         variableLatencyFrames = MAX( variableLatencyFrames, 0 );
         resultBufferSizeFrames = MAX( resultBufferSizeFrames, (UInt32) variableLatencyFrames );
@@ -2043,7 +2063,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( inputParameters )
     {
         inputLatencyFrames += PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor);
-        stream->streamRepresentation.streamInfo.inputLatency = inputLatencyFrames / sampleRate;
+        /* round upward so that reported latency is not less than actual latency */
+        stream->streamRepresentation.streamInfo.inputLatency = rounded_divide(inputLatencyFrames, sampleRate, FE_UPWARD);
     }
     else
     {
@@ -2053,7 +2074,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( outputParameters )
     {
         outputLatencyFrames += PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor);
-        stream->streamRepresentation.streamInfo.outputLatency = outputLatencyFrames / sampleRate;
+        /* round upward so that reported latency is not less than actual latency */
+        stream->streamRepresentation.streamInfo.outputLatency = rounded_divide(outputLatencyFrames, sampleRate, FE_UPWARD);
     }
     else
     {
