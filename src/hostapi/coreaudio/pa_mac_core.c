@@ -62,21 +62,22 @@
  * PaMacCore_SetError() will do this.
  */
 
-#include "pa_mac_core_internal.h"
-
 #include <fenv.h>
 /* This PRAGMA can reduce performance. So consider moving this into its
  * own file along with rounded_divide().
  */
 #pragma STDC FENV_ACCESS ON
 
-#include <string.h> /* strlen(), memcmp() etc. */
 #include <math.h>
 #include <libkern/OSAtomic.h>
+#include <string.h> /* strlen(), memcmp() etc. */
 
+#include "pa_mac_core_internal.h"
 #include "pa_mac_core.h"
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
+
+#include "pa_debugprint.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -92,11 +93,12 @@ PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIn
 static double rounded_divide(double numerator, double denominator, int round)
 {
     int old_mode = fegetround();
-    if (fesetround(FE_UPWARD) == 0) {
+    if (fesetround(round) == 0) {
             double result = numerator / denominator;
             fesetround(old_mode);
             return result;
     }
+    PaUtil_DebugPrint("pa_mac_core.c: fesetround(%d) failed!\n", round);
     return numerator / denominator;
 }
 
