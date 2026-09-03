@@ -68,9 +68,15 @@
 #include <math.h>
 #include <libkern/OSAtomic.h>
 
+#include <fenv.h>
+#pragma STDC FENV_ACCESS ON
+
 #include "pa_mac_core.h"
 #include "pa_mac_core_utilities.h"
 #include "pa_mac_core_blocking.h"
+
+#include <fenv.h>
+#pragma STDC FENV_ACCESS ON
 
 #ifdef __cplusplus
 extern "C"
@@ -82,6 +88,17 @@ extern "C"
 
 /* prototypes for functions declared in this file */
 PaError PaMacCore_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );
+
+static double rounded_divide(double numerator, double denominator, int round)
+{
+    int old_mode = fegetround();
+    if (fesetround(FE_UPWARD) == 0) {
+            double result = numerator / denominator;
+            fesetround(old_mode);
+            return result;
+    }
+    return numerator / denominator;
+}
 
 /*
  * Function declared in pa_mac_core.h. Sets up a PaMacCoreStreamInfoStruct
@@ -1720,12 +1737,6 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaSampleFormat hostInputSampleFormat, hostOutputSampleFormat;
     UInt32 fixedInputLatency = 0;
     UInt32 fixedOutputLatency = 0;
-    /* Most of the tests pass with just the ceil() call. But there was one failure that
-     * needed this epsilon fix. The reportedLatency was low by 1e-19.
-     * This value value was chosen because it is much smaller than the human scale and
-     * much larger than the scale of the rounding errors.
-     */
-    const double kLatencyEpsilon = 1e-10; /* Rounding error in frames. */
     // Accumulate contributions to latency in these variables.
     UInt32 inputLatencyFrames = 0;
     UInt32 outputLatencyFrames = 0;
@@ -2050,13 +2061,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( inputParameters )
     {
         inputLatencyFrames += PaUtil_GetBufferProcessorInputLatencyFrames(&stream->bufferProcessor);
-        double latency = inputLatencyFrames / sampleRate;
-        if( latency < inputParameters->suggestedLatency &&
-            (inputParameters->suggestedLatency - latency) * sampleRate < kLatencyEpsilon )
-        {
-            latency = inputParameters->suggestedLatency;
-        }
-        stream->streamRepresentation.streamInfo.inputLatency = latency;
+        /* round upward so that reported latency is not less than actual latency */
+        stream->streamRepresentation.streamInfo.inputLatency = rounded_divide(inputLatencyFrames, sampleRate, FE_UPWARD);
     }
     else
     {
@@ -2066,13 +2072,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     if( outputParameters )
     {
         outputLatencyFrames += PaUtil_GetBufferProcessorOutputLatencyFrames(&stream->bufferProcessor);
-        double latency = outputLatencyFrames / sampleRate;
-        if( latency < outputParameters->suggestedLatency &&
-            (outputParameters->suggestedLatency - latency) * sampleRate < kLatencyEpsilon )
-        {
-            latency = outputParameters->suggestedLatency;
-        }
-        stream->streamRepresentation.streamInfo.outputLatency = latency;
+        /* round upward so that reported latency is not less than actual latency */
+       stream->streamRepresentation.streamInfo.outputLatency = rounded_divide(outputLatencyFrames, sampleRate, FE_UPWARD);
     }
     else
     {
