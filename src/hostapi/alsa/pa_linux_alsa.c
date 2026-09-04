@@ -62,6 +62,7 @@
 #include <time.h>
 #include <sys/mman.h>
 #include <signal.h> /* For sig_atomic_t */
+#include <stdarg.h> /* For va_list */
 #ifdef PA_ALSA_DYNAMIC
     #include <dlfcn.h> /* For dlXXX functions */
 #endif
@@ -249,6 +250,120 @@ static const char *g_AlsaLibName = PA_ALSA_PATHNAME;
 
 /* Handle to dynamically loaded library. */
 static void *g_AlsaLib = NULL;
+
+/* Suppress Alsa's default stderr logging unless PA_ENABLE_DEBUG_OUTPUT is defined. */
+#ifdef PA_ENABLE_DEBUG_OUTPUT
+
+static void PaAlsa_InstallSilentLogHandler( void ) {}
+static void PaAlsa_UninstallSilentLogHandler( void ) {}
+
+#else
+
+/* snd_lib_log_set_handler() was added in Alsa 1.2.15 and supersedes the deprecated
+   snd_lib_error_set_handler(). snd_lib_log_set_local() is deliberately not used: it
+   only affects the calling thread, so it can neither be installed for the whole
+   process from a constructor, nor reliably removed again from a destructor.
+   Declare the handler type here so that this file still compiles against
+   pre-1.2.15 headers.
+*/
+#if !defined(SND_LIB_VERSION) || SND_LIB_VERSION < ALSA_VERSION_INT( 1, 2, 15 )
+typedef void (*snd_lib_log_handler_t)( int prio, int interface, const char *file, int line,
+        const char *function, int errcode, const char *fmt, va_list arg );
+#endif
+
+typedef snd_lib_log_handler_t (*snd_lib_log_set_handler_ft)( snd_lib_log_handler_t );
+typedef int (*snd_lib_error_set_handler_ft)( snd_lib_error_handler_t );
+
+#ifndef PA_ALSA_DYNAMIC
+/* Weak reference: resolves to NULL against libasound < 1.2.15, so a PortAudio built
+   against newer headers still loads there.
+*/
+extern snd_lib_log_handler_t snd_lib_log_set_handler( snd_lib_log_handler_t ) __attribute__((weak));
+#endif
+
+/* The setter PortAudio installed its handler with, retained so that it is removed with
+   the same function it was installed with. Both NULL when nothing is installed.
+*/
+static snd_lib_log_set_handler_ft g_AlsaSetLogHandler = NULL;
+static snd_lib_error_set_handler_ft g_AlsaSetErrorHandler = NULL;
+
+static void AlsaSilentLogHandler( int prio, int interface, const char *file, int line,
+        const char *function, int errcode, const char *fmt, va_list arg )
+{
+    (void)prio; (void)interface; (void)file; (void)line;
+    (void)function; (void)errcode; (void)fmt; (void)arg;
+}
+
+static void AlsaSilentErrorHandler( const char *file, int line, const char *function, int err,
+        const char *fmt, ... )
+{
+    (void)file; (void)line; (void)function; (void)err; (void)fmt;
+}
+
+__attribute__((constructor)) static void PaAlsa_InstallSilentLogHandler( void )
+{
+    snd_lib_log_set_handler_ft setLogHandler;
+    snd_lib_error_set_handler_ft setErrorHandler;
+
+    /* Return immediately if a PortAudio handler is already installed. */
+    if( g_AlsaSetLogHandler != NULL || g_AlsaSetErrorHandler != NULL )
+        return;
+
+#ifdef PA_ALSA_DYNAMIC
+    /* The library is not loaded yet when the constructor runs; PaAlsa_Initialize()
+       retries after PaAlsa_LoadLibrary(). */
+    if( g_AlsaLib == NULL )
+        return;
+
+    setLogHandler = (snd_lib_log_set_handler_ft) dlsym( g_AlsaLib, "snd_lib_log_set_handler" );
+    setErrorHandler = (snd_lib_error_set_handler_ft) dlsym( g_AlsaLib, "snd_lib_error_set_handler" );
+#else
+    setLogHandler = &snd_lib_log_set_handler;
+    setErrorHandler = &snd_lib_error_set_handler;
+#endif
+
+    if( setLogHandler != NULL )
+    {
+        /* Passing NULL installs Alsa's default handler and returns the previous one;
+           comparing them is the only way to leave an application's handler in place. */
+        snd_lib_log_handler_t previous = setLogHandler( NULL );
+        snd_lib_log_handler_t defaultHandler = setLogHandler( previous );
+
+        if( previous == defaultHandler )
+        {
+            setLogHandler( AlsaSilentLogHandler );
+            g_AlsaSetLogHandler = setLogHandler;
+        }
+    }
+    else if( setErrorHandler != NULL )
+    {
+        /* The old snd_lib_error_set_handler API does not provide any
+           means to detect an existing error handler. Always install the
+           PortAudio error handler, replacing any already-registered
+           handler. */
+        setErrorHandler( AlsaSilentErrorHandler );
+        g_AlsaSetErrorHandler = setErrorHandler;
+    }
+}
+
+/* Restore Alsa's default handler even if PortAudio is unloaded without Pa_Terminate()
+   having been called, so that Alsa is not left holding a pointer into unmapped code.
+*/
+__attribute__((destructor)) static void PaAlsa_UninstallSilentLogHandler( void )
+{
+    if( g_AlsaSetLogHandler != NULL )
+    {
+        g_AlsaSetLogHandler( NULL );
+        g_AlsaSetLogHandler = NULL;
+    }
+    else if( g_AlsaSetErrorHandler != NULL )
+    {
+        g_AlsaSetErrorHandler( NULL );
+        g_AlsaSetErrorHandler = NULL;
+    }
+}
+
+#endif /* PA_ENABLE_DEBUG_OUTPUT */
 
 #ifdef PA_ALSA_DYNAMIC
 
@@ -742,13 +857,6 @@ static const PaAlsaDeviceInfo *GetDeviceInfo( const PaUtilHostApiRepresentation 
     return (const PaAlsaDeviceInfo *)hostApi->deviceInfos[device];
 }
 
-/** Uncommented because AlsaErrorHandler is unused for anything good yet. If AlsaErrorHandler is
-    to be used, do not forget to register this callback in PaAlsa_Initialize, and unregister in Terminate.
-*/
-/*static void AlsaErrorHandler(const char *file, int line, const char *function, int err, const char *fmt, ...)
-{
-}*/
-
 PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex hostApiIndex )
 {
     PaError result = paNoError;
@@ -773,10 +881,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
 
-    /** If AlsaErrorHandler is to be used, do not forget to unregister callback pointer in
-        Terminate function.
-    */
-    /*ENSURE_( snd_lib_error_set_handler(AlsaErrorHandler), paUnanticipatedHostError );*/
+    PaAlsa_InstallSilentLogHandler();
 
     PA_ENSURE( BuildDeviceList( alsaHostApi ) );
 
@@ -823,9 +928,7 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     assert( hostApi );
 
-    /** See AlsaErrorHandler and PaAlsa_Initialize for details.
-    */
-    /*snd_lib_error_set_handler(NULL);*/
+    PaAlsa_UninstallSilentLogHandler();
 
     if( alsaHostApi->allocations )
     {

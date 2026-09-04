@@ -74,6 +74,31 @@
 
 #include "pa_jack.h"
 
+/* Suppress JACK's stderr logging before jack_client_open(); PaJack_Initialize()
+   installs its own silent JackErrorCallback() only after that. Restore the default on
+   unload so that JACK is not left holding a pointer into unmapped code.
+
+    Currently not supported with MSVC on Windows because __attribute((constructor))__ is not available (patches welcome).
+*/
+#if !defined(PA_ENABLE_DEBUG_OUTPUT) && !defined(_MSC_VER)
+
+static void JackSilentErrorCallback( const char *msg )
+{
+    (void)msg;
+}
+
+__attribute__((constructor)) static void PaJack_ConstructErrorCallback( void )
+{
+    jack_set_error_function( JackSilentErrorCallback );
+}
+
+__attribute__((destructor)) static void PaJack_DestructErrorCallback( void )
+{
+    jack_set_error_function( NULL );
+}
+
+#endif /* !defined(PA_ENABLE_DEBUG_OUTPUT) && !defined(_MSC_VER) */
+
 static pthread_t mainThread_;
 static char *jackErr_ = NULL;
 static const char* clientName_ = "PortAudio";
