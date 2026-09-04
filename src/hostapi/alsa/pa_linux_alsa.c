@@ -252,8 +252,8 @@ static void *g_AlsaLib = NULL;
 /* Suppress Alsa's default stderr logging unless PA_ENABLE_DEBUG_OUTPUT is defined. */
 #ifdef PA_ENABLE_DEBUG_OUTPUT
 
-static void PaAlsa_InstallLogHandler( void ) {}
-static void PaAlsa_UninstallLogHandler( void ) {}
+static void PaAlsa_InstallSilentLogHandler( void ) {}
+static void PaAlsa_UninstallSilentLogHandler( void ) {}
 
 #else
 
@@ -285,20 +285,20 @@ extern snd_lib_log_handler_t snd_lib_log_set_handler( snd_lib_log_handler_t ) __
 static snd_lib_log_set_handler_ft g_AlsaSetLogHandler = NULL;
 static snd_lib_error_set_handler_ft g_AlsaSetErrorHandler = NULL;
 
-static void AlsaLogHandler( int prio, int interface, const char *file, int line,
+static void AlsaSilentLogHandler( int prio, int interface, const char *file, int line,
         const char *function, int errcode, const char *fmt, va_list arg )
 {
     (void)prio; (void)interface; (void)file; (void)line;
     (void)function; (void)errcode; (void)fmt; (void)arg;
 }
 
-static void AlsaErrorHandler( const char *file, int line, const char *function, int err,
+static void AlsaSilentErrorHandler( const char *file, int line, const char *function, int err,
         const char *fmt, ... )
 {
     (void)file; (void)line; (void)function; (void)err; (void)fmt;
 }
 
-__attribute__((constructor)) static void PaAlsa_InstallLogHandler( void )
+__attribute__((constructor)) static void PaAlsa_InstallSilentLogHandler( void )
 {
     snd_lib_log_set_handler_ft setLogHandler;
     snd_lib_error_set_handler_ft setErrorHandler;
@@ -329,7 +329,7 @@ __attribute__((constructor)) static void PaAlsa_InstallLogHandler( void )
 
         if( previous == defaultHandler )
         {
-            setLogHandler( AlsaLogHandler );
+            setLogHandler( AlsaSilentLogHandler );
             g_AlsaSetLogHandler = setLogHandler;
         }
     }
@@ -339,7 +339,7 @@ __attribute__((constructor)) static void PaAlsa_InstallLogHandler( void )
            means to detect an existing error handler. Always install the
            PortAudio error handler, replacing any already-registered
            handler. */
-        setErrorHandler( AlsaErrorHandler );
+        setErrorHandler( AlsaSilentErrorHandler );
         g_AlsaSetErrorHandler = setErrorHandler;
     }
 }
@@ -347,7 +347,7 @@ __attribute__((constructor)) static void PaAlsa_InstallLogHandler( void )
 /* Restore Alsa's default handler even if PortAudio is unloaded without Pa_Terminate()
    having been called, so that Alsa is not left holding a pointer into unmapped code.
 */
-__attribute__((destructor)) static void PaAlsa_UninstallLogHandler( void )
+__attribute__((destructor)) static void PaAlsa_UninstallSilentLogHandler( void )
 {
     if( g_AlsaSetLogHandler != NULL )
     {
