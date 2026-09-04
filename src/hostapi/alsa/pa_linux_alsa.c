@@ -879,7 +879,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
 
-    PaAlsa_InstallLogHandler();
+    PaAlsa_InstallSilentLogHandler();
 
     PA_ENSURE( BuildDeviceList( alsaHostApi ) );
 
@@ -926,7 +926,7 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     assert( hostApi );
 
-    PaAlsa_UninstallLogHandler();
+    PaAlsa_UninstallSilentLogHandler();
 
     if( alsaHostApi->allocations )
     {
