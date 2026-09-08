@@ -88,6 +88,76 @@ PaError PaAsio_ShowControlPanel( PaDeviceIndex device, void* systemSpecific );
 
 
 
+/** ASIO message types.
+
+ These mostly correspond with asioMessage calls from the ASIO SDK.
+ ASIO's sampleRateDidChange is adapted to use this callback.
+ Refer to ASIO SDK documentation for complete information.
+*/
+typedef enum PaAsioMessageType
+{
+    /** The driver requests that it be reset (by closing and re-opening the stream).
+        Typically dispatched when the user changes driver settings.
+        Recommend closing, re-opening and restarting stream, and always returning 1.
+
+        params:
+            none.
+    */
+    paAsioResetRequest      = 1,
+
+    /** Informs the application that a sample-rate change was detected.
+        Recommend noting the new sample-rate, but no action is needed.
+
+        params:
+            opt[0] -- the new sample-rate.
+    */
+    paAsioSampleRateChanged = 2,
+
+    /** Informs the application that the driver has a new preferred buffer size.
+        Recommend handling like paAsioResetRequest.
+
+        params:
+            value -- the new preferred buffer size.
+    */
+    paAsioBufferSizeChange  = 3,
+
+    /** Informs the application that the driver has gone out of sync, invalidating timestamps.
+        Recommend handling like paAsioResetRequest.
+
+        params:
+            none.
+    */
+    paAsioResyncRequest     = 4,
+
+    /** Informs the application that the driver's latencies have changed.
+        FIXME: The only way to query the new latencies is to reset the stream.
+        Recommend ignoring unless latency reporting is critical.
+
+        params:
+            none.
+    */
+    paAsioLatenciesChanged = 5,
+
+} PaAsioMessageType;
+
+/** ASIO message callback, set in PaAsioStreamInfo.
+    Do not call PortAudio or PaAsio functions inside this callback!
+
+ @param value Message-specific integer value.
+ Indicates buffer size in paAsioBufferSizeChange.
+
+ @param message Message-specific pointer value.
+ Unused as of the ASIO 2.2 SDK.
+
+ @param opt Message-specific double value.
+ opt[0] indicates sample rate in paAsioSampleRateChange.
+
+ @param userData The value of a user supplied pointer passed to
+ Pa_OpenStream() intended for storing synthesis data etc.
+
+ @return True if the application handled the message, false otherwise.
+*/
+typedef long PaAsio_MessageCallback( long messageType, long value, void *message, double *opt, void *userData );
 
 /** Retrieve a pointer to a string containing the name of the specified
  input channel. The string is valid until Pa_Terminate is called.
@@ -121,11 +191,12 @@ PaError PaAsio_SetStreamSampleRate( PaStream* stream, double sampleRate );
 
 
 #define paAsioUseChannelSelectors      (0x01)
+#define paAsioUseMessageCallback       (0x02)
 
 typedef struct PaAsioStreamInfo{
     unsigned long size;             /**< sizeof(PaAsioStreamInfo) */
     PaHostApiTypeId hostApiType;    /**< paASIO */
-    unsigned long version;          /**< 1 */
+    unsigned long version;          /**< 2 */
 
     unsigned long flags;
 
@@ -140,6 +211,13 @@ typedef struct PaAsioStreamInfo{
         result.
     */
     int *channelSelectors;
+
+    /** ASIO message callback.
+        Include paAsioUseMessageCallback in flags to enable.
+        Unsupported in Blocking I/O mode.
+        If a callback is supplied for both input and output, it will be called twice!
+    */
+    PaAsio_MessageCallback *messageCallback;
 }PaAsioStreamInfo;
 
 
