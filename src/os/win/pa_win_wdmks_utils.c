@@ -154,7 +154,8 @@ static PaError WdmGetPinPropertyMulti(
     if( DeviceIoControl( handle, IOCTL_KS_PROPERTY, &ksPProp, sizeof(KSP_PIN),
             (void*)*ksMultipleItem,  multipleItemSize, &bytesReturned, NULL ) == 0 || bytesReturned != multipleItemSize )
     {
-        PaUtil_FreeMemory( ksMultipleItem );
+        PaUtil_FreeMemory( *ksMultipleItem );
+        *ksMultipleItem = NULL;
         return paUnanticipatedHostError;
     }
 
