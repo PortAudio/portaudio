@@ -97,6 +97,7 @@ SELFTESTS = \
 TESTS = \
 	bin/patest1 \
 	bin/patest_buffer \
+	bin/pa_start_stop_deadlock \
 	bin/patest_callbackstop \
 	bin/patest_clip \
 	bin/patest_dither \
