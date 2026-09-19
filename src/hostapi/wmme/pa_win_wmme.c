@@ -677,13 +677,13 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
     PaError result = paNoError;
     char *deviceName; /* non-const ptr */
     MMRESULT mmresult;
-    WAVEINCAPSW wic;
+    WAVEINCAPS2W wic;
     PaDeviceInfo *deviceInfo = &winMmeDeviceInfo->inheritedDeviceInfo;
     size_t len;
 
     *success = 0;
 
-    mmresult = waveInGetDevCapsW( winMmeInputDeviceId, &wic, sizeof( WAVEINCAPSW ) );
+    mmresult = waveInGetDevCapsW( winMmeInputDeviceId, (LPWAVEINCAPSW) & wic, sizeof(wic));
     if( mmresult == MMSYSERR_NOMEM )
     {
         result = paInsufficientMemory;
@@ -759,6 +759,18 @@ static PaError InitializeInputDeviceInfo( PaWinMmeHostApiRepresentation *winMmeH
 
     DetectDefaultSampleRate( winMmeDeviceInfo, winMmeInputDeviceId,
             QueryInputWaveFormatEx, deviceInfo->maxInputChannels );
+
+    {
+        static const GUID nullNameGuid = { 0 };
+        if (memcmp(&wic.NameGuid, &nullNameGuid, sizeof(wic.NameGuid)) != 0) {
+            WCHAR GUIDstr[100] = { 0 };
+            LPSTR uniqueID = (LPSTR)PaUtil_GroupAllocateZeroInitializedMemory(winMmeHostApi->allocations, (long)100 * sizeof(char));
+            if (StringFromGUID2(&wic.NameGuid, GUIDstr, 100) > 0 && uniqueID) {
+                CopyWCharStringToUtf8CString(uniqueID, 100, GUIDstr);
+                deviceInfo->uniqueID = uniqueID;
+            }
+        }
+    }
 
     *success = 1;
 

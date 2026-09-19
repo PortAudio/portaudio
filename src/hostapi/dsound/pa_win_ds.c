@@ -983,6 +983,15 @@ static PaError AddOutputDeviceInfoFromDirectSound(
 
         if( lpGUID == NULL )
             hostApi->info.defaultOutputDevice = hostApi->info.deviceCount;
+        else
+        {
+            WCHAR GUIDstr[100] = { 0 };
+            LPSTR uniqueID = (LPSTR)PaUtil_GroupAllocateZeroInitializedMemory(winDsHostApi->allocations, 100);
+            if (StringFromGUID2(lpGUID, GUIDstr, 100) > 0 && deviceInfo->uniqueID) {
+                WideCharToMultiByte(CP_UTF8, 0, GUIDstr, (INT32)wcslen(GUIDstr), uniqueID, 100 - 1, 0, 0);
+                deviceInfo->uniqueID = uniqueID;
+            }
+        }
 
         hostApi->info.deviceCount++;
     }

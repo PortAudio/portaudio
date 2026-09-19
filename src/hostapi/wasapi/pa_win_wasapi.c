@@ -1744,11 +1744,17 @@ static PaError FillDeviceInfo(PaWasapiHostApiRepresentation *paWasapi, void *pEn
     // Get device Id
     {
         WCHAR *deviceId;
+        LPSTR uniqueId;
 
         hr = IMMDevice_GetId(wasapiDeviceInfo->device, &deviceId);
         IF_FAILED_INTERNAL_ERROR_JUMP(hr, result, error);
 
         wcsncpy(wasapiDeviceInfo->deviceId, deviceId, PA_WASAPI_DEVICE_ID_LEN - 1);
+
+        uniqueId = (LPSTR)PaUtil_GroupAllocateZeroInitializedMemory(paWasapi->allocations, (long)PA_WASAPI_DEVICE_ID_LEN * sizeof(char));
+        WideCharToMultiByte(CP_UTF8, 0, wasapiDeviceInfo->deviceId, (INT32)wcslen(wasapiDeviceInfo->deviceId), uniqueId, PA_WASAPI_DEVICE_ID_LEN - 1, 0, 0);
+        deviceInfo->uniqueID = uniqueId;
+
         CoTaskMemFree(deviceId);
     }
 

@@ -331,7 +331,7 @@ case "${host_os}" in
         if [[ "x$with_wmme" = "xyes" ]]; then
             add_objects src/hostapi/wmme/pa_win_wmme.o src/os/win/pa_win_hostapis.o src/os/win/pa_win_util.o src/os/win/pa_win_version.o src/os/win/pa_win_waveformat.o
             LIBS="${LIBS} -lwinmm -lm -lole32 -luuid"
-            DLL_LIBS="${DLL_LIBS} -lwinmm"
+            DLL_LIBS="${DLL_LIBS} -lwinmm -lole32"
             CFLAGS="$CFLAGS -UPA_USE_WMME -DPA_USE_WMME=1"
             INCLUDES="$INCLUDES pa_win_wmme.h pa_win_waveformat.h"
         fi
