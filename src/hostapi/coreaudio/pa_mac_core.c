@@ -2138,7 +2138,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     return result;
 
 error:
-    CloseStream( stream );
+    CloseStream( (PaStream*)stream );
     return result;
 }
 
