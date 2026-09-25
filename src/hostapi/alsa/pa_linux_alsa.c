@@ -864,7 +864,7 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
 
     /* Try loading Alsa library. */
     if (!PaAlsa_LoadLibrary())
-        return paHostApiNotFound;
+        return paNoError;
 
     PA_UNLESS( alsaHostApi = (PaAlsaHostApiRepresentation*) PaUtil_AllocateZeroInitializedMemory(
                 sizeof(PaAlsaHostApiRepresentation) ), paInsufficientMemory );
