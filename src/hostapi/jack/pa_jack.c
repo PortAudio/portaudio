@@ -58,6 +58,9 @@
 #include <math.h>
 #include <pthread.h>
 #include <semaphore.h>
+#ifdef PA_JACK_DYNAMIC
+    #include <dlfcn.h> /* For dlXXX functions */
+#endif
 
 #include <jack/types.h>
 #include <jack/jack.h>
@@ -74,6 +77,51 @@
 
 #include "pa_jack.h"
 
+/* Defines JACK function types and pointers to these functions. */
+#define _PA_DEFINE_FUNC(x)  typedef typeof(x) x##_ft; static x##_ft *lib##x = 0
+
+_PA_DEFINE_FUNC(jack_client_open);
+_PA_DEFINE_FUNC(jack_client_close);
+_PA_DEFINE_FUNC(jack_client_name_size);
+_PA_DEFINE_FUNC(jack_get_client_name);
+_PA_DEFINE_FUNC(jack_activate);
+_PA_DEFINE_FUNC(jack_deactivate);
+_PA_DEFINE_FUNC(jack_on_shutdown);
+_PA_DEFINE_FUNC(jack_set_error_function);
+_PA_DEFINE_FUNC(jack_set_process_callback);
+_PA_DEFINE_FUNC(jack_set_sample_rate_callback);
+_PA_DEFINE_FUNC(jack_set_xrun_callback);
+_PA_DEFINE_FUNC(jack_get_sample_rate);
+_PA_DEFINE_FUNC(jack_get_buffer_size);
+_PA_DEFINE_FUNC(jack_frame_time);
+
+_PA_DEFINE_FUNC(jack_get_ports);
+_PA_DEFINE_FUNC(jack_connect);
+_PA_DEFINE_FUNC(jack_port_register);
+_PA_DEFINE_FUNC(jack_port_unregister);
+_PA_DEFINE_FUNC(jack_port_by_name);
+_PA_DEFINE_FUNC(jack_port_name);
+_PA_DEFINE_FUNC(jack_port_name_size);
+_PA_DEFINE_FUNC(jack_port_connected);
+_PA_DEFINE_FUNC(jack_port_disconnect);
+_PA_DEFINE_FUNC(jack_port_get_buffer);
+_PA_DEFINE_FUNC(jack_port_get_latency_range);
+
+#undef _PA_DEFINE_FUNC
+
+#ifdef PA_JACK_DYNAMIC
+
+/* Redefine 'PA_JACK_PATHNAME' to a different JACK library name if desired. */
+#ifndef PA_JACK_PATHNAME
+    #define PA_JACK_PATHNAME "libjack.so.0"
+#endif
+static const char *g_JackLibName = PA_JACK_PATHNAME;
+
+/* Handle to dynamically loaded library. */
+static void *g_JackLib = NULL;
+
+#endif // PA_JACK_DYNAMIC
+
 /* Suppress JACK's stderr logging before jack_client_open(); PaJack_Initialize()
    installs its own silent JackErrorCallback() only after that. Restore the default on
    unload so that JACK is not left holding a pointer into unmapped code.
@@ -89,15 +137,122 @@ static void JackSilentErrorCallback( const char *msg )
 
 __attribute__((constructor)) static void PaJack_ConstructErrorCallback( void )
 {
+#ifdef PA_JACK_DYNAMIC
+    /* The library is not loaded yet when the constructor runs; PaJack_Initialize()
+       retries after PaJack_LoadLibrary(). */
+    if( g_JackLib != NULL )
+        libjack_set_error_function( JackSilentErrorCallback );
+#else
     jack_set_error_function( JackSilentErrorCallback );
+#endif
 }
 
 __attribute__((destructor)) static void PaJack_DestructErrorCallback( void )
 {
+#ifdef PA_JACK_DYNAMIC
+    if( g_JackLib != NULL )
+        libjack_set_error_function( NULL );
+#else
     jack_set_error_function( NULL );
+#endif
 }
 
+#elif defined(PA_JACK_DYNAMIC)
+
+static void PaJack_ConstructErrorCallback( void ) {}
+static void PaJack_DestructErrorCallback( void ) {}
+
 #endif /* !defined(PA_ENABLE_DEBUG_OUTPUT) && !defined(_MSC_VER) */
+
+/* Trying to load JACK library dynamically if 'PA_JACK_DYNAMIC' is defined, otherwise
+   will link during compilation.
+*/
+static int PaJack_LoadLibrary()
+{
+#ifdef PA_JACK_DYNAMIC
+
+    PA_DEBUG(( "%s: loading JACK library file - %s\n", __FUNCTION__, g_JackLibName ));
+
+    dlerror();
+    g_JackLib = dlopen(g_JackLibName, (RTLD_NOW|RTLD_GLOBAL) );
+    if (g_JackLib == NULL)
+    {
+        PA_DEBUG(( "%s: failed dlopen() JACK library file - %s, error: %s\n", __FUNCTION__, g_JackLibName, dlerror() ));
+        return 0;
+    }
+
+    PA_DEBUG(( "%s: loading JACK API\n", __FUNCTION__ ));
+
+    /* There are no local replacements, so every symbol is required. */
+    #define _PA_LOAD_FUNC(x) do {              \
+        lib##x = dlsym( g_JackLib, #x );       \
+        if( lib##x == NULL ) {                 \
+            PA_DEBUG(( "%s: symbol [%s] not found in - %s, error: %s\n", __FUNCTION__, #x, g_JackLibName, dlerror() )); \
+            dlclose(g_JackLib);                \
+            g_JackLib = NULL;                  \
+            return 0; }                        \
+        } while(0)
+
+#else
+
+    #define _PA_LOAD_FUNC(x) lib##x = &x
+
+#endif
+
+    _PA_LOAD_FUNC(jack_client_open);
+    _PA_LOAD_FUNC(jack_client_close);
+    _PA_LOAD_FUNC(jack_client_name_size);
+    _PA_LOAD_FUNC(jack_get_client_name);
+    _PA_LOAD_FUNC(jack_activate);
+    _PA_LOAD_FUNC(jack_deactivate);
+    _PA_LOAD_FUNC(jack_on_shutdown);
+    _PA_LOAD_FUNC(jack_set_error_function);
+    _PA_LOAD_FUNC(jack_set_process_callback);
+    _PA_LOAD_FUNC(jack_set_sample_rate_callback);
+    _PA_LOAD_FUNC(jack_set_xrun_callback);
+    _PA_LOAD_FUNC(jack_get_sample_rate);
+    _PA_LOAD_FUNC(jack_get_buffer_size);
+    _PA_LOAD_FUNC(jack_frame_time);
+
+    _PA_LOAD_FUNC(jack_get_ports);
+    _PA_LOAD_FUNC(jack_connect);
+    _PA_LOAD_FUNC(jack_port_register);
+    _PA_LOAD_FUNC(jack_port_unregister);
+    _PA_LOAD_FUNC(jack_port_by_name);
+    _PA_LOAD_FUNC(jack_port_name);
+    _PA_LOAD_FUNC(jack_port_name_size);
+    _PA_LOAD_FUNC(jack_port_connected);
+    _PA_LOAD_FUNC(jack_port_disconnect);
+    _PA_LOAD_FUNC(jack_port_get_buffer);
+    _PA_LOAD_FUNC(jack_port_get_latency_range);
+#undef _PA_LOAD_FUNC
+
+#ifdef PA_JACK_DYNAMIC
+    PA_DEBUG(( "%s: loaded JACK API - ok\n", __FUNCTION__ ));
+#endif
+
+    return 1;
+}
+
+void PaJack_SetLibraryPathName( const char *pathName )
+{
+#ifdef PA_JACK_DYNAMIC
+    g_JackLibName = pathName;
+#else
+    (void)pathName;
+#endif
+}
+
+/* Close handle to JACK library. */
+static void PaJack_CloseLibrary()
+{
+#ifdef PA_JACK_DYNAMIC
+    /* The library may stay loaded by others, so it must not keep a callback into PortAudio. */
+    PaJack_DestructErrorCallback();
+    dlclose(g_JackLib);
+    g_JackLib = NULL;
+#endif
+}
 
 static pthread_t mainThread_;
 static char *jackErr_ = NULL;
@@ -481,7 +636,7 @@ static jack_nframes_t port_get_min_latency( jack_port_t *port, jack_latency_call
 {
     jack_latency_range_t range;
 
-    jack_port_get_latency_range( port, mode, &range );
+    libjack_port_get_latency_range( port, mode, &range );
     return range.min;
 }
 
@@ -541,7 +696,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     char *port_regex_string = NULL;
     // In the worst case scenario, every character would be escaped, doubling the string size.
     // Add 1 for null terminator.
-    size_t device_name_regex_escaped_size = jack_client_name_size() * 2 + 1;
+    size_t device_name_regex_escaped_size = libjack_client_name_size() * 2 + 1;
     size_t port_regex_size = device_name_regex_escaped_size + strlen(port_regex_suffix);
     unsigned long port_index, client_index;
     double globalSampleRate;
@@ -561,14 +716,14 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
     PaUtil_FreeAllAllocations( jackApi->deviceInfoMemory );
 
     port_regex_string = PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory, port_regex_size );
-    tmp_client_name = PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory, jack_client_name_size() );
+    tmp_client_name = PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory, libjack_client_name_size() );
 
     /* We can only retrieve the list of clients indirectly, by first
      * asking for a list of all ports, then parsing the port names
      * according to the client_name:port_name convention (which is
      * enforced by jackd)
      * A: If jack_get_ports returns NULL, there's nothing for us to do */
-    UNLESS( (jack_ports = jack_get_ports( jackApi->jack_client, "", JACK_PORT_TYPE_FILTER, 0 )) && jack_ports[0], paNoError );
+    UNLESS( (jack_ports = libjack_get_ports( jackApi->jack_client, "", JACK_PORT_TYPE_FILTER, 0 )) && jack_ports[0], paNoError );
     /* Find number of ports */
     while( jack_ports[numPorts] )
         ++numPorts;
@@ -587,7 +742,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         /* extract the client name from the port name, using a regex
          * that parses the clientname:portname syntax */
         UNLESS( !regexec( &port_regex, port, 1, &match_info, 0 ), paInternalError );
-        assert(match_info.rm_eo - match_info.rm_so <= jack_client_name_size());
+        assert(match_info.rm_eo - match_info.rm_so <= libjack_client_name_size());
         memcpy( tmp_client_name, port + match_info.rm_so,
                 match_info.rm_eo - match_info.rm_so );
         tmp_client_name[match_info.rm_eo - match_info.rm_so] = '\0';
@@ -628,7 +783,7 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
 
     /* there is one global sample rate all clients must conform to */
 
-    globalSampleRate = jack_get_sample_rate( jackApi->jack_client );
+    globalSampleRate = libjack_get_sample_rate( jackApi->jack_client );
     UNLESS( commonApi->deviceInfos = (PaDeviceInfo**)PaUtil_GroupAllocateZeroInitializedMemory( jackApi->deviceInfoMemory,
                 sizeof(PaDeviceInfo*) * numClients ), paInsufficientMemory );
 
@@ -661,14 +816,14 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         strncat( port_regex_string, port_regex_suffix, port_regex_size );
 
         /* ... what are your output ports (that we could input from)? */
-        clientPorts = jack_get_ports( jackApi->jack_client, port_regex_string,
+        clientPorts = libjack_get_ports( jackApi->jack_client, port_regex_string,
                                      JACK_PORT_TYPE_FILTER, JackPortIsOutput);
         curDevInfo->maxInputChannels = 0;
         curDevInfo->defaultLowInputLatency = 0.;
         curDevInfo->defaultHighInputLatency = 0.;
         if( clientPorts )
         {
-            jack_port_t *p = jack_port_by_name( jackApi->jack_client, clientPorts[0] );
+            jack_port_t *p = libjack_port_by_name( jackApi->jack_client, clientPorts[0] );
             curDevInfo->defaultLowInputLatency = curDevInfo->defaultHighInputLatency =
                 port_get_min_latency( p, JackCaptureLatency ) / globalSampleRate;
 
@@ -682,14 +837,14 @@ static PaError BuildDeviceList( PaJackHostApiRepresentation *jackApi )
         }
 
         /* ... what are your input ports (that we could output to)? */
-        clientPorts = jack_get_ports( jackApi->jack_client, port_regex_string,
+        clientPorts = libjack_get_ports( jackApi->jack_client, port_regex_string,
                                      JACK_PORT_TYPE_FILTER, JackPortIsInput);
         curDevInfo->maxOutputChannels = 0;
         curDevInfo->defaultLowOutputLatency = 0.;
         curDevInfo->defaultHighOutputLatency = 0.;
         if( clientPorts )
         {
-            jack_port_t *p = jack_port_by_name( jackApi->jack_client, clientPorts[0] );
+            jack_port_t *p = libjack_port_by_name( jackApi->jack_client, clientPorts[0] );
             curDevInfo->defaultLowOutputLatency = curDevInfo->defaultHighOutputLatency =
                 port_get_min_latency( p, JackPlaybackLatency ) / globalSampleRate;
 
@@ -796,6 +951,14 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
     *hostApi = NULL;    /* Initialize to NULL */
     pthread_condattr_t cattr;
 
+    /* Try loading JACK library. A missing library only makes this API unavailable, see jack_client_open() below. */
+    if( !PaJack_LoadLibrary() )
+        return paNoError;
+
+#ifdef PA_JACK_DYNAMIC
+    PaJack_ConstructErrorCallback();
+#endif
+
     UNLESS( jackHostApi = (PaJackHostApiRepresentation*)
         PaUtil_AllocateZeroInitializedMemory( sizeof(PaJackHostApiRepresentation) ), paInsufficientMemory );
     UNLESS( jackHostApi->deviceInfoMemory = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
@@ -814,7 +977,7 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
      * automatically which we do not want.
      */
 
-    jackHostApi->jack_client = jack_client_open( clientName_, JackNoStartServer, &jackStatus );
+    jackHostApi->jack_client = libjack_client_open( clientName_, JackNoStartServer, &jackStatus );
     if( !jackHostApi->jack_client )
     {
         /* the V19 development docs say that if an implementation
@@ -862,26 +1025,26 @@ PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi,
     jackHostApi->processQueue = NULL;
     jackHostApi->jackIsDown = 0;
 
-    jack_on_shutdown( jackHostApi->jack_client, JackOnShutdown, jackHostApi );
-    jack_set_error_function( JackErrorCallback );
-    jackHostApi->jack_buffer_size = jack_get_buffer_size ( jackHostApi->jack_client );
+    libjack_on_shutdown( jackHostApi->jack_client, JackOnShutdown, jackHostApi );
+    libjack_set_error_function( JackErrorCallback );
+    jackHostApi->jack_buffer_size = libjack_get_buffer_size ( jackHostApi->jack_client );
     /* Don't check for error, may not be supported (deprecated in at least jackdmp) */
-    jack_set_sample_rate_callback( jackHostApi->jack_client, JackSrCb, jackHostApi );
-    UNLESS( !jack_set_xrun_callback( jackHostApi->jack_client, JackXRunCb, jackHostApi ), paUnanticipatedHostError );
-    UNLESS( !jack_set_process_callback( jackHostApi->jack_client, JackCallback, jackHostApi ), paUnanticipatedHostError );
-    UNLESS( !jack_activate( jackHostApi->jack_client ), paUnanticipatedHostError );
+    libjack_set_sample_rate_callback( jackHostApi->jack_client, JackSrCb, jackHostApi );
+    UNLESS( !libjack_set_xrun_callback( jackHostApi->jack_client, JackXRunCb, jackHostApi ), paUnanticipatedHostError );
+    UNLESS( !libjack_set_process_callback( jackHostApi->jack_client, JackCallback, jackHostApi ), paUnanticipatedHostError );
+    UNLESS( !libjack_activate( jackHostApi->jack_client ), paUnanticipatedHostError );
     activated = 1;
 
     return result;
 
 error:
     if( activated )
-        ASSERT_CALL( jack_deactivate( jackHostApi->jack_client ), 0 );
+        ASSERT_CALL( libjack_deactivate( jackHostApi->jack_client ), 0 );
 
     if( jackHostApi )
     {
         if( jackHostApi->jack_client )
-            ASSERT_CALL( jack_client_close( jackHostApi->jack_client ), 0 );
+            ASSERT_CALL( libjack_client_close( jackHostApi->jack_client ), 0 );
 
         if( jackHostApi->deviceInfoMemory )
         {
@@ -891,6 +1054,8 @@ error:
 
         PaUtil_FreeMemory( jackHostApi );
     }
+
+    PaJack_CloseLibrary();
     return result;
 }
 
@@ -901,12 +1066,12 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     /* note: this automatically disconnects all ports, since a deactivated
      * client is not allowed to have any ports connected */
-    ASSERT_CALL( jack_deactivate( jackHostApi->jack_client ), 0 );
+    ASSERT_CALL( libjack_deactivate( jackHostApi->jack_client ), 0 );
 
     ASSERT_CALL( pthread_mutex_destroy( &jackHostApi->mtx ), 0 );
     ASSERT_CALL( pthread_cond_destroy( &jackHostApi->cond ), 0 );
 
-    ASSERT_CALL( jack_client_close( jackHostApi->jack_client ), 0 );
+    ASSERT_CALL( libjack_client_close( jackHostApi->jack_client ), 0 );
 
     if( jackHostApi->deviceInfoMemory )
     {
@@ -918,6 +1083,9 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     free( jackErr_ );
     jackErr_ = NULL;
+
+    /* Close JACK library. */
+    PaJack_CloseLibrary();
 }
 
 static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
@@ -999,7 +1167,7 @@ static PaError IsFormatSupported( struct PaUtilHostApiRepresentation *hostApi,
     /* check that the device supports sampleRate */
 
 #define ABS(x) ( (x) > 0 ? (x) : -(x) )
-    if( ABS(sampleRate - jack_get_sample_rate(((PaJackHostApiRepresentation *) hostApi)->jack_client )) > 1 )
+    if( ABS(sampleRate - libjack_get_sample_rate(((PaJackHostApiRepresentation *) hostApi)->jack_client )) > 1 )
         return paInvalidSampleRate;
 #undef ABS
 
@@ -1063,12 +1231,12 @@ static void CleanUpStream( PaJackStream *stream, int terminateStreamRepresentati
     for( int i = 0; i < stream->num_incoming_connections; ++i )
     {
         if( stream->local_input_ports[i] )
-            ASSERT_CALL( jack_port_unregister( stream->jack_client, stream->local_input_ports[i] ), 0 );
+            ASSERT_CALL( libjack_port_unregister( stream->jack_client, stream->local_input_ports[i] ), 0 );
     }
     for( int i = 0; i < stream->num_outgoing_connections; ++i )
     {
         if( stream->local_output_ports[i] )
-            ASSERT_CALL( jack_port_unregister( stream->jack_client, stream->local_output_ports[i] ), 0 );
+            ASSERT_CALL( libjack_port_unregister( stream->jack_client, stream->local_output_ports[i] ), 0 );
     }
 
     if( terminateStreamRepresentation )
@@ -1167,17 +1335,17 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     PaError result = paNoError;
     PaJackHostApiRepresentation *jackHostApi = (PaJackHostApiRepresentation*)hostApi;
     PaJackStream *stream = NULL;
-    char *port_string = PaUtil_GroupAllocateZeroInitializedMemory( jackHostApi->deviceInfoMemory, jack_port_name_size() );
+    char *port_string = PaUtil_GroupAllocateZeroInitializedMemory( jackHostApi->deviceInfoMemory, libjack_port_name_size() );
     // In the worst case every character would be escaped which would double the string length.
     // Add 1 for null terminator
-    size_t regex_escaped_client_name_size = jack_client_name_size() * 2 + 1;
+    size_t regex_escaped_client_name_size = libjack_client_name_size() * 2 + 1;
     unsigned long regex_size = regex_escaped_client_name_size + strlen(port_regex_suffix);
     char *regex_pattern = PaUtil_GroupAllocateZeroInitializedMemory( jackHostApi->deviceInfoMemory, regex_size );
     const char **jack_ports = NULL;
     /* int jack_max_buffer_size = jack_get_buffer_size( jackHostApi->jack_client ); */
     int i;
     int inputChannelCount, outputChannelCount;
-    const double jackSr = jack_get_sample_rate( jackHostApi->jack_client );
+    const double jackSr = libjack_get_sample_rate( jackHostApi->jack_client );
     PaSampleFormat inputSampleFormat = 0, outputSampleFormat = 0;
     int bpInitialized = 0, srInitialized = 0;   /* Initialized buffer processor and stream representation? */
     unsigned long ofs;
@@ -1271,7 +1439,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             latency = outputParameters->suggestedLatency;
 
         /* the latency the user asked for indicates the minimum buffer size in frames */
-        minimum_buffer_frames = (int) (latency * jack_get_sample_rate( jackHostApi->jack_client ));
+        minimum_buffer_frames = (int) (latency * libjack_get_sample_rate( jackHostApi->jack_client ));
 
         /* we also need to be able to store at least three full jack buffers to avoid dropouts */
         if( jackHostApi->jack_buffer_size * 3 > minimum_buffer_frames )
@@ -1304,8 +1472,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     ofs = jackHostApi->inputBase;
     for( i = 0; i < inputChannelCount; i++ )
     {
-        snprintf( port_string, jack_port_name_size(), "in_%lu", ofs + i );
-        UNLESS( stream->local_input_ports[i] = jack_port_register(
+        snprintf( port_string, libjack_port_name_size(), "in_%lu", ofs + i );
+        UNLESS( stream->local_input_ports[i] = libjack_port_register(
               jackHostApi->jack_client, port_string,
               JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0 ), paInsufficientMemory );
     }
@@ -1314,8 +1482,8 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
     ofs = jackHostApi->outputBase;
     for( i = 0; i < outputChannelCount; i++ )
     {
-        snprintf( port_string, jack_port_name_size(), "out_%lu", ofs + i );
-        UNLESS( stream->local_output_ports[i] = jack_port_register(
+        snprintf( port_string, libjack_port_name_size(), "out_%lu", ofs + i );
+        UNLESS( stream->local_output_ports[i] = libjack_port_register(
              jackHostApi->jack_client, port_string,
              JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0 ), paInsufficientMemory );
     }
@@ -1334,11 +1502,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                  hostApi->deviceInfos[ inputParameters->device ]->name,
                  regex_escaped_client_name_size );
         strncat( regex_pattern, port_regex_suffix, regex_size );
-        UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
+        UNLESS( jack_ports = libjack_get_ports( jackHostApi->jack_client, regex_pattern,
                                      JACK_PORT_TYPE_FILTER, JackPortIsOutput ), paUnanticipatedHostError );
         for( i = 0; i < inputChannelCount && jack_ports[i]; i++ )
         {
-            if( (stream->remote_output_ports[i] = jack_port_by_name(
+            if( (stream->remote_output_ports[i] = libjack_port_by_name(
                  jackHostApi->jack_client, jack_ports[i] )) == NULL )
             {
                 err = 1;
@@ -1361,11 +1529,11 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                  hostApi->deviceInfos[ outputParameters->device ]->name,
                  regex_escaped_client_name_size );
         strncat( regex_pattern, port_regex_suffix, regex_size );
-        UNLESS( jack_ports = jack_get_ports( jackHostApi->jack_client, regex_pattern,
+        UNLESS( jack_ports = libjack_get_ports( jackHostApi->jack_client, regex_pattern,
                                      JACK_PORT_TYPE_FILTER, JackPortIsInput ), paUnanticipatedHostError );
         for( i = 0; i < outputChannelCount && jack_ports[i]; i++ )
         {
-            if( (stream->remote_input_ports[i] = jack_port_by_name(
+            if( (stream->remote_input_ports[i] = libjack_port_by_name(
                  jackHostApi->jack_client, jack_ports[i] )) == 0 )
             {
                 err = 1;
@@ -1406,7 +1574,7 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
             + PaUtil_GetBufferProcessorOutputLatencyFrames( &stream->bufferProcessor )) / sampleRate;
 
     stream->streamRepresentation.streamInfo.sampleRate = jackSr;
-    stream->t0 = jack_frame_time( jackHostApi->jack_client );   /* A: Time should run from Pa_OpenStream */
+    stream->t0 = libjack_frame_time( jackHostApi->jack_client );   /* A: Time should run from Pa_OpenStream */
 
     /* Add to queue of opened streams */
     ENSURE_PA( AddStream( stream ) );
@@ -1467,7 +1635,7 @@ static PaError RealProcess( PaJackStream *stream, jack_nframes_t frames )
     PaStreamCallbackTimeInfo timeInfo = {0,0,0};
     int chn;
     int framesProcessed;
-    const double sr = jack_get_sample_rate( stream->jack_client );    /* Shouldn't change during the process callback */
+    const double sr = libjack_get_sample_rate( stream->jack_client );    /* Shouldn't change during the process callback */
     PaStreamCallbackFlags cbFlags = 0;
 
     /* If the user has returned !paContinue from the callback we'll want to flush the internal buffers,
@@ -1483,7 +1651,7 @@ static PaError RealProcess( PaJackStream *stream, jack_nframes_t frames )
         goto end;
     }
 
-    timeInfo.currentTime = (jack_frame_time( stream->jack_client ) - stream->t0) / sr;
+    timeInfo.currentTime = (libjack_frame_time( stream->jack_client ) - stream->t0) / sr;
     if( stream->num_incoming_connections > 0 )
         timeInfo.inputBufferAdcTime = timeInfo.currentTime -
             port_get_min_latency( stream->remote_output_ports[0], JackCaptureLatency ) / sr;
@@ -1510,7 +1678,7 @@ static PaError RealProcess( PaJackStream *stream, jack_nframes_t frames )
     for( chn = 0; chn < stream->num_incoming_connections; chn++ )
     {
         jack_default_audio_sample_t *channel_buf = (jack_default_audio_sample_t*)
-            jack_port_get_buffer( stream->local_input_ports[chn],
+            libjack_port_get_buffer( stream->local_input_ports[chn],
                     frames );
 
         PaUtil_SetNonInterleavedInputChannel( &stream->bufferProcessor,
@@ -1521,7 +1689,7 @@ static PaError RealProcess( PaJackStream *stream, jack_nframes_t frames )
     for( chn = 0; chn < stream->num_outgoing_connections; chn++ )
     {
         jack_default_audio_sample_t *channel_buf = (jack_default_audio_sample_t*)
-            jack_port_get_buffer( stream->local_output_ports[chn],
+            libjack_port_get_buffer( stream->local_output_ports[chn],
                     frames );
 
         PaUtil_SetNonInterleavedOutputChannel( &stream->bufferProcessor,
@@ -1545,7 +1713,7 @@ static PaError UpdateQueue( PaJackHostApiRepresentation *hostApi )
 {
     PaError result = paNoError;
     int queueModified = 0;
-    const double jackSr = jack_get_sample_rate( hostApi->jack_client );
+    const double jackSr = libjack_get_sample_rate( hostApi->jack_client );
     int err;
 
     if( (err = pthread_mutex_trylock( &hostApi->mtx )) != 0 )
@@ -1678,7 +1846,7 @@ static int JackCallback( jack_nframes_t frames, void *userData )
             PA_DEBUG(( "Silencing the output\n" ));
             for( int i = 0; i < stream->num_outgoing_connections; ++i )
             {
-                jack_default_audio_sample_t *buffer = jack_port_get_buffer( stream->local_output_ports[i], frames );
+                jack_default_audio_sample_t *buffer = libjack_port_get_buffer( stream->local_output_ports[i], frames );
                 memset( buffer, 0, sizeof (jack_default_audio_sample_t) * frames );
             }
 
@@ -1724,8 +1892,8 @@ static PaError StartStream( PaStream *s )
     {
         for( int i = 0; i < stream->num_incoming_connections; i++ )
         {
-            int r = jack_connect( stream->jack_client, jack_port_name( stream->remote_output_ports[i] ),
-                    jack_port_name( stream->local_input_ports[i] ) );
+            int r = libjack_connect( stream->jack_client, libjack_port_name( stream->remote_output_ports[i] ),
+                    libjack_port_name( stream->local_input_ports[i] ) );
             UNLESS( 0 == r || EEXIST == r, paUnanticipatedHostError );
         }
     }
@@ -1734,8 +1902,8 @@ static PaError StartStream( PaStream *s )
     {
         for( int i = 0; i < stream->num_outgoing_connections; i++ )
         {
-            int r = jack_connect( stream->jack_client, jack_port_name( stream->local_output_ports[i] ),
-                    jack_port_name( stream->remote_input_ports[i] ) );
+            int r = libjack_connect( stream->jack_client, libjack_port_name( stream->local_output_ports[i] ),
+                    libjack_port_name( stream->remote_input_ports[i] ) );
             UNLESS( 0 == r || EEXIST == r, paUnanticipatedHostError );
         }
     }
@@ -1802,17 +1970,17 @@ error:
     {
         for( int i = 0; i < stream->num_incoming_connections; i++ )
         {
-            if( jack_port_connected( stream->local_input_ports[i] ) )
+            if( libjack_port_connected( stream->local_input_ports[i] ) )
             {
-                UNLESS( !jack_port_disconnect( stream->jack_client, stream->local_input_ports[i] ),
+                UNLESS( !libjack_port_disconnect( stream->jack_client, stream->local_input_ports[i] ),
                         paUnanticipatedHostError );
             }
         }
         for( int i = 0; i < stream->num_outgoing_connections; i++ )
         {
-            if( jack_port_connected( stream->local_output_ports[i] ) )
+            if( libjack_port_connected( stream->local_output_ports[i] ) )
             {
-                UNLESS( !jack_port_disconnect( stream->jack_client, stream->local_output_ports[i] ),
+                UNLESS( !libjack_port_disconnect( stream->jack_client, stream->local_output_ports[i] ),
                         paUnanticipatedHostError );
             }
         }
@@ -1852,7 +2020,7 @@ static PaTime GetStreamTime( PaStream *s )
     PaJackStream *stream = (PaJackStream*)s;
 
     /* A: Is this relevant?? --> TODO: what if we're recording-only? */
-    return (jack_frame_time( stream->jack_client ) - stream->t0) / (PaTime)jack_get_sample_rate( stream->jack_client );
+    return (libjack_frame_time( stream->jack_client ) - stream->t0) / (PaTime)libjack_get_sample_rate( stream->jack_client );
 }
 
 
@@ -1864,7 +2032,11 @@ static double GetStreamCpuLoad( PaStream* s )
 
 PaError PaJack_SetClientName( const char* name )
 {
+#ifdef PA_JACK_DYNAMIC
+    if( g_JackLib != NULL && strlen( name ) > libjack_client_name_size() ) /* Before loading, jack_client_open() rejects a too long name. */
+#else
     if( strlen( name ) > jack_client_name_size() )
+#endif
     {
         /* OK, I don't know any better error code */
         return paInvalidFlag;
@@ -1879,7 +2051,7 @@ PaError PaJack_GetClientName(const char** clientName)
     PaJackHostApiRepresentation* jackHostApi = NULL;
     PaJackHostApiRepresentation** ref = &jackHostApi;
     ENSURE_PA( PaUtil_GetHostApiRepresentation( (PaUtilHostApiRepresentation**)ref, paJACK ) );
-    *clientName = jack_get_client_name( jackHostApi->jack_client );
+    *clientName = libjack_get_client_name( jackHostApi->jack_client );
 
 error:
     return result;
