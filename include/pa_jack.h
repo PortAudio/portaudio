@@ -70,6 +70,13 @@ PaError PaJack_SetClientName( const char* name );
  */
 PaError PaJack_GetClientName(const char** clientName);
 
+/** Set the path and name of JACK library file if PortAudio is configured to load it dynamically (see
+ *  PA_JACK_DYNAMIC). This setting will overwrite the default name set by PA_JACK_PATHNAME define.
+ * @param pathName Full path with filename. Only filename can be used, but dlopen() will lookup default
+ *                 searchable directories (/usr/lib;/usr/local/lib) then.
+ */
+void PaJack_SetLibraryPathName( const char *pathName );
+
 #ifdef __cplusplus
 }
 #endif
