@@ -58,12 +58,21 @@
 #include <math.h>
 #include <pthread.h>
 #include <semaphore.h>
-#ifdef PA_JACK_DYNAMIC
-    #include <dlfcn.h> /* For dlXXX functions */
-#endif
 
 #include <jack/types.h>
 #include <jack/jack.h>
+
+#ifdef PA_JACK_DYNAMIC
+#ifdef _WIN32
+    #include <windows.h> /* After JACK headers, since MinGW requires winsock2.h before windows.h. */
+    #define dlopen( name, flags )   ((void *)LoadLibraryA( name ))
+    #define dlsym( lib, name )      ((void *)GetProcAddress( (HMODULE)(lib), name ))
+    #define dlclose( lib )          FreeLibrary( (HMODULE)(lib) )
+    #define dlerror()               "" /* Win32 reports errors through GetLastError(). */
+#else
+    #include <dlfcn.h> /* For dlXXX functions */
+#endif
+#endif
 
 #include "pa_util.h"
 #include "pa_pthread_util.h"
@@ -78,7 +87,7 @@
 #include "pa_jack.h"
 
 /* Defines JACK function types and pointers to these functions. */
-#define _PA_DEFINE_FUNC(x)  typedef typeof(x) x##_ft; static x##_ft *lib##x = 0
+#define _PA_DEFINE_FUNC(x)  typedef __typeof__(x) x##_ft; static x##_ft *lib##x = 0
 
 _PA_DEFINE_FUNC(jack_client_open);
 _PA_DEFINE_FUNC(jack_client_close);
@@ -113,7 +122,13 @@ _PA_DEFINE_FUNC(jack_port_get_latency_range);
 
 /* Redefine 'PA_JACK_PATHNAME' to a different JACK library name if desired. */
 #ifndef PA_JACK_PATHNAME
+#if defined(_WIN64)
+    #define PA_JACK_PATHNAME "libjack64.dll"
+#elif defined(_WIN32)
+    #define PA_JACK_PATHNAME "libjack.dll"
+#else
     #define PA_JACK_PATHNAME "libjack.so.0"
+#endif
 #endif
 static const char *g_JackLibName = PA_JACK_PATHNAME;
 
@@ -173,7 +188,7 @@ static int PaJack_LoadLibrary()
 
     PA_DEBUG(( "%s: loading JACK library file - %s\n", __FUNCTION__, g_JackLibName ));
 
-    dlerror();
+    (void)dlerror();
     g_JackLib = dlopen(g_JackLibName, (RTLD_NOW|RTLD_GLOBAL) );
     if (g_JackLib == NULL)
     {
