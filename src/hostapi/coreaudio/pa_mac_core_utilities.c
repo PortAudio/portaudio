@@ -60,6 +60,7 @@
 #include "pa_mac_core_internal.h"
 #include <libkern/OSAtomic.h>
 #include <strings.h>
+#include <string.h>
 #include <pthread.h>
 #include <sys/time.h>
 
@@ -321,7 +322,8 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
 
     char str[20];
     // see if it appears to be a 4-char-code
-    *(UInt32 *)(str + 1) = CFSwapInt32HostToBig(error);
+    UInt32 bigEndianError = CFSwapInt32HostToBig(error);
+    memcpy(str + 1, &bigEndianError, sizeof(bigEndianError));
     if (isprint(str[1]) && isprint(str[2]) && isprint(str[3]) && isprint(str[4]))
     {
         str[0] = str[5] = '\'';
