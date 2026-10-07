@@ -358,6 +358,54 @@ static PaError OpenAndSetupOneAudioUnit( const PaMacCoreStream *stream,
     PaUtil_SetLastHostErrorInfo( paCoreAudio, errorCode, errorText )
 
 /*
+ * Fire the user's stream finished callback, at most once per StartStream.
+ * May be called concurrently from FinishStoppingStream and from the
+ * startStopQueue handler; the atomic exchange makes sure only one fires.
+ */
+static void fireStreamFinishedOnce( PaMacCoreStream *stream )
+{
+    if( OSAtomicCompareAndSwap32Barrier( 1, 0, &stream->streamFinishedArmed ) )
+    {
+        PaStreamFinishedCallback *sfc = stream->streamRepresentation.streamFinishedCallback;
+        if( sfc )
+            sfc( stream->streamRepresentation.userData );
+    }
+}
+
+/*
+ * Runs on stream->startStopQueue in response to startStopCallback. Unlike in
+ * the listener itself, it is safe to call AudioUnitGetProperty here: nothing
+ * on this queue holds CoreAudio locks, so at worst the query blocks until a
+ * concurrent start/stop completes. Detects the two ways the units can stop
+ * without Pa_StopStream/Pa_AbortStream driving it: the user callback
+ * requested a stop (CALLBACK_STOPPED), or the device stopped spontaneously
+ * while ACTIVE (unplugged, etc.).
+ */
+static void handleStartStopNotification( void *inRefCon )
+{
+    PaMacCoreStream *stream = (PaMacCoreStream *) inRefCon;
+    if( stream->state == ACTIVE || stream->state == CALLBACK_STOPPED )
+    {
+        /* This may be a start or a stop notification (they coalesce in the
+           dispatch source); query the unit to find out. Mirror
+           FinishStoppingStream's choice of unit and element. */
+        AudioUnit unit = stream->outputUnit ? stream->outputUnit : stream->inputUnit;
+        AudioUnitElement element = stream->outputUnit ? 0 : 1;
+        UInt32 isRunning = 1;
+        UInt32 size = sizeof( isRunning );
+        OSStatus err = AudioUnitGetProperty( unit, kAudioOutputUnitProperty_IsRunning,
+                                             kAudioUnitScope_Global, element, &isRunning, &size );
+        /* on error, do nothing rather than misreport a stop */
+        if( !err && !isRunning )
+            fireStreamFinishedOnce( stream );
+        /* As before, a spontaneous stop leaves state ACTIVE: the user must
+           still call Pa_StopStream. */
+    }
+    /* STOPPING/STOPPED: FinishStoppingStream owns completion and fires the
+       stream finished callback itself. */
+}
+
+/*
  * Callback called when starting or stopping a stream.
  */
 static void startStopCallback(
@@ -368,23 +416,23 @@ static void startStopCallback(
     AudioUnitElement     inElement )
 {
     PaMacCoreStream *stream = (PaMacCoreStream *) inRefCon;
-    UInt32 isRunning;
-    UInt32 size = sizeof( isRunning );
-    OSStatus err;
-    err = AudioUnitGetProperty( ci, kAudioOutputUnitProperty_IsRunning, inScope, inElement, &isRunning, &size );
-    assert( !err );
-    if( err )
-        isRunning = false; //it's very unclear what to do in case of error here. There's no real way to notify the user, and crashing seems unreasonable.
-    if( isRunning )
-        return; //We are only interested in when we are stopping
-    // -- if we are using 2 I/O units, we only need one notification!
-    if( stream->inputUnit && stream->outputUnit && stream->inputUnit != stream->outputUnit && ci == stream->inputUnit )
-        return;
-    PaStreamFinishedCallback *sfc = stream->streamRepresentation.streamFinishedCallback;
-    if( stream->state == STOPPING )
-        stream->state = STOPPED ;
-    if( sfc )
-        sfc( stream->streamRepresentation.userData );
+    /* CoreAudio can deliver this notification synchronously from a context
+       that holds framework-internal locks: on the HAL IO thread with the HAL
+       IOContext mutex held, while a concurrent Pa_StopStream holds the
+       AudioUnit instance mutex inside AudioOutputUnitStop waiting for that
+       same IOContext mutex. Calling AudioUnitGetProperty here therefore
+       AB-BA deadlocks against Pa_StopStream, and calling the user's
+       streamFinishedCallback from here would expose user code to the same
+       locked context. So do no work here: poke the dispatch source (a
+       lock-free, allocation-free signal, safe on the IO thread) and let its
+       handler decide from a safe context. StopStream/AbortStream set
+       STOPPING before stopping the units and detect completion themselves,
+       so they need nothing from this notification. */
+    if( stream->state == ACTIVE || stream->state == CALLBACK_STOPPED )
+    {
+        if( stream->startStopSource )
+            dispatch_source_merge_data( stream->startStopSource, 1 );
+    }
 }
 
 
@@ -1856,6 +1904,21 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
 
     PaUtil_InitializeCpuLoadMeasurer( &stream->cpuLoadMeasurer, sampleRate );
 
+    /* Deferred handling of IsRunning notifications; see startStopCallback.
+       Created before the audio units so the source exists by the time the
+       property listener is registered. */
+    stream->startStopQueue = dispatch_queue_create( "PortAudio.CoreAudio.startStop", DISPATCH_QUEUE_SERIAL );
+    if( stream->startStopQueue )
+        stream->startStopSource = dispatch_source_create( DISPATCH_SOURCE_TYPE_DATA_OR, 0, 0,
+                                                          stream->startStopQueue );
+    if( !stream->startStopSource )
+    {
+        result = paInsufficientMemory;
+        goto error;
+    }
+    dispatch_set_context( stream->startStopSource, stream );
+    dispatch_source_set_event_handler_f( stream->startStopSource, handleStartStopNotification );
+    dispatch_resume( stream->startStopSource );
 
     if( inputParameters )
     {
@@ -2656,6 +2719,9 @@ stop_stream:
     return noErr;
 }
 
+/* dispatch_sync_f target used to drain startStopQueue; see CloseStream. */
+static void startStopQueueDrained( void *ctx ) { (void) ctx; }
+
 /*
     When CloseStream() is called, the multi-api layer ensures that
     the stream has already been stopped or aborted.
@@ -2671,6 +2737,22 @@ static PaError CloseStream( PaStream* s )
     VDBUG( ( "Closing stream.\n" ) );
 
     if( stream ) {
+
+        if( stream->startStopSource )
+        {
+            /* No new handler invocations after the cancel; the synchronous
+               no-op then waits behind any in-flight invocation, so after it
+               returns nothing can touch the units or the stream anymore. */
+            dispatch_source_cancel( stream->startStopSource );
+            dispatch_sync_f( stream->startStopQueue, NULL, startStopQueueDrained );
+            dispatch_release( stream->startStopSource );
+            stream->startStopSource = NULL;
+        }
+        if( stream->startStopQueue )
+        {
+            dispatch_release( stream->startStopQueue );
+            stream->startStopQueue = NULL;
+        }
 
         if( stream->outputUnit )
         {
@@ -2764,6 +2846,10 @@ static PaError StartStream( PaStream *s )
         ERR_WRAP( AudioOutputUnitStart(stream->outputUnit) );
     }
 
+    /* Armed only after a fully successful start, so a failed start can't
+       fire the finished callback. */
+    stream->streamFinishedArmed = 1;
+
     return paNoError;
 #undef ERR_WRAP
 }
@@ -2828,6 +2914,13 @@ static PaError FinishStoppingStream( PaMacCoreStream *stream )
 
     stream->xrunFlags = 0;
     stream->state = STOPPED;
+
+    /* The units are confirmed stopped, so fire the stream finished callback
+       from here (a plain non-CoreAudio context, like other host APIs do)
+       instead of from the IsRunning property listener. If a spontaneous or
+       callback-requested stop already fired it since the last StartStream,
+       this is a no-op. */
+    fireStreamFinishedOnce( stream );
 
     paErr = resetBlioRingBuffers( &stream->blio );
     if( paErr )
