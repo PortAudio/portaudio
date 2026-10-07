@@ -99,6 +99,7 @@ TESTS = \
 	bin/patest_buffer \
 	bin/patest_callbackstop \
 	bin/patest_clip \
+        bin/patest_close_on_finish \
 	bin/patest_dither \
 	bin/patest_hang \
 	bin/patest_in_overflow \
