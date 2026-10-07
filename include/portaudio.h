@@ -966,6 +966,9 @@ PaError Pa_CloseStream( PaStream *stream );
  the stream finished callback will not be called until all generated sample data
  has been played.
 
+ Use this callback to inform your application that the stream is finished.
+ For example, by posting a notification to your UI event loop.
+
  @param userData The userData parameter supplied to Pa_OpenStream()
 
  @note It is not permissible to call PortAudio API functions from within the
