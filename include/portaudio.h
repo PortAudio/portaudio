@@ -968,6 +968,9 @@ PaError Pa_CloseStream( PaStream *stream );
 
  @param userData The userData parameter supplied to Pa_OpenStream()
 
+ @note It is not permissible to call PortAudio API functions from within the
+ stream finished callback.
+
  @see Pa_SetStreamFinishedCallback
 */
 typedef void PaStreamFinishedCallback( void *userData );
