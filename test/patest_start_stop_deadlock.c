@@ -1,4 +1,5 @@
-/** @file pa_start_stop_deadlock.c
+/** @file patest_start_stop_deadlock.c
+    @ingroup test_src
     @brief Reproduce a CoreAudio AB-BA deadlock between Pa_StopStream and the
     kAudioOutputUnitProperty_IsRunning property listener (startStopCallback).
 
@@ -36,6 +37,8 @@
                 2 = deadlock detected (main loop stalled >10s)
     Set PA_DEADLOCK_PARK=1 to leave the wedged process running for debugger
     attach / sample instead of exiting.
+
+    @author Rob Sussman <rob@cycling74.com>
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,6 +156,10 @@ int main(int argc, char** argv)
 
     printf("pid %d: hammering open/start/stop/close cycles, %s (%ld iterations max)...\n",
            (int)getpid(), inputInfo ? "duplex" : "output-only", iterations);
+    printf("  input device:  %s\n", inputInfo ? inputInfo->name : "(none)");
+    printf("  output device: %s\n", Pa_GetDeviceInfo(outputParameters.device)->name);
+    printf("You are more likely to see the crash if the default input and output devices\n");
+    printf("are on the same physical device, for example a USB audio interface.\n");
     fflush(stdout);
 
     pthread_create(&wd, NULL, watchdog, NULL);
