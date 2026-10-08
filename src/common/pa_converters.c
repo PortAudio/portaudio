@@ -990,7 +990,7 @@ static void Int32_To_Int8_Dither(
     while( count-- )
     {
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaInt32)((PaUint32)PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8);
 
         /* apply dither, truncate resulting 32-bit value to 8-bit */
         *dest = (signed char) ((((*src) >> 1) + dither) >> 23);
@@ -1035,7 +1035,7 @@ static void Int32_To_UInt8_Dither(
     while( count-- )
     {
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaInt32)((PaUint32)PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8);
 
         /* apply dither, truncate resulting 32-bit value to 8-bit and convert to unsigned */
         *dest = (unsigned char) ((((src[0] >> 1) + dither) >> 23) + 128);
@@ -1062,13 +1062,13 @@ static void Int24_To_Float32(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[0]) << 8);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 24);
+        temp = (((PaUint32)src[0]) << 8);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 24);
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaInt32)src[0]) << 24);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 8);
+        temp = (((PaUint32)src[0]) << 24);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 8);
 #endif
 
         *dest = (float) ((double)temp * const_1_div_2147483648_);
@@ -1095,13 +1095,13 @@ static void Int24_To_Int32(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[0]) << 8);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 24);
+        temp = (((PaUint32)src[0]) << 8);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 24);
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaInt32)src[0]) << 24);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 8);
+        temp = (((PaUint32)src[0]) << 24);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 8);
 #endif
 
         *dest = temp;
@@ -1161,13 +1161,13 @@ static void Int24_To_Int16_Dither(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[0]) << 8);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 24);
+        temp = (((PaUint32)src[0]) << 8);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 24);
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaInt32)src[0]) << 24);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 8);
+        temp = (((PaUint32)src[0]) << 24);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 8);
 #endif
 
         /* REVIEW */
@@ -1225,17 +1225,17 @@ static void Int24_To_Int8_Dither(
     {
         /* convert 24-bit to 32-bit value */
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[0]) << 8);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 24);
+        temp = (((PaUint32)src[0]) << 8);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 24);
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaInt32)src[0]) << 24);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 8);
+        temp = (((PaUint32)src[0]) << 24);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 8);
 #endif
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaInt32)((PaUint32)PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8);
 
         /* apply dither, truncate resulting 32-bit value to 8-bit */
         *dest = (signed char) (((temp >> 1) + dither) >> 23);
@@ -1291,17 +1291,17 @@ static void Int24_To_UInt8_Dither(
     {
         /* convert 24-bit to 32-bit value */
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaInt32)src[0]) << 8);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 24);
+        temp = (((PaUint32)src[0]) << 8);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 24);
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaInt32)src[0]) << 24);
-        temp = temp | (((PaInt32)src[1]) << 16);
-        temp = temp | (((PaInt32)src[2]) << 8);
+        temp = (((PaUint32)src[0]) << 24);
+        temp = temp | (((PaUint32)src[1]) << 16);
+        temp = temp | (((PaUint32)src[2]) << 8);
 #endif
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaInt32)((PaUint32)PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8);
 
         /* apply dither, truncate resulting 32-bit value to 8-bit and convert to unsigned */
         *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
@@ -1349,7 +1349,7 @@ static void Int16_To_Int32(
             (*src << 16) | (*src & 0xFFFF)
         */
 
-        *dest = *src << 16;
+        *dest = (PaInt32)((PaUint32)*src << 16);
 
         src += sourceStride;
         dest += destinationStride;
@@ -1423,10 +1423,10 @@ static void Int16_To_Int8_Dither(
     while( count-- )
     {
         /* convert 16-bit to 32-bit value */
-        temp = ((PaInt32)src[0]) << 16;
+        temp = (PaInt32)((PaUint32)src[0] << 16);
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaInt32)((PaUint32)PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8);
 
         /* apply dither, truncate resulting 32-bit value to 8-bit */
         *dest = (signed char) (((temp >> 1) + dither) >> 23);
@@ -1471,10 +1471,10 @@ static void Int16_To_UInt8_Dither(
     while( count-- )
     {
         /* convert 16-bit to 32-bit value */
-        temp = ((PaInt32)src[0]) << 16;
+        temp = (PaInt32)((PaUint32)src[0] << 16);
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
-        dither = PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8;
+        dither = (PaInt32)((PaUint32)PaUtil_Generate16BitTriangularDither( ditherGenerator ) << 8);
 
         /* apply dither, truncate resulting 32-bit value to 8-bit and convert to unsigned */
         *dest = (unsigned char) ((((temp >> 1) + dither) >> 23) + 128);
@@ -1518,7 +1518,7 @@ static void Int8_To_Int32(
 
     while( count-- )
     {
-        (*dest) = (*src) << 24;
+        (*dest) = (PaInt32)((PaUint32)(*src) << 24);
 
         src += sourceStride;
         dest += destinationStride;
@@ -1567,7 +1567,7 @@ static void Int8_To_Int16(
 
     while( count-- )
     {
-        (*dest) = (PaInt16)((*src) << 8);
+        (*dest) = (PaInt16)((PaUint32)(*src) << 8);
 
         src += sourceStride;
         dest += destinationStride;
@@ -1628,7 +1628,7 @@ static void UInt8_To_Int32(
 
     while( count-- )
     {
-        (*dest) = (*src - 128) << 24;
+        (*dest) = (PaInt32)((PaUint32)(*src - 128) << 24);
 
         src += sourceStride;
         dest += destinationStride;
@@ -1677,7 +1677,7 @@ static void UInt8_To_Int16(
 
     while( count-- )
     {
-        (*dest) = (PaInt16)((*src - 128) << 8);
+        (*dest) = (PaInt16)((PaUint32)(*src - 128) << 8);
 
         src += sourceStride;
         dest += destinationStride;
