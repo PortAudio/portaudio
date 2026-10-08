@@ -202,8 +202,10 @@ int main(void)
         err = Pa_StopStream( stream );
         if( err != paNoError ) goto error;
 
-        if (i < (NUM_LOOPS - 1))
-        printf("Pause for 2 seconds.\n"); fflush(stdout);
+        if (i < (NUM_LOOPS - 1)) {
+            printf("Pause for 2 seconds.\n");
+            fflush(stdout);
+        }
         Pa_Sleep( 2000 );
     }
 
