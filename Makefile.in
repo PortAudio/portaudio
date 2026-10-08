@@ -97,7 +97,6 @@ SELFTESTS = \
 TESTS = \
 	bin/patest1 \
 	bin/patest_buffer \
-	bin/pa_start_stop_deadlock \
 	bin/patest_callbackstop \
 	bin/patest_clip \
 	bin/patest_dither \
@@ -120,6 +119,7 @@ TESTS = \
 	bin/patest_sine_time \
 	bin/patest_sine_srate \
 	bin/patest_start_stop \
+	bin/patest_start_stop_deadlock \
 	bin/patest_stop \
 	bin/patest_stop_playout \
 	bin/patest_toomanysines \
