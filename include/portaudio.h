@@ -292,7 +292,8 @@ typedef enum PaHostApiTypeId
     paAudioScienceHPI=14,
     paAudioIO=15,
     paPulseAudio=16,
-    paSndio=17
+    paSndio=17,
+    paScreenCaptureKit=18,
 } PaHostApiTypeId;
 
 
