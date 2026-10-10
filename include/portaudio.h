@@ -523,6 +523,7 @@ typedef struct PaDeviceInfo
     PaTime defaultHighOutputLatency;
 
     double defaultSampleRate;
+    const char* uniqueID;
 } PaDeviceInfo;
 
 
