@@ -49,6 +49,7 @@
 
 #include "pa_process.h"
 #include "pa_util.h"
+#include <stddef.h>
 
 
 #define PA_FRAMES_PER_TEMP_BUFFER_WHEN_HOST_BUFFER_SIZE_IS_UNKNOWN_    1024
@@ -782,7 +783,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                         for( i=0; i<bp->inputChannelCount; ++i )
                         {
                             bp->tempInputBufferPtrs[i] = ((unsigned char*)bp->tempInputBuffer) +
-                                i * bp->bytesPerUserInputSample * frameCount;
+                                (size_t)i * bp->bytesPerUserInputSample * frameCount;
                         }
                     }
 
@@ -868,7 +869,7 @@ static unsigned long NonAdaptingProcess( PaUtilBufferProcessor *bp,
                         for( i=0; i<bp->outputChannelCount; ++i )
                         {
                             bp->tempOutputBufferPtrs[i] = ((unsigned char*)bp->tempOutputBuffer) +
-                                i * bp->bytesPerUserOutputSample * frameCount;
+                                (size_t)i * bp->bytesPerUserOutputSample * frameCount;
                         }
                     }
 
@@ -1002,7 +1003,7 @@ static unsigned long AdaptingInputOnlyProcess( PaUtilBufferProcessor *bp,
         if( bp->userInputIsInterleaved )
         {
             destBytePtr = ((unsigned char*)bp->tempInputBuffer) +
-                    bp->bytesPerUserInputSample * bp->inputChannelCount *
+                    (size_t)bp->bytesPerUserInputSample * bp->inputChannelCount *
                     bp->framesInTempInputBuffer;
 
             destSampleStrideSamples = bp->inputChannelCount;
@@ -1022,7 +1023,7 @@ static unsigned long AdaptingInputOnlyProcess( PaUtilBufferProcessor *bp,
             for( i=0; i<bp->inputChannelCount; ++i )
             {
                 bp->tempInputBufferPtrs[i] = ((unsigned char*)bp->tempInputBuffer) +
-                    i * bp->bytesPerUserInputSample * bp->framesPerUserBuffer;
+                    (size_t)i * bp->bytesPerUserInputSample * bp->framesPerUserBuffer;
             }
 
             userInput = bp->tempInputBufferPtrs;
@@ -1145,7 +1146,7 @@ static unsigned long AdaptingOutputOnlyProcess( PaUtilBufferProcessor *bp,
             if( bp->userOutputIsInterleaved )
             {
                 srcBytePtr = ((unsigned char*)bp->tempOutputBuffer) +
-                        bp->bytesPerUserOutputSample * bp->outputChannelCount *
+                        (size_t)bp->bytesPerUserOutputSample * bp->outputChannelCount *
                         (bp->framesPerUserBuffer - bp->framesInTempOutputBuffer);
 
                 srcSampleStrideSamples = bp->outputChannelCount;
@@ -1242,7 +1243,7 @@ static void CopyTempOutputBuffersToHostOutputBuffers( PaUtilBufferProcessor *bp)
         if( bp->userOutputIsInterleaved )
         {
             srcBytePtr = ((unsigned char*)bp->tempOutputBuffer) +
-                    bp->bytesPerUserOutputSample * bp->outputChannelCount *
+                    (size_t)bp->bytesPerUserOutputSample * bp->outputChannelCount *
                     (bp->framesPerUserBuffer - bp->framesInTempOutputBuffer);
 
             srcSampleStrideSamples = bp->outputChannelCount;
@@ -1371,7 +1372,7 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
             if( bp->userInputIsInterleaved )
             {
                 destBytePtr = ((unsigned char*)bp->tempInputBuffer) +
-                        bp->bytesPerUserInputSample * bp->inputChannelCount *
+                        (size_t)bp->bytesPerUserInputSample * bp->inputChannelCount *
                         bp->framesInTempInputBuffer;
 
                 destSampleStrideSamples = bp->inputChannelCount;

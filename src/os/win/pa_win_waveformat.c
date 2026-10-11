@@ -69,7 +69,7 @@ void PaWin_InitializeWaveFormatEx( PaWinWaveFormat *waveFormat,
 {
     WAVEFORMATEX *waveFormatEx = (WAVEFORMATEX*)waveFormat;
     int bytesPerSample = Pa_GetSampleSize(sampleFormat);
-    unsigned long bytesPerFrame = numChannels * bytesPerSample;
+    unsigned long bytesPerFrame = (unsigned long)numChannels * (unsigned long)bytesPerSample;
 
     waveFormatEx->wFormatTag = waveFormatTag;
     waveFormatEx->nChannels = (WORD)numChannels;
@@ -87,7 +87,7 @@ void PaWin_InitializeWaveFormatExtensible( PaWinWaveFormat *waveFormat,
 {
     WAVEFORMATEX *waveFormatEx = (WAVEFORMATEX*)waveFormat;
     int bytesPerSample = Pa_GetSampleSize(sampleFormat);
-    unsigned long bytesPerFrame = numChannels * bytesPerSample;
+    unsigned long bytesPerFrame = (unsigned long)numChannels * (unsigned long)bytesPerSample;
     GUID guid;
 
     waveFormatEx->wFormatTag = WAVE_FORMAT_EXTENSIBLE;

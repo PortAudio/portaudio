@@ -103,6 +103,7 @@
 
 #include "pa_win_coinitialize.h"
 #include "pa_win_util.h"
+#include <stddef.h>
 
 /* This version of pa_asio.cpp is currently only targeted at Win32,
    It would require a few tweaks to work with pre-OS X Macintosh.
@@ -2577,10 +2578,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 ));
 
             /* Determine the size of ring buffer in bytes. */
-            lBytesPerFrame = inputChannelCount * Pa_GetSampleSize(inputSampleFormat );
+            lBytesPerFrame = (size_t)inputChannelCount * Pa_GetSampleSize(inputSampleFormat );
 
             /* Allocate the blocking i/o input ring buffer memory. */
-            stream->blockingState->readRingBufferData = (void*)PaUtil_AllocateZeroInitializedMemory( lBlockingBufferSize * lBytesPerFrame );
+            stream->blockingState->readRingBufferData = (void*)PaUtil_AllocateZeroInitializedMemory( (size_t)lBlockingBufferSize * lBytesPerFrame );
             if( !stream->blockingState->readRingBufferData )
             {
                 result = paInsufficientMemory;
@@ -2668,10 +2669,10 @@ static PaError OpenStream( struct PaUtilHostApiRepresentation *hostApi,
                 ));
 
             /* Determine the size of ring buffer in bytes. */
-            lBytesPerFrame = outputChannelCount * Pa_GetSampleSize(outputSampleFormat);
+            lBytesPerFrame = (size_t)outputChannelCount * Pa_GetSampleSize(outputSampleFormat);
 
             /* Allocate the blocking i/o output ring buffer memory. */
-            stream->blockingState->writeRingBufferData = (void*)PaUtil_AllocateZeroInitializedMemory( lBlockingBufferSize * lBytesPerFrame );
+            stream->blockingState->writeRingBufferData = (void*)PaUtil_AllocateZeroInitializedMemory( (size_t)lBlockingBufferSize * lBytesPerFrame );
             if( !stream->blockingState->writeRingBufferData )
             {
                 result = paInsufficientMemory;
