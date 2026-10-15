@@ -191,7 +191,6 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
     /*FIXME: still need to handle possible ComponentResult values.*/
     /*       unfortunately, they don't seem to be documented anywhere.*/
     PaError result;
-    const char *errorType;
     const char *errorText;
 
     switch (error) {
@@ -315,11 +314,7 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
         result = paUnanticipatedHostError;
     }
 
-    if (isError)
-        errorType = "Error";
-    else
-        errorType = "Warning";
-
+#ifdef MAC_CORE_DEBUG
     char str[20];
     // see if it appears to be a 4-char-code
     UInt32 bigEndianError = CFSwapInt32HostToBig(error);
@@ -333,7 +328,8 @@ PaError PaMacCore_SetError(OSStatus error, int line, int isError)
         sprintf(str, "%d", (int)error);
     }
 
-    DBUG(("%s on line %d: err='%s', msg=%s\n", errorType, line, str, errorText));
+    DBUG(("%s on line %d: err=%s, msg=%s\n", (isError ? "Error" : "Warning"), line, str, errorText));
+#endif
 
     if (result == paUnanticipatedHostError) {
         PaUtil_SetLastHostErrorInfo( paCoreAudio, error, errorText );
