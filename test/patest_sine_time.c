@@ -173,7 +173,7 @@ int main(void)
               &data );
     if( err != paNoError ) goto error;
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < NUM_LOOPS; i++) {
         secondsPerLoop = NUM_SECONDS / NUM_LOOPS;
         /* Watch until sound loop is finished. */
         printf("Play for %3.1f seconds.\n",  secondsPerLoop); fflush(stdout);
@@ -202,9 +202,11 @@ int main(void)
         err = Pa_StopStream( stream );
         if( err != paNoError ) goto error;
 
-        if (i < (NUM_LOOPS - 1))
-        printf("Pause for 2 seconds.\n"); fflush(stdout);
-        Pa_Sleep( 2000 );
+        if (i < (NUM_LOOPS - 1)) {
+            printf("Pause for 2 seconds.\n");
+            fflush(stdout);
+            Pa_Sleep( 2000 );
+        }
     }
 
     err = Pa_CloseStream( stream );
