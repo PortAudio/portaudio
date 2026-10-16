@@ -1062,13 +1062,13 @@ static void Int24_To_Float32(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaUint32)src[0]) << 8);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 24);
+        temp = (PaInt32)((((PaUint32)src[0]) << 8)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 24));
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaUint32)src[0]) << 24);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 8);
+        temp = (PaInt32)((((PaUint32)src[0]) << 24)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 8));
 #endif
 
         *dest = (float) ((double)temp * const_1_div_2147483648_);
@@ -1095,13 +1095,13 @@ static void Int24_To_Int32(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaUint32)src[0]) << 8);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 24);
+        temp = (PaInt32)((((PaUint32)src[0]) << 8)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 24));
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaUint32)src[0]) << 24);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 8);
+        temp = (PaInt32)((((PaUint32)src[0]) << 24)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 8));
 #endif
 
         *dest = temp;
@@ -1161,13 +1161,13 @@ static void Int24_To_Int16_Dither(
     {
 
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaUint32)src[0]) << 8);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 24);
+        temp = (PaInt32)((((PaUint32)src[0]) << 8)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 24));
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaUint32)src[0]) << 24);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 8);
+        temp = (PaInt32)((((PaUint32)src[0]) << 24)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 8));
 #endif
 
         /* REVIEW */
@@ -1225,13 +1225,13 @@ static void Int24_To_Int8_Dither(
     {
         /* convert 24-bit to 32-bit value */
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaUint32)src[0]) << 8);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 24);
+        temp = (PaInt32)((((PaUint32)src[0]) << 8)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 24));
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaUint32)src[0]) << 24);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 8);
+        temp = (PaInt32)((((PaUint32)src[0]) << 24)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 8));
 #endif
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
@@ -1291,13 +1291,13 @@ static void Int24_To_UInt8_Dither(
     {
         /* convert 24-bit to 32-bit value */
 #if defined(PA_LITTLE_ENDIAN)
-        temp = (((PaUint32)src[0]) << 8);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 24);
+        temp = (PaInt32)((((PaUint32)src[0]) << 8)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 24));
 #elif defined(PA_BIG_ENDIAN)
-        temp = (((PaUint32)src[0]) << 24);
-        temp = temp | (((PaUint32)src[1]) << 16);
-        temp = temp | (((PaUint32)src[2]) << 8);
+        temp = (PaInt32)((((PaUint32)src[0]) << 24)
+                         | (((PaUint32)src[1]) << 16)
+                         | (((PaUint32)src[2]) << 8));
 #endif
 
         /* increase dither scale to 24-bit value so that it would not be truncated completely when applied */
