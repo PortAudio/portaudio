@@ -3506,6 +3506,19 @@ static PaError PaAlsaStream_HandleXrun( PaAlsaStream *self )
                     PA_DEBUG(( "%s: [capture] non-MMAP-PCM failed recovering from XRUN, will restart Alsa\n", __FUNCTION__ ));
                     ++ restartAlsa; /* did not manage to recover */
                 }
+                else if( !self->pcmsSynced && !restartAlsa &&
+                         alsa_snd_pcm_state( self->capture.pcm ) == SND_PCM_STATE_PREPARED )
+                {
+                    /* Recovery prepares the PCM, but polling cannot start capture.
+                     * Linked PCMs follow playback startup; a pending full restart
+                     * will start capture through AlsaStart instead.
+                     */
+                    if( alsa_snd_pcm_start( self->capture.pcm ) < 0 )
+                    {
+                        PA_DEBUG(( "%s: [capture] recovered PCM failed to start, will restart Alsa\n", __FUNCTION__ ));
+                        ++ restartAlsa;
+                    }
+                }
             }
             else
                 ++ restartAlsa; /* always restart MMAPed device */
