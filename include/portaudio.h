@@ -640,7 +640,7 @@ PaError Pa_IsFormatSupported( const PaStreamParameters *inputParameters,
  Pa_GetStreamTime, Pa_GetStreamCpuLoad
 
 */
-typedef void PaStream;
+typedef struct PaStream PaStream;
 
 
 /** Can be passed as the framesPerBuffer parameter to Pa_OpenStream()
