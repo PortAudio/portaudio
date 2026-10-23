@@ -151,7 +151,15 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/
 find_package(JACK)
 cmake_dependent_option(PA_USE_JACK "Enable support for JACK Audio Connection Kit" ON JACK_FOUND OFF)
 if(PA_USE_JACK)
-  target_link_libraries(portaudio PRIVATE JACK::jack)
+  option(PA_JACK_DYNAMIC "Enable dynamically loading libjack with dlopen using PaJack_SetLibraryPathName" OFF)
+  if(PA_JACK_DYNAMIC)
+    target_compile_definitions(portaudio PRIVATE PA_JACK_DYNAMIC)
+    target_include_directories(portaudio PRIVATE "${JACK_INCLUDEDIR}")
+    target_link_libraries(portaudio PRIVATE Regex::regex "${CMAKE_DL_LIBS}")
+  else()
+    target_link_libraries(portaudio PRIVATE JACK::jack)
+    set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} jack")
+  endif()
   target_sources(portaudio PRIVATE
     src/hostapi/jack/pa_jack.c
     src/os/unix/pa_pthread_util.c
@@ -161,7 +169,6 @@ if(PA_USE_JACK)
   target_include_directories(portaudio PRIVATE src/os/unix) # for pa_pthread_util.h
   target_compile_definitions(portaudio PUBLIC PA_USE_JACK=1)
   set(PKGCONFIG_CFLAGS "${PKGCONFIG_CFLAGS} -DPA_USE_JACK=1")
-  set(PKGCONFIG_REQUIRES_PRIVATE "${PKGCONFIG_REQUIRES_PRIVATE} jack")
 
   # needed for PortAudioConfig.cmake so `find_package(PortAudio)` works in downstream projects
   install(FILES cmake/modules/FindRegex.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/portaudio/modules")
