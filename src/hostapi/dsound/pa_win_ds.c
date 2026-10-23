@@ -3095,8 +3095,12 @@ static PaError StopStream( PaStream *s )
         if( stream->pDirectSoundOutputBuffer != NULL )
         {
             stream->outputIsRunning = FALSE;
-            // FIXME: what happens if IDirectSoundBuffer_Stop returns an error?
             hr = IDirectSoundBuffer_Stop( stream->pDirectSoundOutputBuffer );
+            if( hr != DS_OK )
+            {
+                result = paUnanticipatedHostError;
+                PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr );
+            }
 
             if( stream->pDirectSoundPrimaryBuffer )
                 IDirectSoundBuffer_Stop( stream->pDirectSoundPrimaryBuffer ); /* FIXME we never started the primary buffer so I'm not sure we need to stop it */
@@ -3108,8 +3112,12 @@ static PaError StopStream( PaStream *s )
         // Stop the buffer capture
         if( stream->pDirectSoundInputBuffer != NULL )
         {
-            // FIXME: what happens if IDirectSoundCaptureBuffer_Stop returns an error?
             hr = IDirectSoundCaptureBuffer_Stop( stream->pDirectSoundInputBuffer );
+            if( hr != DS_OK )
+            {
+                result = paUnanticipatedHostError;
+                PA_DS_SET_LAST_DIRECTSOUND_ERROR( hr );
+            }
         }
     }
 
