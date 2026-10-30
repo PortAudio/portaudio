@@ -57,7 +57,8 @@ Pass the mode as the second argument after the ALSA PCM name:
 
 Modes -1 through 3 were checked against both revisions on Linux ARM64. Each
 successful mode repeats close/reopen three times. `state=-1` means no subsequent
-callback observed a state. It is not an ALSA state code.
+callback recorded a state. Mode 4 does not record PCM state and always reports
+`state=-1`; use ALSA diagnostics separately. It is not an ALSA state code.
 
 ## How the synthetic fixture works
 
@@ -75,8 +76,7 @@ EBUSY if an XRUN is merely reported without a real overrun. Do not use modes
 selected ALSA PCM (e.g. `hw:0,0`) and the normal ALSA configuration. Mode 4 never
 injects avail/status/start/recover faults; it only forces non-MMAP access and
 delays the fifth callback. No observed overflow means the test fails rather
-than claiming recovery was tested. The new C mode 4 has not yet been validated
-on physical input.
+than claiming recovery was tested. See the direct USB validation below.
 
 The brief mutex protects observations between the callback and main thread;
 this diagnostic intentionally delays audio and is not a real-time programming
@@ -84,3 +84,50 @@ example. Stream API calls are made on the main thread, never in the finished
 callback. Persistent start errors are expected to stop the stream. The test
 does not claim to recover USB removal, linked duplex, MMAP, lost audio, or
 long-duration recording failures.
+
+## Direct Linux USB validation
+
+Mode 4 was compared on 2026-10-30 with a MOTU UltraLite-mk5 connected directly
+by USB to an x86_64 Linux host, kernel `6.8.0-136-generic`, ALSA library 1.2.11
+and the standard USB audio driver. These tests used no VZ or virtio-snd.
+The baseline was `7c45fed9322bd86b5dd0da4547b15d9ac3b9b0ac`; the candidate was
+`178bf1b7fa0db575130f861e18fcc5c446e37e15`.
+
+The unchanged C source was tested with `plughw:CARD=UltraLitemk5,DEV=0`.
+This uses ALSA format/channel conversion for the test's mono S16 input.
+The downstream hardware may use MMAP even though PortAudio uses non-MMAP.
+
+A second comparison used `hw:CARD=UltraLitemk5,DEV=0` without that conversion.
+For this device, the test source needed exactly two substitutions before
+compiling the same variant against both libraries:
+
+```c
+input.channelCount = 20;       /* originally 1 */
+input.sampleFormat = paInt24;  /* originally paInt16 */
+```
+
+Run mode 4 with the chosen PCM name, using the normal ALSA configuration
+rather than `null.conf`. Run mode -1 before and after to check normal capture.
+The direct `hw` comparison used 48 kHz and 4096-frame application callbacks.
+`/proc/asound` confirmed `RW_INTERLEAVED`, `S24_3LE`, 20 channels, a 4096-frame
+period and an 8192-frame hardware buffer.
+
+Both paths produced the same results:
+
+| Check | Baseline | Candidate |
+| --- | --- | --- |
+| After real overrun | Stops at five callbacks, remains active | Three trials reach 100 callbacks and finish inactive |
+| Frames after delayed callback | 0 | 389120 per trial |
+| Overflow callback notification | No subsequent callback | One per trial |
+| Close | Returns within watchdog | Returns each trial |
+| Normal capture before and after | Three opens each pass | Three opens each pass |
+
+The native PCM monitor observed XRUN and a prolonged PREPARED interval during
+the baseline stall. Normal capture after closing the baseline test uses a new
+process; it is separate from automatic recovery of the failed stream.
+
+A separate local sample-inspection variant completed three additional native
+hardware overrun/close/reopen trials and confirmed nonzero 24-bit samples after
+recovery. The public reproducer itself does not inspect samples. These short
+MOTU tests do not establish other-device, unplug, suspend/resume, linked-duplex,
+MMAP recovery or long-duration coverage. Audio lost during XRUN is not restored.
