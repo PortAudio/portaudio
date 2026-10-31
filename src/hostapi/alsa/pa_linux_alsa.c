@@ -1045,10 +1045,10 @@ static PaError GropeDevice( snd_pcm_t* pcm, int isPlug, StreamDirection mode, in
         goto error;
     }
 
-    /* XXX: Limit to sensible number (ALSA plugins accept a crazy amount of channels)? */
-    if( isPlug && maxChans > 128 )
+    /* Limit plugin channels to 64 (PipeWire defines SPA_AUDIO_MAX_CHANNELS as 64) */
+    if( isPlug && maxChans > 64 )
     {
-        maxChans = 128;
+        maxChans = 64;
         PA_DEBUG(( "%s: Limiting number of plugin channels to %u\n", __FUNCTION__, maxChans ));
     }
 
