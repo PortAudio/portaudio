@@ -100,6 +100,7 @@ TESTS = \
 	bin/patest_callbackstop \
 	bin/patest_clip \
 	bin/patest_dither \
+	bin/patest_flex \
 	bin/patest_hang \
 	bin/patest_in_overflow \
 	bin/patest_latency \
