@@ -452,14 +452,15 @@ error:
 /*******************************************************************/
 static int TestSingleStreamParameters(PaQaTestParameters testParameters)
 {
-    PaStreamParameters inputParameters, outputParameters, *ipp, *opp;
+    PaStreamParameters inputParameters, outputParameters;
+    PaStreamParameters *ipp = NULL;
+    PaStreamParameters *opp = NULL;
     PaStream *stream = NULL;
     PaQaData myData;
     int numChannels = 0;
 
     if( testParameters.mode == MODE_INPUT )
     {
-        opp = NULL;
         numChannels = testParameters.numInputChannels;
         inputParameters.device       = testParameters.deviceID;
         inputParameters.channelCount = testParameters.numInputChannels;
@@ -471,7 +472,6 @@ static int TestSingleStreamParameters(PaQaTestParameters testParameters)
     }
     else if( testParameters.mode == MODE_OUTPUT )
     {
-        ipp = NULL;
         numChannels = testParameters.numOutputChannels;
         outputParameters.device       = testParameters.deviceID;
         outputParameters.channelCount = testParameters.numOutputChannels;
