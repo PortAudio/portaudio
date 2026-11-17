@@ -256,12 +256,13 @@ static PaError BoostPriority( PaUnixThread* self )
     struct sched_param spm = { 0 };
     /* Priority should only matter between contending FIFO threads? */
     spm.sched_priority = 1;
+    int err;
 
     assert( self );
 
-    if( pthread_setschedparam( self->thread, SCHED_FIFO, &spm ) != 0 )
+    if( (err = pthread_setschedparam( self->thread, SCHED_FIFO, &spm )) != 0 )
     {
-        PA_UNLESS( errno == EPERM, paInternalError );  /* Lack permission to raise priority */
+        PA_UNLESS( err == EPERM, paInternalError );  /* Lack permission to raise priority */
         PA_DEBUG(( "Failed bumping priority\n" ));
         result = 0;
     }
