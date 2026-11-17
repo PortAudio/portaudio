@@ -14,6 +14,13 @@ This module provides an `ASIO::host` IMPORT library target for building host
 applications which use ASIO drivers. If you want to build an ASIO driver, this
 module may serve as a useful start but you will need to modify it.
 
+As of ASIO-SDK_2.3.4_2025-10-15, the ASIO SDK file host/pc/asiolist.cpp contains
+a bug. This cmake file detects the bug and patches the bug if it is detected.
+Alternatively, you can supply an SDK with the bug already patched, or supply an
+SDK with a file host/pc/patched_asiolist.cpp which, if present, will be used in
+preference to host/pc/asiolist.cpp. All of these options work without additional
+configuration.
+
 #]=======================================================================]
 
 if(NOT WIN32)
@@ -61,18 +68,54 @@ if(ASIO_ROOT)
   message(STATUS "Found ASIO SDK: ${ASIO_ROOT}")
 
   if(ASIO_FOUND AND NOT TARGET ASIO::host)
-    #patch asiolist.cpp
-    if(NOT EXISTS "${ASIO_ROOT}/host/pc/patched_asiolist.cpp")
-      file(READ "${ASIO_ROOT}/host/pc/asiolist.cpp" FILE_CONTENTS)
-      string(REPLACE "delete lpdrv" "delete[] lpdrv" FILE_CONTENTS "${FILE_CONTENTS}")
-      file(WRITE "${ASIO_ROOT}/host/pc/patched_asiolist.cpp" "${FILE_CONTENTS}")
-      message(STATUS "Done patching asiolist.cpp into patched_asiolist.cpp")
-    endif()
     add_library(ASIO::host INTERFACE IMPORTED)
+
+    # Work around ASIO SDK pc/asiolist.cpp bug where `lpdrv` is allocated using array new:
+    #   lpdrv = new ASIODRVSTRUCT[1];
+    # but deleted using scalar delete:
+    #   delete lpdrv; // BUG! should be `delete [] lpdrv;`
+    #
+    set(ORIGINAL_ASIOLIST "${ASIO_ROOT}/host/pc/asiolist.cpp")
+    set(SOURCE_PATCHED_ASIOLIST "${ASIO_ROOT}/host/pc/patched_asiolist.cpp")
+    if(EXISTS "${SOURCE_PATCHED_ASIOLIST}")
+      message(STATUS "ASIO: pc/asiolist.cpp: using pre-patched source: ${SOURCE_PATCHED_ASIOLIST}")
+      set(GOOD_ASIOLIST "${SOURCE_PATCHED_ASIOLIST}")
+    else()
+      # add a configure dependency so that editing asiolist.cpp or swapping the SDK triggers a reconfigure
+      set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${ORIGINAL_ASIOLIST}")
+      file(READ "${ORIGINAL_ASIOLIST}" ASIOLIST_CONTENTS)
+      # match: `lpdrv = new ASIODRVSTRUCT[1]` i.e. only apply delete[] patch if new[] was used
+      # assumes all allocation sites consistently allocate using the same new form
+      set(ALLOC_LPDRV_NEW_ARRAY_REGEX "lpdrv[ \t]*=[ \t]*new[ \t]+[a-zA-Z_][a-zA-Z0-9_]*[ \t]*\\[[0-9]+\\]")
+      if(NOT ASIOLIST_CONTENTS MATCHES "${ALLOC_LPDRV_NEW_ARRAY_REGEX}")
+        message(STATUS "ASIO: pc/asiolist.cpp does not use array allocation for lpdrv - skipping patch.")
+        set(GOOD_ASIOLIST "${ORIGINAL_ASIOLIST}")
+      else()
+        # patch asiolist.cpp. this has no effect if asiolist.cpp already contains the fix
+        # use configure_file to keep timestamp stable across reconfigures
+        set(PATCHED_ASIOLIST_IN "${CMAKE_CURRENT_BINARY_DIR}/patched_asiolist.cpp.in")
+        set(PATCHED_ASIOLIST "${CMAKE_CURRENT_BINARY_DIR}/patched_asiolist.cpp")
+
+        string(REGEX REPLACE "delete[ \t]+lpdrv[ \t]*;" "delete [] lpdrv;" PATCHED_ASIOLIST_CONTENTS "${ASIOLIST_CONTENTS}")
+        file(WRITE "${PATCHED_ASIOLIST_IN}" "${PATCHED_ASIOLIST_CONTENTS}")
+        configure_file("${PATCHED_ASIOLIST_IN}" "${PATCHED_ASIOLIST}" COPYONLY)
+        if(PATCHED_ASIOLIST_CONTENTS STREQUAL ASIOLIST_CONTENTS)
+          message(STATUS "ASIO: pc/asiolist.cpp: no scalar delete found - already fixed or unrecognised.")
+        else()
+          message(STATUS "ASIO: pc/asiolist.cpp: patched scalar delete -> delete [] in: ${PATCHED_ASIOLIST}")
+        endif()
+        unset(PATCHED_ASIOLIST_CONTENTS)
+
+        set(GOOD_ASIOLIST "${PATCHED_ASIOLIST}")
+      endif()
+      unset(ASIOLIST_CONTENTS)
+    endif()
+    # ^^^ end pc/asiolist.cpp bug workaround.
+
     target_sources(ASIO::host INTERFACE
       "${ASIO_ROOT}/common/asio.cpp"
       "${ASIO_ROOT}/host/asiodrivers.cpp"
-      "${ASIO_ROOT}/host/pc/patched_asiolist.cpp"
+      "${GOOD_ASIOLIST}"
     )
     target_include_directories(ASIO::host INTERFACE
       "${ASIO_ROOT}/common"
