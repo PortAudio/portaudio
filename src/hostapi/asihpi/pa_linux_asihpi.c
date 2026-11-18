@@ -1322,9 +1322,6 @@ static void PaAsiHpi_StreamComponentDump( PaAsiHpiStreamComponent *streamComp,
     case paUtilUnknownHostBufferSize:
         PA_DEBUG(( "[unknown] " ));
         break;
-    case paUtilVariableHostBufferSizePartialUsageAllowed:
-        PA_DEBUG(( "[variable] " ));
-        break;
     }
     PA_DEBUG(( "(%d max)\n", streamComp->tempBufferSize / streamComp->bytesPerFrame ));
     /* HPI hardware settings */

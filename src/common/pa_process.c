@@ -1287,18 +1287,15 @@ static void CopyTempOutputBuffersToHostOutputBuffers( PaUtilBufferProcessor *bp)
     data from the temporary output buffer into the host output buffers, then
     from the host input buffers into the temporary input buffers. Calling the
     streamCallback when necessary.
-    When processPartialUserBuffers is 0, all available input data will be
-    consumed and all available output space will be filled. When
-    processPartialUserBuffers is non-zero, as many full user buffers
-    as possible will be processed, but partial buffers will not be consumed.
+    All available input data will be consumed and all available output space
+    will be filled.
 */
 static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
-        int *streamCallbackResult, int processPartialUserBuffers )
+        int *streamCallbackResult )
 {
     void *userInput, *userOutput;
     unsigned long framesProcessed = 0;
     unsigned long framesAvailable;
-    unsigned long endProcessingMinFrameCount;
     unsigned long maxFramesToCopy;
     PaUtilChannelDescriptor *hostInputChannels, *hostOutputChannels;
     unsigned int frameCount;
@@ -1310,15 +1307,10 @@ static unsigned long AdaptingProcess( PaUtilBufferProcessor *bp,
 
     framesAvailable = bp->hostInputFrameCount[0] + bp->hostInputFrameCount[1];/* this is assumed to be the same as the output buffer's frame count */
 
-    if( processPartialUserBuffers )
-        endProcessingMinFrameCount = 0;
-    else
-        endProcessingMinFrameCount = (bp->framesPerUserBuffer - 1);
-
     /* Fill host output with remaining frames in user output (tempOutputBuffer) */
     CopyTempOutputBuffersToHostOutputBuffers( bp );
 
-    while( framesAvailable > endProcessingMinFrameCount )
+    while( framesAvailable >= bp->framesPerUserBuffer )
     {
 
         if( bp->framesInTempOutputBuffer == 0 && *streamCallbackResult != paContinue )
@@ -1612,16 +1604,7 @@ unsigned long PaUtil_EndBufferProcessing( PaUtilBufferProcessor* bp, int *stream
         {
             /* full duplex */
 
-            if( bp->hostBufferSizeMode == paUtilVariableHostBufferSizePartialUsageAllowed  )
-            {
-                framesProcessed = AdaptingProcess( bp, streamCallbackResult,
-                        0 /* dont process partial user buffers */ );
-            }
-            else
-            {
-                framesProcessed = AdaptingProcess( bp, streamCallbackResult,
-                        1 /* process partial user buffers */ );
-            }
+            framesProcessed = AdaptingProcess( bp, streamCallbackResult );
         }
         else if( bp->inputChannelCount != 0 )
         {
