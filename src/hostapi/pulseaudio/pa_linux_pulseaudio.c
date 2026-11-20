@@ -608,10 +608,7 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     {
         PA_DEBUG( ("Portaudio %s: Can't connect to server",
                    __FUNCTION__) );
-        PA_PULSEAUDIO_SET_LAST_HOST_ERROR( ret,
-                                           "PulseAudio_Initialize: Can't connect to server");
-        result = paUnanticipatedHostError;
-        goto error;
+        goto unavailable;
     }
 
     ret = 0;
@@ -625,7 +622,9 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
 
         if( result > PA_OK )
         {
-            goto error;
+            PA_DEBUG( ("Portaudio %s: Connection to server failed",
+                       __FUNCTION__) );
+            goto unavailable;
         }
 
         if( result == PA_OK )
@@ -785,6 +784,14 @@ PaError PaPulseAudio_Initialize( PaUtilHostApiRepresentation ** hostApi,
     PaPulseAudio_UnLock( pulseaudioHostApi->mainloop );
     lockTaken = 0;
     return result;
+
+    unavailable:
+    /* No usable PulseAudio server: don't fail Pa_Initialize() for every
+     * host API, just don't provide this one (like the other host APIs do
+     * when their backend is missing). */
+    *hostApi = NULL;
+    result = paNoError;
+    /* fall through to clean up */
 
     error:
 
