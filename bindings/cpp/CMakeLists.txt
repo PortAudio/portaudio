@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 cmake_policy(VERSION 3.13)
 
+if(PA_BUILD_SHARED_LIBS)
+  set(LIBRARY_BUILD_TYPE SHARED)
+else()
+  set(LIBRARY_BUILD_TYPE STATIC)
+endif()
+
 project(PortAudioCpp VERSION 19.8 LANGUAGES CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
@@ -65,7 +71,7 @@ endif()
 # portaudiocpp-targets
 # ##############################################################################
 
-add_library(portaudiocpp ${portaudiocpp-sources})
+add_library(portaudiocpp ${LIBRARY_BUILD_TYPE} ${portaudiocpp-sources})
 add_library(PortAudio::portaudiocpp ALIAS portaudiocpp) # For subdirectory build
 
 find_package(PortAudio MODULE REQUIRED)
