@@ -251,6 +251,13 @@ static const char *g_AlsaLibName = PA_ALSA_PATHNAME;
 /* Handle to dynamically loaded library. */
 static void *g_AlsaLib = NULL;
 
+/* detect whether ALSA is available*/
+#ifdef PA_ALSA_DYNAMIC
+    #define PA_ALSA_LIBRARY_IS_LOADED (g_AlsaLib != NULL)
+#else
+    #define PA_ALSA_LIBRARY_IS_LOADED (1)
+#endif
+
 /* Suppress Alsa's default stderr logging unless PA_ENABLE_DEBUG_OUTPUT is defined. */
 #ifdef PA_ENABLE_DEBUG_OUTPUT
 
@@ -862,54 +869,74 @@ PaError PaAlsa_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex
     PaError result = paNoError;
     PaAlsaHostApiRepresentation *alsaHostApi = NULL;
 
-    /* Try loading Alsa library. */
-    if (!PaAlsa_LoadLibrary())
-        return paNoError;
-
     PA_UNLESS( alsaHostApi = (PaAlsaHostApiRepresentation*) PaUtil_AllocateZeroInitializedMemory(
                 sizeof(PaAlsaHostApiRepresentation) ), paInsufficientMemory );
     PA_UNLESS( alsaHostApi->allocations = PaUtil_CreateAllocationGroup(), paInsufficientMemory );
     alsaHostApi->hostApiIndex = hostApiIndex;
-    alsaHostApi->alsaLibVersion = PaAlsaVersionNum();
+    alsaHostApi->alsaLibVersion = 0;
 
     *hostApi = (PaUtilHostApiRepresentation*)alsaHostApi;
     (*hostApi)->info.structVersion = 1;
     (*hostApi)->info.type = paALSA;
     (*hostApi)->info.name = "ALSA";
 
+    (*hostApi)->info.deviceCount = 0;
+    (*hostApi)->info.defaultInputDevice = paNoDevice;
+    (*hostApi)->info.defaultOutputDevice = paNoDevice;
+
+    /* Try loading Alsa library. Detect success using PA_ALSA_LIBRARY_IS_LOADED */
+    PaAlsa_LoadLibrary();
+
+    if (PA_ALSA_LIBRARY_IS_LOADED) {
+        PaAlsa_InstallSilentLogHandler();
+
+        alsaHostApi->alsaLibVersion = PaAlsaVersionNum();
+
+        PA_ENSURE( BuildDeviceList( alsaHostApi ) );
+
+        PA_ENSURE( PaUnixThreading_Initialize() );
+    }
+
+    /* Install standard functions even if ALSA is unavailable.
+       If there are no valid device indices pa_front.c will never call into
+       any of these functions except Terminate */
+
     (*hostApi)->Terminate = Terminate;
     (*hostApi)->OpenStream = OpenStream;
     (*hostApi)->IsFormatSupported = IsFormatSupported;
 
-    PaAlsa_InstallSilentLogHandler();
-
-    PA_ENSURE( BuildDeviceList( alsaHostApi ) );
-
     PaUtil_InitializeStreamInterface( &alsaHostApi->callbackStreamInterface,
-                                      CloseStream, StartStream,
-                                      StopStream, AbortStream,
-                                      IsStreamStopped, IsStreamActive,
-                                      GetStreamTime, GetStreamCpuLoad,
-                                      PaUtil_DummyRead, PaUtil_DummyWrite,
-                                      PaUtil_DummyGetReadAvailable,
-                                      PaUtil_DummyGetWriteAvailable );
+                                    CloseStream, StartStream,
+                                    StopStream, AbortStream,
+                                    IsStreamStopped, IsStreamActive,
+                                    GetStreamTime, GetStreamCpuLoad,
+                                    PaUtil_DummyRead, PaUtil_DummyWrite,
+                                    PaUtil_DummyGetReadAvailable,
+                                    PaUtil_DummyGetWriteAvailable );
 
     PaUtil_InitializeStreamInterface( &alsaHostApi->blockingStreamInterface,
-                                      CloseStream, StartStream,
-                                      StopStream, AbortStream,
-                                      IsStreamStopped, IsStreamActive,
-                                      GetStreamTime, PaUtil_DummyGetCpuLoad,
-                                      ReadStream, WriteStream,
-                                      GetStreamReadAvailable,
-                                      GetStreamWriteAvailable );
-
-    PA_ENSURE( PaUnixThreading_Initialize() );
+                                    CloseStream, StartStream,
+                                    StopStream, AbortStream,
+                                    IsStreamStopped, IsStreamActive,
+                                    GetStreamTime, PaUtil_DummyGetCpuLoad,
+                                    ReadStream, WriteStream,
+                                    GetStreamReadAvailable,
+                                    GetStreamWriteAvailable );
 
     return result;
 
 error:
     if( alsaHostApi )
     {
+        if( PA_ALSA_LIBRARY_IS_LOADED )
+        {
+            alsa_snd_config_update_free_global();
+
+            PaAlsa_UninstallSilentLogHandler();
+
+            PaAlsa_CloseLibrary();
+        }
+
         if( alsaHostApi->allocations )
         {
             PaUtil_FreeAllAllocations( alsaHostApi->allocations );
@@ -928,7 +955,14 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
 
     assert( hostApi );
 
-    PaAlsa_UninstallSilentLogHandler();
+    if( PA_ALSA_LIBRARY_IS_LOADED )
+    {
+        alsa_snd_config_update_free_global();
+
+        PaAlsa_UninstallSilentLogHandler();
+
+        PaAlsa_CloseLibrary();
+    }
 
     if( alsaHostApi->allocations )
     {
@@ -937,10 +971,6 @@ static void Terminate( struct PaUtilHostApiRepresentation *hostApi )
     }
 
     PaUtil_FreeMemory( alsaHostApi );
-    alsa_snd_config_update_free_global();
-
-    /* Close Alsa library. */
-    PaAlsa_CloseLibrary();
 }
 
 /** Determine max channels and default latencies.
